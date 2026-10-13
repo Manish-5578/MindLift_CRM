@@ -109,7 +109,15 @@ builder.Services.AddHealthChecks()
 
 // Hangfire: one storage object per application, handed to the job client and the worker explicitly.
 // Hangfire's global storage is shared by every application in the process, so several hosts (the tests run many) would send jobs to one another's database.
-var hangfireStorage = new PostgreSqlStorage(connectionString, new PostgreSqlStorageOptions { QueuePollInterval = TimeSpan.FromSeconds(1) });
+var hangfireStorage = new PostgreSqlStorage(connectionString, new PostgreSqlStorageOptions
+{
+    QueuePollInterval = TimeSpan.FromSeconds(1),
+    TransactionSynchronisationTimeout = TimeSpan.FromSeconds(5),
+    InvisibilityTimeout = TimeSpan.FromMinutes(5),
+    UseSlidingInvisibilityTimeout = true,
+    PrepareSchemaIfNecessary = true,
+    EnableTransactionScopeEnlistment = true
+});
 GlobalConfiguration.Configuration
     .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
     .UseSimpleAssemblyNameTypeSerializer()
@@ -118,12 +126,13 @@ GlobalConfiguration.Configuration
 builder.Services.AddHangfire(config => config.UseStorage(hangfireStorage));
 builder.Services.AddSingleton<JobStorage>(hangfireStorage);
 builder.Services.AddSingleton<IBackgroundJobClient>(_ => new BackgroundJobClient(hangfireStorage));
-builder.Services.AddSingleton<IHostedService>(_ => new MindLift.Api.Hosting.HangfireServerHost(hangfireStorage, new BackgroundJobServerOptions
+builder.Services.AddSingleton<IHostedService>(sp => new MindLift.Api.Hosting.HangfireServerHost(hangfireStorage, new BackgroundJobServerOptions
 {
     Queues = ["default", "messaging", "reports", "imports", "ocr"],
 
     // Hangfire's own default (5 per CPU, up to 20) stays for real runs. Tests lower it so many hosts do not exhaust the database.
     WorkerCount = builder.Configuration.GetValue<int?>("Hangfire:WorkerCount") ?? Math.Min(Environment.ProcessorCount * 5, 20),
+    Activator = sp.GetRequiredService<JobActivator>()
 }));
 builder.Services.AddCors(options => options.AddPolicy("dev", policy =>
     policy.SetIsOriginAllowed(origin => new Uri(origin).Host is "localhost" or "127.0.0.1")
