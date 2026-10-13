@@ -189,8 +189,11 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
     app.MapScalarApiReference();
 
-    // Development only. In production the dashboard is limited to platform admins.
-    app.UseHangfireDashboard("/hangfire", new DashboardOptions { Authorization = [] });
+    // Off unless Hangfire:DashboardEnabled is set. When on, only requests from this machine are answered.
+    if (app.Configuration.GetValue<bool>("Hangfire:DashboardEnabled"))
+    {
+        app.UseHangfireDashboard("/hangfire", new DashboardOptions { Authorization = [new MindLift.Api.Hosting.LocalOnlyDashboardFilter()] });
+    }
 
     // Development only. After a rebuild the browser must not reuse an old Blazor boot file, or the app shows a blank page.
     app.Use(async (context, next) =>
