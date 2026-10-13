@@ -1,0 +1,64 @@
+name: MindLift CRM CI
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: mindlift_test
+          POSTGRES_USER: mindlift
+          POSTGRES_PASSWORD: mindlift_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET 10 SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Cache NuGet Packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/Directory.Packages.props', '**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+
+    - name: Install System Dependencies (Tesseract OCR)
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y tesseract-ocr tesseract-ocr-eng tesseract-ocr-ara
+
+    - name: Restore Dependencies
+      run: dotnet restore MindLift.slnx
+
+    - name: Build Solution
+      run: dotnet build MindLift.slnx --configuration Release --no-restore
+
+    - name: Run Unit Tests
+      run: dotnet test tests/MindLift.UnitTests/MindLift.UnitTests.csproj --configuration Release --no-build --logger "trx;LogFileName=unit-results.trx"
+
+    - name: Run UI Tests
+      run: dotnet test tests/MindLift.UITests/MindLift.UITests.csproj --configuration Release --no-build --logger "trx;LogFileName=ui-results.trx"
+
+    - name: Run Integration Tests
+      run: dotnet test tests/MindLift.IntegrationTests/MindLift.IntegrationTests.csproj --configuration Release --no-build --logger "trx;LogFileName=integration-results.trx"

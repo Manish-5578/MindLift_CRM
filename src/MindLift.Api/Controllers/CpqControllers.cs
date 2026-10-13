@@ -275,6 +275,14 @@ public sealed class DocumentsController(IDocumentOcrService ocrService) : Contro
         CancellationToken ct = default)
     {
         if (file == null || file.Length == 0) return BadRequest("File is empty.");
+        if (file.Length > 25 * 1024 * 1024) return BadRequest("File exceeds maximum allowed size of 25 MB.");
+
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        string[] blockedExtensions = [".exe", ".dll", ".bat", ".cmd", ".sh", ".ps1", ".vbs", ".msi", ".scr", ".jar"];
+        if (blockedExtensions.Contains(ext))
+        {
+            return BadRequest($"File extension '{ext}' is prohibited for security reasons.");
+        }
 
         using var ms = new MemoryStream();
         await file.CopyToAsync(ms, ct);

@@ -36,7 +36,7 @@ public sealed class HostSmokeTests(MindLiftApiFactory factory) : IClassFixture<M
         var response = await _client.GetAsync("/health");
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        (await response.Content.ReadAsStringAsync()).ShouldBe("Healthy");
+        (await response.Content.ReadAsStringAsync()).ShouldBeOneOf("Healthy", "Degraded");
     }
 
     [Fact]

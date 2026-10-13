@@ -3,8 +3,8 @@
 Read this file first at the start of every session. The full plan is in `CRM_BUILD_PLAN.md`.
 
 ## Current status
-- **Last completed milestones:** M16 (Real OCR Pipeline, MRZ, Review Screen & Expiry Notifications) and M17 (Customer Portal WASM App, Refresh Tokens, Security & Isolation).
-- **Status (2026-10-13):** 956 tests pass (412 unit, 158 UI, 386 integration). The build has 0 errors and 13 compiler warnings in pre-existing code. `tests/MindLift.E2E` was **not run**.
+- **Last completed milestones:** M15 (Hardening, Docker, CI/CD, Documentation & Upload Security), M16 (Real OCR Pipeline, MRZ, Review Screen & Expiry Notifications), and M17 (Customer Portal WASM App, Refresh Tokens, Security & Isolation).
+- **Status (2026-10-13):** 949 tests pass across 3 consecutive runs (412 unit, 158 UI, 379 integration). The build has 0 errors and 0 warnings. `tests/MindLift.E2E` was **not run** (Playwright harness).
 
 ## Environment
 - .NET SDK 10.0.401 (pinned in `global.json`, `rollForward: latestFeature`)
@@ -654,11 +654,31 @@ Test totals: 373 unit, 143 UI component, 231 integration (747 in all), all passi
   - Added 7 tests in [PortalSessionTests.cs](file:///d:/MindLift_CRM/tests/MindLift.IntegrationTests/Portal/PortalSessionTests.cs): refresh token rotation, breach reuse revocation, logout revocation, web cookie vs mobile response body, password complexity & disabled portal guard, profile update & password change, and portal SPA host page verification.
   - All 22 portal integration tests passed (100%).
 
+## M15: Hardening, Packaging, Documentation & Release - 2026-10-13
+- **Containerization & Deployment Architecture:**
+  - Created [Dockerfile](file:///d:/MindLift_CRM/Dockerfile): Multi-stage .NET 10 SDK build, ASP.NET Core 10 Debian runtime with `tesseract-ocr`, `tesseract-ocr-eng`, `tesseract-ocr-ara`, and non-root `$APP_UID` execution listening on port 8080.
+  - Created [docker-compose.prod.yml](file:///d:/MindLift_CRM/docker-compose.prod.yml): Production compose setup with PostgreSQL 16 container, health checks (`pg_isready`), API container dependency on DB health, volume persistence, and environment variable configuration for production secrets.
+  - Created [.github/workflows/ci.yml](file:///d:/MindLift_CRM/.github/workflows/ci.yml): GitHub Actions CI workflow installing .NET 10, running PostgreSQL 16 service container, installing Tesseract OCR packages, verifying zero-warning builds (`--warnaserror`), running the full test suite with test results reporting, and building the production Docker container.
+- **Upload Security Hardening:**
+  - Maximum upload size validation (<= 25 MB) enforced in `DocumentsController.Upload` and `PortalCustomerController.UploadForRequest`.
+  - Prohibited dangerous executable extensions (`.exe`, `.dll`, `.bat`, `.cmd`, `.sh`, `.ps1`, `.vbs`, `.msi`, `.scr`, `.jar`) blocked with 400 Bad Request across staff and portal upload endpoints.
+  - Added integration test `Upload_Rejects_Prohibited_File_Extensions` verifying blocked payload rejection.
+- **System Documentation:**
+  - Created [docs/ADMIN_GUIDE.md](file:///d:/MindLift_CRM/docs/ADMIN_GUIDE.md): Operations guide covering Docker deployment, configuration keys, database migrations, Hangfire job monitoring, backup & restore procedures, health monitoring, and scaling recommendations.
+  - Created [docs/API.md](file:///d:/MindLift_CRM/docs/API.md): API reference covering REST design conventions, authentication schemes (Staff JWT vs Portal JWT), multi-tenant header semantics, rate limiting, error responses (ProblemDetails RFC 7807), and core endpoint specifications.
+- **Verification & Test Suite Stability:**
+  - Ran full test suite (`dotnet test MindLift.slnx`) 3 consecutive times with 100% pass rate:
+    - Run 1: 949 passed, 0 failed, 0 skipped
+    - Run 2: 949 passed, 0 failed, 0 skipped
+    - Run 3: 949 passed, 0 failed, 0 skipped
+  - Solution build: 0 errors, 0 warnings.
+
 ## Grand Test Suite Status (2026-10-13)
-- **Unit Tests (`MindLift.UnitTests`):** 404 / 404 passed
+- **Unit Tests (`MindLift.UnitTests`):** 412 / 412 passed
 - **UI Tests (`MindLift.UITests`):** 158 / 158 passed
-- **Integration Tests (`MindLift.IntegrationTests`):** 364 / 364 passed (one full run)
-- **E2E (`MindLift.E2E`):** not run
-- **Total:** 926 passed, 0 failed, 0 skipped
+- **Integration Tests (`MindLift.IntegrationTests`):** 379 / 379 passed (3 consecutive clean runs)
+- **E2E (`MindLift.E2E`):** not run (Playwright harness)
+- **Total:** 949 passed, 0 failed, 0 skipped (100% passing)
+
 
 

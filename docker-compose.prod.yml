@@ -1,0 +1,59 @@
+name: mindlift-prod
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: mindlift-prod-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mindlift}
+      POSTGRES_USER: ${POSTGRES_USER:-mindlift}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Database password required}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mindlift} -d ${POSTGRES_DB:-mindlift}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mindlift-network
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mindlift-prod-api
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-mindlift};Username=${POSTGRES_USER:-mindlift};Password=${POSTGRES_PASSWORD:?Database password required}"
+      Database__MigrateOnStartup: "true"
+      Jwt__SigningKey: "${JWT_SIGNING_KEY:?JWT signing key required}"
+      Jwt__Issuer: "${JWT_ISSUER:-https://app.mindlift.io}"
+      Jwt__Audience: "${JWT_AUDIENCE:-mindlift-api}"
+      PortalJwt__SigningKey: "${PORTAL_JWT_SIGNING_KEY:?Portal JWT signing key required}"
+      PortalJwt__Issuer: "${PORTAL_JWT_ISSUER:-https://app.mindlift.io}"
+      PortalJwt__Audience: "${PORTAL_JWT_AUDIENCE:-mindlift-portal}"
+      Ocr__TesseractPath: "/usr/bin/tesseract"
+      Ocr__Languages: "eng+ara"
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - mindlift-network
+
+networks:
+  mindlift-network:
+    driver: bridge
+
+volumes:
+  postgres-data:

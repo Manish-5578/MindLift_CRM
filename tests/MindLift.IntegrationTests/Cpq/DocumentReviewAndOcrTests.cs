@@ -59,6 +59,7 @@ public sealed class DocumentReviewAndOcrTests(MindLiftApiFactory factory) : ICla
 
         ocr.DocumentType.ShouldBe("Passport");
         ocr.DetectedInvoiceNumber.ShouldBe("987654321");
+        ocr.DetectedVendor.ShouldNotBeNull();
         ocr.DetectedVendor.ShouldContain("SMITH JOHN ARTHUR");
 
         var updatedDoc = await admin.Client.GetFromJsonAsync<BusinessDocumentDto>($"/api/v1/documents/{doc.Id}");
@@ -128,7 +129,8 @@ public sealed class DocumentReviewAndOcrTests(MindLiftApiFactory factory) : ICla
 
         // Verify account updated
         var updatedAccount = await admin.Client.GetFromJsonAsync<AccountDto>($"/api/v1/accounts/{account.Id}");
-        updatedAccount!.Description.ShouldContain("[License: CN-9901]");
+        updatedAccount!.Description.ShouldNotBeNull();
+        updatedAccount.Description.ShouldContain("[License: CN-9901]");
     }
 
     [Fact]
@@ -228,4 +230,17 @@ public sealed class DocumentReviewAndOcrTests(MindLiftApiFactory factory) : ICla
         var deniedReview = await noDocsUser.Client.PostAsJsonAsync($"/api/v1/documents/{docA.Id}/review", new ReviewDocumentRequest("Approve"));
         deniedReview.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
+
+    [Fact]
+    public async Task Upload_Rejects_Prohibited_File_Extensions()
+    {
+        var admin = await Workspaces.SignupAsync(factory);
+
+        var badForm = CreateFileContent("malicious payload", "malware.exe");
+        var res = await admin.Client.PostAsync("/api/v1/documents/upload", badForm);
+        res.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        var body = await res.Content.ReadAsStringAsync();
+        body.ShouldContain("prohibited for security reasons");
+    }
 }
+
