@@ -39,7 +39,8 @@ public sealed class DocumentReviewAndOcrTests(MindLiftApiFactory factory) : ICla
     {
         var admin = await Workspaces.SignupAsync(factory);
         var garbage = new MultipartFormDataContent();
-        var bytes = new ByteArrayContent(new byte[] { 0x00, 0x13, 0x37, 0xFF, 0x01, 0x02, 0x03 });
+        // A valid PDF header followed by unreadable content: it passes the upload check and fails at OCR.
+        var bytes = new ByteArrayContent("%PDF-1.4\n"u8.ToArray().Concat(new byte[] { 0x00, 0x13, 0x37, 0xFF, 0x01, 0x02, 0x03 }).ToArray());
         bytes.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
         garbage.Add(bytes, "file", "broken-scan.pdf");
         var uploadRes = await admin.Client.PostAsync("/api/v1/documents/upload", garbage);

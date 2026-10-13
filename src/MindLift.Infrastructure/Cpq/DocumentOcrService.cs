@@ -60,6 +60,12 @@ public sealed class DocumentOcrService(
         bool sharedWithPortal = false,
         CancellationToken ct = default)
     {
+        // A renamed file (for example an executable called scan.png) must not be stored as the type it claims to be.
+        if (!MindLift.Infrastructure.Files.FileService.SignatureMatches(Path.GetExtension(fileName), fileBytes))
+        {
+            throw new ValidationException("File", "The file content does not match its type.");
+        }
+
         var storageKey = $"docs/{CurrentTenantId}/{Guid.NewGuid():N}_{Path.GetFileName(fileName)}";
         using var stream = new MemoryStream(fileBytes);
         await fileStorage.SaveAsync(storageKey, stream, ct);

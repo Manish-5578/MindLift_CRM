@@ -174,6 +174,29 @@ public sealed class DocumentTypeTests(MindLiftApiFactory factory) : IClassFixtur
         (await stranger.Client.PostAsync($"/api/v1/settings/document-types/{type.Id}/test", FileForm([1, 2, 3], "x.txt", "text/plain"))).StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
+    [Fact]
+    public async Task A_renamed_executable_is_refused_as_a_document()
+    {
+        var admin = await Workspaces.SignupAsync(factory);
+        var executable = new byte[] { 0x4D, 0x5A, 0x90, 0x00, 0x03, 0x00 };
+
+        var response = await admin.Client.PostAsync("/api/v1/documents/upload", FileForm(executable, "scan.png", "image/png"));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Responses_carry_the_baseline_security_headers()
+    {
+        var admin = await Workspaces.SignupAsync(factory);
+
+        var response = await admin.Client.GetAsync("/api/v1/users?pageSize=1");
+
+        response.Headers.GetValues("X-Content-Type-Options").ShouldBe(["nosniff"]);
+        response.Headers.GetValues("X-Frame-Options").ShouldBe(["DENY"]);
+        response.Headers.GetValues("Referrer-Policy").ShouldBe(["strict-origin-when-cross-origin"]);
+    }
+
     private static string FindRepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

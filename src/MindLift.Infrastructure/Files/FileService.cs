@@ -215,6 +215,12 @@ public sealed class FileService(AppDbContext db, IFileStorage storage, ITenantCo
                 return bytes.Length >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF;
             case ".webp":
                 return bytes.Length >= 12 && bytes[..4].SequenceEqual("RIFF"u8) && bytes[8..12].SequenceEqual("WEBP"u8);
+            case ".bmp":
+                return bytes.Length >= 2 && bytes[0] == 0x42 && bytes[1] == 0x4D;
+            case ".tif":
+            case ".tiff":
+                // Little-endian "II*\0" or big-endian "MM\0*".
+                return bytes.Length >= 4 && (bytes[..4].SequenceEqual("II*\0"u8) || bytes[..4].SequenceEqual("MM\0*"u8));
             case ".docx":
             case ".xlsx":
                 return bytes.Length >= 4 && bytes[0] == 0x50 && bytes[1] == 0x4B;

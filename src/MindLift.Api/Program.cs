@@ -173,6 +173,16 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 app.UseSerilogRequestLogging();
 app.UseExceptionHandler();
 
+// Baseline browser protections for every response. Framing is refused and MIME sniffing is off.
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    context.Response.Headers["X-Frame-Options"] = "DENY";
+    context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    context.Response.Headers["Content-Security-Policy"] = "frame-ancestors 'none'";
+    await next();
+});
+
 if (app.Environment.IsDevelopment())
 {
     app.UseCors("dev");
