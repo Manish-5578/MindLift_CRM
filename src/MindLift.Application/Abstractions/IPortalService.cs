@@ -20,7 +20,10 @@ public interface IPortalService
     // Staff Management
     Task<PortalSettingsDto> GetSettingsAsync(CancellationToken ct = default);
     Task<PortalSettingsDto> SaveSettingsAsync(SavePortalSettingsRequest req, CancellationToken ct = default);
-    Task<string> InviteContactAsync(InvitePortalUserRequest req, CancellationToken ct = default);
+    Task InviteContactAsync(InvitePortalUserRequest req, CancellationToken ct = default);
+    Task<PortalAccessStatusDto> GetContactAccessAsync(Guid contactId, CancellationToken ct = default);
     Task<IReadOnlyList<PortalDocumentRequestDto>> GetDocumentRequestsForRecordAsync(Guid? contactId, Guid? accountId, Guid? dealId, CancellationToken ct = default);
     Task<PortalDocumentRequestDto> CreateDocumentRequestAsync(SaveDocumentRequest req, CancellationToken ct = default);
+    Task<PortalDocumentRequestDto> UpdateDocumentRequestStatusAsync(Guid id, string status, CancellationToken ct = default);
+    Task SetDocumentSharingAsync(Guid documentId, bool shared, CancellationToken ct = default);
 }

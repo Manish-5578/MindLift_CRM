@@ -332,7 +332,7 @@ public sealed class BusinessDocumentDto
     public Guid? AssociatedQuoteId { get; set; }
     public Guid? AssociatedInvoiceId { get; set; }
     public Guid? AssociatedContactId { get; set; }
-    public bool SharedWithPortal { get; set; } = true;
+    public bool SharedWithPortal { get; set; }
     public string Status { get; set; } = "Ready"; // Queued, Processing, NeedsReview, Ready, Rejected
     public DateOnly? ExpiryDate { get; set; }
     public DateOnly? IssueDate { get; set; }

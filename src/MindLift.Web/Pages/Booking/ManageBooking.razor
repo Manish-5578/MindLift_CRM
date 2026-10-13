@@ -20,7 +20,7 @@
             <MudText Typo="Typo.h4">@_booking.PageName</MudText>
             <MudText Typo="Typo.body1" data-testid="manage-when">@_booking.CompanyName · @_booking.StartUtc.ToString("dddd d MMMM yyyy, HH:mm", CultureInfo.InvariantCulture) UTC</MudText>
             <MudText Typo="Typo.body2" Class="ml-muted">@_booking.DurationMinutes minutes · @_booking.LocationType@(string.IsNullOrWhiteSpace(_booking.LocationValue) ? "" : ": " + _booking.LocationValue)</MudText>
-            <MudChip T="string" Size="Size.Small" Dot="true">@StatusLabel</MudChip>
+            <MudChip T="string" Size="Size.Small">@StatusLabel</MudChip>
 
             @if (_done is not null)
             {

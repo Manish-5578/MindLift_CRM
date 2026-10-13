@@ -88,6 +88,21 @@ public sealed record SaveDocumentRequest(
     DateOnly? DueDate
 );
 
+/// <summary>Staff decision on a document request: Completed (accepted) or Cancelled.</summary>
+public sealed record UpdateDocumentRequestStatusRequest(string Status);
+
+/// <summary>Portal access for one contact. Status is NotInvited, Invited, Active or Disabled.</summary>
+public sealed record PortalAccessStatusDto(
+    Guid ContactId,
+    string Status,
+    string? Email,
+    DateTime? InvitedAt,
+    DateTime? ActivatedAt,
+    DateTime? LastLoginAt
+);
+
+public sealed record SetDocumentSharingRequest(bool SharedWithPortal);
+
 public sealed record PortalKeyInfoFieldDto(
     string Label,
     string Value,

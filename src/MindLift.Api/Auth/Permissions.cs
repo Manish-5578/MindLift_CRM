@@ -38,7 +38,7 @@ public sealed class PermissionPolicyProvider(IOptions<AuthorizationOptions> opti
     private const string Prefix = "perm:";
     private readonly DefaultAuthorizationPolicyProvider _fallback = new(options);
 
-    public Task<AuthorizationPolicy?> GetDefaultPolicyAsync() => _fallback.GetDefaultPolicyAsync();
+    public Task<AuthorizationPolicy> GetDefaultPolicyAsync() => _fallback.GetDefaultPolicyAsync();
 
     public Task<AuthorizationPolicy?> GetFallbackPolicyAsync() => _fallback.GetFallbackPolicyAsync();
 

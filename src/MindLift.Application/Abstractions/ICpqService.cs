@@ -48,7 +48,7 @@ public interface IDocumentOcrService
         Guid? quoteId = null,
         Guid? invoiceId = null,
         Guid? contactId = null,
-        bool sharedWithPortal = true,
+        bool sharedWithPortal = false,
         CancellationToken ct = default);
 
     Task<OcrResultDto> ProcessOcrAsync(Guid documentId, CancellationToken ct = default);

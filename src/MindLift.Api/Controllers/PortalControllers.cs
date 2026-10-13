@@ -67,6 +67,15 @@ public sealed class PortalCustomerController(IPortalService portalService, IDocu
     private Guid GetContactId() => Guid.Parse(User.FindFirstValue("cid") ?? throw new UnauthorizedException("invalid_portal_token", "Missing contact claim."));
     private Guid? GetAccountId() => Guid.TryParse(User.FindFirstValue("aid"), out var a) ? a : null;
 
+    /// <summary>A customer may open a shared document linked to their contact, or to their account when they have one.</summary>
+    private bool OwnsDocument(BusinessDocumentDto doc)
+    {
+        if (!doc.SharedWithPortal) return false;
+        if (doc.AssociatedContactId == GetContactId()) return true;
+        var accountId = GetAccountId();
+        return accountId.HasValue && doc.AssociatedAccountId == accountId;
+    }
+
     [HttpGet("home")]
     public async Task<ActionResult<PortalHomeDto>> GetHome(CancellationToken ct = default)
     {
@@ -88,11 +97,7 @@ public sealed class PortalCustomerController(IPortalService portalService, IDocu
     public async Task<ActionResult<BusinessDocumentDto>> GetDocumentById(Guid id, CancellationToken ct = default)
     {
         var doc = await ocrService.GetDocumentByIdAsync(id, ct);
-        if (doc == null || !doc.SharedWithPortal) return NotFound();
-
-        // Ensure belongs to customer contact or account
-        if (doc.AssociatedContactId != GetContactId() && doc.AssociatedAccountId != GetAccountId())
-            return NotFound();
+        if (doc == null || !OwnsDocument(doc)) return NotFound();
 
         return Ok(doc);
     }
@@ -101,10 +106,7 @@ public sealed class PortalCustomerController(IPortalService portalService, IDocu
     public async Task<IActionResult> GetDocumentFile(Guid id, CancellationToken ct = default)
     {
         var doc = await ocrService.GetDocumentByIdAsync(id, ct);
-        if (doc == null || !doc.SharedWithPortal) return NotFound();
-
-        if (doc.AssociatedContactId != GetContactId() && doc.AssociatedAccountId != GetAccountId())
-            return NotFound();
+        if (doc == null || !OwnsDocument(doc)) return NotFound();
 
         var streamResult = await ocrService.GetDocumentStreamAsync(id, ct);
         if (streamResult == null) return NotFound();
@@ -168,12 +170,31 @@ public sealed class PortalStaffController(IPortalService portalService) : Contro
         return Ok(settings);
     }
 
+    [HttpGet("contacts/{id:guid}/portal")]
+    [HasPermission(AppModule.Contacts, PermissionAction.View)]
+    public async Task<ActionResult<PortalAccessStatusDto>> GetContactAccess(Guid id, CancellationToken ct = default)
+        => Ok(await portalService.GetContactAccessAsync(id, ct));
+
+    /// <summary>Sends the invite email. The token is never returned to staff.</summary>
     [HttpPost("contacts/{id:guid}/portal/invite")]
     [HasPermission(AppModule.Contacts, PermissionAction.Edit)]
-    public async Task<ActionResult<string>> InviteContact(Guid id, [FromBody] InvitePortalUserRequest req, CancellationToken ct = default)
+    public async Task<ActionResult<PortalAccessStatusDto>> InviteContact(Guid id, [FromBody] InvitePortalUserRequest req, CancellationToken ct = default)
     {
-        var token = await portalService.InviteContactAsync(req with { ContactId = id }, ct);
-        return Ok(new { token });
+        await portalService.InviteContactAsync(req with { ContactId = id }, ct);
+        return Ok(await portalService.GetContactAccessAsync(id, ct));
+    }
+
+    [HttpPost("document-requests/{id:guid}/status")]
+    [HasPermission(AppModule.Documents, PermissionAction.Edit)]
+    public async Task<ActionResult<PortalDocumentRequestDto>> UpdateRequestStatus(Guid id, [FromBody] UpdateDocumentRequestStatusRequest req, CancellationToken ct = default)
+        => Ok(await portalService.UpdateDocumentRequestStatusAsync(id, req.Status, ct));
+
+    [HttpPut("documents/{id:guid}/portal-sharing")]
+    [HasPermission(AppModule.Documents, PermissionAction.Edit)]
+    public async Task<IActionResult> SetDocumentSharing(Guid id, [FromBody] SetDocumentSharingRequest req, CancellationToken ct = default)
+    {
+        await portalService.SetDocumentSharingAsync(id, req.SharedWithPortal, ct);
+        return NoContent();
     }
 
     [HttpGet("document-requests")]

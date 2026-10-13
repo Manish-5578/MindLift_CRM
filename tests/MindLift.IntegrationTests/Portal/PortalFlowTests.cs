@@ -65,10 +65,10 @@ public sealed class PortalFlowTests(MindLiftApiFactory factory) : IClassFixture<
         var inviteReq = new InvitePortalUserRequest(contact.Id, contactEmail);
         var inviteResp = await admin.Client.PostAsJsonAsync($"/api/v1/contacts/{contact.Id}/portal/invite", inviteReq);
         inviteResp.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var inviteResult = await inviteResp.Content.ReadFromJsonAsync<Dictionary<string, string>>();
-        inviteResult.ShouldNotBeNull();
-        inviteResult.ContainsKey("token").ShouldBeTrue();
-        var rawToken = inviteResult["token"];
+        var access = await inviteResp.Content.ReadFromJsonAsync<PortalAccessStatusDto>();
+        access!.Status.ShouldBe("Invited");
+        (await inviteResp.Content.ReadAsStringAsync()).ShouldNotContain("token");
+        var rawToken = factory.Emails.LatestTokenFor(contactEmail);
         rawToken.ShouldNotBeNullOrWhiteSpace();
 
         // 3. Customer accepts invite anonymously with a new password
@@ -92,6 +92,9 @@ public sealed class PortalFlowTests(MindLiftApiFactory factory) : IClassFixture<
         var home = await homeResp.Content.ReadFromJsonAsync<PortalHomeDto>();
         home.ShouldNotBeNull();
         home.CustomerName.ShouldBe("Fatima Zahra");
+
+        var after = await admin.Client.GetFromJsonAsync<PortalAccessStatusDto>($"/api/v1/contacts/{contact.Id}/portal");
+        after!.Status.ShouldBe("Active");
     }
 
     [Fact]
@@ -110,8 +113,8 @@ public sealed class PortalFlowTests(MindLiftApiFactory factory) : IClassFixture<
 
         var inviteResp = await admin.Client.PostAsJsonAsync($"/api/v1/contacts/{contact.Id}/portal/invite",
             new InvitePortalUserRequest(contact.Id, email));
-        var inviteData = await inviteResp.Content.ReadFromJsonAsync<Dictionary<string, string>>();
-        var token = inviteData!["token"];
+        inviteResp.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var token = factory.Emails.LatestTokenFor(email);
 
         var anonClient = factory.CreateClient();
         var acceptResp = await anonClient.PostAsJsonAsync($"/api/v1/portal/{tenant.Slug}/auth/accept-invite",
@@ -157,11 +160,11 @@ public sealed class PortalFlowTests(MindLiftApiFactory factory) : IClassFixture<
 
         var inviteResp = await admin.Client.PostAsJsonAsync($"/api/v1/contacts/{contact!.Id}/portal/invite",
             new InvitePortalUserRequest(contact.Id, email));
-        var inviteData = await inviteResp.Content.ReadFromJsonAsync<Dictionary<string, string>>();
+        inviteResp.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         var anonClient = factory.CreateClient();
         var acceptResp = await anonClient.PostAsJsonAsync($"/api/v1/portal/{tenant.Slug}/auth/accept-invite",
-            new AcceptPortalInviteRequest(inviteData!["token"], "Pass4567!"));
+            new AcceptPortalInviteRequest(factory.Emails.LatestTokenFor(email), "Pass4567!"));
         var portalAuth = await acceptResp.Content.ReadFromJsonAsync<PortalLoginResponse>();
 
         // 2. Staff creates a document request for this contact
@@ -221,11 +224,11 @@ public sealed class PortalFlowTests(MindLiftApiFactory factory) : IClassFixture<
 
         var inviteResp = await admin.Client.PostAsJsonAsync($"/api/v1/contacts/{contact!.Id}/portal/invite",
             new InvitePortalUserRequest(contact.Id, email));
-        var inviteData = await inviteResp.Content.ReadFromJsonAsync<Dictionary<string, string>>();
+        inviteResp.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         var anonClient = factory.CreateClient();
         var acceptResp = await anonClient.PostAsJsonAsync($"/api/v1/portal/{tenant.Slug}/auth/accept-invite",
-            new AcceptPortalInviteRequest(inviteData!["token"], "PassWord999!"));
+            new AcceptPortalInviteRequest(factory.Emails.LatestTokenFor(email), "PassWord999!"));
         acceptResp.StatusCode.ShouldBe(HttpStatusCode.OK);
         var portalAuth = await acceptResp.Content.ReadFromJsonAsync<PortalLoginResponse>();
 
@@ -289,11 +292,11 @@ public sealed class PortalFlowTests(MindLiftApiFactory factory) : IClassFixture<
 
         var inviteResp = await admin.Client.PostAsJsonAsync($"/api/v1/contacts/{contact!.Id}/portal/invite",
             new InvitePortalUserRequest(contact.Id, email));
-        var inviteData = await inviteResp.Content.ReadFromJsonAsync<Dictionary<string, string>>();
+        inviteResp.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         var anonClient = factory.CreateClient();
         var acceptResp = await anonClient.PostAsJsonAsync($"/api/v1/portal/{tenant.Slug}/auth/accept-invite",
-            new AcceptPortalInviteRequest(inviteData!["token"], "StrongCustomerPass!"));
+            new AcceptPortalInviteRequest(factory.Emails.LatestTokenFor(email), "StrongCustomerPass!"));
         var portalAuth = await acceptResp.Content.ReadFromJsonAsync<PortalLoginResponse>();
 
         var portalClient = factory.CreateClient();

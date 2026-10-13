@@ -23,10 +23,13 @@
                 Request Customer File
             </MudButton>
             <MudFileUpload T="IBrowserFile" FilesChanged="UploadDocumentAsync" Accept=".pdf,.png,.jpg,.jpeg,.txt">
-                <MudButton HtmlTag="label" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.CloudUpload" Disabled="_uploading" Size="Size.Small">
-                    @if (_uploading) { <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" /> }
-                    Upload Document
-                </MudButton>
+                <CustomContent Context="upload">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.CloudUpload" Disabled="_uploading" Size="Size.Small"
+                               OnClick="@(() => upload.OpenFilePickerAsync())" id="upload-document">
+                        @if (_uploading) { <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" /> }
+                        Upload Document
+                    </MudButton>
+                </CustomContent>
             </MudFileUpload>
         </div>
     </div>
@@ -170,14 +173,12 @@
                         }
                     </MudTd>
                     <MudTd DataLabel="Portal">
-                        @if (context.SharedWithPortal)
-                        {
-                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Info" Icon="@Icons.Material.Outlined.Public">Shared</MudChip>
-                        }
-                        else
-                        {
-                            <MudText Typo="Typo.caption" Class="ml-muted">Internal</MudText>
-                        }
+                        @{ var linked = context.AssociatedContactId.HasValue || context.AssociatedAccountId.HasValue; }
+                        <MudTooltip Text="@(linked ? SharingTooltip : UnlinkedTooltip)">
+                            <MudSwitch T="bool" Value="context.SharedWithPortal" ValueChanged="@(v => SetSharingAsync(context, v))"
+                                       Disabled="@(!linked || _sharingBusy.Contains(context.Id))" Color="Color.Info" Size="Size.Small"
+                                       Label="@(context.SharedWithPortal ? SharedLabel : InternalLabel)" id="@($"share-{context.Id}")" />
+                        </MudTooltip>
                     </MudTd>
                     <MudTd DataLabel="Date">
                         <MudText Typo="Typo.body2">@context.UploadedAt.ToString("MMM dd, yyyy HH:mm")</MudText>
@@ -242,16 +243,25 @@
                         <MudText Typo="Typo.body2">@context.CreatedAt.ToString("MMM dd, yyyy")</MudText>
                     </MudTd>
                     <MudTd DataLabel="Action" Style="text-align:right">
-                        @if (context.Status == "Submitted")
-                        {
-                            <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small" StartIcon="@Icons.Material.Outlined.CheckCircle">
-                                Approved
-                            </MudButton>
-                        }
-                        else if (context.Status == "Open")
-                        {
-                            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Outlined">Awaiting Client</MudChip>
-                        }
+                        <div class="d-flex justify-end gap-1">
+                            @if (context.Status == "Submitted")
+                            {
+                                <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small" StartIcon="@Icons.Material.Outlined.CheckCircle"
+                                           Disabled="_statusBusy" OnClick="@(() => SetRequestStatusAsync(context, Completed))">Approve</MudButton>
+                                <MudButton Variant="Variant.Outlined" Color="Color.Warning" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Replay"
+                                           Disabled="_statusBusy" OnClick="@(() => SetRequestStatusAsync(context, Open))">Ask again</MudButton>
+                            }
+                            else if (context.Status == "Open")
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Outlined">Awaiting client</MudChip>
+                                <MudIconButton Icon="@Icons.Material.Outlined.Cancel" Size="Size.Small" Color="Color.Error" aria-label="Cancel request"
+                                               Disabled="_statusBusy" OnClick="@(() => SetRequestStatusAsync(context, Cancelled))" />
+                            }
+                            else if (context.Status == "Cancelled")
+                            {
+                                <MudButton Variant="Variant.Text" Size="Size.Small" Disabled="_statusBusy" OnClick="@(() => SetRequestStatusAsync(context, Open))">Reopen</MudButton>
+                            }
+                        </div>
                     </MudTd>
                 </RowTemplate>
             </MudTable>
@@ -329,6 +339,9 @@
     </TitleContent>
     <DialogContent>
         <div class="d-flex flex-column gap-3 py-2">
+            <MudAutocomplete T="ContactListItemDto" @bind-Value="_newReqContact" SearchFunc="SearchContactsAsync" ToStringFunc="@(c => c is null ? string.Empty : ContactLabel(c))"
+                             Label="Customer contact" Required="true" Variant="Variant.Outlined" Margin="Margin.Dense" DebounceInterval="300" MinCharacters="1"
+                             ResetValueOnEmptyText="true" AdornmentIcon="@Icons.Material.Outlined.Person" id="request-contact" />
             <MudTextField @bind-Value="_newReqTitle" Label="Document Name / Title" Placeholder="e.g. Valid Trade License 2026" Required="true" Variant="Variant.Outlined" Margin="Margin.Dense" />
             <MudTextField @bind-Value="_newReqDescription" Label="Instructions for Customer" Lines="3" Placeholder="Please ensure the trade license is valid for at least 6 months and stamped." Variant="Variant.Outlined" Margin="Margin.Dense" />
             <MudDatePicker @bind-Date="_newReqDueDate" Label="Due Date" Variant="Variant.Outlined" Margin="Margin.Dense" />
@@ -336,7 +349,7 @@
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="@(() => _requestDialogOpen = false)">Cancel</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SubmitNewRequestAsync" Disabled="@(string.IsNullOrWhiteSpace(_newReqTitle) || _submittingReq)">
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SubmitNewRequestAsync" Disabled="@(string.IsNullOrWhiteSpace(_newReqTitle) || _newReqContact is null || _submittingReq)">
             @if (_submittingReq) { <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" /> }
             Send Request
         </MudButton>
@@ -363,6 +376,87 @@
     private string _newReqTitle = "";
     private string _newReqDescription = "";
     private DateTime? _newReqDueDate = DateTime.Today.AddDays(14);
+    private ContactListItemDto? _newReqContact;
+
+    private bool _statusBusy;
+    private readonly HashSet<Guid> _sharingBusy = [];
+
+    // Constants keep string literals out of @(...) attribute expressions.
+    private const string Completed = "Completed";
+    private const string Open = "Open";
+    private const string Cancelled = "Cancelled";
+    private const string SharedLabel = "Shared";
+    private const string InternalLabel = "Internal";
+    private const string SharingTooltip = "Visible to the linked customer in their portal when on";
+    private const string UnlinkedTooltip = "Link this document to a contact or account before sharing";
+
+    private static string ContactLabel(ContactListItemDto c) =>
+        string.IsNullOrWhiteSpace(c.Email) ? c.FullName : $"{c.FullName} · {c.Email}";
+
+    private async Task<IEnumerable<ContactListItemDto>> SearchContactsAsync(string? text, CancellationToken ct)
+    {
+        try
+        {
+            var resp = await Http.PostAsJsonAsync("api/v1/contacts/query", new ListQuery(text, null, null, null, 1, 20), ct);
+            if (!resp.IsSuccessStatusCode) return [];
+            var page = await resp.Content.ReadFromJsonAsync<PagedResult<ContactListItemDto>>(cancellationToken: ct);
+            return page?.Items ?? [];
+        }
+        catch (OperationCanceledException)
+        {
+            return [];
+        }
+    }
+
+    private async Task SetRequestStatusAsync(PortalDocumentRequestDto request, string status)
+    {
+        _statusBusy = true;
+        try
+        {
+            var resp = await Http.PostAsJsonAsync($"api/v1/document-requests/{request.Id}/status", new UpdateDocumentRequestStatusRequest(status));
+            if (resp.IsSuccessStatusCode)
+            {
+                Snackbar.Add(status switch
+                {
+                    Completed => "Request approved. The customer's files are marked as reviewed.",
+                    Cancelled => "Request cancelled.",
+                    _ => "Request reopened. The customer can upload again."
+                }, Severity.Success);
+                await LoadRequestsAsync();
+                if (status == Completed) await LoadDocumentsAsync();
+            }
+            else
+            {
+                Snackbar.Add("Could not update the request.", Severity.Error);
+            }
+        }
+        finally
+        {
+            _statusBusy = false;
+        }
+    }
+
+    private async Task SetSharingAsync(BusinessDocumentDto doc, bool shared)
+    {
+        _sharingBusy.Add(doc.Id);
+        try
+        {
+            var resp = await Http.PutAsJsonAsync($"api/v1/documents/{doc.Id}/portal-sharing", new SetDocumentSharingRequest(shared));
+            if (resp.IsSuccessStatusCode)
+            {
+                doc.SharedWithPortal = shared;
+                Snackbar.Add(shared ? "Shared with the customer portal." : "Removed from the customer portal.", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Could not change portal sharing.", Severity.Error);
+            }
+        }
+        finally
+        {
+            _sharingBusy.Remove(doc.Id);
+        }
+    }
 
     private List<BusinessDocumentDto> FilteredDocuments => _documents.Where(d =>
         (string.IsNullOrWhiteSpace(_searchQuery) ||
@@ -417,18 +511,19 @@
         _newReqTitle = "";
         _newReqDescription = "";
         _newReqDueDate = DateTime.Today.AddDays(14);
+        _newReqContact = null;
         _requestDialogOpen = true;
     }
 
     private async Task SubmitNewRequestAsync()
     {
-        if (string.IsNullOrWhiteSpace(_newReqTitle)) return;
+        if (string.IsNullOrWhiteSpace(_newReqTitle) || _newReqContact is null) return;
         _submittingReq = true;
         try
         {
             var req = new SaveDocumentRequest(
-                ContactId: Guid.Empty,
-                AccountId: null,
+                ContactId: _newReqContact.Id,
+                AccountId: _newReqContact.AccountId,
                 DealId: null,
                 Title: _newReqTitle.Trim(),
                 Description: string.IsNullOrWhiteSpace(_newReqDescription) ? null : _newReqDescription.Trim(),

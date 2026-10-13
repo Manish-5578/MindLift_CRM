@@ -18,6 +18,7 @@ public static class NotificationTypes
     public const string BookingCancelled = "BookingCancelled";
     public const string ImportCompleted = "ImportCompleted";
     public const string TrialEnding = "TrialEnding";
+    public const string PortalUpload = "PortalUpload";
 
     /// <summary>A preference row, not a notification: the optional "my day" email sent each morning.</summary>
     public const string DailyDigest = "DailyDigest";
@@ -40,6 +41,7 @@ public static class NotificationTypes
         (BookingCancelled, "A customer cancels a booking", true),
         (ImportCompleted, "An import finishes", true),
         (TrialEnding, "My trial is ending", true),
+        (PortalUpload, "A customer uploads a requested document", true),
     ];
 
     public static bool IsKnown(string type) => type == DailyDigest || All.Any(t => t.Type == type);

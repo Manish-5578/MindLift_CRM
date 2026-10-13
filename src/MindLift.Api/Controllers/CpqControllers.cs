@@ -271,7 +271,7 @@ public sealed class DocumentsController(IDocumentOcrService ocrService) : Contro
         [FromForm] Guid? quoteId = null,
         [FromForm] Guid? invoiceId = null,
         [FromForm] Guid? contactId = null,
-        [FromForm] bool sharedWithPortal = true,
+        [FromForm] bool sharedWithPortal = false,
         CancellationToken ct = default)
     {
         if (file == null || file.Length == 0) return BadRequest("File is empty.");

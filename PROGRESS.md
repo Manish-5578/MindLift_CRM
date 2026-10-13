@@ -3,8 +3,8 @@
 Read this file first at the start of every session. The full plan is in `CRM_BUILD_PLAN.md`.
 
 ## Current status
-- **Last completed milestones:** M14 (Reports & Analytics Engine + PDF & Schedules), M16 (CPQ, Document Streaming & OCR Review), M17 (Customer Portal, Branding, Document Requests & Security Isolation)
-- **Status:** All core and advanced milestones fully implemented, verified, and passing 918 tests (100% pass rate: 404 unit, 158 UI, 356 integration). Zero warnings/errors.
+- **Last completed milestones:** M14 (Reports & Analytics Engine + PDF & Schedules). M16 and M17 are **partly built** (see their sections for what is missing).
+- **Status (2026-10-13):** 926 tests pass (404 unit, 158 UI, 364 integration). The build has 0 errors but **16 distinct compiler warnings** remain (unread constructor parameters, obsolete Hangfire/Testcontainers APIs, nullability in older files, one EF1002, one Dapper AOT notice). An earlier line here said "Zero warnings"; that was wrong. `tests/MindLift.E2E` was **not run**.
 
 ## Environment
 - .NET SDK 10.0.401 (pinned in `global.json`, `rollForward: latestFeature`)
@@ -595,10 +595,24 @@ Test totals: 373 unit, 143 UI component, 231 integration (747 in all), all passi
   - **CRM Staff UI:** Integrated "Invite to Portal" action in `ContactDetail.razor`, and unified Document Requests table and request authoring dialog in `Documents.razor`.
   - **Tests:** Complete suite of 7 integration tests in `PortalFlowTests.cs` (100% pass rate).
 
-## Grand Test Suite Status
-- **Unit Tests (`MindLift.UnitTests`):** 404 / 404 passed (100%)
-- **UI Tests (`MindLift.UITests`):** 158 / 158 passed (100%)
-- **Integration Tests (`MindLift.IntegrationTests`):** 356 / 356 passed (100%)
-- **Total Test Count:** **918 tests passed, 0 failed, 0 skipped**
+### M17 review fixes - 2026-10-13
+- **Security fixes:**
+  - The invite endpoint no longer returns the raw invite token to staff. It returns the contact's portal access status; the token only travels in the email.
+  - Portal document by-id check: a customer without an account could open any shared document that also had no account (`null != null` was false). Fixed with `OwnsDocument` in [PortalControllers.cs](file:///d:/MindLift_CRM/src/MindLift.Api/Controllers/PortalControllers.cs).
+  - Staff uploads were shared with the portal **by default**. Default is now private (entity, DTO, upload endpoint, service).
+  - Inviting an email already used by another contact now returns 409.
+- **Correctness fixes:** request dialog sent `ContactId = Guid.Empty` (now a contact picker and server validation, 400 on missing contact or title); "Approved" button did nothing (now Approve / Ask again / Cancel / Reopen through `POST /api/v1/document-requests/{id}/status`); portal metrics were hard-coded (fake 15.2% and fake 2024-2026 series), now real per-year totals in the tenant base currency; uploads to a Completed or Cancelled request now return 422; the upload button on `/documents` used a MudBlazor 8 child-content pattern that MudBlazor 9 ignores (now `CustomContent`).
+- **New staff features:** `GET /api/v1/contacts/{id}/portal` (portal status chip on the contact page), `PUT /api/v1/documents/{id}/portal-sharing` (share switch per document row), `PortalUpload` notification to the requester and the contact owner when a customer uploads.
+- **Tests:** 8 new integration tests in [PortalIsolationAndReviewTests.cs](file:///d:/MindLift_CRM/tests/MindLift.IntegrationTests/Portal/PortalIsolationAndReviewTests.cs): customer A vs B in one workspace, cross-workspace customer and staff, private-by-default sharing, request validation, upload notification + approval -> Ready + closed request 422, unknown status 400, duplicate invite email 409, Staff allowed / no-permission role denied on every new endpoint. Existing portal tests now read the invite token from the captured email.
+- **Warnings fixed:** MUD0002 in Documents, Products and ManageBooking; CS8613/CS8619 in `Permissions.cs`.
+- **Not checked:** the new staff UI (contact picker, share switch, approve buttons, portal chip) was **not checked in a browser**; it only compiles and the UI test suite still passes.
+- **Still missing for M17:** the `MindLift.Portal` WASM app (customers have no screens yet), portal refresh tokens, EN/AR 375px screen checks.
+
+## Grand Test Suite Status (2026-10-13)
+- **Unit Tests (`MindLift.UnitTests`):** 404 / 404 passed
+- **UI Tests (`MindLift.UITests`):** 158 / 158 passed
+- **Integration Tests (`MindLift.IntegrationTests`):** 364 / 364 passed (one full run)
+- **E2E (`MindLift.E2E`):** not run
+- **Total:** 926 passed, 0 failed, 0 skipped
 
 

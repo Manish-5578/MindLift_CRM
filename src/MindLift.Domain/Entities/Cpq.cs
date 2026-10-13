@@ -162,7 +162,7 @@ public sealed class BusinessDocument : TenantEntity
     public Guid? AssociatedQuoteId { get; set; }
     public Guid? AssociatedInvoiceId { get; set; }
     public Guid? AssociatedContactId { get; set; }
-    public bool SharedWithPortal { get; set; } = true;
+    public bool SharedWithPortal { get; set; }
     public string Status { get; set; } = "Ready"; // Queued, Processing, NeedsReview, Ready, Rejected
     public Guid? ReviewedById { get; set; }
     public DateTime? ReviewedAt { get; set; }

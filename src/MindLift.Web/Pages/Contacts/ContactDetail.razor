@@ -25,6 +25,10 @@
             <Badges>
                 @if (contact.Type is not null) { <StatusChip Text="@TypeLabel(contact.Type)" Dot="false" /> }
                 <MudText Typo="Typo.body2" Class="ml-muted">Created <DateText Value="@contact.CreatedAtUtc" /></MudText>
+                @if (_portal is not null && _portal.Status != NotInvited)
+                {
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="@PortalColor" Icon="@Icons.Material.Outlined.VpnKey" data-testid="portal-status">@PortalText</MudChip>
+                }
             </Badges>
             <Actions>
                 @if (Can(p => p.CanEdit))
@@ -33,7 +37,7 @@
                 }
                 @if (Can(p => p.CanEdit) && !string.IsNullOrWhiteSpace(contact.Email))
                 {
-                    <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.VpnKey" OnClick="InviteToPortalAsync" data-testid="invite-portal">Invite to Portal</MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.VpnKey" OnClick="InviteToPortalAsync" Disabled="_inviting" data-testid="invite-portal">@InviteLabel</MudButton>
                 }
                 @if (Can(p => p.CanDelete))
                 {
@@ -188,6 +192,42 @@
         {
             _loading = false;
         }
+
+        await LoadPortalAsync();
+    }
+
+    private const string NotInvited = "NotInvited";
+    private PortalAccessStatusDto? _portal;
+    private bool _inviting;
+
+    private string InviteLabel => _portal is null || _portal.Status == NotInvited ? "Invite to Portal" : "Resend portal invite";
+
+    private string PortalText => _portal?.Status switch
+    {
+        "Active" => "Portal active",
+        "Invited" => "Portal invite sent",
+        "Disabled" => "Portal disabled",
+        _ => string.Empty
+    };
+
+    private Color PortalColor => _portal?.Status switch
+    {
+        "Active" => Color.Success,
+        "Invited" => Color.Info,
+        _ => Color.Default
+    };
+
+    private async Task LoadPortalAsync()
+    {
+        try
+        {
+            var response = await Http.GetAsync($"api/v1/contacts/{Id}/portal");
+            _portal = response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<PortalAccessStatusDto>() : null;
+        }
+        catch (HttpRequestException)
+        {
+            _portal = null;
+        }
     }
 
     private RecordTimeline? _timeline;
@@ -278,22 +318,28 @@
     private async Task InviteToPortalAsync()
     {
         if (_summary?.Contact.Email is null) return;
+        _inviting = true;
         try
         {
             var req = new InvitePortalUserRequest(Id, _summary.Contact.Email);
             var response = await Http.PostAsJsonAsync($"api/v1/contacts/{Id}/portal/invite", req);
             if (response.IsSuccessStatusCode)
             {
+                _portal = await response.Content.ReadFromJsonAsync<PortalAccessStatusDto>();
                 Snackbar.Add($"Portal invitation sent to {_summary.Contact.Email}", Severity.Success);
             }
             else
             {
-                Snackbar.Add("Could not send portal invitation.", Severity.Error);
+                Snackbar.Add(await ProblemText.FromAsync(response, "Could not send portal invitation."), Severity.Error);
             }
         }
-        catch (Exception ex)
+        catch (HttpRequestException ex)
         {
             Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _inviting = false;
         }
     }
 }

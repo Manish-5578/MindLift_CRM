@@ -18,7 +18,8 @@ public sealed class PortalService(
     ITenantContext tenant,
     TokenService tokenService,
     IEmailSender emailSender,
-    IDocumentOcrService ocrService) : IPortalService
+    IDocumentOcrService ocrService,
+    INotificationService notifications) : IPortalService
 {
     private Guid CurrentTenantId => tenant.TenantId ?? throw new UnauthorizedAccessException("Tenant context required.");
     private static readonly PasswordHasher<PortalUser> Hasher = new();
@@ -398,27 +399,32 @@ public sealed class PortalService(
             ));
         }
 
-        // Metrics (if enabled)
+        // Metrics (if enabled): totals of the customer's ready documents by year of the document date.
         var metrics = new List<PortalMetricCardDto>();
         if (settings?.ShowMetrics ?? true)
         {
-            var invoiceTotals = readyDocs.Where(d => d.DetectedTotal.HasValue).Select(d => d.DetectedTotal!.Value).ToList();
-            if (invoiceTotals.Count > 0)
+            var byYear = readyDocs
+                .Where(d => d.DetectedTotal.HasValue)
+                .GroupBy(d => (d.DetectedDate ?? d.CreatedAt).Year)
+                .OrderBy(g => g.Key)
+                .Select(g => new PortalMetricPointDto(g.Key.ToString(System.Globalization.CultureInfo.InvariantCulture), g.Sum(d => d.DetectedTotal!.Value)))
+                .ToList();
+
+            if (byYear.Count > 0)
             {
+                var latest = byYear[^1].Value;
+                decimal? previous = byYear.Count > 1 ? byYear[^2].Value : null;
+                decimal? change = previous is > 0 ? Math.Round((latest - previous.Value) / previous.Value * 100m, 1) : null;
+                var currency = await db.TenantSettings.AsNoTracking().Select(s => s.BaseCurrency).FirstOrDefaultAsync(ct) ?? "USD";
+
                 metrics.Add(new PortalMetricCardDto(
-                    Key: "total_invoiced",
-                    Label: "Total Invoiced",
-                    Currency: "USD",
-                    Latest: invoiceTotals.Sum(),
-                    Previous: invoiceTotals.Count > 1 ? invoiceTotals.Take(invoiceTotals.Count - 1).Sum() : null,
-                    ChangePct: 15.2m,
-                    Series:
-                    [
-                        new PortalMetricPointDto("2024", invoiceTotals.Sum() * 0.7m),
-                        new PortalMetricPointDto("2025", invoiceTotals.Sum() * 0.9m),
-                        new PortalMetricPointDto("2026", invoiceTotals.Sum())
-                    ]
-                ));
+                    Key: "documented_totals",
+                    Label: "Document totals",
+                    Currency: currency,
+                    Latest: latest,
+                    Previous: previous,
+                    ChangePct: change,
+                    Series: byYear));
             }
         }
 
@@ -517,6 +523,11 @@ public sealed class PortalService(
         var req = await db.DocumentRequests.FirstOrDefaultAsync(r => r.Id == requestId && r.ContactId == contactId && !r.IsDeleted, ct)
             ?? throw new NotFoundException("DocumentRequest", requestId);
 
+        if (req.Status is "Completed" or "Cancelled")
+        {
+            throw new BusinessRuleException("request_closed", "This request is closed and no longer accepts uploads.");
+        }
+
         var doc = await ocrService.UploadDocumentAsync(
             fileName,
             contentType,
@@ -532,11 +543,27 @@ public sealed class PortalService(
             ct: ct);
 
         var entity = await db.BusinessDocuments.FirstAsync(d => d.Id == doc.Id, ct);
-        entity.Status = "Ready";
+        entity.Status = "NeedsReview";
 
         req.Status = "Submitted";
         await db.SaveChangesAsync(ct);
 
+        // Tell the person who asked and the contact's owner.
+        var ownerId = await db.Contacts.AsNoTracking().Where(c => c.Id == contactId).Select(c => (Guid?)c.OwnerId).FirstOrDefaultAsync(ct);
+        var recipients = new[] { req.CreatedById, ownerId }.Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToList();
+        if (recipients.Count > 0)
+        {
+            await notifications.NotifyAsync(new NotificationRequest(
+                recipients,
+                NotificationTypes.PortalUpload,
+                $"Customer uploaded \"{req.Title}\"",
+                fileName,
+                "Contact",
+                contactId,
+                "/documents"), ct);
+        }
+
+        doc.Status = "NeedsReview";
         return doc;
     }
 
@@ -584,13 +611,23 @@ public sealed class PortalService(
         return new PortalSettingsDto(s.IsEnabled, s.WelcomeMessage, s.WelcomeMessageAr, s.ShowMetrics, s.AllowGeneralUploads, s.NotifyCustomerOnExpiry, s.SupportEmail, s.SupportPhone);
     }
 
-    public async Task<string> InviteContactAsync(InvitePortalUserRequest req, CancellationToken ct = default)
+    public async Task InviteContactAsync(InvitePortalUserRequest req, CancellationToken ct = default)
     {
         var contact = await db.Contacts.FirstOrDefaultAsync(c => c.Id == req.ContactId && !c.IsDeleted, ct)
             ?? throw new NotFoundException("Contact", req.ContactId);
 
+        if (string.IsNullOrWhiteSpace(req.Email))
+        {
+            throw new ValidationException(new Dictionary<string, string[]> { ["email"] = ["An email address is required."] });
+        }
+
         var normEmail = req.Email.Trim().ToUpperInvariant();
         var user = await db.PortalUsers.FirstOrDefaultAsync(u => u.NormalizedEmail == normEmail && !u.IsDeleted, ct);
+
+        if (user != null && user.ContactId != contact.Id)
+        {
+            throw new ConflictException("portal_email_taken", "This email already has portal access for another contact.");
+        }
 
         if (user == null)
         {
@@ -638,9 +675,75 @@ public sealed class PortalService(
                 ct);
         }
         catch { }
-
-        return plainToken;
     }
+
+    public async Task<PortalAccessStatusDto> GetContactAccessAsync(Guid contactId, CancellationToken ct = default)
+    {
+        if (!await db.Contacts.AnyAsync(c => c.Id == contactId && !c.IsDeleted, ct))
+        {
+            throw new NotFoundException("Contact", contactId);
+        }
+
+        var user = await db.PortalUsers.AsNoTracking()
+            .Where(u => u.ContactId == contactId && !u.IsDeleted)
+            .OrderByDescending(u => u.InvitedAt)
+            .FirstOrDefaultAsync(ct);
+
+        if (user is null)
+        {
+            return new PortalAccessStatusDto(contactId, "NotInvited", null, null, null, null);
+        }
+
+        var status = !user.IsActive ? "Disabled" : user.ActivatedAt.HasValue ? "Active" : "Invited";
+        return new PortalAccessStatusDto(contactId, status, user.Email, user.InvitedAt, user.ActivatedAt, user.LastLoginAt);
+    }
+
+    public async Task<PortalDocumentRequestDto> UpdateDocumentRequestStatusAsync(Guid id, string status, CancellationToken ct = default)
+    {
+        if (status is not ("Completed" or "Cancelled" or "Open"))
+        {
+            throw new ValidationException(new Dictionary<string, string[]> { ["status"] = ["Status must be Open, Completed or Cancelled."] });
+        }
+
+        var entity = await db.DocumentRequests.FirstOrDefaultAsync(r => r.Id == id && !r.IsDeleted, ct)
+            ?? throw new NotFoundException("DocumentRequest", id);
+
+        entity.Status = status;
+
+        // Accepting a submission marks the customer's uploaded files for this request as reviewed.
+        if (status == "Completed")
+        {
+            var pending = await db.BusinessDocuments
+                .Where(d => d.AssociatedContactId == entity.ContactId && d.Status == "NeedsReview" && !d.IsDeleted)
+                .ToListAsync(ct);
+            foreach (var d in pending)
+            {
+                d.Status = "Ready";
+                d.ReviewedAt = DateTime.UtcNow;
+                d.ReviewedById = tenant.UserId;
+            }
+        }
+
+        await db.SaveChangesAsync(ct);
+        return ToDto(entity);
+    }
+
+    public async Task SetDocumentSharingAsync(Guid documentId, bool shared, CancellationToken ct = default)
+    {
+        var doc = await db.BusinessDocuments.FirstOrDefaultAsync(d => d.Id == documentId && !d.IsDeleted, ct)
+            ?? throw new NotFoundException("Document", documentId);
+
+        if (shared && doc.AssociatedContactId is null && doc.AssociatedAccountId is null)
+        {
+            throw new BusinessRuleException("document_unlinked", "Link the document to a contact or account before sharing it with the portal.");
+        }
+
+        doc.SharedWithPortal = shared;
+        await db.SaveChangesAsync(ct);
+    }
+
+    private static PortalDocumentRequestDto ToDto(DocumentRequest r) =>
+        new(r.Id, r.ContactId, r.AccountId, r.DealId, r.Title, r.Description, r.DueDate, r.Status, r.CreatedAt);
 
     public async Task<IReadOnlyList<PortalDocumentRequestDto>> GetDocumentRequestsForRecordAsync(
         Guid? contactId,
@@ -668,13 +771,21 @@ public sealed class PortalService(
 
     public async Task<PortalDocumentRequestDto> CreateDocumentRequestAsync(SaveDocumentRequest req, CancellationToken ct = default)
     {
+        if (string.IsNullOrWhiteSpace(req.Title))
+        {
+            throw new ValidationException(new Dictionary<string, string[]> { ["title"] = ["A title is required."] });
+        }
+
+        var contact = await db.Contacts.AsNoTracking().FirstOrDefaultAsync(c => c.Id == req.ContactId && !c.IsDeleted, ct)
+            ?? throw new ValidationException(new Dictionary<string, string[]> { ["contactId"] = ["Choose an existing contact."] });
+
         var entity = new DocumentRequest
         {
             TenantId = CurrentTenantId,
-            ContactId = req.ContactId,
-            AccountId = req.AccountId,
+            ContactId = contact.Id,
+            AccountId = req.AccountId ?? contact.AccountId,
             DealId = req.DealId,
-            Title = req.Title,
+            Title = req.Title.Trim(),
             Description = req.Description,
             DueDate = req.DueDate,
             Status = "Open",
@@ -684,16 +795,6 @@ public sealed class PortalService(
         db.DocumentRequests.Add(entity);
         await db.SaveChangesAsync(ct);
 
-        return new PortalDocumentRequestDto(
-            entity.Id,
-            entity.ContactId,
-            entity.AccountId,
-            entity.DealId,
-            entity.Title,
-            entity.Description,
-            entity.DueDate,
-            entity.Status,
-            entity.CreatedAt
-        );
+        return ToDto(entity);
     }
 }

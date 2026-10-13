@@ -30,7 +30,7 @@ public sealed class DocumentOcrService(IAppDbContext db, ITenantContext tenant, 
         Guid? quoteId = null,
         Guid? invoiceId = null,
         Guid? contactId = null,
-        bool sharedWithPortal = true,
+        bool sharedWithPortal = false,
         CancellationToken ct = default)
     {
         var storageKey = $"docs/{CurrentTenantId}/{Guid.NewGuid():N}_{Path.GetFileName(fileName)}";
