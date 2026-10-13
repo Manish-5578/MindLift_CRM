@@ -1,0 +1,22 @@
+<div class="ml-card" data-testid="skeleton-table">
+    <div style="padding:0">
+        <div class="ml-row" style="height:40px;padding:0 20px;background:var(--ml-surface-2)">
+            @for (var c = 0; c < Columns; c++)
+            {
+                <MudSkeleton Width="60px" Height="12px" />
+            }
+        </div>
+        @for (var r = 0; r < Rows; r++)
+        {
+            <div class="ml-row" style="height:52px;padding:0 20px">
+                <MudSkeleton SkeletonType="SkeletonType.Circle" Width="32px" Height="32px" />
+                <MudSkeleton Width="60%" Height="14px" />
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public int Rows { get; set; } = 8;
+    [Parameter] public int Columns { get; set; } = 5;
+}

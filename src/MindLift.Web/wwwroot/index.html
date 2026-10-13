@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MindLift</title>
+    <base href="/" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="_content/MudBlazor/MudBlazor.min.css" />
+    <link rel="stylesheet" href="_content/MindLift.UI/css/mindlift.css" />
+    <link rel="stylesheet" href="css/app.css" />
+    <script type="importmap"></script>
+</head>
+
+<body>
+    <div id="app">
+        <svg class="loading-progress">
+            <circle r="40%" cx="50%" cy="50%" />
+            <circle r="40%" cx="50%" cy="50%" />
+        </svg>
+        <div class="loading-progress-text"></div>
+    </div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="." class="reload">Reload</a>
+        <span class="dismiss">🗙</span>
+    </div>
+
+    <script>
+        // Called from Blazor (IJSRuntime). Theme and language live on <html> so CSS tokens and RTL switch.
+        window.mindlift = {
+            setTheme: function (theme) { document.documentElement.setAttribute('data-theme', theme); },
+            setLanguage: function (lang) {
+                document.documentElement.setAttribute('lang', lang);
+                document.documentElement.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
+                localStorage.setItem('ml.lang', lang);
+            },
+            // Saves bytes the app already has (an export) as a file download. The data arrives as base64 text.
+            downloadFile: function (fileName, contentType, base64) {
+                var bytes = Uint8Array.from(atob(base64), function (c) { return c.charCodeAt(0); });
+                var url = URL.createObjectURL(new Blob([bytes], { type: contentType }));
+                var link = document.createElement('a');
+                link.href = url;
+                link.download = fileName;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+            }
+        };
+    </script>
+    <script>
+        // Firefox only starts a drag when data is set on dragstart, and Blazor cannot set it from C#.
+        document.addEventListener('dragstart', function (e) {
+            if (e.target && e.target.closest && e.target.closest('[data-kanban-card]')) {
+                e.dataTransfer.setData('text/plain', 'card');
+                e.dataTransfer.effectAllowed = 'move';
+            }
+        });
+    </script>
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    <script src="_content/Blazor-ApexCharts/js/apex-charts.min.js"></script>
+    <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
+</body>
+
+</html>

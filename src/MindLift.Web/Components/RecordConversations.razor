@@ -1,0 +1,196 @@
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@using System.Net.Http.Json
+@using MindLift.Shared.Contracts
+
+<MlCard Title="Messages & Omnichannel" TestId="record-conversations">
+    <div class="ml-stack">
+        <div class="d-flex align-center justify-space-between mb-2">
+            <MudText Typo="Typo.caption" Class="ml-muted">WhatsApp, Email and SMS communication with this record</MudText>
+            <MudButton Variant="Variant.Outlined"
+                       Size="Size.Small"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Send"
+                       OnClick="@(() => _composerOpen = !_composerOpen)">
+                @(_composerOpen ? "Close Composer" : "Send Message")
+            </MudButton>
+        </div>
+
+        @if (_composerOpen)
+        {
+            <MudPaper Outlined="true" Class="pa-3 mb-3" Style="background: var(--mud-palette-surface);">
+                <div class="d-flex gap-2 mb-2">
+                    <MudChip T="string" Size="Size.Small" Variant="@(_channel == CommunicationChannel.WhatsApp ? Variant.Filled : Variant.Outlined)" Color="Color.Success" OnClick="@(() => _channel = CommunicationChannel.WhatsApp)">WhatsApp</MudChip>
+                    <MudChip T="string" Size="Size.Small" Variant="@(_channel == CommunicationChannel.Email ? Variant.Filled : Variant.Outlined)" Color="Color.Info" OnClick="@(() => _channel = CommunicationChannel.Email)">Email</MudChip>
+                    <MudChip T="string" Size="Size.Small" Variant="@(_channel == CommunicationChannel.Sms ? Variant.Filled : Variant.Outlined)" Color="Color.Secondary" OnClick="@(() => _channel = CommunicationChannel.Sms)">SMS</MudChip>
+                </div>
+
+                <MudTextField @bind-Value="_recipient" Label="Recipient" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+
+                @if (_channel == CommunicationChannel.Email)
+                {
+                    <MudTextField @bind-Value="_subject" Label="Subject" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                }
+
+                <MudTextField @bind-Value="_body" Label="Message" Variant="Variant.Outlined" Lines="3" Class="mb-2" />
+
+                <div class="d-flex justify-end">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" OnClick="SendMessageAsync" Disabled="@(_sending || string.IsNullOrWhiteSpace(_body) || string.IsNullOrWhiteSpace(_recipient))">
+                        @if (_sending)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
+                        }
+                        <span>Send @_channel</span>
+                    </MudButton>
+                </div>
+            </MudPaper>
+        }
+
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else if (_messages.Count == 0)
+        {
+            <MudText Typo="Typo.body2" Class="ml-muted pa-4 text-center">No messages sent or received yet.</MudText>
+        }
+        else
+        {
+            <div class="d-flex flex-column gap-2">
+                @foreach (var msg in _messages)
+                {
+                    var isOutbound = msg.Direction == MessageDirection.Outbound;
+                    <div class="pa-3 border rounded d-flex flex-column" style="background: var(--mud-palette-surface);">
+                        <div class="d-flex align-center justify-space-between mb-1">
+                            <div class="d-flex align-center gap-2">
+                                <MudChip T="string" Size="Size.Small" Color="@GetColor(msg.Channel)">@msg.Channel</MudChip>
+                                <MudText Typo="Typo.caption" Class="font-weight-bold">
+                                    @(isOutbound ? $"To: {msg.To}" : $"From: {msg.From}")
+                                </MudText>
+                            </div>
+                            <MudText Typo="Typo.caption" Class="ml-muted">
+                                @msg.CreatedAt.ToLocalTime().ToString("g")
+                            </MudText>
+                        </div>
+                        @if (!string.IsNullOrEmpty(msg.Subject))
+                        {
+                            <MudText Typo="Typo.subtitle2" Class="font-weight-bold mb-1">@msg.Subject</MudText>
+                        }
+                        <MudText Typo="Typo.body2" Style="white-space: pre-wrap;">@msg.Body</MudText>
+                        <div class="d-flex align-center justify-end gap-1 mt-1">
+                            <MudText Typo="Typo.caption" Class="ml-muted">@msg.Status</MudText>
+                            @if (msg.Status == MessageStatus.Read)
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.DoneAll" Size="Size.Small" Color="Color.Info" Style="font-size: 14px;" />
+                            }
+                            else if (msg.Status == MessageStatus.Delivered)
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.DoneAll" Size="Size.Small" Style="font-size: 14px;" />
+                            }
+                            else if (msg.Status == MessageStatus.Sent)
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.Done" Size="Size.Small" Style="font-size: 14px;" />
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</MlCard>
+
+@code {
+    [Parameter, EditorRequired] public string EntityType { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public Guid EntityId { get; set; }
+    [Parameter] public string? DefaultPhone { get; set; }
+    [Parameter] public string? DefaultEmail { get; set; }
+
+    private List<MessageDto> _messages = [];
+    private bool _loading = true;
+    private bool _composerOpen = false;
+    private bool _sending = false;
+
+    private CommunicationChannel _channel = CommunicationChannel.WhatsApp;
+    private string _recipient = string.Empty;
+    private string _subject = string.Empty;
+    private string _body = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _recipient = _channel == CommunicationChannel.Email ? (DefaultEmail ?? "") : (DefaultPhone ?? "");
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _messages = await Http.GetFromJsonAsync<List<MessageDto>>($"/api/v1/communication/records/{EntityType}/{EntityId}") ?? [];
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load messages: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SendMessageAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_body) || string.IsNullOrWhiteSpace(_recipient)) return;
+
+        _sending = true;
+        try
+        {
+            var req = new SendMessageRequest(
+                _channel,
+                null,
+                _recipient,
+                _channel == CommunicationChannel.Email ? _subject : null,
+                _body,
+                LeadId: EntityType == "leads" ? EntityId : null,
+                ContactId: EntityType == "contacts" ? EntityId : null,
+                AccountId: EntityType == "accounts" ? EntityId : null,
+                DealId: EntityType == "deals" ? EntityId : null
+            );
+
+            var resp = await Http.PostAsJsonAsync("/api/v1/communication/send", req);
+            if (resp.IsSuccessStatusCode)
+            {
+                var msg = await resp.Content.ReadFromJsonAsync<MessageDto>();
+                if (msg != null)
+                {
+                    _messages.Insert(0, msg);
+                    _body = string.Empty;
+                    _subject = string.Empty;
+                    _composerOpen = false;
+                    Snackbar.Add("Message dispatched", Severity.Success);
+                }
+            }
+            else
+            {
+                var err = await resp.Content.ReadAsStringAsync();
+                Snackbar.Add($"Failed to send: {err}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Send error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _sending = false;
+        }
+    }
+
+    private static Color GetColor(CommunicationChannel ch) => ch switch
+    {
+        CommunicationChannel.WhatsApp => Color.Success,
+        CommunicationChannel.Email => Color.Info,
+        CommunicationChannel.Sms => Color.Secondary,
+        _ => Color.Default
+    };
+}

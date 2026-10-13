@@ -1,0 +1,240 @@
+@page "/settings/booking-pages"
+@inject HttpClient Http
+@inject AppState App
+@inject ISnackbar Snackbar
+
+<PageTitle>Booking pages · MindLift</PageTitle>
+
+<div class="ml-page ml-page--form">
+    <PageHeader Title="Booking pages" Subtitle="Public pages where customers book a time with you or your team, without signing in.">
+        <Actions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => OpenForm(null)" data-testid="primary-action">New booking page</MudButton>
+        </Actions>
+    </PageHeader>
+    <SettingsNav Current="/settings/booking-pages" />
+
+    @if (_loading)
+    {
+        <SkeletonTable Rows="3" Columns="3" />
+    }
+    else if (_pages.Count == 0)
+    {
+        <EmptyState Icon="@Icons.Material.Outlined.EventAvailable" Title="No booking pages yet" Message="Create one and share its link. Customers see only the free times." />
+    }
+    else
+    {
+        @foreach (var page in _pages)
+        {
+            var current = page;
+            <MlCard Title="@current.Name" Subtitle="@($"{current.DurationMinutes} minutes · {(current.AssignmentMode == "RoundRobin" ? "Team, round robin" : "One person")} · {(current.IsActive ? "On" : "Off")}")" Class="mb-4" TestId="@("booking-page-" + current.Slug)">
+                <div class="ml-stack-sm">
+                    <MudText Typo="Typo.body2" data-testid="booking-link">Link: @current.PublicPath</MudText>
+                    <div class="ml-row" style="justify-content:flex-end">
+                        <MudButton Size="Size.Small" OnClick="() => OpenForm(current)" data-testid="edit-booking-page">Edit</MudButton>
+                        <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeleteAsync(current)" data-testid="delete-booking-page">Delete</MudButton>
+                    </div>
+                </div>
+            </MlCard>
+        }
+    }
+</div>
+
+<FormDrawer @bind-Open="_drawer" Title="@(_editing is null ? "New booking page" : "Edit booking page")" SubmitText="Save" Busy="_busy" OnSubmit="SaveAsync" IsDirty="true">
+    @if (_error is not null)
+    {
+        <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3" data-testid="booking-error">@_error</MudAlert>
+    }
+
+    <div class="ml-stack">
+        <MudTextField @bind-Value="_name" Label="Name *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="bp-name" />
+        <MudTextField @bind-Value="_slug" Label="Address (letters, numbers, hyphens) *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="bp-slug" />
+        <MudTextField @bind-Value="_description" Label="Description" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />
+        <MudGrid Spacing="3">
+            <MudItem xs="6"><MudNumericField T="int" @bind-Value="_duration" Label="Minutes" Min="5" Max="480" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="bp-duration" /></MudItem>
+            <MudItem xs="6"><MudNumericField T="int" @bind-Value="_step" Label="Start times every (min)" Min="5" Max="240" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+            <MudItem xs="6"><MudNumericField T="int" @bind-Value="_notice" Label="Notice (hours)" Min="0" Max="720" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+            <MudItem xs="6"><MudNumericField T="int" @bind-Value="_ahead" Label="Days ahead" Min="1" Max="365" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+        </MudGrid>
+
+        <MudSelect T="string" @bind-Value="_mode" Label="Who takes the bookings" Variant="Variant.Outlined" Margin="Margin.Dense">
+            <MudSelectItem T="string" Value="@("SingleUser")">Only me</MudSelectItem>
+            <MudSelectItem T="string" Value="@("RoundRobin")">Everyone who is active (round robin)</MudSelectItem>
+        </MudSelect>
+
+        <MudText Typo="Typo.subtitle2">Open hours</MudText>
+        <div class="ml-row ml-row--wrap" data-testid="bp-days">
+            @foreach (var day in Days)
+            {
+                var key = day.Key;
+                <MudChip T="string" Variant="@(_openDays.Contains(key) ? Variant.Filled : Variant.Outlined)" Color="@(_openDays.Contains(key) ? Color.Primary : Color.Default)"
+                         OnClick="() => ToggleDay(key)" data-testid="@("bp-day-" + key)">@day.Label</MudChip>
+            }
+        </div>
+        <MudGrid Spacing="3">
+            <MudItem xs="6"><MudTextField @bind-Value="_from" Label="From (09:00)" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="bp-from" /></MudItem>
+            <MudItem xs="6"><MudTextField @bind-Value="_to" Label="To (17:00)" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="bp-to" /></MudItem>
+        </MudGrid>
+        <MudTextField @bind-Value="_timeZone" Label="Time zone (for example Asia/Dubai)" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="bp-timezone" />
+
+        <MudSelect T="string" @bind-Value="_location" Label="Meeting type" Variant="Variant.Outlined" Margin="Margin.Dense">
+            <MudSelectItem T="string" Value="@("Video")">Video</MudSelectItem>
+            <MudSelectItem T="string" Value="@("Phone")">Phone</MudSelectItem>
+            <MudSelectItem T="string" Value="@("InPerson")">In person</MudSelectItem>
+        </MudSelect>
+        <MudTextField @bind-Value="_locationValue" Label="Link or address" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudTextField @bind-Value="_reminders" Label="Reminders before, in minutes (for example 1440, 60)" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="bp-reminders" />
+        <MudTextField @bind-Value="_company" Label="Ask for company (required)" Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="Leave empty to ask no extra question." />
+        <MudCheckBox @bind-Value="_active" Label="Page is on" Color="Color.Primary" />
+    </div>
+</FormDrawer>
+
+@code {
+    private static readonly (string Key, string Label)[] Days = [("mon", "Mon"), ("tue", "Tue"), ("wed", "Wed"), ("thu", "Thu"), ("fri", "Fri"), ("sat", "Sat"), ("sun", "Sun")];
+
+    private List<BookingPageDto> _pages = [];
+    private bool _loading = true;
+    private bool _drawer;
+    private bool _busy;
+    private string? _error;
+    private BookingPageDto? _editing;
+    private string _name = string.Empty;
+    private string _slug = string.Empty;
+    private string? _description;
+    private int _duration = 30;
+    private int _step = 30;
+    private int _notice = 4;
+    private int _ahead = 30;
+    private string _mode = "SingleUser";
+    private HashSet<string> _openDays = ["mon", "tue", "wed", "thu", "fri"];
+    private string _from = "09:00";
+    private string _to = "17:00";
+    private string _timeZone = "UTC";
+    private string _location = "Video";
+    private string? _locationValue;
+    private string _reminders = "60, 15";
+    private string? _company;
+    private bool _active = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _timeZone = App.Bootstrap?.Company.TimeZoneId ?? "UTC";
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _pages = await Http.GetFromJsonAsync<List<BookingPageDto>>("api/v1/settings/booking-pages") ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            _pages = [];
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void ToggleDay(string key)
+    {
+        if (!_openDays.Add(key))
+        {
+            _openDays.Remove(key);
+        }
+    }
+
+    private void OpenForm(BookingPageDto? page)
+    {
+        _editing = page;
+        _error = null;
+        _name = page?.Name ?? string.Empty;
+        _slug = page?.Slug ?? string.Empty;
+        _description = page?.Description;
+        _duration = page?.DurationMinutes ?? 30;
+        _step = page?.SlotStepMinutes ?? 30;
+        _notice = page?.MinNoticeHours ?? 4;
+        _ahead = page?.MaxDaysAhead ?? 30;
+        _mode = page?.AssignmentMode ?? "SingleUser";
+        _openDays = page is null ? ["mon", "tue", "wed", "thu", "fri"] : page.Availability.Weekly.Where(d => d.Value.Count > 0).Select(d => d.Key).ToHashSet();
+        var firstRange = page?.Availability.Weekly.Values.FirstOrDefault(r => r.Count > 0)?.FirstOrDefault();
+        _from = firstRange?.From ?? "09:00";
+        _to = firstRange?.To ?? "17:00";
+        _timeZone = page?.Availability.TimeZone ?? App.Bootstrap?.Company.TimeZoneId ?? "UTC";
+        _location = page?.LocationType ?? "Video";
+        _locationValue = page?.LocationValue;
+        _reminders = page is null ? "60, 15" : string.Join(", ", page.ReminderOffsetsMinutes);
+        _company = page?.Questions.FirstOrDefault(q => q.Key == "company")?.Label;
+        _active = page?.IsActive ?? true;
+        _drawer = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        _error = null;
+        _busy = true;
+        try
+        {
+            var weekly = Days.ToDictionary(d => d.Key, d => (IReadOnlyList<TimeRangeDto>)(_openDays.Contains(d.Key) ? [new TimeRangeDto(_from, _to)] : []));
+            var availability = new AvailabilityDto(_timeZone, weekly, _editing?.Availability.DateOverrides ?? []);
+            var users = App.Bootstrap is { } boot ? (_mode == "RoundRobin" ? await ActiveUsersAsync() : [boot.User.UserId]) : (IReadOnlyList<Guid>)[];
+            var questions = string.IsNullOrWhiteSpace(_company) ? new List<BookingQuestionDto>() : new List<BookingQuestionDto> { new("company", _company.Trim(), true, "text") };
+            var offsets = _reminders.Split([',', ' '], StringSplitOptions.RemoveEmptyEntries).Select(s => int.TryParse(s, out var m) ? m : -1).ToList();
+
+            var request = new SaveBookingPageRequest(_slug.Trim(), _name.Trim(), _description, _duration, 0, 0, _step, _notice, _ahead, _mode, users,
+                availability, questions, _location, _locationValue, offsets, _active);
+            var response = _editing is null
+                ? await Http.PostAsJsonAsync("api/v1/settings/booking-pages", request)
+                : await Http.PutAsJsonAsync($"api/v1/settings/booking-pages/{_editing.Id}", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                var fields = await ProblemText.FieldErrorsAsync(response);
+                _error = fields.Count > 0 ? string.Join(" ", fields.Values) : await ProblemText.FromAsync(response, "We could not save this booking page.");
+                return;
+            }
+
+            _drawer = false;
+            Snackbar.Add("Booking page saved", Severity.Success);
+            await LoadAsync();
+        }
+        catch (HttpRequestException)
+        {
+            _error = "We could not reach MindLift. Check your connection and try again.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task<IReadOnlyList<Guid>> ActiveUsersAsync()
+        => (await RecordLookupsUsers()).Select(u => u.Id).ToList();
+
+    private async Task<List<UserListItem>> RecordLookupsUsers()
+    {
+        try
+        {
+            var page = await Http.GetFromJsonAsync<PagedResult<UserListItem>>("api/v1/users?pageSize=200");
+            return page?.Items.Where(u => u.IsActive).ToList() ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            return [];
+        }
+    }
+
+    private async Task DeleteAsync(BookingPageDto page)
+    {
+        var response = await Http.DeleteAsync($"api/v1/settings/booking-pages/{page.Id}");
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "We could not delete this booking page."), Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Booking page deleted", Severity.Success);
+        await LoadAsync();
+    }
+}

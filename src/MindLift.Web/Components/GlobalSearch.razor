@@ -1,0 +1,66 @@
+@inject HttpClient Http
+@inject NavigationManager Nav
+
+<MudAutocomplete T="SearchHitDto" Value="_selected" ValueChanged="OnPickedAsync" SearchFunc="SearchAsync" ToStringFunc="hit => hit?.Title"
+                 Placeholder="Search records" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.Search"
+                 Variant="Variant.Outlined" Margin="Margin.Dense" Class="ml-hide-xs mr-2" Style="max-width:320px" Clearable="true"
+                 CoerceText="false" ResetValueOnEmptyText="true" MinCharacters="2" DebounceInterval="250" MaxItems="15"
+                 data-testid="global-search">
+    <ItemTemplate Context="hit">
+        <div class="ml-row" data-testid="search-hit">
+            <MudIcon Icon="@IconFor(hit.Kind)" Size="Size.Small" />
+            <div class="ml-grow" style="min-width:0">
+                <MudText Typo="Typo.body2" Class="ml-truncate">@hit.Title</MudText>
+                @if (!string.IsNullOrWhiteSpace(hit.Subtitle))
+                {
+                    <MudText Typo="Typo.caption" Class="ml-muted ml-truncate">@hit.Subtitle</MudText>
+                }
+            </div>
+            <span class="ml-faint">@KindLabel(hit.Kind)</span>
+        </div>
+    </ItemTemplate>
+    <NoItemsTemplate>
+        <MudText Typo="Typo.body2" Class="ml-muted" Style="padding:8px 16px" data-testid="search-empty">No matches</MudText>
+    </NoItemsTemplate>
+</MudAutocomplete>
+
+@code {
+    private SearchHitDto? _selected;
+
+    private async Task<IEnumerable<SearchHitDto>> SearchAsync(string text, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(text) || text.Trim().Length < 2)
+        {
+            return [];
+        }
+
+        try
+        {
+            return await Http.GetFromJsonAsync<List<SearchHitDto>>("api/v1/search?q=" + Uri.EscapeDataString(text.Trim()), cancellationToken) ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            return [];
+        }
+    }
+
+    private Task OnPickedAsync(SearchHitDto? hit)
+    {
+        if (hit is not null)
+        {
+            Nav.NavigateTo(hit.Kind switch { "contact" => "/contacts/", "account" => "/accounts/", _ => "/leads/" } + hit.Id);
+        }
+
+        _selected = null;
+        return Task.CompletedTask;
+    }
+
+    private static string IconFor(string kind) => kind switch
+    {
+        "contact" => Icons.Material.Outlined.Contacts,
+        "account" => Icons.Material.Outlined.Business,
+        _ => Icons.Material.Outlined.PersonSearch,
+    };
+
+    private static string KindLabel(string kind) => kind switch { "contact" => "Contact", "account" => "Account", _ => "Lead" };
+}

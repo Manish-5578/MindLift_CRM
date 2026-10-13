@@ -1,0 +1,137 @@
+@page "/settings/currencies"
+@inject HttpClient Http
+@inject AppState App
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageTitle>Currencies · MindLift</PageTitle>
+
+<div class="ml-page ml-page--form">
+    <PageHeader Title="Currencies" Subtitle="The base currency reports use, the currencies you can record deals in, and their rates." />
+    <SettingsNav Current="/settings/currencies" />
+
+    @if (_currencies is null)
+    {
+        <SkeletonCards Count="2" />
+    }
+    else
+    {
+        <MlCard Title="Currencies" Class="mb-4">
+            <div class="ml-stack">
+                @if (_error is not null) { <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert> }
+                <MudTextField @bind-Value="_base" Label="Base currency (ISO code)" Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="Three letters, for example AED." data-testid="base-currency" />
+                <MudTextField @bind-Value="_enabled" Label="Other currencies you use" Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="Comma-separated, for example USD, EUR." data-testid="enabled-currencies" />
+                <div class="ml-row" style="justify-content:flex-end">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveCurrenciesAsync" data-testid="primary-action">Save currencies</MudButton>
+                </div>
+            </div>
+        </MlCard>
+
+        <MlCard Title="Exchange rates" Subtitle="Rate to the base currency, from the date it applies.">
+            <div class="ml-stack">
+                @if (_rates.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Class="ml-muted">No rates yet. Enable a currency above, then add its rate.</MudText>
+                }
+                @foreach (var rate in _rates)
+                {
+                    <div class="ml-row" style="padding:6px 0;border-bottom:1px solid var(--ml-border)">
+                        <div class="ml-grow"><MudText Typo="Typo.body1">1 @rate.Currency = @rate.RateToBase.ToString("0.########") @_base</MudText></div>
+                        <MudText Typo="Typo.caption" Class="ml-muted"><DateText Value="@rate.EffectiveDate" Relative="false" /></MudText>
+                        <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" OnClick="() => DeleteRateAsync(rate.Id)" aria-label="Delete rate" />
+                    </div>
+                }
+                <div class="ml-row ml-row--wrap">
+                    <MudTextField @bind-Value="_rateCode" Label="Currency" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:120px" />
+                    <MudNumericField @bind-Value="_rateValue" Label="Rate" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0.00000001m" Style="max-width:160px" />
+                    <MudDatePicker @bind-Date="_rateDate" Label="Effective" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:180px" />
+                    <MudButton Variant="Variant.Outlined" OnClick="AddRateAsync">Add rate</MudButton>
+                </div>
+            </div>
+        </MlCard>
+    }
+</div>
+
+@code {
+    private CurrencySettingsDto? _currencies;
+    private List<ExchangeRateDto> _rates = [];
+    private string _base = "AED";
+    private string _enabled = string.Empty;
+    private string _rateCode = string.Empty;
+    private decimal? _rateValue;
+    private DateTime? _rateDate = DateTime.Today;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!App.IsAdmin)
+        {
+            Nav.NavigateTo("/");
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _currencies = await Http.GetFromJsonAsync<CurrencySettingsDto>("api/v1/settings/currencies");
+            if (_currencies is not null)
+            {
+                _base = _currencies.BaseCurrency;
+                _enabled = string.Join(", ", _currencies.EnabledCurrencies.Where(c => c != _currencies.BaseCurrency));
+            }
+
+            _rates = await Http.GetFromJsonAsync<List<ExchangeRateDto>>("api/v1/settings/exchange-rates") ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            _currencies = null;
+        }
+    }
+
+    private async Task SaveCurrenciesAsync()
+    {
+        _error = null;
+        var others = _enabled.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        var response = await Http.PutAsJsonAsync("api/v1/settings/currencies", new SaveCurrencySettingsRequest(_base.Trim().ToUpperInvariant(), others));
+        if (!response.IsSuccessStatusCode)
+        {
+            _error = await ProblemText.FromAsync(response, "We could not save the currencies.");
+            return;
+        }
+
+        Snackbar.Add("Currencies saved", Severity.Success);
+        await LoadAsync();
+    }
+
+    private async Task AddRateAsync()
+    {
+        if (_rateValue is null || _rateDate is null || string.IsNullOrWhiteSpace(_rateCode))
+        {
+            Snackbar.Add("Enter a currency, a rate and a date.", Severity.Warning);
+            return;
+        }
+
+        var response = await Http.PostAsJsonAsync("api/v1/settings/exchange-rates",
+            new SaveExchangeRateRequest(_rateCode.Trim().ToUpperInvariant(), _rateValue.Value, _rateDate.Value));
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "We could not add this rate."), Severity.Error);
+            return;
+        }
+
+        _rateCode = string.Empty;
+        _rateValue = null;
+        Snackbar.Add("Rate added", Severity.Success);
+        await LoadAsync();
+    }
+
+    private async Task DeleteRateAsync(Guid id)
+    {
+        await Http.DeleteAsync($"api/v1/settings/exchange-rates/{id}");
+        await LoadAsync();
+    }
+}

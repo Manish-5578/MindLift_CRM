@@ -1,0 +1,155 @@
+@implements IDisposable
+@inject HttpClient Http
+@inject NotificationClient Notifications
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<div style="position:relative;display:inline-flex" data-testid="notification-bell" data-connected="@ConnectedText">
+    <MudBadge Content="@Notifications.Unread" Visible="@(Notifications.Unread > 0)" Max="99" Color="Color.Error" Overlap="true" data-testid="notification-badge">
+        <MudIconButton Icon="@Icons.Material.Outlined.Notifications" Color="Color.Inherit" OnClick="ToggleAsync" aria-label="Notifications" data-testid="notification-bell-button" />
+    </MudBadge>
+
+    <MudPopover Open="_open" Fixed="true" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" Class="ml-notifications" Style="min-width:320px;max-width:min(380px, 96vw)">
+        <div data-testid="notification-panel">
+            <div class="ml-row ml-row--between" style="padding:12px 16px">
+                <MudText Typo="Typo.subtitle2">Notifications</MudText>
+                @if (Notifications.Unread > 0)
+                {
+                    <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="MarkAllAsync" data-testid="mark-all-read">Mark all as read</MudButton>
+                }
+            </div>
+            <MudDivider />
+
+            @if (_loading)
+            {
+                <MudProgressLinear Indeterminate="true" />
+            }
+            else if (_items.Count == 0)
+            {
+                <div style="padding:16px 20px" data-testid="notifications-empty">
+                    <MudText Typo="Typo.body2" Class="ml-muted">Nothing new. Assignments, mentions and reminders will show up here.</MudText>
+                </div>
+            }
+
+            @foreach (var item in _items)
+            {
+                var current = item;
+                <div class="@RowClass(current)" @onclick="() => OpenAsync(current)" role="button" tabindex="0" data-testid="notification-item">
+                    <MudText Typo="Typo.body2" Style="@(current.IsRead ? null : "font-weight:600")">@current.Title</MudText>
+                    @if (!string.IsNullOrWhiteSpace(current.Body))
+                    {
+                        <MudText Typo="Typo.caption" Class="ml-muted ml-truncate">@current.Body</MudText>
+                    }
+                    <MudText Typo="Typo.caption" Class="ml-faint"><DateText Value="@current.CreatedAtUtc" /></MudText>
+                </div>
+            }
+
+            <MudDivider />
+            <div style="padding:8px 16px">
+                <MudButton Href="/notifications" Size="Size.Small" Variant="Variant.Text" OnClick="Close" data-testid="see-all-notifications">See all</MudButton>
+            </div>
+        </div>
+    </MudPopover>
+</div>
+<MudOverlay Visible="_open" OnClick="Close" AutoClose="false" />
+
+@code {
+    private List<NotificationDto> _items = [];
+    private bool _loading;
+    private bool _open;
+
+    protected override void OnInitialized()
+    {
+        Notifications.Changed += OnChanged;
+        Notifications.Received += OnReceived;
+    }
+
+    private string ConnectedText => Notifications.IsConnected ? "true" : "false";
+
+    private string RowClass(NotificationDto item) => item.IsRead ? "ml-notification" : "ml-notification ml-notification--unread";
+
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    /// <summary>A notification arrived while the page is open: show it as a toast and, if the list is open, at the top of it.</summary>
+    private void OnReceived(NotificationDto notification) => _ = InvokeAsync(() =>
+    {
+        Snackbar.Add(notification.Title, Severity.Info, config =>
+        {
+            config.Action = notification.Url is null ? null : "View";
+            config.OnClick = _ =>
+            {
+                Nav.NavigateTo(notification.Url!);
+                return Task.CompletedTask;
+            };
+            config.RequireInteraction = false;
+        });
+
+        if (_open)
+        {
+            _items.Insert(0, notification);
+        }
+
+        StateHasChanged();
+    });
+
+    private async Task ToggleAsync()
+    {
+        _open = !_open;
+        if (_open)
+        {
+            await LoadAsync();
+        }
+    }
+
+    private void Close() => _open = false;
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var page = await Http.GetFromJsonAsync<NotificationPageDto>("api/v1/notifications?page=1&pageSize=20");
+            _items = page?.Items.ToList() ?? [];
+            if (page is not null)
+            {
+                Notifications.SetUnread(page.Unread);
+            }
+        }
+        catch (HttpRequestException)
+        {
+            _items = [];
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenAsync(NotificationDto item)
+    {
+        if (!item.IsRead)
+        {
+            await Http.PostAsync($"api/v1/notifications/{item.Id}/read", null);
+            await Notifications.RefreshCountAsync();
+        }
+
+        _open = false;
+        if (item.Url is not null)
+        {
+            Nav.NavigateTo(item.Url);
+        }
+    }
+
+    private async Task MarkAllAsync()
+    {
+        await Http.PostAsync("api/v1/notifications/read-all", null);
+        _items = _items.Select(i => i with { IsRead = true }).ToList();
+        Notifications.SetUnread(0);
+    }
+
+    public void Dispose()
+    {
+        Notifications.Changed -= OnChanged;
+        Notifications.Received -= OnReceived;
+    }
+}

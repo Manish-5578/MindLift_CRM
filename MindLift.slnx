@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MindLift.Api/MindLift.Api.csproj" />
+    <Project Path="src/MindLift.Application/MindLift.Application.csproj" />
+    <Project Path="src/MindLift.Domain/MindLift.Domain.csproj" />
+    <Project Path="src/MindLift.Infrastructure/MindLift.Infrastructure.csproj" />
+    <Project Path="src/MindLift.Shared/MindLift.Shared.csproj" />
+    <Project Path="src/MindLift.UI/MindLift.UI.csproj" />
+    <Project Path="src/MindLift.Web/MindLift.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MindLift.E2E/MindLift.E2E.csproj" />
+    <Project Path="tests/MindLift.IntegrationTests/MindLift.IntegrationTests.csproj" />
+    <Project Path="tests/MindLift.UITests/MindLift.UITests.csproj" />
+    <Project Path="tests/MindLift.UnitTests/MindLift.UnitTests.csproj" />
+  </Folder>
+</Solution>

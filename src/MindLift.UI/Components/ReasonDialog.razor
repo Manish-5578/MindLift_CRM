@@ -1,0 +1,46 @@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h5">@Title</MudText>
+    </TitleContent>
+    <DialogContent>
+        <div class="ml-stack">
+            @if (!string.IsNullOrWhiteSpace(Message))
+            {
+                <MudText Typo="Typo.body1" Class="ml-muted">@Message</MudText>
+            }
+            <MudTextField @bind-Value="_reason" Label="@Label" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" Immediate="true" AutoFocus="true"
+                          Error="@(_error is not null)" ErrorText="@_error" data-testid="reason-input" />
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Cancel" data-testid="reason-cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="@(Danger ? Color.Error : Color.Primary)" OnClick="Confirm" data-testid="reason-ok">@ConfirmText</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private string _reason = string.Empty;
+    private string? _error;
+
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public string Title { get; set; } = "Add a reason";
+    [Parameter] public string? Message { get; set; }
+    [Parameter] public string Label { get; set; } = "Reason *";
+    [Parameter] public string ConfirmText { get; set; } = "Confirm";
+    [Parameter] public bool Danger { get; set; }
+
+    private void Confirm()
+    {
+        // The button stays enabled. A missing reason is explained under the field instead (plan 18.8.4).
+        if (string.IsNullOrWhiteSpace(_reason))
+        {
+            _error = "A reason is required.";
+            return;
+        }
+
+        MudDialog.Close(DialogResult.Ok(_reason.Trim()));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

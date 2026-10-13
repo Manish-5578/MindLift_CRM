@@ -1,0 +1,17 @@
+<div class="ml-state" data-testid="error-state">
+    <div class="ml-state__icon ml-state__icon--error"><MudIcon Icon="@Icons.Material.Outlined.ErrorOutline" Style="font-size:36px" /></div>
+    <MudText Typo="Typo.h6">@Title</MudText>
+    <MudText Typo="Typo.body1" Class="ml-state__message">@Message</MudText>
+    @if (OnRetry.HasDelegate)
+    {
+        <div class="ml-state__actions">
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Refresh" OnClick="OnRetry" data-testid="error-retry">Try again</MudButton>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "Something went wrong";
+    [Parameter] public string Message { get; set; } = "We could not load this. Check your connection and try again.";
+    [Parameter] public EventCallback OnRetry { get; set; }
+}

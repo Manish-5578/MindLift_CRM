@@ -1,0 +1,192 @@
+@inject HttpClient Http
+@inject AppState App
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+
+<MlCard Title="Activities" TestId="record-activities">
+    <div class="ml-stack">
+        @if (CanCreate)
+        {
+            <div class="ml-row ml-row--wrap" data-testid="activity-actions">
+                <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Outlined.TaskAlt" OnClick="() => OpenNew(ActivityTypes.Task)" data-testid="add-task">Task</MudButton>
+                <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Call" OnClick="() => OpenNew(ActivityTypes.Call)" data-testid="add-call">Call</MudButton>
+                <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Event" OnClick="() => OpenNew(ActivityTypes.Meeting)" data-testid="add-meeting">Meeting</MudButton>
+                <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Outlined.StickyNote2" OnClick="() => OpenNew(ActivityTypes.Note)" data-testid="add-note">Note</MudButton>
+            </div>
+        }
+
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else if (_items.Count == 0)
+        {
+            <MudText Typo="Typo.body2" Class="ml-muted" data-testid="no-activities">Nothing logged yet.</MudText>
+        }
+
+        @foreach (var item in _items)
+        {
+            var current = item;
+            <div class="ml-row" style="padding:8px 0;border-bottom:1px solid var(--ml-border);align-items:flex-start" data-testid="activity-row">
+                @if (current.Type is "Task" or "Meeting" or "Call" && CanEdit)
+                {
+                    <MudCheckBox T="bool" Value="@(current.Status == "Completed")" ValueChanged="v => ToggleAsync(current, v)" Color="Color.Primary" aria-label="@("Complete " + current.Subject)" data-testid="activity-check" />
+                }
+                else
+                {
+                    <MudIcon Icon="@IconFor(current.Type)" Size="Size.Small" Class="mt-2" />
+                }
+
+                <div class="ml-grow" style="min-width:0;overflow-wrap:anywhere">
+                    <MudText Typo="Typo.subtitle2" Style="@(current.Status == "Completed" && current.Type != "Note" ? "text-decoration:line-through" : null)">@current.Subject</MudText>
+                    @if (!string.IsNullOrWhiteSpace(current.Description))
+                    {
+                        <MudText Typo="Typo.body2" Class="ml-muted" Style="white-space:pre-wrap">@current.Description</MudText>
+                    }
+                    @if (current.Mentions.Count > 0)
+                    {
+                        <MudText Typo="Typo.caption" Class="ml-link" data-testid="activity-mentions-text">@string.Join(" ", current.Mentions.Select(m => "@" + m.Name))</MudText>
+                    }
+                    @if (current.Attendees.Count > 0)
+                    {
+                        <MudText Typo="Typo.caption" Class="ml-muted" data-testid="activity-guests">Guests: @string.Join(", ", current.Attendees)@(current.InvitationsSentAtUtc is null ? "" : " · invitations sent")</MudText>
+                    }
+                    <MudText Typo="Typo.caption" Class="ml-muted">
+                        @current.Type@(current.Direction is null ? "" : " · " + current.Direction)
+                        @if (current.DueAtUtc is not null) { <text> · </text><DateText Value="@current.DueAtUtc" Danger="@current.IsOverdue" /> }
+                        @if (current.OwnerName is not null) { <text> · @current.OwnerName</text> }
+                    </MudText>
+                </div>
+
+                @if (CanEdit)
+                {
+                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="() => EditAsync(current)" aria-label="Edit" />
+                }
+                @if (CanDelete)
+                {
+                    <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" OnClick="() => DeleteAsync(current)" aria-label="Delete" data-testid="activity-delete" />
+                }
+            </div>
+        }
+    </div>
+</MlCard>
+
+<ActivityFormDrawer @ref="_form" @bind-Open="_drawer" OnSaved="OnSaved" LeadId="LeadId" ContactId="ContactId" AccountId="AccountId" DealId="DealId" />
+
+@code {
+    [Parameter] public Guid? LeadId { get; set; }
+    [Parameter] public Guid? ContactId { get; set; }
+    [Parameter] public Guid? AccountId { get; set; }
+    [Parameter] public Guid? DealId { get; set; }
+
+    /// <summary>Tells the page the list changed, for example to refresh a deal's next step.</summary>
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private ActivityFormDrawer? _form;
+    private bool _drawer;
+    private bool _loading = true;
+    private IReadOnlyList<ActivityDto> _items = [];
+    private Guid? _loadedFor;
+
+    private bool Can(Func<ModulePermissionDto, bool> check) => App.Bootstrap?.Permissions.Any(p => p.Module == "Activities" && check(p)) == true;
+    private bool CanCreate => Can(p => p.CanCreate);
+    private bool CanEdit => Can(p => p.CanEdit);
+    private bool CanDelete => Can(p => p.CanDelete);
+
+    private Guid? Key => DealId ?? ContactId ?? AccountId ?? LeadId;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Key != _loadedFor)
+        {
+            _loadedFor = Key;
+            await LoadAsync();
+        }
+    }
+
+    private int _loadSequence;
+
+    public async Task LoadAsync()
+    {
+        // Only the newest answer is used, so a slow older load cannot overwrite a newer list.
+        var sequence = ++_loadSequence;
+        _loading = true;
+        IReadOnlyList<ActivityDto> items;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/v1/activities/query", new ActivityQuery("all", null, null, false, LeadId, ContactId, AccountId, DealId, 1, 100));
+            items = response.IsSuccessStatusCode ? (await response.Content.ReadFromJsonAsync<PagedResult<ActivityDto>>())?.Items ?? [] : [];
+        }
+        catch (HttpRequestException)
+        {
+            items = [];
+        }
+
+        if (sequence != _loadSequence)
+        {
+            return;
+        }
+
+        _items = items;
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private static string IconFor(string type) => type switch
+    {
+        "Call" => Icons.Material.Outlined.Call,
+        "Meeting" => Icons.Material.Outlined.Event,
+        "Note" => Icons.Material.Outlined.StickyNote2,
+        _ => Icons.Material.Outlined.TaskAlt,
+    };
+
+    private void OpenNew(string type)
+    {
+        _form?.OpenNew(type);
+        _drawer = true;
+    }
+
+    private void EditAsync(ActivityDto item)
+    {
+        _form?.OpenEdit(item);
+        _drawer = true;
+    }
+
+    private async Task OnSaved()
+    {
+        Snackbar.Add("Activity saved", Severity.Success);
+        await LoadAsync();
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task ToggleAsync(ActivityDto item, bool done)
+    {
+        var response = done
+            ? await Http.PostAsJsonAsync($"api/v1/activities/{item.Id}/complete", new CompleteActivityRequest(null, null, null))
+            : await Http.PostAsync($"api/v1/activities/{item.Id}/reopen", null);
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "We could not update this activity."), Severity.Error);
+        }
+
+        await LoadAsync();
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task DeleteAsync(ActivityDto item)
+    {
+        if (!await Dialogs.ConfirmAsync($"Delete {item.Subject}?", "It is removed from every record it is linked to.", "Delete", danger: true))
+        {
+            return;
+        }
+
+        var response = await Http.DeleteAsync($"api/v1/activities/{item.Id}");
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "We could not delete this activity."), Severity.Error);
+        }
+
+        await LoadAsync();
+        await OnChanged.InvokeAsync();
+    }
+}

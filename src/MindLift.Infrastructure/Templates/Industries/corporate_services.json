@@ -1,0 +1,52 @@
+{
+  "key": "corporate_services",
+  "version": 1,
+  "name": "Corporate services",
+  "nameAr": "الخدمات المؤسسية",
+  "description": "Company formation, secretarial and corporate compliance firms managing engagements and documents.",
+  "modules": {
+    "labels": {
+      "Deals": { "singular": "Engagement", "plural": "Engagements", "singularAr": "ارتباط", "pluralAr": "الارتباطات" }
+    },
+    "enable": ["Dashboard", "Leads", "Contacts", "Accounts", "Deals", "Activities", "Calendar", "Communication", "Reports", "Notifications", "Documents", "Projects", "Invoices", "Portal"],
+    "disable": []
+  },
+  "picklists": {},
+  "pipelines": [
+    {
+      "name": "Engagements",
+      "nameAr": "الارتباطات",
+      "isDefault": true,
+      "stages": [
+        { "name": "Enquiry", "nameAr": "استفسار", "probability": 10, "type": "Open", "rottingDays": 7 },
+        { "name": "Proposal", "nameAr": "عرض", "probability": 30, "type": "Open", "rottingDays": 7 },
+        { "name": "Documents collected", "nameAr": "تم جمع المستندات", "probability": 60, "type": "Open", "rottingDays": 10 },
+        { "name": "Submitted", "nameAr": "مقدمة", "probability": 80, "type": "Open", "rottingDays": 14 },
+        { "name": "Completed", "nameAr": "مكتملة", "probability": 100, "type": "Won" },
+        { "name": "Lost", "nameAr": "خاسرة", "probability": 0, "type": "Lost" }
+      ]
+    }
+  ],
+  "customFields": [
+    { "entity": "accounts", "key": "cf_trade_license_no", "label": "Trade license no.", "labelAr": "رقم الرخصة التجارية", "type": "Text", "section": "Licensing", "showInList": true },
+    { "entity": "accounts", "key": "cf_license_expiry", "label": "License expiry", "labelAr": "انتهاء الرخصة", "type": "Date", "section": "Licensing", "showInList": true },
+    { "entity": "accounts", "key": "cf_jurisdiction", "label": "Jurisdiction", "labelAr": "الجهة", "type": "Picklist", "section": "Licensing",
+      "options": [
+        { "value": "mainland", "label": "Mainland", "labelAr": "البر الرئيسي" },
+        { "value": "freezone", "label": "Free zone", "labelAr": "منطقة حرة" },
+        { "value": "offshore", "label": "Offshore", "labelAr": "خارج الدولة" }
+      ] },
+    { "entity": "deals", "key": "cf_service_type", "label": "Service type", "labelAr": "نوع الخدمة", "type": "Text" }
+  ],
+  "layouts": {
+    "leads": {
+      "Form": [
+        { "section": "Contact info", "sectionAr": "بيانات الاتصال", "columns": 2, "fields": ["first_name", "last_name", "email", "phone", "company_name"] },
+        { "section": "Lead details", "sectionAr": "تفاصيل العميل", "columns": 2, "fields": ["source", "status", "rating", "owner_id"] }
+      ]
+    }
+  },
+  "dashboardHighlights": ["deals_in_progress", "upcoming_meetings", "documents_expiring"],
+  "documentTypes": { "enable": ["trade_license", "passport", "emirates_id", "financial_statement", "generic"], "portalEnabled": true },
+  "sampleData": { "profile": "corporate_services" }
+}

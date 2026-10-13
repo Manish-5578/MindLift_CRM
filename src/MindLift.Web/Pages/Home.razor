@@ -1,0 +1,727 @@
+@page "/"
+@using MindLift.Shared.Contracts
+@using MindLift.Shared.Enums
+@using System.Text.Json
+@using System.Globalization
+@inject AuthSession Session
+@inject AppState App
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>Dashboard · MindLift</PageTitle>
+
+<div class="ml-page">
+    <div class="d-flex flex-wrap align-center justify-space-between gap-3 mb-4">
+        <div>
+            <MudText Typo="Typo.h5" Style="font-weight:700">@Greeting</MudText>
+            <MudText Typo="Typo.body2" Class="ml-muted">@DateLine</MudText>
+        </div>
+
+        <div class="d-flex flex-wrap align-center gap-2">
+            @if (_dashboard?.AvailableViews.Count > 1)
+            {
+                <MudChipSet T="DashboardView" SelectedValue="_currentView" SelectedValueChanged="OnViewChanged" CheckMark="false">
+                    @foreach (var v in _dashboard.AvailableViews)
+                    {
+                        <MudChip T="DashboardView" Value="@v" Color="Color.Primary" Variant="@(_currentView == v ? Variant.Filled : Variant.Outlined)" Size="Size.Small">
+                            @(v switch
+                            {
+                                DashboardView.Staff => "My View",
+                                DashboardView.Manager => "Team View",
+                                DashboardView.Admin => "Company View",
+                                _ => v.ToString()
+                            })
+                        </MudChip>
+                    }
+                </MudChipSet>
+            }
+
+            <MudSelect T="string" Value="_periodPreset" ValueChanged="OnPeriodChanged" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Style="min-width:140px">
+                <MudSelectItem T="string" Value="@("this_month")">This month</MudSelectItem>
+                <MudSelectItem T="string" Value="@("last_month")">Last month</MudSelectItem>
+                <MudSelectItem T="string" Value="@("this_quarter")">This quarter</MudSelectItem>
+                <MudSelectItem T="string" Value="@("this_year")">This year</MudSelectItem>
+            </MudSelect>
+
+            <MudIconButton Icon="@Icons.Material.Outlined.Refresh" Size="Size.Small" OnClick="() => LoadDashboardAsync(true)" aria-label="Refresh dashboard" />
+            <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Outlined.DashboardCustomize" OnClick="() => _customizeOpen = true">
+                Customize
+            </MudButton>
+        </div>
+    </div>
+
+    @if (_onboarding is { CurrentStep: < 99 })
+    {
+        <MlCard Title="Finish setting up your workspace" Subtitle="@($"Step {_onboarding.CurrentStep} of 6")" Class="mb-4" TestId="setup-card">
+            <div class="ml-stack">
+                <MudProgressLinear Value="@(100.0 * (_onboarding.CurrentStep - 1) / 6)" Color="Color.Primary" Rounded="true" />
+                <MudText Typo="Typo.body2" Class="ml-muted">Your data, pipeline and team are configured in a few short steps.</MudText>
+                <div><MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/onboarding" data-testid="primary-action">Continue setup</MudButton></div>
+            </div>
+        </MlCard>
+    }
+
+    @if (_loading)
+    {
+        <SkeletonTable Rows="6" Columns="4" />
+    }
+    else if (_loadFailed)
+    {
+        <ErrorState OnRetry="() => LoadDashboardAsync(true)" />
+    }
+    else if (_dashboard is not null)
+    {
+        <!-- KPI Strip (Full Width) -->
+        var kpiWidget = _dashboard.Widgets.FirstOrDefault(w => w.Key == "kpi_strip" && !w.IsHidden);
+        if (kpiWidget?.Data is { } kpiJson)
+        {
+            var tiles = Deserialize<List<KpiTileDto>>(kpiJson) ?? [];
+            <div class="d-flex flex-wrap gap-3 mb-4" data-testid="kpi-strip">
+                @foreach (var tile in tiles)
+                {
+                    <div class="pa-4 rounded-lg flex-1" style="background:var(--ml-card-bg, #fff);border:1px solid var(--ml-border);min-width:180px;cursor:pointer" @onclick="() => NavigateTo(tile.DrillDownUrl)">
+                        <div class="d-flex justify-space-between align-center mb-1">
+                            <MudText Typo="Typo.caption" Class="ml-muted" Style="font-weight:600;text-transform:uppercase">@tile.Label</MudText>
+                            @if (tile.ChangePct is not null)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="@(tile.Trend == tile.GoodWhen ? Color.Success : Color.Error)" Variant="Variant.Text" Class="pa-0">
+                                    <MudIcon Icon="@(tile.Trend == "up" ? Icons.Material.Filled.ArrowUpward : Icons.Material.Filled.ArrowDownward)" Size="Size.Small" />
+                                    @Math.Abs(tile.ChangePct.Value)%
+                                </MudChip>
+                            }
+                        </div>
+                        <MudText Typo="Typo.h5" Style="font-weight:700">@FormatValue(tile.Value, tile.Format)</MudText>
+                    </div>
+                }
+            </div>
+        }
+
+        <!-- 12-Column Responsive Grid -->
+        <MudGrid Spacing="3">
+            @foreach (var widget in _dashboard.Widgets.Where(w => w.Key != "kpi_strip" && !w.IsHidden).OrderBy(w => w.Order))
+            {
+                <MudItem xs="12" md="@((int)widget.Size)">
+                    @switch (widget.Key)
+                    {
+                        case "my_day":
+                            RenderMyDay(widget);
+                            break;
+                        case "upcoming_meetings":
+                            RenderUpcomingMeetings(widget);
+                            break;
+                        case "new_leads":
+                            RenderNewLeads(widget);
+                            break;
+                        case "deals_in_progress":
+                            RenderDealsInProgress(widget);
+                            break;
+                        case "deals_closing_soon":
+                            RenderDealsClosingSoon(widget);
+                            break;
+                        case "target_progress":
+                            RenderTargetProgress(widget);
+                            break;
+                        case "sales_trend":
+                            RenderSalesTrend(widget);
+                            break;
+                        case "leads_by_source":
+                            RenderLeadsBySource(widget);
+                            break;
+                        case "pipeline_funnel":
+                            RenderPipelineFunnel(widget);
+                            break;
+                        case "team_leaderboard":
+                            RenderTeamLeaderboard(widget);
+                            break;
+                        case "team_overdue":
+                            RenderTeamOverdue(widget);
+                            break;
+                        case "recent_wins":
+                            RenderRecentWins(widget);
+                            break;
+                        case "activity_summary":
+                            RenderActivitySummary(widget);
+                            break;
+                        case "system_overview":
+                            RenderSystemOverview(widget);
+                            break;
+                        default:
+                            <MlCard Title="@widget.Title">
+                                <MudText Typo="Typo.body2" Class="ml-muted">No visual representation available for @widget.Key.</MudText>
+                            </MlCard>
+                            break;
+                    }
+                </MudItem>
+            }
+        </MudGrid>
+    }
+</div>
+
+<!-- Layout Customizer Drawer -->
+<FormDrawer Open="_customizeOpen" OpenChanged="v => _customizeOpen = v" Title="Customize Dashboard" SubmitText="Done" Busy="false" OnSubmit="() => _customizeOpen = false">
+    <div class="ml-stack">
+        <MudText Typo="Typo.caption" Class="ml-muted">Toggle visibility of widgets for this view.</MudText>
+        @if (_dashboard is not null)
+        {
+            @foreach (var w in _dashboard.Widgets)
+            {
+                <div class="d-flex align-center justify-space-between pa-2 rounded" style="border:1px solid var(--ml-border)">
+                    <MudText Typo="Typo.body2">@w.Title</MudText>
+                    <MudSwitch T="bool" Value="@(!w.IsHidden)" ValueChanged="v => ToggleWidgetVisibility(w, !v)" Color="Color.Primary" />
+                </div>
+            }
+
+            <MudButton Variant="Variant.Text" Color="Color.Error" StartIcon="@Icons.Material.Outlined.RestartAlt" OnClick="ResetLayoutAsync" Class="mt-2">
+                Reset to Default Layout
+            </MudButton>
+        }
+    </div>
+</FormDrawer>
+
+@code {
+    private OnboardingDto? _onboarding;
+    private DashboardResponse? _dashboard;
+    private DashboardView _currentView = DashboardView.Staff;
+    private string _periodPreset = "this_month";
+    private bool _loading = true;
+    private bool _loadFailed;
+    private bool _customizeOpen;
+
+    private string Greeting
+    {
+        get
+        {
+            var hour = DateTime.Now.Hour;
+            var first = App.Bootstrap?.User.FullName.Split(' ').FirstOrDefault() ?? "there";
+            return hour < 12 ? $"Good morning, {first}" : hour < 17 ? $"Good afternoon, {first}" : $"Good evening, {first}";
+        }
+    }
+
+    private static string DateLine => DateTime.Now.ToString("dddd, dd MMMM yyyy", CultureInfo.InvariantCulture);
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.IsSignedIn)
+        {
+            Nav.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        if (App.IsAdmin)
+        {
+            try
+            {
+                var response = await Http.GetAsync("api/v1/onboarding");
+                if (response.IsSuccessStatusCode)
+                {
+                    _onboarding = await response.Content.ReadFromJsonAsync<OnboardingDto>();
+                }
+            }
+            catch { }
+        }
+
+        await LoadDashboardAsync();
+    }
+
+    private async Task LoadDashboardAsync(bool refresh = false)
+    {
+        _loading = true;
+        _loadFailed = false;
+        try
+        {
+            var url = $"api/v1/dashboard?view={_currentView}&period={_periodPreset}&refresh={refresh}";
+            var resp = await Http.GetFromJsonAsync<DashboardResponse>(url);
+            if (resp is not null)
+            {
+                _dashboard = resp;
+                _currentView = resp.View;
+            }
+        }
+        catch
+        {
+            _loadFailed = true;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OnViewChanged(DashboardView view)
+    {
+        _currentView = view;
+        await LoadDashboardAsync();
+    }
+
+    private async Task OnPeriodChanged(string period)
+    {
+        _periodPreset = period;
+        await LoadDashboardAsync();
+    }
+
+    private async Task ToggleWidgetVisibility(DashboardWidgetDto widget, bool isHidden)
+    {
+        if (_dashboard is null) return;
+        var items = _dashboard.Widgets.Select(w =>
+            w.Key == widget.Key
+                ? new DashboardWidgetLayoutItem(w.Key, w.Order, w.Size, isHidden)
+                : new DashboardWidgetLayoutItem(w.Key, w.Order, w.Size, w.IsHidden)
+        ).ToList();
+
+        var req = new SaveDashboardLayoutRequest(_currentView, items);
+        await Http.PutAsJsonAsync("api/v1/dashboard/layout", req);
+        await LoadDashboardAsync();
+    }
+
+    private async Task ResetLayoutAsync()
+    {
+        await Http.DeleteAsync($"api/v1/dashboard/layout?view={_currentView}");
+        _customizeOpen = false;
+        Snackbar.Add("Layout reset to default", Severity.Info);
+        await LoadDashboardAsync();
+    }
+
+    private async Task CompleteTaskAsync(Guid taskId)
+    {
+        try
+        {
+            await Http.PostAsJsonAsync($"api/v1/activities/{taskId}/complete", new { });
+            Snackbar.Add("Task completed", Severity.Success);
+            await LoadDashboardAsync(true);
+        }
+        catch
+        {
+            Snackbar.Add("Could not complete task", Severity.Error);
+        }
+    }
+
+    private void NavigateTo(string? url)
+    {
+        if (!string.IsNullOrWhiteSpace(url))
+        {
+            Nav.NavigateTo(url);
+        }
+    }
+
+    private static T? Deserialize<T>(JsonElement element)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<T>(element.GetRawText());
+        }
+        catch
+        {
+            return default;
+        }
+    }
+
+    private string FormatValue(decimal value, string format) => format switch
+    {
+        "currency" => $"{value:N0} {App.Bootstrap?.Company.BaseCurrency ?? "USD"}",
+        "percent" => $"{value:N1}%",
+        _ => $"{value:N0}"
+    };
+
+    // ---------- WIDGET RENDERERS ----------
+
+    private RenderFragment RenderMyDay(DashboardWidgetDto widget) => __builder =>
+    {
+        if (widget.Data is null) return;
+        var data = Deserialize<MyDayWidgetData>(widget.Data.Value);
+        <MlCard Title="My Day" Subtitle="@($"{data?.TodayTasksCount ?? 0} tasks today · {data?.OverdueTasksCount ?? 0} overdue")">
+            <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" TabPanelsClass="pa-2">
+                <MudTabPanel Text="@($"Today ({data?.TodayTasksCount ?? 0})")">
+                    @if (data?.TodayTasks.Count == 0)
+                    {
+                        <EmptyState Title="No tasks due today" Message="You're all caught up for today." Compact="true" />
+                    }
+                    else
+                    {
+                        @foreach (var task in data?.TodayTasks ?? [])
+                        {
+                            <div class="d-flex align-center justify-space-between py-2" style="border-bottom:1px solid var(--ml-border)">
+                                <div class="d-flex align-center gap-2">
+                                    <MudCheckBox T="bool" Value="false" ValueChanged="() => CompleteTaskAsync(task.Id)" Color="Color.Success" Dense="true" />
+                                    <div>
+                                        <MudText Typo="Typo.body2" Style="font-weight:600">@task.Subject</MudText>
+                                        <MudText Typo="Typo.caption" Class="ml-muted">@(task.DueAt?.ToString("g") ?? "Today")</MudText>
+                                    </div>
+                                </div>
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="@(task.Priority == "High" ? Color.Error : Color.Default)">@task.Priority</MudChip>
+                            </div>
+                        }
+                    }
+                </MudTabPanel>
+
+                <MudTabPanel Text="@($"Overdue ({data?.OverdueTasksCount ?? 0})")" BadgeColor="Color.Error">
+                    @if (data?.OverdueTasks.Count == 0)
+                    {
+                        <EmptyState Title="No overdue tasks" Message="Great job! No pending tasks are past due." Compact="true" />
+                    }
+                    else
+                    {
+                        @foreach (var task in data?.OverdueTasks ?? [])
+                        {
+                            <div class="d-flex align-center justify-space-between py-2" style="border-bottom:1px solid var(--ml-border)">
+                                <div class="d-flex align-center gap-2">
+                                    <MudCheckBox T="bool" Value="false" ValueChanged="() => CompleteTaskAsync(task.Id)" Color="Color.Success" Dense="true" />
+                                    <div>
+                                        <MudText Typo="Typo.body2" Style="font-weight:600" Color="Color.Error">@task.Subject</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Error">Due: @(task.DueAt?.ToString("g") ?? "Overdue")</MudText>
+                                    </div>
+                                </div>
+                                <MudChip T="string" Size="Size.Small" Color="Color.Error">Overdue</MudChip>
+                            </div>
+                        }
+                    }
+                </MudTabPanel>
+
+                <MudTabPanel Text="@($"Meetings ({data?.TodayMeetingsCount ?? 0})")">
+                    @if (data?.TodayMeetings.Count == 0)
+                    {
+                        <EmptyState Title="No meetings today" Message="No appointments scheduled for today." Compact="true" />
+                    }
+                    else
+                    {
+                        @foreach (var m in data?.TodayMeetings ?? [])
+                        {
+                            <div class="d-flex align-center justify-space-between py-2" style="border-bottom:1px solid var(--ml-border)">
+                                <div>
+                                    <MudText Typo="Typo.body2" Style="font-weight:600">@m.Subject</MudText>
+                                    <MudText Typo="Typo.caption" Class="ml-muted">@m.StartAt.ToString("t") – @m.EndAt.ToString("t")</MudText>
+                                </div>
+                                <MudButton Variant="Variant.Text" Size="Size.Small" Href="/calendar">View</MudButton>
+                            </div>
+                        }
+                    }
+                </MudTabPanel>
+            </MudTabs>
+        </MlCard>
+    };
+
+    private RenderFragment RenderUpcomingMeetings(DashboardWidgetDto widget) => __builder =>
+    {
+        if (widget.Data is null) return;
+        var meetings = Deserialize<List<DashboardMeetingItem>>(widget.Data.Value) ?? [];
+        <MlCard Title="Upcoming Meetings" Subtitle="Next 7 days">
+            @if (meetings.Count == 0)
+            {
+                <EmptyState Title="No meetings" Message="No upcoming meetings scheduled for this week." Compact="true" />
+            }
+            else
+            {
+                @foreach (var m in meetings)
+                {
+                    <div class="d-flex align-center justify-space-between py-2" style="border-bottom:1px solid var(--ml-border)">
+                        <div>
+                            <MudText Typo="Typo.body2" Style="font-weight:600">@m.Subject</MudText>
+                            <MudText Typo="Typo.caption" Class="ml-muted">@m.StartAt.ToString("ddd, dd MMM · t")</MudText>
+                        </div>
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" Href="/calendar">Calendar</MudButton>
+                    </div>
+                }
+            }
+        </MlCard>
+    };
+
+    private RenderFragment RenderNewLeads(DashboardWidgetDto widget) => __builder =>
+    {
+        if (widget.Data is null) return;
+        var data = Deserialize<NewLeadsWidgetData>(widget.Data.Value);
+        <MlCard Title="New Leads" Subtitle="@($"{data?.TotalCount ?? 0} uncontacted leads")">
+            @if (data?.Leads.Count == 0)
+            {
+                <EmptyState Title="No new leads" Message="All incoming leads have been addressed." Compact="true" />
+            }
+            else
+            {
+                @foreach (var lead in data?.Leads ?? [])
+                {
+                    var leadId = lead.Id;
+                    <div class="d-flex align-center justify-space-between py-2" style="border-bottom:1px solid var(--ml-border);cursor:pointer" @onclick="@(() => NavigateTo($"/leads/{leadId}"))">
+                        <div>
+                            <div class="d-flex align-center gap-2">
+                                <MudText Typo="Typo.body2" Style="font-weight:600">@lead.Name</MudText>
+                                @if (lead.IsSlaBreached)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Error">SLA > 24h</MudChip>
+                                }
+                            </div>
+                            <MudText Typo="Typo.caption" Class="ml-muted">@lead.CompanyName · @lead.Age</MudText>
+                        </div>
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@lead.Rating</MudChip>
+                    </div>
+                }
+            }
+        </MlCard>
+    };
+
+    private RenderFragment RenderDealsInProgress(DashboardWidgetDto widget) => __builder =>
+    {
+        if (widget.Data is null) return;
+        var data = Deserialize<DealsInProgressData>(widget.Data.Value);
+        <MlCard Title="Deals In Progress" Subtitle="@($"{data?.Count ?? 0} active deals · Total: {data?.TotalInBase:N0} {App.Bootstrap?.Company.BaseCurrency}")">
+            @if (data?.RottingCount > 0)
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">@data.RottingCount deal(s) have been idle past stage rotting threshold.</MudAlert>
+            }
+
+            @foreach (var stage in data?.ByStage ?? [])
+            {
+                var pct = data?.TotalInBase == 0m ? 0 : (int)(stage.TotalInBase / data!.TotalInBase * 100m);
+                <div class="mb-3">
+                    <div class="d-flex justify-space-between align-center mb-1">
+                        <MudText Typo="Typo.caption" Style="font-weight:600">@stage.Name (@stage.Count)</MudText>
+                        <MudText Typo="Typo.caption">@stage.TotalInBase.ToString("N0")</MudText>
+                    </div>
+                    <MudProgressLinear Value="@pct" Color="Color.Primary" Rounded="true" Size="Size.Small" />
+                </div>
+            }
+        </MlCard>
+    };
+
+    private RenderFragment RenderDealsClosingSoon(DashboardWidgetDto widget) => __builder =>
+    {
+        if (widget.Data is null) return;
+        var deals = Deserialize<List<ClosingDealItem>>(widget.Data.Value) ?? [];
+        <MlCard Title="Deals Closing Soon" Subtitle="Scheduled to close in the next 30 days">
+            @if (deals.Count == 0)
+            {
+                <EmptyState Title="No closing deals" Message="No open deals have an expected close date this month." Compact="true" />
+            }
+            else
+            {
+                @foreach (var deal in deals)
+                {
+                    <div class="d-flex align-center justify-space-between py-2" style="border-bottom:1px solid var(--ml-border)">
+                        <div>
+                            <MudText Typo="Typo.body2" Style="font-weight:600">@deal.Name</MudText>
+                            <MudText Typo="Typo.caption" Class="ml-muted">@deal.StageName · Due @deal.ExpectedCloseDate.ToString("yyyy-MM-dd")</MudText>
+                        </div>
+                        <div class="text-right">
+                            <MudText Typo="Typo.body2" Style="font-weight:700">@deal.Amount.ToString("N0") @deal.Currency</MudText>
+                            @if (deal.IsOverdue)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Error">Overdue</MudChip>
+                            }
+                        </div>
+                    </div>
+                }
+            }
+        </MlCard>
+    };
+
+    private RenderFragment RenderTargetProgress(DashboardWidgetDto widget) => __builder =>
+    {
+        if (widget.Data is null) return;
+        var targets = Deserialize<List<TargetProgressItem>>(widget.Data.Value) ?? [];
+        <MlCard Title="Target Progress">
+            @foreach (var t in targets)
+            {
+                <div class="mb-3">
+                    <div class="d-flex justify-space-between align-center mb-1">
+                        <MudText Typo="Typo.caption" Style="font-weight:600">@t.Metric</MudText>
+                        <MudChip T="string" Size="Size.Small" Color="@(t.Status == "ahead" ? Color.Success : t.Status == "on_track" ? Color.Info : Color.Warning)" Variant="Variant.Text">
+                            @t.Status.ToUpperInvariant()
+                        </MudChip>
+                    </div>
+                    <MudProgressLinear Value="@((double)t.Pct)" Color="@(t.Status == "ahead" ? Color.Success : Color.Primary)" Rounded="true" Size="Size.Medium" />
+                    <div class="d-flex justify-space-between mt-1">
+                        <MudText Typo="Typo.caption" Class="ml-muted">Actual: @t.Actual.ToString("N0")</MudText>
+                        <MudText Typo="Typo.caption" Class="ml-muted">Target: @t.Target.ToString("N0") (@t.Pct%)</MudText>
+                    </div>
+                </div>
+            }
+        </MlCard>
+    };
+
+    private RenderFragment RenderSalesTrend(DashboardWidgetDto widget) => __builder =>
+    {
+        if (widget.Data is null) return;
+        var months = Deserialize<List<MonthlySalesItem>>(widget.Data.Value) ?? [];
+        var max = months.Count == 0 ? 1m : Math.Max(1m, months.Max(m => m.WonAmount));
+        <MlCard Title="12-Month Sales Trend" Subtitle="Revenue closed-won by month">
+            <div class="d-flex align-end gap-2" style="height:140px;padding-top:20px">
+                @foreach (var m in months)
+                {
+                    var barHeight = Math.Max(4, (int)(m.WonAmount / max * 100));
+                    <div class="flex-1 d-flex flex-column align-center" style="height:100%;justify-content:flex-end">
+                        <div style="@($"width:100%;height:{barHeight}%;background:var(--mud-palette-primary);border-radius:4px 4px 0 0")" title="@($"{m.MonthLabel}: {m.WonAmount:N0}")"></div>
+                        <MudText Typo="Typo.caption" Style="font-size:10px;margin-top:4px" Class="ml-muted">@m.MonthLabel.Split(' ')[0]</MudText>
+                    </div>
+                }
+            </div>
+        </MlCard>
+    };
+
+    private RenderFragment RenderLeadsBySource(DashboardWidgetDto widget) => __builder =>
+    {
+        if (widget.Data is null) return;
+        var sources = Deserialize<List<LeadSourceItem>>(widget.Data.Value) ?? [];
+        var total = sources.Sum(s => s.Count);
+        <MlCard Title="Leads By Source">
+            @foreach (var s in sources)
+            {
+                var pct = total == 0 ? 0 : (int)((decimal)s.Count / total * 100m);
+                <div class="mb-2">
+                    <div class="d-flex justify-space-between align-center mb-1">
+                        <MudText Typo="Typo.caption" Style="font-weight:600">@s.Source (@s.Count leads)</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Success">@s.ConvertedCount converted</MudText>
+                    </div>
+                    <MudProgressLinear Value="@pct" Color="Color.Info" Rounded="true" Size="Size.Small" />
+                </div>
+            }
+        </MlCard>
+    };
+
+    private RenderFragment RenderPipelineFunnel(DashboardWidgetDto widget) => __builder =>
+    {
+        if (widget.Data is null) return;
+        var stages = Deserialize<List<FunnelStageItem>>(widget.Data.Value) ?? [];
+        <MlCard Title="Pipeline Funnel Velocity">
+            @foreach (var s in stages)
+            {
+                <div class="mb-2">
+                    <div class="d-flex justify-space-between align-center mb-1">
+                        <MudText Typo="Typo.caption" Style="font-weight:600">@s.StageName</MudText>
+                        <MudText Typo="Typo.caption">@s.ConversionRate% reached (@s.Count)</MudText>
+                    </div>
+                    <MudProgressLinear Value="@((double)s.ConversionRate)" Color="Color.Primary" Rounded="true" Size="Size.Small" />
+                </div>
+            }
+        </MlCard>
+    };
+
+    private RenderFragment RenderTeamLeaderboard(DashboardWidgetDto widget) => __builder =>
+    {
+        if (widget.Data is null) return;
+        var users = Deserialize<List<LeaderboardUserItem>>(widget.Data.Value) ?? [];
+        <MlCard Title="Team Leaderboard" Subtitle="Top sales performance">
+            @for (var i = 0; i < users.Count; i++)
+            {
+                var u = users[i];
+                <div class="d-flex align-center justify-space-between py-2" style="border-bottom:1px solid var(--ml-border)">
+                    <div class="d-flex align-center gap-2">
+                        <MudAvatar Size="Size.Small" Color="@(i == 0 ? Color.Warning : i == 1 ? Color.Info : Color.Default)">@(i + 1)</MudAvatar>
+                        <div>
+                            <MudText Typo="Typo.body2" Style="font-weight:600">@u.FullName</MudText>
+                            <MudText Typo="Typo.caption" Class="ml-muted">@u.WonCount deals won · @u.NewLeadsCount leads · @u.CompletedActivitiesCount activities</MudText>
+                        </div>
+                    </div>
+                    <MudText Typo="Typo.body2" Style="font-weight:700">@u.WonAmount.ToString("N0")</MudText>
+                </div>
+            }
+        </MlCard>
+    };
+
+    private RenderFragment RenderTeamOverdue(DashboardWidgetDto widget) => __builder =>
+    {
+        if (widget.Data is null) return;
+        var users = Deserialize<List<UserOverdueItem>>(widget.Data.Value) ?? [];
+        <MlCard Title="Team Overdue Tasks">
+            @if (users.Count == 0)
+            {
+                <EmptyState Title="No overdue tasks" Message="Entire team is up to date." Compact="true" />
+            }
+            else
+            {
+                @foreach (var u in users)
+                {
+                    <div class="d-flex align-center justify-space-between py-2" style="border-bottom:1px solid var(--ml-border)">
+                        <div>
+                            <MudText Typo="Typo.body2" Style="font-weight:600">@u.FullName</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Error">Oldest: @u.OldestOverdueAge overdue</MudText>
+                        </div>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Error">@u.OverdueCount tasks</MudChip>
+                    </div>
+                }
+            }
+        </MlCard>
+    };
+
+    private RenderFragment RenderRecentWins(DashboardWidgetDto widget) => __builder =>
+    {
+        if (widget.Data is null) return;
+        var wins = Deserialize<List<RecentWinItem>>(widget.Data.Value) ?? [];
+        <MlCard Title="Recent Wins" Subtitle="Latest closed-won deals">
+            @if (wins.Count == 0)
+            {
+                <EmptyState Title="No closed wins" Message="Closed-won deals will appear here." Compact="true" />
+            }
+            else
+            {
+                @foreach (var win in wins)
+                {
+                    <div class="d-flex align-center justify-space-between py-2" style="border-bottom:1px solid var(--ml-border)">
+                        <div>
+                            <MudText Typo="Typo.body2" Style="font-weight:600">@win.DealName</MudText>
+                            <MudText Typo="Typo.caption" Class="ml-muted">Closed by @win.OwnerName on @win.ClosedAt.ToString("dd MMM yyyy")</MudText>
+                        </div>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success">@win.Amount.ToString("N0") @win.Currency</MudChip>
+                    </div>
+                }
+            }
+        </MlCard>
+    };
+
+    private RenderFragment RenderActivitySummary(DashboardWidgetDto widget) => __builder =>
+    {
+        if (widget.Data is null) return;
+        var summary = Deserialize<List<ActivityTypeSummaryItem>>(widget.Data.Value) ?? [];
+        <MlCard Title="Activity Summary" Subtitle="Completed activities this period vs previous">
+            @foreach (var s in summary)
+            {
+                <div class="d-flex align-center justify-space-between py-2" style="border-bottom:1px solid var(--ml-border)">
+                    <MudText Typo="Typo.body2">@s.ActivityType</MudText>
+                    <div class="d-flex align-center gap-2">
+                        <MudText Typo="Typo.body2" Style="font-weight:700">@s.Count</MudText>
+                        <MudText Typo="Typo.caption" Class="ml-muted">(prev: @s.PreviousCount)</MudText>
+                    </div>
+                </div>
+            }
+        </MlCard>
+    };
+
+    private RenderFragment RenderSystemOverview(DashboardWidgetDto widget) => __builder =>
+    {
+        if (widget.Data is null) return;
+        var data = Deserialize<SystemOverviewData>(widget.Data.Value);
+        <MlCard Title="System Overview" Subtitle="Account capacity and usage">
+            <div class="ml-stack-sm">
+                <div class="d-flex justify-space-between py-1">
+                    <MudText Typo="Typo.body2">Active Users</MudText>
+                    <MudText Typo="Typo.body2" Style="font-weight:600">@data?.ActiveUsers / @data?.PlanSeats seats</MudText>
+                </div>
+                <div class="d-flex justify-space-between py-1">
+                    <MudText Typo="Typo.body2">Pending Invites</MudText>
+                    <MudText Typo="Typo.body2" Style="font-weight:600">@data?.PendingInvites</MudText>
+                </div>
+                <div class="d-flex justify-space-between py-1">
+                    <MudText Typo="Typo.body2">File Storage</MudText>
+                    <MudText Typo="Typo.body2" Style="font-weight:600">@Math.Round((data?.StorageBytes ?? 0) / 1024d / 1024d, 1) MB</MudText>
+                </div>
+                <div class="d-flex justify-space-between py-1">
+                    <MudText Typo="Typo.body2">Trial Status</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Primary" Style="font-weight:600">@data?.TrialDaysLeft days left</MudText>
+                </div>
+            </div>
+        </MlCard>
+    };
+
+    private sealed class MyDayWidgetData
+    {
+        public List<DashboardTaskItem> TodayTasks { get; set; } = [];
+        public List<DashboardTaskItem> OverdueTasks { get; set; } = [];
+        public List<DashboardMeetingItem> TodayMeetings { get; set; } = [];
+        public int TodayTasksCount { get; set; }
+        public int OverdueTasksCount { get; set; }
+        public int TodayMeetingsCount { get; set; }
+    }
+
+    private sealed class NewLeadsWidgetData
+    {
+        public List<DashboardLeadItem> Leads { get; set; } = [];
+        public int TotalCount { get; set; }
+    }
+}

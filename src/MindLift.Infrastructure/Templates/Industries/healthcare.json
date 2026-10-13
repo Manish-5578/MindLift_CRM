@@ -1,0 +1,55 @@
+{
+  "key": "healthcare",
+  "version": 1,
+  "name": "Healthcare",
+  "nameAr": "الرعاية الصحية",
+  "description": "Clinics and medical practices managing patient enquiries, appointments and follow-ups.",
+  "modules": {
+    "labels": {
+      "Deals": { "singular": "Patient case", "plural": "Patient cases", "singularAr": "حالة مريض", "pluralAr": "حالات المرضى" }
+    },
+    "enable": ["Dashboard", "Leads", "Contacts", "Accounts", "Deals", "Activities", "Calendar", "Communication", "Reports", "Notifications", "Documents", "Portal"],
+    "disable": []
+  },
+  "picklists": {
+    "lead_source": {
+      "mode": "merge",
+      "values": [
+        { "value": "insurance_referral", "label": "Insurance referral", "labelAr": "إحالة من شركة تأمين" },
+        { "value": "doctor_referral", "label": "Doctor referral", "labelAr": "إحالة من طبيب" }
+      ]
+    }
+  },
+  "pipelines": [
+    {
+      "name": "Patient cases",
+      "nameAr": "حالات المرضى",
+      "isDefault": true,
+      "stages": [
+        { "name": "Enquiry", "nameAr": "استفسار", "probability": 10, "type": "Open", "rottingDays": 2 },
+        { "name": "Booked", "nameAr": "تم الحجز", "probability": 40, "type": "Open", "rottingDays": 3 },
+        { "name": "Consulted", "nameAr": "تمت الاستشارة", "probability": 70, "type": "Open", "rottingDays": 14 },
+        { "name": "Follow-up", "nameAr": "متابعة", "probability": 90, "type": "Open", "rottingDays": 30 },
+        { "name": "Closed", "nameAr": "مغلقة", "probability": 100, "type": "Won" },
+        { "name": "Lost", "nameAr": "خاسرة", "probability": 0, "type": "Lost" }
+      ]
+    }
+  ],
+  "customFields": [
+    { "entity": "contacts", "key": "cf_date_of_birth", "label": "Date of birth", "labelAr": "تاريخ الميلاد", "type": "Date", "section": "Patient", "showInList": true },
+    { "entity": "deals", "key": "cf_insurance_provider", "label": "Insurance provider", "labelAr": "شركة التأمين", "type": "Text", "section": "Insurance", "showInList": true },
+    { "entity": "deals", "key": "cf_policy_number", "label": "Policy number", "labelAr": "رقم الوثيقة", "type": "Text", "section": "Insurance" },
+    { "entity": "deals", "key": "cf_doctor", "label": "Doctor", "labelAr": "الطبيب", "type": "Text", "section": "Care" }
+  ],
+  "layouts": {
+    "leads": {
+      "Form": [
+        { "section": "Contact info", "sectionAr": "بيانات الاتصال", "columns": 2, "fields": ["first_name", "last_name", "email", "phone"] },
+        { "section": "Lead details", "sectionAr": "تفاصيل العميل", "columns": 2, "fields": ["source", "status", "rating", "owner_id"] }
+      ]
+    }
+  },
+  "dashboardHighlights": ["upcoming_meetings", "deals_in_progress", "documents_expiring"],
+  "documentTypes": { "enable": ["emirates_id", "passport", "insurance_card", "generic"], "portalEnabled": true },
+  "sampleData": { "profile": "healthcare" }
+}

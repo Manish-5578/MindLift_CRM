@@ -1,0 +1,103 @@
+@page "/booking/manage/{Token}"
+@using System.Globalization
+@layout AuthLayout
+@inject HttpClient Http
+
+<PageTitle>Your booking · MindLift</PageTitle>
+
+<div class="ml-wizard" style="max-width:520px;margin-top:32px">
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else if (_booking is null)
+    {
+        <MudAlert Severity="Severity.Error" data-testid="manage-missing">This link is not valid. Use the link from your confirmation email.</MudAlert>
+    }
+    else
+    {
+        <div class="ml-stack" data-testid="manage-card">
+            <MudText Typo="Typo.h4">@_booking.PageName</MudText>
+            <MudText Typo="Typo.body1" data-testid="manage-when">@_booking.CompanyName · @_booking.StartUtc.ToString("dddd d MMMM yyyy, HH:mm", CultureInfo.InvariantCulture) UTC</MudText>
+            <MudText Typo="Typo.body2" Class="ml-muted">@_booking.DurationMinutes minutes · @_booking.LocationType@(string.IsNullOrWhiteSpace(_booking.LocationValue) ? "" : ": " + _booking.LocationValue)</MudText>
+            <MudChip T="string" Size="Size.Small" Dot="true">@StatusLabel</MudChip>
+
+            @if (_done is not null)
+            {
+                <MudAlert Severity="Severity.Success" data-testid="manage-done">@_done</MudAlert>
+            }
+            @if (_error is not null)
+            {
+                <MudAlert Severity="Severity.Error" Dense="true" data-testid="manage-error">@_error</MudAlert>
+            }
+
+            @if (_booking.CanChange)
+            {
+                <MudTextField @bind-Value="_reason" Label="Reason (optional)" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="manage-reason" />
+                <MudButton Variant="Variant.Outlined" Color="Color.Error" FullWidth="true" Disabled="_busy" OnClick="CancelAsync" data-testid="manage-cancel">Cancel this booking</MudButton>
+                <MudText Typo="Typo.caption" Class="ml-muted">To choose another time, cancel this one and book again from the page.</MudText>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Token { get; set; } = string.Empty;
+
+    private ManageBookingDto? _booking;
+    private bool _loading = true;
+    private bool _busy;
+    private string _reason = string.Empty;
+    private string? _done;
+    private string? _error;
+
+    private string StatusLabel => _booking?.Status switch
+    {
+        BookingStatus.Cancelled => "Cancelled",
+        BookingStatus.NoShow => "No show",
+        _ => "Confirmed",
+    };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        try
+        {
+            _booking = await Http.GetFromJsonAsync<ManageBookingDto>($"api/v1/public/booking/manage/{Uri.EscapeDataString(Token)}");
+        }
+        catch (HttpRequestException)
+        {
+            _booking = null;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task CancelAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"api/v1/public/booking/manage/{Uri.EscapeDataString(Token)}/cancel", new CancelBookingRequest(string.IsNullOrWhiteSpace(_reason) ? null : _reason));
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await ProblemText.FromAsync(response, "We could not cancel this booking.");
+                return;
+            }
+
+            _done = "Your booking is cancelled. We have emailed you a confirmation.";
+            await OnParametersSetAsync();
+        }
+        catch (HttpRequestException)
+        {
+            _error = "We could not reach MindLift. Check your connection and try again.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

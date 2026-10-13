@@ -1,0 +1,283 @@
+@page "/settings/layouts"
+@inject HttpClient Http
+@inject AppState App
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageTitle>Fields & layouts · MindLift</PageTitle>
+
+<div class="ml-page ml-page--form">
+    <PageHeader Title="Fields & layouts" Subtitle="Choose which fields appear on each record form and detail page, in what order, and in which section." />
+    <SettingsNav Current="/settings/layouts" />
+
+    <MlCard Class="mb-4" TestId="layout-picker">
+        <div class="ml-row ml-row--wrap">
+            <MudSelect T="string" Value="_entity" ValueChanged="OnPickerChangedAsync" Label="Record type" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:200px" data-testid="entity-select">
+                @foreach (var (key, label) in Entities)
+                {
+                    <MudSelectItem T="string" Value="@key">@label</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSelect T="string" Value="_kind" ValueChanged="OnKindChangedAsync" Label="Layout" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:200px" data-testid="kind-select">
+                <MudSelectItem T="string" Value="KindForm">Create and edit form</MudSelectItem>
+                <MudSelectItem T="string" Value="KindDetail">Record page</MudSelectItem>
+            </MudSelect>
+        </div>
+    </MlCard>
+
+    @if (_loading)
+    {
+        <SkeletonCards Count="2" />
+    }
+    else if (_loadFailed)
+    {
+        <ErrorState OnRetry="() => LoadAsync(_entity, _kind)" />
+    }
+    else
+    {
+        @foreach (var section in _sections)
+        {
+            <MlCard Class="mb-4" TestId="layout-section">
+                <div class="ml-row ml-row--wrap" style="margin-bottom:12px">
+                    <MudTextField @bind-Value="section.Section" Label="Section name" Variant="Variant.Outlined" Margin="Margin.Dense" Class="ml-grow" />
+                    <MudSelect T="int" @bind-Value="section.Columns" Label="Columns" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:120px">
+                        <MudSelectItem T="int" Value="1">1 column</MudSelectItem>
+                        <MudSelectItem T="int" Value="2">2 columns</MudSelectItem>
+                    </MudSelect>
+                    <MudIconButton Icon="@Icons.Material.Outlined.ArrowUpward" Size="Size.Small" Disabled="section.Index == 0" OnClick="() => MoveSection(section, -1)" aria-label="Move section up" />
+                    <MudIconButton Icon="@Icons.Material.Outlined.ArrowDownward" Size="Size.Small" Disabled="section.Index == _sections.Count - 1" OnClick="() => MoveSection(section, 1)" aria-label="Move section down" />
+                    <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Disabled="_sections.Count == 1" OnClick="() => RemoveSection(section)" aria-label="Remove section" />
+                </div>
+
+                @if (section.Fields.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Class="ml-muted">No fields in this section yet. Add one from the list below.</MudText>
+                }
+                @foreach (var key in section.Fields)
+                {
+                    var fieldKey = key;
+                    <div class="ml-row" style="padding:8px 0;border-bottom:1px solid var(--ml-border)" data-testid="layout-field">
+                        <div class="ml-grow">
+                            <MudText Typo="Typo.body1">@FieldLabel(fieldKey)</MudText>
+                            <MudText Typo="Typo.caption" Class="ml-muted">@fieldKey</MudText>
+                        </div>
+                        <MudIconButton Icon="@Icons.Material.Outlined.ArrowUpward" Size="Size.Small" OnClick="() => MoveField(section, fieldKey, -1)" aria-label="Move field up" />
+                        <MudIconButton Icon="@Icons.Material.Outlined.ArrowDownward" Size="Size.Small" OnClick="() => MoveField(section, fieldKey, 1)" aria-label="Move field down" />
+                        <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small" OnClick="() => RemoveField(section, fieldKey)" aria-label="Remove field" />
+                    </div>
+                }
+            </MlCard>
+        }
+
+        <MlCard Title="Add fields" Subtitle="Fields that are not on this layout yet. Pick the section they go into first." Class="mb-4" TestId="available-fields">
+            @if (_sections.Count > 0)
+            {
+                <MudSelect T="int" @bind-Value="_targetIndex" Label="Add to section" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:280px">
+                    @for (var i = 0; i < _sections.Count; i++)
+                    {
+                        var index = i;
+                        <MudSelectItem T="int" Value="@index">@_sections[index].Section</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+            <div class="ml-row ml-row--wrap" style="margin-top:12px">
+                @foreach (var field in AvailableFields())
+                {
+                    var key = field.Key;
+                    <MudChip T="string" Size="Size.Small" OnClick="() => AddField(key)" Variant="Variant.Outlined">@field.Label</MudChip>
+                }
+                @if (!AvailableFields().Any())
+                {
+                    <MudText Typo="Typo.body2" Class="ml-muted">Every field is on this layout.</MudText>
+                }
+            </div>
+        </MlCard>
+
+        <div class="ml-row ml-row--wrap" style="justify-content:space-between">
+            <MudButton Variant="Variant.Outlined" OnClick="AddSection">Add section</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_busy" OnClick="SaveAsync" data-testid="primary-action">Save layout</MudButton>
+        </div>
+    }
+</div>
+
+@code {
+    private const string KindForm = "Form";
+    private const string KindDetail = "Detail";
+
+    private static readonly (string Key, string Label)[] Entities =
+    [
+        ("leads", "Leads"), ("contacts", "Contacts"), ("accounts", "Accounts"), ("deals", "Deals"), ("activities", "Activities"),
+    ];
+
+    private sealed class EditSection
+    {
+        public int Index { get; set; }
+        public string Section { get; set; } = string.Empty;
+        public string? SectionAr { get; set; }
+        public int Columns { get; set; } = 1;
+        public List<string> Fields { get; } = [];
+    }
+
+    private string _entity = "leads";
+    private string _kind = KindForm;
+    private List<EditSection> _sections = [];
+    private List<FieldDto> _fields = [];
+    private int _targetIndex;
+    private bool _loading = true;
+    private bool _loadFailed;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!App.IsAdmin)
+        {
+            Nav.NavigateTo("/");
+            return;
+        }
+
+        await LoadAsync(_entity, _kind);
+    }
+
+    private async Task OnPickerChangedAsync(string entity)
+    {
+        _entity = entity;
+        await LoadAsync(entity, _kind);
+    }
+
+    private async Task OnKindChangedAsync(string kind)
+    {
+        _kind = kind;
+        await LoadAsync(_entity, kind);
+    }
+
+    private async Task LoadAsync(string entity, string kind)
+    {
+        _loading = true;
+        _loadFailed = false;
+        try
+        {
+            _fields = await Http.GetFromJsonAsync<List<FieldDto>>($"api/v1/settings/fields/{entity}") ?? [];
+            var layout = await Http.GetFromJsonAsync<LayoutDto>($"api/v1/settings/layouts/{entity}/{kind}");
+            _sections = (layout?.Sections ?? []).Select((s, i) => ToEdit(s, i)).ToList();
+            if (_sections.Count == 0)
+            {
+                _sections.Add(new EditSection { Index = 0, Section = "Details" });
+            }
+
+            _targetIndex = 0;
+        }
+        catch (HttpRequestException)
+        {
+            _loadFailed = true;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static EditSection ToEdit(LayoutSectionDto dto, int index)
+    {
+        var section = new EditSection { Index = index, Section = dto.Section, SectionAr = dto.SectionAr, Columns = dto.Columns };
+        section.Fields.AddRange(dto.Fields);
+        return section;
+    }
+
+    private string FieldLabel(string key) => _fields.FirstOrDefault(f => f.Key == key)?.Label ?? key;
+
+    private List<FieldDto> AvailableFields()
+    {
+        var placed = _sections.SelectMany(s => s.Fields).ToHashSet();
+        return _fields.Where(f => !f.IsHidden && !placed.Contains(f.Key)).ToList();
+    }
+
+    private void AddField(string key)
+    {
+        if (_sections.Count == 0)
+        {
+            return;
+        }
+
+        var target = _sections[Math.Clamp(_targetIndex, 0, _sections.Count - 1)];
+        target.Fields.Add(key);
+    }
+
+    private void MoveField(EditSection section, string key, int delta)
+    {
+        var index = section.Fields.IndexOf(key);
+        var next = index + delta;
+        if (index < 0 || next < 0 || next >= section.Fields.Count)
+        {
+            return;
+        }
+
+        (section.Fields[index], section.Fields[next]) = (section.Fields[next], section.Fields[index]);
+    }
+
+    private void RemoveField(EditSection section, string key) => section.Fields.Remove(key);
+
+    private void AddSection()
+    {
+        _sections.Add(new EditSection { Index = _sections.Count, Section = "New section" });
+    }
+
+    private void MoveSection(EditSection section, int delta)
+    {
+        var next = section.Index + delta;
+        if (next < 0 || next >= _sections.Count)
+        {
+            return;
+        }
+
+        (_sections[section.Index], _sections[next]) = (_sections[next], _sections[section.Index]);
+        Renumber();
+    }
+
+    private void RemoveSection(EditSection section)
+    {
+        if (_sections.Count == 1)
+        {
+            return;
+        }
+
+        var orphans = section.Fields.ToList();
+        _sections.Remove(section);
+        // Fields from a removed section go to the first section, so nothing silently disappears from the layout.
+        _sections[0].Fields.AddRange(orphans);
+        Renumber();
+        _targetIndex = 0;
+    }
+
+    private void Renumber()
+    {
+        for (var i = 0; i < _sections.Count; i++)
+        {
+            _sections[i].Index = i;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        var sections = _sections
+            .Select(s => new LayoutSectionDto(s.Section.Trim().Length == 0 ? "Section" : s.Section.Trim(), s.SectionAr, s.Columns, s.Fields.ToList()))
+            .ToList();
+        _busy = true;
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"api/v1/settings/layouts/{_entity}/{_kind}", new SaveLayoutRequest(sections));
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add(await ProblemText.FromAsync(response, "We could not save this layout."), Severity.Error);
+                return;
+            }
+
+            Snackbar.Add("Layout saved", Severity.Success);
+            await App.LoadAsync();
+            await LoadAsync(_entity, _kind);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

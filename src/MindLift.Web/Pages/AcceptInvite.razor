@@ -1,0 +1,107 @@
+@page "/accept-invite"
+@layout AuthLayout
+@inject HttpClient Http
+@inject AuthSession Session
+@inject AppState App
+@inject NavigationManager Nav
+
+<PageTitle>Join your team · MindLift</PageTitle>
+
+<div class="ml-wizard" style="max-width:420px;margin-top:48px">
+    <div class="ml-stack">
+        <MudText Typo="Typo.h4" data-testid="page-title">Join your team</MudText>
+
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else if (_preview is null)
+        {
+            <MudAlert Severity="Severity.Error" data-testid="invite-invalid">@(_error ?? "This invitation is not valid. It may have expired or been withdrawn. Ask your admin to send a new one.")</MudAlert>
+            <MudButton Variant="Variant.Outlined" Href="/login">Go to sign in</MudButton>
+        }
+        else
+        {
+            <MudText Typo="Typo.body1" data-testid="invite-summary">Hello @_preview.FirstName, <strong>@_preview.CompanyName</strong> invited you to MindLift as @_preview.Email.</MudText>
+            @if (_error is not null)
+            {
+                <MudAlert Severity="Severity.Error" Dense="true" data-testid="invite-error">@_error</MudAlert>
+            }
+
+            <MudTextField @bind-Value="_password" Label="Choose a password" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Password" Required="true"
+                          HelperText="At least 8 characters, with upper and lower case letters and a digit." data-testid="invite-password" />
+            <MudTextField @bind-Value="_confirm" Label="Repeat the password" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Password" Required="true" OnKeyDown="OnKey" data-testid="invite-confirm" />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Size="Size.Large" Disabled="_busy" OnClick="AcceptAsync" data-testid="primary-action">Join @_preview.CompanyName</MudButton>
+        }
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery] public string? Token { get; set; }
+
+    private InvitationPreview? _preview;
+    private string _password = string.Empty;
+    private string _confirm = string.Empty;
+    private string? _error;
+    private bool _loading = true;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(Token))
+            {
+                var response = await Http.GetAsync("api/v1/auth/invitations/" + Uri.EscapeDataString(Token));
+                _preview = response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<InvitationPreview>() : null;
+            }
+        }
+        catch (HttpRequestException)
+        {
+            _error = "We could not reach MindLift. Check your connection and try again.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OnKey(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter") await AcceptAsync();
+    }
+
+    private async Task AcceptAsync()
+    {
+        _error = null;
+        if (_password != _confirm)
+        {
+            _error = "The two passwords are not the same.";
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/v1/auth/accept-invite", new AcceptInvitationRequest(Token!, _password));
+            if (!response.IsSuccessStatusCode)
+            {
+                var fields = await ProblemText.FieldErrorsAsync(response);
+                _error = fields.Count > 0 ? string.Join(" ", fields.Values) : await ProblemText.FromAsync(response, "We could not accept this invitation.");
+                return;
+            }
+
+            Session.SetTokens((await response.Content.ReadFromJsonAsync<TokenResponse>())!);
+            await App.LoadAsync();
+            Nav.NavigateTo("/", forceLoad: true);
+        }
+        catch (HttpRequestException)
+        {
+            _error = "We could not reach MindLift. Check your connection and try again.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

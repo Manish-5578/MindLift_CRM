@@ -1,0 +1,89 @@
+@page "/login"
+@layout AuthLayout
+@inject HttpClient Http
+@inject AuthSession Session
+@inject AppState App
+@inject NavigationManager Nav
+
+<PageTitle>Sign in · MindLift</PageTitle>
+
+<div class="ml-wizard" style="max-width:420px;margin-top:48px">
+    <div class="ml-stack">
+        <MudText Typo="Typo.h4" data-testid="page-title">Welcome back</MudText>
+        <MudText Typo="Typo.body2" Class="ml-muted">Sign in to your MindLift workspace.</MudText>
+
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" data-testid="login-error">@_error</MudAlert>
+        }
+
+        <MudTextField @bind-Value="_email" Label="Email" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Email" Required="true" data-testid="login-email" />
+        <MudTextField @bind-Value="_password" Label="Password" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Password" Required="true" OnKeyDown="OnKey" data-testid="login-password" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Size="Size.Large" Disabled="_busy" OnClick="SignInAsync" data-testid="primary-action">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }
+            else { <text>Sign in</text> }
+        </MudButton>
+
+        <MudText Typo="Typo.body2" Class="ml-muted"><MudLink Href="/forgot-password" Class="ml-link" data-testid="forgot-link">Forgot your password?</MudLink></MudText>
+        <MudText Typo="Typo.body2" Class="ml-muted">New to MindLift? <MudLink Href="/signup" Class="ml-link">Create an account</MudLink></MudText>
+    </div>
+</div>
+
+@code {
+    private string _email = string.Empty;
+    private string _password = string.Empty;
+    private string? _error;
+    private bool _busy;
+
+    private async Task OnKey(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter") await SignInAsync();
+    }
+
+    private async Task SignInAsync()
+    {
+        _error = null;
+        _busy = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/v1/auth/login", new LoginRequest(_email, _password));
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await ProblemText.FromAsync(response, "Email or password is incorrect.");
+                return;
+            }
+
+            Session.SetTokens((await response.Content.ReadFromJsonAsync<TokenResponse>())!);
+            await App.LoadAsync();
+            await GoHomeAsync();
+        }
+        catch (HttpRequestException)
+        {
+            _error = "We could not reach MindLift. Check your connection and try again.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>Owners and admins who have not finished setup are sent back to the wizard.</summary>
+    private async Task GoHomeAsync()
+    {
+        if (App.IsAdmin)
+        {
+            var onboarding = await Http.GetAsync("api/v1/onboarding");
+            if (onboarding.IsSuccessStatusCode)
+            {
+                var state = await onboarding.Content.ReadFromJsonAsync<OnboardingDto>();
+                if (state is { CurrentStep: < 99 })
+                {
+                    Nav.NavigateTo("/onboarding");
+                    return;
+                }
+            }
+        }
+
+        Nav.NavigateTo("/");
+    }
+}

@@ -1,0 +1,31 @@
+<MudAvatar Size="@SizeOf(Size)" Style="@($"width:{Size}px;height:{Size}px;background:{Background};color:#fff;font-weight:600;font-size:{Size * 0.4:0.##}px")" title="@Name" data-testid="user-avatar">@Initials(Name)</MudAvatar>
+
+@code {
+    private static readonly string[] Palette = ["#4F46E5", "#0D9488", "#F59E0B", "#EC4899", "#0EA5E9", "#84CC16", "#8B5CF6", "#F97316"];
+
+    [Parameter] public string Name { get; set; } = "";
+    [Parameter] public Guid? Id { get; set; }
+    [Parameter] public int Size { get; set; } = 32;
+
+    private string Background
+    {
+        get
+        {
+            var key = Id?.ToByteArray().Sum(b => (int)b) ?? Name.Sum(c => (int)c);
+            return Palette[Math.Abs(key) % Palette.Length];
+        }
+    }
+
+    private static MudBlazor.Size SizeOf(int size) => size <= 24 ? MudBlazor.Size.Small : MudBlazor.Size.Medium;
+
+    private static string Initials(string name)
+    {
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length switch
+        {
+            0 => "?",
+            1 => parts[0][..1].ToUpperInvariant(),
+            _ => (parts[0][..1] + parts[^1][..1]).ToUpperInvariant(),
+        };
+    }
+}

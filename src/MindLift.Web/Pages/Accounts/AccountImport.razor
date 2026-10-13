@@ -1,0 +1,5 @@
+@page "/accounts/import"
+@using MindLift.Shared.Imports
+
+<ImportWizard Module="AppModule.Accounts" Endpoint="api/v1/accounts/import" ListHref="/accounts" Fields="ImportFieldSets.Accounts"
+              RequiredField="name" RequiredLabel="Name" Singular="account" />

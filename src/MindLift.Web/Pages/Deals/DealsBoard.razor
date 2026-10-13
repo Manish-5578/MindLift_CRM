@@ -1,0 +1,226 @@
+@page "/deals/board"
+@using MindLift.Shared.Filtering
+@using FilterOperator = MindLift.Shared.Filtering.FilterOperator
+@inject HttpClient Http
+@inject AuthSession Session
+@inject AppState App
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+
+<PageTitle>@App.ModuleLabel(AppModule.Deals) board · MindLift</PageTitle>
+
+<div class="ml-page">
+    <PageHeader Title="@App.ModuleLabel(AppModule.Deals)" Subtitle="@SubtitleText">
+        <Actions>
+            <MudButtonGroup Variant="Variant.Outlined" Size="Size.Medium" data-testid="layout-toggle">
+                <MudButton Color="Color.Primary" Href="/deals/board">Board</MudButton>
+                <MudButton Href="/deals">List</MudButton>
+            </MudButtonGroup>
+            @if (CanCreate)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" OnClick="OpenNew" data-testid="primary-action">New deal</MudButton>
+            }
+        </Actions>
+    </PageHeader>
+
+    <div class="ml-row ml-row--wrap" style="margin-bottom:16px" data-testid="board-toolbar">
+        @if (Pipelines.Count > 1)
+        {
+            <MudSelect T="Guid" Value="_pipelineId" ValueChanged="PipelineChangedAsync" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:240px" aria-label="Pipeline" data-testid="pipeline-select">
+                @foreach (var pipeline in Pipelines)
+                {
+                    <MudSelectItem T="Guid" Value="@pipeline.Id">@pipeline.Name</MudSelectItem>
+                }
+            </MudSelect>
+        }
+        <MudSwitch T="bool" Value="_mineOnly" ValueChanged="MineAsync" Label="Only mine" Color="Color.Primary" data-testid="mine-only" />
+    </div>
+
+    @if (_error is not null)
+    {
+        <ErrorState Message="@_error" OnRetry="LoadAsync" />
+    }
+    else if (_loading && _columns.Count == 0)
+    {
+        <SkeletonCards Count="4" />
+    }
+    else
+    {
+        <KanbanBoard TItem="DealCardDto" Columns="_columns" Items="_view" Card="_card" OnMove="MoveAsync" EmptyText="No deals here" />
+    }
+</div>
+
+<DealFormDrawer @ref="_form" @bind-Open="_drawer" OnSaved="OnSaved" />
+
+@code {
+    private DealFormDrawer? _form;
+    private bool _drawer;
+    private bool _loading = true;
+    private string? _error;
+    private bool _mineOnly;
+    private Guid _pipelineId;
+    private DealBoardDto? _board;
+    private int _requestId;
+    private List<KanbanColumn> _columns = [];
+    private IReadOnlyDictionary<string, IReadOnlyList<DealCardDto>> _view = new Dictionary<string, IReadOnlyList<DealCardDto>>();
+    private RenderFragment<DealCardDto> _card = _ => _ => { };
+
+    private IReadOnlyList<PipelineDto> Pipelines => App.Bootstrap?.Pipelines.Where(p => p.IsActive).OrderBy(p => p.SortOrder).ToList() ?? [];
+
+    private bool CanCreate => App.Bootstrap?.Permissions.Any(p => p.Module == "Deals" && p.CanCreate) == true;
+
+    private string? SubtitleText => _board is null ? null : $"{_board.Stages.Where(s => s.Type == "Open").Sum(s => s.Count):N0} open · {_board.Stages.Where(s => s.Type == "Open").Sum(s => s.TotalInBase):N0} {_board.BaseCurrency}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.IsSignedIn)
+        {
+            Nav.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        _pipelineId = Pipelines.FirstOrDefault(p => p.IsDefault)?.Id ?? Pipelines.FirstOrDefault()?.Id ?? Guid.Empty;
+        _card = deal =>
+            @<div class="ml-stack-sm">
+                <a href="@("/deals/" + deal.Id)" draggable="false" class="ml-link" style="text-decoration:none">
+                    <MudText Typo="Typo.subtitle1" Class="ml-truncate">@deal.Name</MudText>
+                </a>
+                <MudText Typo="Typo.body2" Class="ml-muted ml-truncate">@(deal.AccountName ?? deal.ContactName ?? "—")</MudText>
+                <div class="ml-row ml-row--between">
+                    <MoneyText Amount="deal.Amount" Currency="@deal.Currency" />
+                    <UserAvatar Name="@OwnerName(deal)" Id="@deal.OwnerId" Size="24" />
+                </div>
+                <div class="ml-row ml-row--wrap">
+                    @if (deal.ExpectedCloseDate is not null)
+                    {
+                        <MudText Typo="Typo.caption" Class="ml-muted">Closes <DateText Value="@deal.ExpectedCloseDate" /></MudText>
+                    }
+                    <MudText Typo="Typo.caption" Class="ml-muted">@deal.DaysInStage d in stage</MudText>
+                    @if (deal.IsRotting)
+                    {
+                        <StatusChip Text="Rotting" Color="@StatusColors.For("Lost")" Dot="false" />
+                    }
+                </div>
+            </div>;
+
+        await LoadAsync();
+    }
+
+    private static string OwnerName(DealCardDto deal) => deal.OwnerName ?? "?";
+
+    private async Task PipelineChangedAsync(Guid id)
+    {
+        _pipelineId = id;
+        await LoadAsync();
+    }
+
+    private async Task MineAsync(bool value)
+    {
+        _mineOnly = value;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var request = ++_requestId;
+        _loading = true;
+        _error = null;
+        try
+        {
+            FilterGroup? filter = null;
+            if (_mineOnly)
+            {
+                filter = new FilterGroup { Conditions = [new FilterCondition { Field = "owner_id", Op = FilterOperator.Eq, Value = JsonSerializer.SerializeToElement("@me") }] };
+            }
+
+            var url = _pipelineId == Guid.Empty ? "api/v1/deals/board" : $"api/v1/deals/board?pipelineId={_pipelineId}";
+            var response = await Http.PostAsJsonAsync(url, filter ?? new FilterGroup());
+            if (request != _requestId)
+            {
+                return;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await ProblemText.FromAsync(response, "We could not load your deals. Try again.");
+                return;
+            }
+
+            _board = await response.Content.ReadFromJsonAsync<DealBoardDto>();
+            _pipelineId = _board!.PipelineId;
+            _columns = _board.Stages.Select(s => new KanbanColumn(s.Id.ToString(), s.Name, s.Color ?? TypeColor(s.Type), s.Count,
+                $"{s.TotalInBase:N0} {_board.BaseCurrency}" + (s.Type == "Open" ? $" · {s.WeightedInBase:N0} weighted" : string.Empty))).ToList();
+            _view = _board.Stages.ToDictionary(s => s.Id.ToString(), s => (IReadOnlyList<DealCardDto>)s.Deals);
+        }
+        catch (HttpRequestException)
+        {
+            _error = "We could not reach MindLift. Check your connection and try again.";
+        }
+        finally
+        {
+            if (request == _requestId)
+            {
+                _loading = false;
+            }
+        }
+    }
+
+    private static string TypeColor(string type) => type switch { "Won" => "#16A34A", "Lost" => "#94A3B8", _ => "#4F46E5" };
+
+    private async Task MoveAsync(KanbanMove<DealCardDto> move)
+    {
+        var deal = move.Item;
+        var target = _board?.Stages.FirstOrDefault(s => s.Id.ToString() == move.ToKey);
+        if (target is null)
+        {
+            return;
+        }
+
+        string? lostReason = null;
+        string? lostNotes = null;
+        if (target.Type == "Lost")
+        {
+            var reasons = App.Bootstrap?.Picklists.FirstOrDefault(p => p.Key == "lost_reason")?.Values.Where(v => v.IsActive).OrderBy(v => v.SortOrder).ToList() ?? [];
+            var parameters = new DialogParameters<LostDealDialog> { { x => x.Title, $"Mark {deal.Name} as lost?" }, { x => x.Reasons, reasons } };
+            var reference = await Dialogs.ShowAsync<LostDealDialog>("Lost", parameters, new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, BackdropClick = false, CloseButton = false });
+            var result = await reference.Result;
+            if (result is not { Canceled: false } || result.Data is not LostDealDialog.Result lost)
+            {
+                return;
+            }
+
+            lostReason = lost.Reason;
+            lostNotes = lost.Notes;
+        }
+        else if (target.Type == "Won" && !await Dialogs.ConfirmAsync($"Mark {deal.Name} as won?", "The close date is set to today and any onboarding checklist is created.", "Mark as won"))
+        {
+            return;
+        }
+
+        var response = await Http.PatchAsJsonAsync($"api/v1/deals/{deal.Id}/stage", new ChangeDealStageRequest(target.Id, lostReason, lostNotes, null, deal.Version));
+        if (response.IsSuccessStatusCode)
+        {
+            Snackbar.Add($"{deal.Name} moved to {target.Name}", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "We could not move this deal."), Severity.Error);
+        }
+
+        // Totals and order come from the server, so the board is reloaded whether or not the move worked.
+        await LoadAsync();
+    }
+
+    private void OpenNew()
+    {
+        _form?.OpenNew();
+        _drawer = true;
+    }
+
+    private async Task OnSaved()
+    {
+        Snackbar.Add("Deal saved", Severity.Success);
+        await LoadAsync();
+    }
+}

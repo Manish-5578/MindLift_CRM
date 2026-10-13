@@ -1,0 +1,131 @@
+<FormDrawer Open="Open" OpenChanged="OnOpenChanged" Title="@(_accountId is null ? "New account" : "Edit account")" SubmitText="@(_accountId is null ? "Create account" : "Save changes")" Busy="_busy" OnSubmit="SaveAsync" IsDirty="IsDirty">
+    @if (_error is not null)
+    {
+        <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3" data-testid="account-error">@_error</MudAlert>
+    }
+
+    <DynamicForm Fields="Fields" Values="_values" Users="_users" AccountSearch="SearchAccountsAsync" Errors="_fieldErrors"
+                 CustomFields="_customFields" CustomValues="_custom" CustomValuesChanged="v => _custom = v" />
+</FormDrawer>
+
+@code {
+    [Inject] private HttpClient Http { get; set; } = default!;
+    [Inject] private AppState App { get; set; } = default!;
+
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+    [Parameter] public EventCallback OnSaved { get; set; }
+
+    private Dictionary<string, string?> _values = new();
+    private Dictionary<string, JsonElement?> _custom = new();
+    private IReadOnlyList<FieldDto> _customFields = [];
+    private IReadOnlyDictionary<string, string> _fieldErrors = new Dictionary<string, string>();
+    private List<UserListItem> _users = [];
+    private Guid? _accountId;
+    private bool _busy;
+    private string? _error;
+    private string _snapshot = string.Empty;
+
+    private bool IsDirty => TakeSnapshot() != _snapshot;
+
+    private string TakeSnapshot() => JsonSerializer.Serialize(new { Form = _values, Custom = _custom });
+
+    private static IReadOnlyList<FormField> Fields =>
+    [
+        new("name", "Name", Required: true, TestId: "account-name"),
+        new("website", "Website", FormFieldKind.Url, Columns: 6),
+        new("phone", "Phone", FormFieldKind.Phone, Columns: 6),
+        new("industry", "Industry", Columns: 6),
+        new("parentAccountId", "Parent company", FormFieldKind.Account, Columns: 6, TestId: "account-parent"),
+        new("ownerId", "Owner", FormFieldKind.User),
+        new("description", "Notes", FormFieldKind.Multiline),
+    ];
+
+    protected override async Task OnInitializedAsync() => _users = await RecordLookups.UsersAsync(Http);
+
+    private async Task<IReadOnlyList<LookupItem>> SearchAccountsAsync(string text, CancellationToken cancellationToken)
+        => (await RecordLookups.AccountsAsync(Http, text, cancellationToken)).Where(a => a.Id != _accountId).ToList();
+
+    public void OpenNew()
+    {
+        _accountId = null;
+        _values = new Dictionary<string, string?>();
+        Reset([]);
+    }
+
+    public void OpenEdit(AccountDto account)
+    {
+        _accountId = account.Id;
+        _values = new Dictionary<string, string?>
+        {
+            ["name"] = account.Name, ["website"] = account.Website, ["phone"] = account.Phone, ["industry"] = account.Industry,
+            ["parentAccountId"] = account.ParentAccountId?.ToString(), ["parentAccountId" + DynamicForm.LabelSuffix] = account.ParentName,
+            ["ownerId"] = account.OwnerId.ToString(), ["description"] = account.Description,
+        };
+        Reset(account.CustomFields.ToDictionary(kv => kv.Key, kv => (JsonElement?)kv.Value));
+    }
+
+    private void Reset(Dictionary<string, JsonElement?> custom)
+    {
+        _custom = custom;
+        _customFields = App.Bootstrap?.Fields.GetValueOrDefault("accounts")?.Where(f => f.IsCustom).ToList() ?? [];
+        _error = null;
+        _fieldErrors = new Dictionary<string, string>();
+        _snapshot = TakeSnapshot();
+    }
+
+    private async Task OnOpenChanged(bool value) => await OpenChanged.InvokeAsync(value);
+
+    private string? Value(string key) => string.IsNullOrWhiteSpace(_values.GetValueOrDefault(key)) ? null : _values[key]!.Trim();
+
+    private async Task SaveAsync()
+    {
+        _error = null;
+        _fieldErrors = new Dictionary<string, string>();
+        if (Value("name") is null)
+        {
+            _fieldErrors = new Dictionary<string, string> { ["name"] = "Enter the company name." };
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            Guid? parentId = Guid.TryParse(Value("parentAccountId"), out var parsedParent) ? parsedParent : null;
+            Guid? ownerId = Guid.TryParse(Value("ownerId"), out var parsedOwner) ? parsedOwner : null;
+            var request = new SaveAccountRequest(
+                Value("name")!, Value("website"), Value("phone"), Value("industry"), Value("description"), parentId, ownerId,
+                _custom.Where(kv => kv.Value is not null).ToDictionary(kv => kv.Key, kv => kv.Value!.Value));
+
+            var response = _accountId is null
+                ? await Http.PostAsJsonAsync("api/v1/accounts", request)
+                : await Http.PutAsJsonAsync($"api/v1/accounts/{_accountId}", request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var fields = await ProblemText.FieldErrorsAsync(response);
+                if (fields.Count > 0)
+                {
+                    _fieldErrors = fields;
+                }
+                else
+                {
+                    _error = await ProblemText.FromAsync(response, "We could not save this account.");
+                }
+
+                return;
+            }
+
+            await OpenChanged.InvokeAsync(false);
+            await OnSaved.InvokeAsync();
+        }
+        catch (HttpRequestException)
+        {
+            _error = "We could not reach MindLift. Check your connection and try again.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

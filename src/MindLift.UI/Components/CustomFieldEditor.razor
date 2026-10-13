@@ -1,0 +1,61 @@
+@using FieldType = MindLift.Shared.Filtering.FieldType
+@foreach (var field in Fields)
+{
+    switch (field.Type)
+    {
+        case FieldType.Boolean:
+            <MudCheckBox T="bool" Value="@GetBool(field.Key)" ValueChanged="v => Set(field.Key, v)" Label="@Label(field)" Color="Color.Primary" Class="mb-2" data-testid="@($"cf-{field.Key}")" />
+            break;
+        case FieldType.Number:
+        case FieldType.Decimal:
+        case FieldType.Currency:
+        case FieldType.Percent:
+            <MudNumericField T="decimal?" Value="@GetDecimal(field.Key)" ValueChanged="v => Set(field.Key, v)" Label="@Label(field)" Variant="Variant.Outlined" Margin="Margin.Dense" Required="field.IsRequired" Class="mb-3" data-testid="@($"cf-{field.Key}")" />
+            break;
+        case FieldType.Date:
+            <MudTextField T="string" Value="@GetText(field.Key)" ValueChanged="v => Set(field.Key, v)" Label="@Label(field)" InputType="InputType.Date" Variant="Variant.Outlined" Margin="Margin.Dense" Required="field.IsRequired" Class="mb-3" data-testid="@($"cf-{field.Key}")" />
+            break;
+        case FieldType.Picklist:
+            <MudSelect T="string" Value="@GetText(field.Key)" ValueChanged="v => Set(field.Key, v)" Label="@Label(field)" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-3" data-testid="@($"cf-{field.Key}")">
+                @foreach (var option in field.Options ?? [])
+                {
+                    <MudSelectItem T="string" Value="@option.Value">@option.Label</MudSelectItem>
+                }
+            </MudSelect>
+            break;
+        case FieldType.TextArea:
+            <MudTextField T="string" Value="@GetText(field.Key)" ValueChanged="v => Set(field.Key, v)" Label="@Label(field)" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="3" Class="mb-3" data-testid="@($"cf-{field.Key}")" />
+            break;
+        default:
+            <MudTextField T="string" Value="@GetText(field.Key)" ValueChanged="v => Set(field.Key, v)" Label="@Label(field)" Variant="Variant.Outlined" Margin="Margin.Dense" Required="field.IsRequired" Class="mb-3" data-testid="@($"cf-{field.Key}")" />
+            break;
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<FieldDto> Fields { get; set; } = [];
+    [Parameter, EditorRequired] public Dictionary<string, JsonElement?> Values { get; set; } = new();
+    [Parameter] public EventCallback<Dictionary<string, JsonElement?>> ValuesChanged { get; set; }
+
+    private string Label(FieldDto field) => field.IsRequired ? $"{field.Label} *" : field.Label;
+
+    private string? GetText(string key) => Values.TryGetValue(key, out var v) && v is { ValueKind: JsonValueKind.String } s ? s.GetString() : null;
+
+    private bool GetBool(string key) => Values.TryGetValue(key, out var v) && v is { ValueKind: JsonValueKind.True };
+
+    private decimal? GetDecimal(string key) => Values.TryGetValue(key, out var v) && v is { ValueKind: JsonValueKind.Number } n ? n.GetDecimal() : null;
+
+    private async Task Set(string key, object? value)
+    {
+        Values[key] = value switch
+        {
+            null => null,
+            string text when text.Length == 0 => null,
+            string text => JsonSerializer.SerializeToElement(text),
+            bool flag => JsonSerializer.SerializeToElement(flag),
+            decimal number => JsonSerializer.SerializeToElement(number),
+            _ => JsonSerializer.SerializeToElement(value),
+        };
+        await ValuesChanged.InvokeAsync(Values);
+    }
+}

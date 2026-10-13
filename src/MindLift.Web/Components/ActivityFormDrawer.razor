@@ -1,0 +1,217 @@
+@using System.Globalization
+<FormDrawer Open="Open" OpenChanged="OnOpenChanged" Title="@Title" SubmitText="@(_id is null ? "Save" : "Save changes")" Busy="_busy" OnSubmit="SaveAsync" IsDirty="IsDirty">
+    @if (_error is not null)
+    {
+        <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3" data-testid="activity-error">@_error</MudAlert>
+    }
+
+    @if (_id is null)
+    {
+        <div class="ml-row ml-row--wrap mb-3" data-testid="activity-types">
+            @foreach (var type in ActivityTypes.All)
+            {
+                var current = type;
+                <MudChip T="string" Variant="@(_type == current ? Variant.Filled : Variant.Outlined)" Color="@(_type == current ? Color.Primary : Color.Default)"
+                         OnClick="() => SetType(current)" data-testid="@("activity-type-" + current.ToLowerInvariant())">@current</MudChip>
+            }
+        </div>
+    }
+
+    <DynamicForm Fields="Fields" Values="_values" Users="_users" Errors="_fieldErrors" />
+</FormDrawer>
+
+@code {
+    [Inject] private HttpClient Http { get; set; } = default!;
+    [Inject] private AppState App { get; set; } = default!;
+
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+    [Parameter] public EventCallback OnSaved { get; set; }
+
+    /// <summary>The record the activity is linked to when opened from a record page.</summary>
+    [Parameter] public Guid? LeadId { get; set; }
+    [Parameter] public Guid? ContactId { get; set; }
+    [Parameter] public Guid? AccountId { get; set; }
+    [Parameter] public Guid? DealId { get; set; }
+
+    private Dictionary<string, string?> _values = new();
+    private IReadOnlyDictionary<string, string> _fieldErrors = new Dictionary<string, string>();
+    private List<UserListItem> _users = [];
+    private Guid? _id;
+    private string _type = ActivityTypes.Task;
+    private bool _busy;
+    private string? _error;
+    private string _snapshot = string.Empty;
+
+    private string Title => (_id is null ? "New " : "Edit ") + _type.ToLowerInvariant();
+
+    private bool IsDirty => TakeSnapshot() != _snapshot;
+
+    private string TakeSnapshot() => System.Text.Json.JsonSerializer.Serialize(_values) + _type;
+
+    private IReadOnlyList<FormField> Fields
+    {
+        get
+        {
+            var fields = new List<FormField> { new("subject", _type == ActivityTypes.Note ? "Title" : "Subject", Required: true, TestId: "activity-subject") };
+            switch (_type)
+            {
+                case ActivityTypes.Task:
+                    fields.Add(new("dueAt", "Due", FormFieldKind.DateTime, Columns: 6, TestId: "activity-due"));
+                    fields.Add(new("priority", "Priority", FormFieldKind.Picklist, Options: [Option("Low", 0), Option("Normal", 1), Option("High", 2)], Columns: 6));
+                    fields.Add(new("reminderMinutes", "Remind me (minutes before)", FormFieldKind.Number));
+                    break;
+                case ActivityTypes.Call:
+                    fields.Add(new("dueAt", "When", FormFieldKind.DateTime, Columns: 6));
+                    fields.Add(new("direction", "Direction", FormFieldKind.Picklist, Options: [Option("Outbound", 0), Option("Inbound", 1)], Columns: 6));
+                    fields.Add(new("callOutcome", "Outcome", FormFieldKind.Picklist,
+                        Options: App.Bootstrap?.Picklists.FirstOrDefault(p => p.Key == "call_outcome")?.Values ?? [], Columns: 6));
+                    fields.Add(new("durationMinutes", "Minutes", FormFieldKind.Number, Columns: 6));
+                    break;
+                case ActivityTypes.Meeting:
+                    fields.Add(new("dueAt", "Starts", FormFieldKind.DateTime, Columns: 6, TestId: "activity-due"));
+                    fields.Add(new("endAt", "Ends", FormFieldKind.DateTime, Columns: 6));
+                    fields.Add(new("location", "Location or link"));
+                    fields.Add(new("attendees", "Guests (email addresses)", FormFieldKind.Multiline, TestId: "activity-attendees"));
+                    fields.Add(new("sendInvitations", "Email calendar invitations to the guests", FormFieldKind.Checkbox, TestId: "activity-send-invites"));
+                    fields.Add(new("reminderMinutes", "Remind me (minutes before)", FormFieldKind.Number));
+                    break;
+            }
+
+            if (_type == ActivityTypes.Note)
+            {
+                fields.Add(new("mentions", "Mention people", FormFieldKind.Users, TestId: "activity-mentions"));
+            }
+
+            fields.Add(new("description", _type == ActivityTypes.Note ? "Note" : "Details", FormFieldKind.Multiline, TestId: "activity-description"));
+            if (_type != ActivityTypes.Note)
+            {
+                fields.Add(new("ownerId", "Assigned to", FormFieldKind.User));
+            }
+
+            return fields;
+        }
+    }
+
+    private static PicklistValueDto Option(string value, int order) => new(Guid.Empty, value, value, null, null, null, order, false, true, false);
+
+    protected override async Task OnInitializedAsync() => _users = await RecordLookups.UsersAsync(Http);
+
+    private void SetType(string type)
+    {
+        _type = type;
+        _fieldErrors = new Dictionary<string, string>();
+    }
+
+    public void OpenNew(string type = ActivityTypes.Task)
+    {
+        _id = null;
+        _type = type;
+        _values = new Dictionary<string, string?> { ["priority"] = "Normal", ["direction"] = "Outbound" };
+        Reset();
+    }
+
+    public void OpenEdit(ActivityDto activity)
+    {
+        _id = activity.Id;
+        _type = activity.Type;
+        _values = new Dictionary<string, string?>
+        {
+            ["subject"] = activity.Subject, ["description"] = activity.Description, ["priority"] = activity.Priority,
+            ["dueAt"] = ToLocalInput(activity.DueAtUtc), ["endAt"] = ToLocalInput(activity.EndAtUtc), ["direction"] = activity.Direction,
+            ["callOutcome"] = activity.CallOutcome, ["location"] = activity.Location, ["ownerId"] = activity.OwnerId.ToString(),
+            ["durationMinutes"] = activity.DurationMinutes?.ToString(CultureInfo.InvariantCulture),
+            ["reminderMinutes"] = activity.ReminderMinutes?.ToString(CultureInfo.InvariantCulture),
+            ["attendees"] = string.Join(", ", activity.Attendees),
+            ["mentions"] = string.Join(',', activity.Mentions.Select(m => m.UserId)),
+            ["sendInvitations"] = "false",
+        };
+        Reset();
+    }
+
+    private void Reset()
+    {
+        _error = null;
+        _fieldErrors = new Dictionary<string, string>();
+        _snapshot = TakeSnapshot();
+    }
+
+    private static string? ToLocalInput(DateTime? utc)
+        => utc is null ? null : DateTime.SpecifyKind(utc.Value, DateTimeKind.Utc).ToLocalTime().ToString("yyyy-MM-ddTHH:mm", CultureInfo.InvariantCulture);
+
+    private static DateTime? FromLocalInput(string? text)
+        => DateTime.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.None, out var local) ? DateTime.SpecifyKind(local, DateTimeKind.Local).ToUniversalTime() : null;
+
+    /// <summary>Email addresses typed one per line or separated by commas or semicolons.</summary>
+    private static List<string> Emails(string? text)
+        => (text ?? string.Empty).Split(new[] { (char)10, (char)13, ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+
+    private static List<Guid> Ids(string? text)
+        => (text ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries).Select(s => Guid.TryParse(s, out var id) ? id : Guid.Empty).Where(id => id != Guid.Empty).ToList();
+
+    private string? Value(string key) => string.IsNullOrWhiteSpace(_values.GetValueOrDefault(key)) ? null : _values[key]!.Trim();
+
+    private async Task OnOpenChanged(bool value) => await OpenChanged.InvokeAsync(value);
+
+    private async Task SaveAsync()
+    {
+        _error = null;
+        _fieldErrors = new Dictionary<string, string>();
+        if (Value("subject") is null)
+        {
+            _fieldErrors = new Dictionary<string, string> { ["subject"] = "Enter a subject." };
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            int? minutes = int.TryParse(Value("durationMinutes"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var m) ? m : null;
+            Guid? owner = Guid.TryParse(Value("ownerId"), out var o) ? o : null;
+            var request = new SaveActivityRequest(
+                _type, Value("subject")!, Value("description"), _type == ActivityTypes.Task ? Value("priority") : null,
+                FromLocalInput(Value("dueAt")), FromLocalInput(Value("endAt")), minutes,
+                _type == ActivityTypes.Call ? Value("direction") : null, _type == ActivityTypes.Call ? Value("callOutcome") : null, Value("location"), int.TryParse(Value("reminderMinutes"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var reminder) ? reminder : null,
+                _id is null ? LeadId : null, _id is null ? ContactId : null, _id is null ? AccountId : null, _id is null ? DealId : null, owner,
+                _type == ActivityTypes.Meeting ? Emails(Value("attendees")) : null, _type == ActivityTypes.Meeting && Value("sendInvitations") == "true",
+                _type == ActivityTypes.Note ? Ids(Value("mentions")) : null);
+
+            if (_id is not null)
+            {
+                // Editing keeps the links the activity already has.
+                var existing = await Http.GetFromJsonAsync<ActivityDto>($"api/v1/activities/{_id}");
+                request = request with { LeadId = existing?.LeadId, ContactId = existing?.ContactId, AccountId = existing?.AccountId, DealId = existing?.DealId };
+            }
+
+            var response = _id is null
+                ? await Http.PostAsJsonAsync("api/v1/activities", request)
+                : await Http.PutAsJsonAsync($"api/v1/activities/{_id}", request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var fields = await ProblemText.FieldErrorsAsync(response);
+                if (fields.Count > 0)
+                {
+                    _fieldErrors = fields;
+                }
+                else
+                {
+                    _error = await ProblemText.FromAsync(response, "We could not save this activity.");
+                }
+
+                return;
+            }
+
+            await OpenChanged.InvokeAsync(false);
+            await OnSaved.InvokeAsync();
+        }
+        catch (HttpRequestException)
+        {
+            _error = "We could not reach MindLift. Check your connection and try again.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

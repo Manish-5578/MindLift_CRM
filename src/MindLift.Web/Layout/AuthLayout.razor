@@ -1,0 +1,24 @@
+@inherits LayoutComponentBase
+@inject AppState App
+
+<MudThemeProvider Theme="_theme" />
+<MudPopoverProvider />
+<MudDialogProvider MaxWidth="MaxWidth.Small" FullWidth="true" CloseButton="true" BackdropClick="false" />
+<MudSnackbarProvider />
+
+<MudRTLProvider RightToLeft="App.IsArabic">
+    <MudLayout>
+        <MudMainContent>
+            <div class="ml-page" style="min-height:100vh">
+                <div class="ml-stack" style="align-items:center">
+                    <MudText Typo="Typo.subtitle1" Class="mt-6" Style="font-weight:700;color:var(--ml-primary)">MindLift</MudText>
+                </div>
+                @Body
+            </div>
+        </MudMainContent>
+    </MudLayout>
+</MudRTLProvider>
+
+@code {
+    private readonly MudTheme _theme = MindLiftTheme.Create();
+}

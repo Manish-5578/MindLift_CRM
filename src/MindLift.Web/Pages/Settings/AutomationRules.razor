@@ -1,0 +1,561 @@
+@page "/settings/automation-rules"
+@using MindLift.Shared.Contracts
+@using MindLift.Shared.Enums
+@using MindLift.Shared.Filtering
+@using FilterOp = MindLift.Shared.Filtering.FilterOperator
+@using System.Text.Json
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<PageTitle>Automation rules · MindLift</PageTitle>
+
+<div class="ml-page ml-page--form">
+    <PageHeader Title="Automation rules" Subtitle="Trigger-Condition-Action workflows (Zoho Automation Engine). Run instant or scheduled actions when records are created, updated, or moved between stages.">
+        <Actions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => OpenRule(null)" data-testid="new-rule-action">New rule</MudButton>
+        </Actions>
+    </PageHeader>
+    <SettingsNav Current="/settings/automation-rules" />
+
+    <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" TabPanelsClass="pa-0 mt-3">
+        <MudTabPanel Text="Active Rules" Icon="@Icons.Material.Outlined.Rule">
+            @if (_loading)
+            {
+                <SkeletonTable Rows="4" Columns="4" />
+            }
+            else if (_loadFailed)
+            {
+                <ErrorState OnRetry="LoadAsync" />
+            }
+            else
+            {
+                <MlCard Flush="true" Class="mb-4" TestId="automation-rules-list">
+                    @foreach (var rule in _rules)
+                    {
+                        <div class="ml-row" style="padding:14px 20px;border-bottom:1px solid var(--ml-border);min-height:64px" data-testid="rule-row">
+                            <div class="ml-grow">
+                                <div class="d-flex align-center gap-2 mb-1">
+                                    <MudText Typo="Typo.subtitle2">@rule.Name</MudText>
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary">@rule.EntityType.ToUpperInvariant()</MudChip>
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Info">@TriggerLabel(rule.TriggerType)</MudChip>
+                                </div>
+                                <MudText Typo="Typo.caption" Class="ml-muted">
+                                    Priority @rule.Priority · @rule.Actions.Count action(s): @ActionsSummary(rule.Actions)
+                                    @if (rule.Conditions?.Conditions.Count > 0)
+                                    {
+                                        <span> · @rule.Conditions.Conditions.Count condition(s)</span>
+                                    }
+                                </MudText>
+                            </div>
+                            <MudSwitch T="bool" Value="rule.IsActive" ValueChanged="() => ToggleRule(rule)" Color="Color.Success" Class="mr-2" />
+                            <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="() => OpenRule(rule)" aria-label="Edit rule" />
+                            @if (_confirmId == rule.Id)
+                            {
+                                <MudButton Size="Size.Small" OnClick="() => _confirmId = null">Keep</MudButton>
+                                <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeleteAsync(rule)">Delete</MudButton>
+                            }
+                            else
+                            {
+                                <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" OnClick="() => _confirmId = rule.Id" aria-label="Delete rule" />
+                            }
+                        </div>
+                    }
+                    @if (_rules.Count == 0)
+                    {
+                        <EmptyState Title="No automation rules" Message="Create your first rule to automate tasks, field updates, emails, and notifications on record events." Compact="true" />
+                    }
+                </MlCard>
+            }
+        </MudTabPanel>
+
+        <MudTabPanel Text="Execution Logs" Icon="@Icons.Material.Outlined.History">
+            <MlCard Flush="true" Class="mb-4">
+                @if (_logsLoading)
+                {
+                    <SkeletonTable Rows="5" Columns="4" />
+                }
+                else if (_logs.Count == 0)
+                {
+                    <EmptyState Title="No logs yet" Message="Execution logs will appear here when automation rules fire." Compact="true" />
+                }
+                else
+                {
+                    <div style="padding:12px 20px;border-bottom:1px solid var(--ml-border);display:flex;justify-content:flex-end">
+                        <MudButton Size="Size.Small" StartIcon="@Icons.Material.Outlined.Refresh" OnClick="LoadLogsAsync">Refresh logs</MudButton>
+                    </div>
+                    @foreach (var log in _logs)
+                    {
+                        <div class="ml-row" style="padding:12px 20px;border-bottom:1px solid var(--ml-border)">
+                            <div class="ml-grow">
+                                <div class="d-flex align-center gap-2 mb-1">
+                                    <MudText Typo="Typo.subtitle2">@log.RuleName</MudText>
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@log.EntityType</MudChip>
+                                    <MudChip T="string" Size="Size.Small" Color="@(log.Status == "Success" ? Color.Success : Color.Error)">@log.Status</MudChip>
+                                </div>
+                                <MudText Typo="Typo.caption" Class="ml-muted">
+                                    Trigger: @log.TriggerType · Entity ID: @log.EntityId.ToString()[..8]… · @log.ExecutedAt.ToLocalTime().ToString("g")
+                                </MudText>
+                                @if (!string.IsNullOrWhiteSpace(log.ErrorMessage))
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Error">@log.ErrorMessage</MudText>
+                                }
+                            </div>
+                        </div>
+                    }
+                }
+            </MlCard>
+        </MudTabPanel>
+    </MudTabs>
+</div>
+
+<FormDrawer Open="_open" OpenChanged="v => _open = v" Title="@_title" SubmitText="Save rule" Busy="_busy" OnSubmit="SaveAsync">
+    <div class="ml-stack">
+        @if (_formError is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true">@_formError</MudAlert>
+        }
+
+        <MudTextField @bind-Value="_name" Label="Rule Name *" Variant="Variant.Outlined" Margin="Margin.Dense" />
+
+        <MudSelect T="string" @bind-Value="_entityType" Label="Applies to *" Variant="Variant.Outlined" Margin="Margin.Dense">
+            <MudSelectItem T="string" Value="@("leads")">Leads</MudSelectItem>
+            <MudSelectItem T="string" Value="@("contacts")">Contacts</MudSelectItem>
+            <MudSelectItem T="string" Value="@("accounts")">Accounts</MudSelectItem>
+            <MudSelectItem T="string" Value="@("deals")">Deals</MudSelectItem>
+        </MudSelect>
+
+        <MudSelect T="AutomationTriggerType" @bind-Value="_triggerType" Label="When *" Variant="Variant.Outlined" Margin="Margin.Dense">
+            <MudSelectItem T="AutomationTriggerType" Value="AutomationTriggerType.RecordCreated">Record is Created</MudSelectItem>
+            <MudSelectItem T="AutomationTriggerType" Value="AutomationTriggerType.RecordUpdated">Record is Updated (Any field)</MudSelectItem>
+            <MudSelectItem T="AutomationTriggerType" Value="AutomationTriggerType.FieldChanged">Specific Field Changes</MudSelectItem>
+            @if (_entityType == "deals")
+            {
+                <MudSelectItem T="AutomationTriggerType" Value="AutomationTriggerType.StageChanged">Deal Stage Changes</MudSelectItem>
+            }
+        </MudSelect>
+
+        @if (_triggerType == AutomationTriggerType.FieldChanged)
+        {
+            <MudTextField @bind-Value="_fieldKey" Label="Field Key (e.g. status, rating, cf_budget)" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudTextField @bind-Value="_toValue" Label="Target Value (optional - triggers on change to this value)" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        }
+
+        <MudNumericField @bind-Value="_priority" Label="Priority" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" HelperText="Lower numbers run first." />
+        <MudSwitch T="bool" @bind-Value="_isActive" Label="Active" Color="Color.Primary" />
+
+        <MudDivider Class="my-2" />
+
+        <!-- CRITERIA / CONDITIONS (Zoho TCA Engine) -->
+        <div class="d-flex align-center justify-space-between mb-1">
+            <div>
+                <MudText Typo="Typo.subtitle2">Filter Criteria (Optional)</MudText>
+                <MudText Typo="Typo.caption" Class="ml-muted">Only run actions if record meets these conditions</MudText>
+            </div>
+            <MudButton Size="Size.Small" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add" OnClick="AddCondition">Add Condition</MudButton>
+        </div>
+
+        @if (_conditions.Count > 1)
+        {
+            <MudSelect T="string" @bind-Value="_conditionLogic" Label="Match Logic" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2">
+                <MudSelectItem T="string" Value="@("and")">Match ALL conditions (AND)</MudSelectItem>
+                <MudSelectItem T="string" Value="@("or")">Match ANY condition (OR)</MudSelectItem>
+            </MudSelect>
+        }
+
+        @for (var i = 0; i < _conditions.Count; i++)
+        {
+            var idx = i;
+            var cond = _conditions[i];
+            <div class="d-flex align-center gap-2 mb-2">
+                <MudTextField @bind-Value="cond.Field" Placeholder="Field key (e.g. rating, status)" Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex:2" />
+                <MudSelect T="FilterOp" @bind-Value="cond.Op" Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex:2">
+                    <MudSelectItem T="FilterOp" Value="FilterOp.Eq">Equals</MudSelectItem>
+                    <MudSelectItem T="FilterOp" Value="FilterOp.Neq">Not Equals</MudSelectItem>
+                    <MudSelectItem T="FilterOp" Value="FilterOp.Contains">Contains</MudSelectItem>
+                    <MudSelectItem T="FilterOp" Value="FilterOp.Gt">Greater Than</MudSelectItem>
+                    <MudSelectItem T="FilterOp" Value="FilterOp.Lt">Less Than</MudSelectItem>
+                    <MudSelectItem T="FilterOp" Value="FilterOp.IsEmpty">Is Empty</MudSelectItem>
+                    <MudSelectItem T="FilterOp" Value="FilterOp.IsNotEmpty">Is Not Empty</MudSelectItem>
+                </MudSelect>
+                @if (cond.Op != FilterOp.IsEmpty && cond.Op != FilterOp.IsNotEmpty)
+                {
+                    <MudTextField @bind-Value="cond.Value" Placeholder="Value" Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex:2" />
+                }
+                <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Color="Color.Error" OnClick="() => _conditions.RemoveAt(idx)" />
+            </div>
+        }
+
+        <MudDivider Class="my-2" />
+
+        <!-- ACTIONS -->
+        <div class="d-flex align-center justify-space-between">
+            <MudText Typo="Typo.subtitle2">Actions to Execute</MudText>
+            <MudMenu Label="+ Add Action" Variant="Variant.Outlined" Size="Size.Small" EndIcon="@Icons.Material.Filled.ArrowDropDown">
+                <MudMenuItem OnClick="() => AddAction(AutomationActionType.CreateTask)">Create Task</MudMenuItem>
+                <MudMenuItem OnClick="() => AddAction(AutomationActionType.UpdateField)">Update Field</MudMenuItem>
+                <MudMenuItem OnClick="() => AddAction(AutomationActionType.SendNotification)">Send In-App Toast</MudMenuItem>
+                <MudMenuItem OnClick="() => AddAction(AutomationActionType.SendEmail)">Send Email</MudMenuItem>
+                <MudMenuItem OnClick="() => AddAction(AutomationActionType.Webhook)">Call Webhook</MudMenuItem>
+            </MudMenu>
+        </div>
+
+        @if (_actions.Count == 0)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Warning">Add at least one action to run when this trigger fires.</MudText>
+        }
+
+        @for (var i = 0; i < _actions.Count; i++)
+        {
+            var idx = i;
+            var action = _actions[i];
+            <MlCard Class="pa-3 mb-2" Style="border: 1px solid var(--ml-border)">
+                <div class="d-flex justify-space-between align-center mb-2">
+                    <MudText Typo="Typo.caption" Style="font-weight:600">Action @(idx + 1): @action.Type</MudText>
+                    <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Color="Color.Error" OnClick="() => _actions.RemoveAt(idx)" />
+                </div>
+
+                @if (action.Type == AutomationActionType.CreateTask)
+                {
+                    <MudTextField @bind-Value="action.Subject" Label="Task Subject *" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                    <div class="d-flex gap-2">
+                        <MudNumericField @bind-Value="action.OffsetDays" Label="Due In Days" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" Class="flex-1" />
+                        <MudSelect T="string" @bind-Value="action.Priority" Label="Priority" Variant="Variant.Outlined" Margin="Margin.Dense" Class="flex-1">
+                            <MudSelectItem T="string" Value="@("Normal")">Normal</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("High")">High</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Low")">Low</MudSelectItem>
+                        </MudSelect>
+                    </div>
+                }
+                else if (action.Type == AutomationActionType.UpdateField)
+                {
+                    <MudTextField @bind-Value="action.FieldKey" Label="Field Key (e.g. Rating, Status, cf_budget)" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                    <MudTextField @bind-Value="action.FieldValue" Label="New Value" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                }
+                else if (action.Type == AutomationActionType.SendNotification)
+                {
+                    <MudTextField @bind-Value="action.NotificationMessage" Label="Notification Toast Message *" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                }
+                else if (action.Type == AutomationActionType.SendEmail)
+                {
+                    <MudTextField @bind-Value="action.EmailRecipient" Label="Recipient Email (optional - defaults to record email)" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                    <MudTextField @bind-Value="action.Subject" Label="Email Subject *" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                    <MudTextField @bind-Value="action.EmailBody" Label="Email Body *" Lines="3" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                }
+                else if (action.Type == AutomationActionType.Webhook)
+                {
+                    <MudTextField @bind-Value="action.WebhookUrl" Label="Webhook URL (POST) *" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                }
+
+                <div class="mt-2">
+                    <MudNumericField @bind-Value="action.ScheduledDelayMinutes" Label="Execution Delay (Minutes, 0 = Instant)" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" HelperText="Leave 0 for instant execution; >0 schedules background job" />
+                </div>
+            </MlCard>
+        }
+    </div>
+</FormDrawer>
+
+@code {
+    private List<AutomationRuleDto> _rules = [];
+    private List<AutomationExecutionLogDto> _logs = [];
+    private bool _loading = true;
+    private bool _logsLoading = false;
+    private bool _loadFailed;
+    private Guid? _confirmId;
+
+    // Drawer state
+    private bool _open;
+    private bool _busy;
+    private string _title = "New rule";
+    private string? _formError;
+    private Guid? _editingId;
+
+    // Form fields
+    private string _name = "";
+    private string _entityType = "leads";
+    private AutomationTriggerType _triggerType = AutomationTriggerType.RecordCreated;
+    private string? _fieldKey;
+    private string? _toValue;
+    private int _priority = 1;
+    private bool _isActive = true;
+    private string _conditionLogic = "and";
+    private List<EditableCondition> _conditions = [];
+    private List<EditableAction> _actions = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        await LoadLogsAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _loadFailed = false;
+        try
+        {
+            _rules = await Http.GetFromJsonAsync<List<AutomationRuleDto>>("api/v1/automation/rules") ?? [];
+        }
+        catch
+        {
+            _loadFailed = true;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadLogsAsync()
+    {
+        _logsLoading = true;
+        try
+        {
+            _logs = await Http.GetFromJsonAsync<List<AutomationExecutionLogDto>>("api/v1/automation/logs") ?? [];
+        }
+        catch
+        {
+            // Logs fail gracefully
+        }
+        finally
+        {
+            _logsLoading = false;
+        }
+    }
+
+    private void OpenRule(AutomationRuleDto? rule)
+    {
+        _editingId = rule?.Id;
+        _formError = null;
+        if (rule is null)
+        {
+            _title = "New automation rule";
+            _name = "";
+            _entityType = "leads";
+            _triggerType = AutomationTriggerType.RecordCreated;
+            _fieldKey = null;
+            _toValue = null;
+            _priority = (_rules.Count > 0 ? _rules.Max(r => r.Priority) + 1 : 1);
+            _isActive = true;
+            _conditionLogic = "and";
+            _conditions = [];
+            _actions = [new EditableAction { Type = AutomationActionType.CreateTask, Subject = "Follow up with customer", OffsetDays = 1, Priority = "Normal" }];
+        }
+        else
+        {
+            _title = "Edit automation rule";
+            _name = rule.Name;
+            _entityType = rule.EntityType;
+            _triggerType = rule.TriggerType;
+            _fieldKey = rule.TriggerConfig?.FieldKey;
+            _toValue = rule.TriggerConfig?.ToValue;
+            _priority = rule.Priority;
+            _isActive = rule.IsActive;
+            _conditionLogic = rule.Conditions?.Logic ?? "and";
+            _conditions = rule.Conditions?.Conditions.Select(c => new EditableCondition
+            {
+                Field = c.Field,
+                Op = c.Op,
+                Value = c.Value is { ValueKind: JsonValueKind.String } s ? s.GetString() : c.Value?.ToString()
+            }).ToList() ?? [];
+
+            _actions = rule.Actions.Select(a => new EditableAction
+            {
+                Type = a.Type,
+                FieldKey = a.FieldKey,
+                FieldValue = a.FieldValue,
+                Subject = a.Subject,
+                OffsetDays = a.OffsetDays,
+                Priority = a.Priority,
+                NotificationMessage = a.NotificationMessage,
+                WebhookUrl = a.WebhookUrl,
+                EmailRecipient = a.EmailRecipient,
+                EmailBody = a.EmailBody,
+                ScheduledDelayMinutes = a.ScheduledDelayMinutes
+            }).ToList();
+        }
+        _open = true;
+    }
+
+    private void AddCondition()
+    {
+        _conditions.Add(new EditableCondition { Field = "", Op = FilterOp.Eq, Value = "" });
+    }
+
+    private void AddAction(AutomationActionType type)
+    {
+        _actions.Add(new EditableAction
+        {
+            Type = type,
+            Subject = type == AutomationActionType.CreateTask ? "Follow up" : (type == AutomationActionType.SendEmail ? "Important CRM Update" : null),
+            OffsetDays = type == AutomationActionType.CreateTask ? 2 : null,
+            Priority = "Normal",
+            NotificationMessage = type == AutomationActionType.SendNotification ? "Important update on record" : null,
+            EmailBody = type == AutomationActionType.SendEmail ? "Hello, here is an update regarding your inquiry." : null,
+            WebhookUrl = type == AutomationActionType.Webhook ? "https://api.example.com/crm-webhook" : null
+        });
+    }
+
+    private async Task SaveAsync()
+    {
+        _formError = null;
+        if (string.IsNullOrWhiteSpace(_name))
+        {
+            _formError = "Name is required.";
+            return;
+        }
+
+        if (_actions.Count == 0)
+        {
+            _formError = "Add at least one action.";
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            var triggerConfig = _triggerType == AutomationTriggerType.FieldChanged || _triggerType == AutomationTriggerType.StageChanged
+                ? new AutomationTriggerConfig(_fieldKey, null, _toValue)
+                : null;
+
+            FilterGroup? filterGroup = null;
+            var activeConditions = _conditions.Where(c => !string.IsNullOrWhiteSpace(c.Field)).ToList();
+            if (activeConditions.Count > 0)
+            {
+                filterGroup = new FilterGroup
+                {
+                    Logic = _conditionLogic,
+                    Conditions = activeConditions.Select(c => new FilterCondition
+                    {
+                        Field = c.Field.Trim(),
+                        Op = c.Op,
+                        Value = string.IsNullOrWhiteSpace(c.Value) ? null : JsonSerializer.SerializeToElement(c.Value)
+                    }).ToList()
+                };
+            }
+
+            var actionDefs = _actions.Select(a => new AutomationActionDefinition(
+                a.Type,
+                a.FieldKey,
+                a.FieldValue,
+                a.Subject,
+                a.OffsetDays,
+                a.Priority,
+                a.NotificationMessage,
+                a.WebhookUrl,
+                null,
+                a.EmailRecipient,
+                a.EmailBody,
+                a.ScheduledDelayMinutes > 0 ? a.ScheduledDelayMinutes : null
+            )).ToList();
+
+            var request = new SaveAutomationRuleRequest(
+                _name.Trim(),
+                _entityType,
+                _triggerType,
+                triggerConfig,
+                filterGroup,
+                actionDefs,
+                _isActive,
+                _priority
+            );
+
+            HttpResponseMessage resp;
+            if (_editingId is null)
+            {
+                resp = await Http.PostAsJsonAsync("api/v1/automation/rules", request);
+            }
+            else
+            {
+                resp = await Http.PutAsJsonAsync($"api/v1/automation/rules/{_editingId}", request);
+            }
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                _formError = "Failed to save rule. Verify all fields.";
+                return;
+            }
+
+            _open = false;
+            Snackbar.Add("Automation rule saved", Severity.Success);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _formError = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task ToggleRule(AutomationRuleDto rule)
+    {
+        try
+        {
+            await Http.PostAsync($"api/v1/automation/rules/{rule.Id}/toggle", null);
+            await LoadAsync();
+        }
+        catch
+        {
+            Snackbar.Add("Could not toggle rule", Severity.Error);
+        }
+    }
+
+    private async Task DeleteAsync(AutomationRuleDto rule)
+    {
+        try
+        {
+            await Http.DeleteAsync($"api/v1/automation/rules/{rule.Id}");
+            _confirmId = null;
+            Snackbar.Add("Rule deleted", Severity.Info);
+            await LoadAsync();
+        }
+        catch
+        {
+            Snackbar.Add("Could not delete rule", Severity.Error);
+        }
+    }
+
+    private static string TriggerLabel(AutomationTriggerType t) => t switch
+    {
+        AutomationTriggerType.RecordCreated => "On Created",
+        AutomationTriggerType.RecordUpdated => "On Updated",
+        AutomationTriggerType.FieldChanged => "Field Changed",
+        AutomationTriggerType.StageChanged => "Stage Changed",
+        _ => t.ToString()
+    };
+
+    private static string ActionsSummary(IReadOnlyList<AutomationActionDefinition> actions)
+        => string.Join(", ", actions.Select(a => a.Type switch
+        {
+            AutomationActionType.CreateTask => $"Task: {a.Subject ?? "Follow up"}",
+            AutomationActionType.UpdateField => $"Set {a.FieldKey}={a.FieldValue}",
+            AutomationActionType.SendNotification => "Toast Notification",
+            AutomationActionType.SendEmail => $"Email: {a.Subject ?? "Notification"}",
+            AutomationActionType.Webhook => "Webhook",
+            _ => a.Type.ToString()
+        }));
+
+    private sealed class EditableCondition
+    {
+        public string Field { get; set; } = "";
+        public FilterOp Op { get; set; } = FilterOp.Eq;
+        public string? Value { get; set; }
+    }
+
+    private sealed class EditableAction
+    {
+        public AutomationActionType Type { get; set; }
+        public string? FieldKey { get; set; }
+        public string? FieldValue { get; set; }
+        public string? Subject { get; set; }
+        public int? OffsetDays { get; set; }
+        public string? Priority { get; set; } = "Normal";
+        public string? NotificationMessage { get; set; }
+        public string? WebhookUrl { get; set; }
+        public string? EmailRecipient { get; set; }
+        public string? EmailBody { get; set; }
+        public int? ScheduledDelayMinutes { get; set; }
+    }
+}

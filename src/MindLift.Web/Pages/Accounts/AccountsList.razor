@@ -1,0 +1,158 @@
+@page "/accounts"
+@using MindLift.Shared.Filtering
+@using FilterOperator = MindLift.Shared.Filtering.FilterOperator
+@inject HttpClient Http
+@inject AuthSession Session
+@inject AppState App
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+<PageTitle>@App.ModuleLabel(AppModule.Accounts) · MindLift</PageTitle>
+
+<div class="ml-page ml-page--narrow">
+    @if (App.Bootstrap is not null)
+    {
+        <EntityListPage @ref="_list" TItem="AccountListItemDto" Title="@App.ModuleLabel(AppModule.Accounts)" ItemLabel="@ItemLabel"
+                        Views="_views" DefaultView="all" Columns="_columns" CardTemplate="_card" Loader="LoadAsync" RowHref="Href"
+                        Fields="Fields" Picklists="App.Bootstrap.Picklists" Users="_users"
+                        SearchPlaceholder="Search name, website, industry or phone" EmptyIcon="@Icons.Material.Outlined.Business"
+                        EmptyTitle="No accounts yet" EmptyMessage="Companies appear here when you add them, import them, or convert a lead."
+                        DefaultSortField="created_at" DefaultSortDir="desc">
+            <HeaderActions>
+                @if (Can(p => p.CanImport))
+                {
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Upload" Href="/accounts/import" data-testid="import-accounts">Import</MudButton>
+                }
+                @if (Can(p => p.CanExport))
+                {
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Download" OnClick="ExportAsync" data-testid="export-accounts">Export</MudButton>
+                }
+                @if (Can(p => p.CanCreate))
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" OnClick="OpenNew" data-testid="primary-action">New account</MudButton>
+                }
+            </HeaderActions>
+            <EmptyActions>
+                @if (Can(p => p.CanCreate))
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenNew">New account</MudButton>
+                }
+            </EmptyActions>
+        </EntityListPage>
+    }
+</div>
+
+<AccountFormDrawer @ref="_form" @bind-Open="_drawer" OnSaved="OnSaved" />
+
+@code {
+    private EntityListPage<AccountListItemDto>? _list;
+    private AccountFormDrawer? _form;
+    private bool _drawer;
+    private List<UserListItem> _users = [];
+    private IReadOnlyList<ListView> _views = [];
+    private IReadOnlyList<ListColumn<AccountListItemDto>> _columns = [];
+    private RenderFragment<AccountListItemDto> _card = _ => _ => { };
+
+    private bool Can(Func<ModulePermissionDto, bool> check) => App.Bootstrap?.Permissions.Any(p => p.Module == "Accounts" && check(p)) == true;
+
+    private string ItemLabel => App.ModuleLabel(AppModule.Accounts).ToLowerInvariant();
+
+    private IReadOnlyList<FieldDto> Fields => App.Bootstrap?.Fields.GetValueOrDefault("accounts") ?? [];
+
+    private static string? Href(AccountListItemDto account) => "/accounts/" + account.Id;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.IsSignedIn)
+        {
+            Nav.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        _views =
+        [
+            new("all", "All accounts", new FilterGroup()),
+            new("mine", "My accounts", new FilterGroup
+            {
+                Conditions = [new FilterCondition { Field = "owner_id", Op = FilterOperator.Eq, Value = JsonSerializer.SerializeToElement("@me") }],
+            }),
+        ];
+
+        _columns =
+        [
+            new()
+            {
+                Header = "Name", SortField = "name",
+                Cell = a =>
+                    @<div class="ml-cell-primary">
+                        <UserAvatar Name="@a.Name" Id="@a.Id" Size="32" />
+                        <div class="ml-cell-primary__text">
+                            <MudText Typo="Typo.subtitle2" Class="ml-truncate">@a.Name</MudText>
+                            <MudText Typo="Typo.caption" Class="ml-muted ml-truncate">@(a.ParentName is null ? a.Website ?? "—" : "Part of " + a.ParentName)</MudText>
+                        </div>
+                    </div>,
+            },
+            new() { Header = "Industry", SortField = "industry", HideOnTablet = true, Cell = a => @<span class="ml-muted">@(a.Industry ?? "—")</span> },
+            new() { Header = "Contacts", AlignEnd = true, Cell = a => @<span>@a.ContactCount</span> },
+            new() { Header = "Owner", Cell = a => @<span>@(a.OwnerName ?? "—")</span> },
+            new() { Header = "Created", SortField = "created_at", AlignEnd = true, Cell = a => @<DateText Value="@a.CreatedAtUtc" /> },
+        ];
+
+        _card = a =>
+            @<div class="ml-cell-primary">
+                <UserAvatar Name="@a.Name" Id="@a.Id" Size="40" />
+                <div class="ml-cell-primary__text ml-grow">
+                    <MudText Typo="Typo.subtitle1" Class="ml-truncate">@a.Name</MudText>
+                    <MudText Typo="Typo.body2" Class="ml-muted ml-truncate">@(a.Industry ?? a.Website ?? "—")</MudText>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@a.ContactCount @(a.ContactCount == 1 ? "contact" : "contacts")</MudText>
+                </div>
+            </div>;
+
+        _users = await RecordLookups.UsersAsync(Http);
+    }
+
+    private void OpenNew()
+    {
+        _form?.OpenNew();
+        _drawer = true;
+    }
+
+    private async Task OnSaved()
+    {
+        Snackbar.Add("Account saved", Severity.Success);
+        if (_list is not null)
+        {
+            await _list.ReloadAsync();
+        }
+    }
+
+    private async Task<PagedResult<AccountListItemDto>> LoadAsync(ListQuery query)
+    {
+        var response = await Http.PostAsJsonAsync("api/v1/accounts/query", query);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new ListLoadException(await ProblemText.FromAsync(response, "We could not load your accounts. Try again."));
+        }
+
+        return (await response.Content.ReadFromJsonAsync<PagedResult<AccountListItemDto>>())!;
+    }
+
+    private async Task ExportAsync()
+    {
+        if (_list is null)
+        {
+            return;
+        }
+
+        var response = await Http.PostAsJsonAsync("api/v1/accounts/export", _list.CurrentQuery with { Page = 1, PageSize = 200 });
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "We could not export your accounts."), Severity.Error);
+            return;
+        }
+
+        await JS.InvokeVoidAsync("mindlift.downloadFile", "accounts.csv", "text/csv", Convert.ToBase64String(await response.Content.ReadAsByteArrayAsync()));
+        Snackbar.Add("Export ready", Severity.Success);
+    }
+}

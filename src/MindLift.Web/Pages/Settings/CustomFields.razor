@@ -1,0 +1,158 @@
+@page "/settings/custom-fields"
+@inject HttpClient Http
+@inject AppState App
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageTitle>Custom fields · MindLift</PageTitle>
+
+<div class="ml-page ml-page--form">
+    <PageHeader Title="Custom fields" Subtitle="Add fields to any record type. Keys cannot change after they are created." />
+    <SettingsNav Current="/settings/custom-fields" />
+
+    <MlCard Title="Fields" Class="mb-4">
+        <MudSelect T="string" Value="_entity" ValueChanged="OnEntityChanged" Label="Record type" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-3" data-testid="entity-select">
+            @foreach (var (key, label) in Entities)
+            {
+                <MudSelectItem T="string" Value="@key">@label</MudSelectItem>
+            }
+        </MudSelect>
+
+        @if (_loading)
+        {
+            <SkeletonTable Rows="3" Columns="3" />
+        }
+        else if (_fields is null)
+        {
+            <ErrorState OnRetry="() => LoadAsync(_entity)" />
+        }
+        else if (_fields.Count == 0)
+        {
+            <EmptyState Title="No custom fields yet" Message="Add the first one below." Compact="true" />
+        }
+        else
+        {
+            @foreach (var field in _fields)
+            {
+                <div class="ml-row" style="padding:10px 0;border-bottom:1px solid var(--ml-border)" data-testid="row">
+                    <div class="ml-grow">
+                        <MudText Typo="Typo.subtitle2">@field.Label</MudText>
+                        <MudText Typo="Typo.caption" Class="ml-muted">@field.Key · @field.Type @(field.IsRequired ? "· required" : "")</MudText>
+                    </div>
+                    <StatusChip Text="@(field.IsActive ? "Active" : "Inactive")" Color="@StatusColors.For(field.IsActive ? "Won" : "Expired")" />
+                </div>
+            }
+        }
+    </MlCard>
+
+    <MlCard Title="New custom field">
+        <div class="ml-stack">
+            @if (_error is not null) { <MudAlert Severity="Severity.Error" Dense="true" data-testid="cf-error">@_error</MudAlert> }
+            <MudGrid Spacing="3">
+                <MudItem xs="12" sm="6"><MudTextField @bind-Value="_key" Label="Key (cf_…) *" Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="Lowercase letters, digits and underscores. Starts with cf_." data-testid="cf-key" /></MudItem>
+                <MudItem xs="12" sm="6"><MudTextField @bind-Value="_label" Label="Label *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="cf-label" /></MudItem>
+            </MudGrid>
+            <MudSelect T="string" @bind-Value="_type" Label="Type *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="cf-type">
+                @foreach (var (value, label) in Types)
+                {
+                    <MudSelectItem T="string" Value="@value">@label</MudSelectItem>
+                }
+            </MudSelect>
+            @if (_type is "Picklist" or "MultiPicklist")
+            {
+                <MudTextField @bind-Value="_options" Label="Options, one per line as value|Label" Lines="4" Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="Example: villa|Villa" data-testid="cf-options" />
+            }
+            <MudCheckBox @bind-Value="_required" Label="Required" Color="Color.Primary" />
+            <div class="ml-row" style="justify-content:flex-end">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateAsync" data-testid="primary-action">Add field</MudButton>
+            </div>
+        </div>
+    </MlCard>
+</div>
+
+@code {
+    private static readonly (string Key, string Label)[] Entities =
+    [
+        ("leads", "Leads"), ("contacts", "Contacts"), ("accounts", "Accounts"), ("deals", "Deals"), ("activities", "Activities"),
+    ];
+
+    private static readonly (string Value, string Label)[] Types =
+    [
+        ("Text", "Text"), ("TextArea", "Long text"), ("Number", "Number"), ("Decimal", "Decimal"), ("Currency", "Money"),
+        ("Percent", "Percent"), ("Date", "Date"), ("DateTime", "Date and time"), ("Boolean", "Yes / no"),
+        ("Picklist", "Choice (one)"), ("MultiPicklist", "Choice (many)"), ("Email", "Email"), ("Phone", "Phone"), ("Url", "Link"),
+    ];
+
+    private string _entity = "leads";
+    private List<CustomFieldDto>? _fields;
+    private bool _loading = true;
+    private string _key = "cf_";
+    private string _label = string.Empty;
+    private string _type = "Text";
+    private string _options = string.Empty;
+    private bool _required;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!App.IsAdmin)
+        {
+            Nav.NavigateTo("/");
+            return;
+        }
+
+        await LoadAsync(_entity);
+    }
+
+    private async Task OnEntityChanged(string entity)
+    {
+        _entity = entity;
+        await LoadAsync(entity);
+    }
+
+    private async Task LoadAsync(string entity)
+    {
+        _loading = true;
+        try
+        {
+            _fields = await Http.GetFromJsonAsync<List<CustomFieldDto>>($"api/v1/settings/custom-fields/{entity}");
+        }
+        catch (HttpRequestException)
+        {
+            _fields = null;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        _error = null;
+        var options = _type is "Picklist" or "MultiPicklist"
+            ? _options.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(line => line.Split('|', 2))
+                .Select(parts => new PicklistOptionDto(parts[0].Trim(), (parts.Length > 1 ? parts[1] : parts[0]).Trim(), null, null))
+                .ToList()
+            : null;
+
+        var fieldType = Enum.Parse<MindLift.Shared.Filtering.FieldType>(_type);
+        var response = await Http.PostAsJsonAsync("api/v1/settings/custom-fields", new SaveCustomFieldRequest(
+            _entity, _key.Trim(), _label.Trim(), null, fieldType, _required, true, true, null, _fields?.Count ?? 0, options));
+
+        if (!response.IsSuccessStatusCode)
+        {
+            _error = await ProblemText.FromAsync(response, "We could not add this field.");
+            return;
+        }
+
+        Snackbar.Add("Field added", Severity.Success);
+        _key = "cf_";
+        _label = string.Empty;
+        _options = string.Empty;
+        _required = false;
+        await LoadAsync(_entity);
+        await App.LoadAsync();
+    }
+}

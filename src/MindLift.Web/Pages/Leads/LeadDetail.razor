@@ -1,0 +1,419 @@
+@page "/leads/{Id:guid}"
+@inject HttpClient Http
+@inject AuthSession Session
+@inject AppState App
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+
+<PageTitle>Lead · MindLift</PageTitle>
+
+<div class="ml-page ml-page--narrow">
+    @if (_loading)
+    {
+        <MlCard Loading="true" />
+    }
+    else if (_lead is null)
+    {
+        <ErrorState Title="We could not open this lead" Message="@(_error ?? "It may have been deleted, or you may not have access to it.")" OnRetry="LoadAsync" />
+    }
+    else
+    {
+        <PageHeader Title="@($"{_lead.FirstName} {_lead.LastName}".Trim())" Subtitle="@(_lead.CompanyName ?? _lead.Email ?? "")"
+                    Breadcrumbs="@(new List<BreadcrumbItem> { new(App.ModuleLabel(AppModule.Leads), "/leads"), new(_lead.FirstName, null, true) })">
+            <Actions>
+                @if (!_converted && !_disqualified)
+                {
+                    <MudButton Variant="Variant.Outlined" OnClick="FindDuplicatesAsync" data-testid="find-duplicates">Find duplicates</MudButton>
+                    <MudButton Variant="Variant.Outlined" OnClick="() => _showConvert = !_showConvert">Convert</MudButton>
+                    <MudButton Variant="Variant.Outlined" OnClick="() => _showDisqualify = !_showDisqualify">Disqualify</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenEdit" data-testid="primary-action">Edit</MudButton>
+                }
+            </Actions>
+        </PageHeader>
+
+        <div class="ml-row ml-row--wrap" style="margin-bottom:24px">
+            <StatusChip Text="@StatusLabel(_lead.Status)" Color="@StatusColors.For(_converted ? "Won" : _disqualified ? "Lost" : _lead.Status == "qualified" ? "Qualified" : "Working")" />
+            @if (_lead.Rating is not null) { <StatusChip Text="@RatingLabel(_lead.Rating)" Dot="false" /> }
+            @if (_lead.Source is not null) { <StatusChip Text="@SourceLabel(_lead.Source)" Dot="false" /> }
+            <MudText Typo="Typo.body2" Class="ml-muted">Created <DateText Value="@_lead.CreatedAtUtc" /></MudText>
+        </div>
+
+        @if (_converted)
+        {
+            <MudAlert Severity="Severity.Success" Class="mb-4" data-testid="converted-banner">
+                This lead was converted <DateText Value="@_lead.ConvertedAtUtc" />. Continue in the contact and deal.
+            </MudAlert>
+        }
+
+        @if (_showDisqualify && !_converted)
+        {
+            <MlCard Title="Disqualify this lead" Class="mb-4">
+                <div class="ml-stack">
+                    <MudTextField @bind-Value="_reason" Label="Reason *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="disqualify-reason"
+                                  Error="@(_reasonError is not null)" ErrorText="@_reasonError" />
+                    <MudTextField @bind-Value="_notes" Label="Notes" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />
+                    <div class="ml-row" style="justify-content:flex-end">
+                        <MudButton OnClick="() => _showDisqualify = false">Cancel</MudButton>
+                        <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="DisqualifyAsync" data-testid="disqualify-submit">Disqualify</MudButton>
+                    </div>
+                </div>
+            </MlCard>
+        }
+
+        @if (_showDuplicates && !_converted)
+        {
+            <MlCard Title="Possible duplicates" Subtitle="Leads and contacts with the same email, phone or name." Class="mb-4" TestId="duplicates-panel">
+                <div class="ml-stack">
+                    @if (_candidates.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Class="ml-muted" data-testid="no-duplicates">Nothing else shares this lead's email, phone or name.</MudText>
+                    }
+
+                    @foreach (var candidate in _candidates)
+                    {
+                        var current = candidate;
+                        <div class="ml-row" style="padding:6px 0;border-bottom:1px solid var(--ml-border)" data-testid="duplicate-row">
+                            @if (current.Kind == LeadKind)
+                            {
+                                <MudCheckBox T="bool" Value="_selectedIds.Contains(current.Id)" ValueChanged="v => ToggleCandidate(current.Id, v)" Color="Color.Primary" aria-label="@("Merge " + current.FullName)" />
+                            }
+                            <div class="ml-grow">
+                                <MudText Typo="Typo.subtitle2">@current.FullName</MudText>
+                                <MudText Typo="Typo.caption" Class="ml-muted">@KindLabel(current.Kind) · @(current.Email ?? current.Phone ?? "No contact details") · @current.Reason</MudText>
+                            </div>
+                        </div>
+                    }
+
+                    @if (_candidates.Any(c => c.Kind == LeadKind))
+                    {
+                        <MudText Typo="Typo.caption" Class="ml-muted">Tick the leads to fold into this one. Contacts are shown for information and cannot be merged here.</MudText>
+                    }
+
+                    <div class="ml-row" style="justify-content:flex-end">
+                        <MudButton OnClick="() => _showDuplicates = false">Close</MudButton>
+                        @if (_candidates.Any(c => c.Kind == LeadKind))
+                        {
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="MergeAsync" data-testid="merge-submit">Merge selected</MudButton>
+                        }
+                    </div>
+                </div>
+            </MlCard>
+        }
+
+        @if (_showConvert && !_converted)
+        {
+            <MlCard Title="Convert to a customer" Subtitle="Creates the contact, the company and a deal. Activities move with them." Class="mb-4">
+                <div class="ml-stack">
+                    <MudTextField @bind-Value="_accountName" Label="Company name" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="convert-account" />
+                    <MudCheckBox @bind-Value="_createDeal" Label="Create a deal" Color="Color.Primary" />
+                    @if (_createDeal)
+                    {
+                        <MudTextField @bind-Value="_dealName" Label="Deal name" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                        <MudNumericField @bind-Value="_amount" Label="Amount" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0m" />
+                    }
+                    <div class="ml-row" style="justify-content:flex-end">
+                        <MudButton OnClick="() => _showConvert = false">Cancel</MudButton>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ConvertAsync" data-testid="convert-submit">Convert lead</MudButton>
+                    </div>
+                </div>
+            </MlCard>
+        }
+
+        <MudGrid Spacing="4">
+            <MudItem xs="12" md="6">
+                <MlCard Title="Details">
+                    <KeyValueList Items="@Details()" />
+                </MlCard>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MlCard Title="More">
+                    @if (_custom.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Class="ml-muted">No extra details yet. Add custom fields in Settings.</MudText>
+                    }
+                    else
+                    {
+                        <KeyValueList Items="@CustomItems()" />
+                    }
+                </MlCard>
+            </MudItem>
+        </MudGrid>
+
+        <div class="mt-4"><RecordActivities LeadId="Id" OnChanged="ReloadTimelineAsync" /></div>
+        <div class="mt-4"><RecordTimeline @ref="_timeline" EntityType="leads" EntityId="Id" /></div>
+        <div class="mt-4"><RecordFiles EntityType="leads" EntityId="Id" /></div>
+    }
+</div>
+
+<LeadFormDrawer @ref="_form" @bind-Open="_drawer" OnSaved="LoadAsync" />
+
+@code {
+    private RecordTimeline? _timeline;
+
+    private async Task ReloadTimelineAsync()
+    {
+        if (_timeline is not null)
+        {
+            await _timeline.ReloadAsync();
+        }
+    }
+    [Parameter] public Guid Id { get; set; }
+
+    private LeadDto? _lead;
+    private bool _loading = true;
+    private string? _error;
+    private LeadFormDrawer? _form;
+    private bool _drawer;
+
+    private void OpenEdit()
+    {
+        if (_lead is null) return;
+        _form?.OpenEdit(_lead);
+        _drawer = true;
+    }
+    private const string LeadKind = "lead";
+
+    private bool _showDuplicates;
+    private List<DuplicateCandidateDto> _candidates = [];
+    private readonly HashSet<Guid> _selectedIds = [];
+
+    private static string KindLabel(string kind) => kind switch
+    {
+        "lead" => "Lead",
+        "contact" => "Contact",
+        "account" => "Company",
+        _ => kind,
+    };
+
+    private void ToggleCandidate(Guid id, bool selected)
+    {
+        if (selected)
+        {
+            _selectedIds.Add(id);
+        }
+        else
+        {
+            _selectedIds.Remove(id);
+        }
+    }
+
+    private async Task FindDuplicatesAsync()
+    {
+        if (_lead is null)
+        {
+            return;
+        }
+
+        _showDuplicates = true;
+        _selectedIds.Clear();
+        var response = await Http.PostAsJsonAsync("api/v1/leads/check-duplicates",
+            new CheckDuplicatesRequest(_lead.FirstName, _lead.LastName, _lead.Email, _lead.Phone, _lead.CompanyName));
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "We could not look for duplicates."), Severity.Error);
+            _candidates = [];
+            return;
+        }
+
+        // The check also returns this lead itself. It is not a duplicate of itself.
+        _candidates = (await response.Content.ReadFromJsonAsync<List<DuplicateCandidateDto>>() ?? []).Where(c => c.Id != Id).ToList();
+    }
+
+    private async Task MergeAsync()
+    {
+        if (_lead is null)
+        {
+            return;
+        }
+
+        if (_selectedIds.Count == 0)
+        {
+            Snackbar.Add("Tick at least one lead to merge.", Severity.Warning);
+            return;
+        }
+
+        var count = _selectedIds.Count;
+        var plural = count == 1 ? string.Empty : "s";
+        var confirmed = await Dialogs.ConfirmAsync(
+            $"Merge {count} lead{plural} into {_lead.FirstName} {_lead.LastName}?".Replace("  ", " "),
+            $"The selected lead{plural} will be removed. Empty fields on this lead are filled from {(count == 1 ? "it" : "them")}, and {(count == 1 ? "its" : "their")} tags are added.",
+            "Merge",
+            danger: true);
+        if (!confirmed)
+        {
+            return;
+        }
+
+        var response = await Http.PostAsJsonAsync($"api/v1/leads/{Id}/merge", new MergeLeadsRequest(_selectedIds.ToList()));
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "We could not merge these leads."), Severity.Error);
+            return;
+        }
+
+        Snackbar.Add($"Merged {count} lead{plural}", Severity.Success);
+        _showDuplicates = false;
+        _selectedIds.Clear();
+        await LoadAsync();
+    }
+
+    private bool _showConvert;
+    private bool _showDisqualify;
+    private string _reason = string.Empty;
+    private string? _reasonError;
+    private string? _notes;
+    private string? _accountName;
+    private bool _createDeal;
+    private string? _dealName;
+    private decimal? _amount;
+
+    private bool _converted => _lead?.Status == "converted";
+    private bool _disqualified => _lead?.Status == "disqualified";
+
+    private IReadOnlyDictionary<string, JsonElement> _custom => _lead?.CustomFields ?? new Dictionary<string, JsonElement>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.IsSignedIn)
+        {
+            Nav.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var response = await Http.GetAsync($"api/v1/leads/{Id}");
+            if (response.IsSuccessStatusCode)
+            {
+                _lead = await response.Content.ReadFromJsonAsync<LeadDto>();
+                _accountName ??= _lead?.CompanyName;
+            }
+            else
+            {
+                _lead = null;
+                _error = await ProblemText.FromAsync(response, "It may have been deleted, or you may not have access to it.");
+            }
+        }
+        catch (HttpRequestException)
+        {
+            _error = "We could not reach MindLift. Check your connection and try again.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task DisqualifyAsync()
+    {
+        _reasonError = null;
+        if (string.IsNullOrWhiteSpace(_reason))
+        {
+            _reasonError = "Say why this lead is not a fit.";
+            return;
+        }
+
+        var response = await Http.PostAsJsonAsync($"api/v1/leads/{Id}/disqualify", new DisqualifyLeadRequest(_reason.Trim(), _notes));
+        if (!response.IsSuccessStatusCode)
+        {
+            var fields = await ProblemText.FieldErrorsAsync(response);
+            if (fields.Count > 0)
+            {
+                _reasonError = string.Join(" ", fields.Values);
+                return;
+            }
+
+            Snackbar.Add(await ProblemText.FromAsync(response, "Could not disqualify this lead."), Severity.Error);
+            return;
+        }
+
+        _showDisqualify = false;
+        _reason = string.Empty;
+        Snackbar.Add("Lead disqualified", Severity.Success);
+        await LoadAsync();
+    }
+
+    private async Task ConvertAsync()
+    {
+        var mode = string.IsNullOrWhiteSpace(_accountName) ? "none" : "create";
+        var response = await Http.PostAsJsonAsync($"api/v1/leads/{Id}/convert", new ConvertLeadRequest(
+            mode, null, _accountName, "create", null, _createDeal, _dealName, null, null, _amount, null, null));
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Conflict && await ProblemText.FromAsync(response, "") is var msg && msg.Contains("already exists", StringComparison.Ordinal))
+        {
+            Snackbar.Add("A company with this name already exists. Link it from the company page once it is available.", Severity.Warning);
+            return;
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "Could not convert this lead."), Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Lead converted. Contact, company and deal are created.", Severity.Success);
+        _showConvert = false;
+        await LoadAsync();
+    }
+
+    private IReadOnlyList<(string Label, string? Value)> Details()
+    {
+        if (_lead is null)
+        {
+            return [];
+        }
+
+        var items = new List<(string Label, string? Value)>
+        {
+            ("Email", _lead.Email),
+            ("Phone", _lead.Phone),
+            ("Company", _lead.CompanyName),
+            ("Source", SourceLabel(_lead.Source)),
+            ("Rating", RatingLabel(_lead.Rating)),
+            ("Status", StatusLabel(_lead.Status)),
+            ("Notes", _lead.Description),
+        };
+
+        // The reason only applies to disqualified leads; showing an empty one on other leads is noise.
+        if (_lead.Status == "disqualified")
+        {
+            items.Add(("Disqualified because", _lead.DisqualifyReason));
+        }
+
+        return items;
+    }
+
+    private IReadOnlyList<(string Label, string? Value)> CustomItems()
+    {
+        var fields = App.Bootstrap?.Fields.GetValueOrDefault("leads")?.Where(f => f.IsCustom).ToList() ?? [];
+        return fields
+            .Where(f => _custom.ContainsKey(f.Key))
+            .Select(f => (f.Label, (string?)Render(_custom[f.Key])))
+            .ToList();
+    }
+
+    private static string? Render(JsonElement value) => value.ValueKind switch
+    {
+        JsonValueKind.String => value.GetString(),
+        JsonValueKind.Number => value.GetRawText(),
+        JsonValueKind.True => "Yes",
+        JsonValueKind.False => "No",
+        JsonValueKind.Array => string.Join(", ", value.EnumerateArray().Select(v => v.GetString())),
+        _ => null,
+    };
+
+    private string StatusLabel(string code) => PicklistLabel("lead_status", code);
+    private string? SourceLabel(string? code) => code is null ? null : PicklistLabel("lead_source", code);
+    private string? RatingLabel(string? code) => code is null ? null : PicklistLabel("lead_rating", code);
+
+    private string PicklistLabel(string key, string code)
+        => App.Bootstrap?.Picklists.FirstOrDefault(p => p.Key == key)?.Values.FirstOrDefault(v => v.Value == code)?.Label ?? code;
+}

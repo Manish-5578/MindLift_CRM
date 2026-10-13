@@ -1,0 +1,19 @@
+<MlCard Title="@Title" Class="@Class" TestId="@TestId" HeaderActions="HeaderActions">
+    @if (!string.IsNullOrWhiteSpace(Description))
+    {
+        <MudText Typo="Typo.body2" Class="ml-muted" Style="margin-bottom:16px">@Description</MudText>
+    }
+    @ChildContent
+</MlCard>
+
+@code {
+    [Parameter] public string? Title { get; set; }
+
+    /// <summary>One line under the title that says what this block of fields is for.</summary>
+    [Parameter] public string? Description { get; set; }
+
+    [Parameter] public RenderFragment? HeaderActions { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public string? TestId { get; set; }
+}

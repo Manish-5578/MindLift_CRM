@@ -1,0 +1,207 @@
+@page "/settings/web-forms"
+@using MindLift.Shared.Filtering
+@inject HttpClient Http
+@inject AppState App
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageTitle>Web forms · MindLift</PageTitle>
+
+<div class="ml-page ml-page--form">
+    <PageHeader Title="Web forms" Subtitle="Forms on your website that create leads. Choose the fields, where the lead comes from and the message the visitor sees.">
+        <Actions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => OpenForm(null)" data-testid="primary-action">New form</MudButton>
+        </Actions>
+    </PageHeader>
+    <SettingsNav Current="/settings/web-forms" />
+
+    @if (_loading)
+    {
+        <SkeletonTable Rows="3" Columns="3" />
+    }
+    else if (_loadFailed)
+    {
+        <ErrorState OnRetry="LoadAsync" />
+    }
+    else
+    {
+        @foreach (var form in _forms)
+        {
+            <MlCard Title="@form.Name" Subtitle="@FormSubtitle(form)" Class="mb-4" TestId="@($"form-{form.Name}")">
+                <div class="ml-row ml-row--wrap" style="margin-bottom:8px">
+                    <StatusChip Text="@(form.IsActive ? "Live" : "Paused")" Color="@StatusColors.For(form.IsActive ? "Won" : "Expired")" />
+                    <MudText Typo="Typo.caption" Class="ml-muted">@form.SubmissionCount @(form.SubmissionCount == 1 ? "submission" : "submissions")</MudText>
+                </div>
+                <MudText Typo="Typo.body2" Class="ml-muted" style="margin-bottom:4px">Fields: @string.Join(", ", form.Fields.Select(FieldLabel))</MudText>
+                <MudText Typo="Typo.body2" Class="ml-muted" style="margin-bottom:4px">Endpoint for your website:</MudText>
+                <MudText Typo="Typo.caption" Class="ml-muted" style="margin-bottom:8px">Send a POST request with JSON fields firstName, lastName, email, phone, companyName and message. Leave hp empty; it is a spam trap.</MudText>
+                <MudTextField T="string" Value="@EndpointFor(form)" ReadOnly="true" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="1" data-testid="form-endpoint" />
+                <div class="ml-row" style="justify-content:flex-end;margin-top:8px">
+                    <MudButton Size="Size.Small" OnClick="() => OpenForm(form)">Edit form</MudButton>
+                </div>
+            </MlCard>
+        }
+        @if (_forms.Count == 0)
+        {
+            <EmptyState Title="No web forms yet" Message="Create a form, then paste its endpoint into your website." />
+        }
+    }
+</div>
+
+<FormDrawer Open="_open" OpenChanged="v => _open = v" Title="@_title" SubmitText="Save form" Busy="_busy" OnSubmit="SaveAsync">
+    <div class="ml-stack">
+        @if (_formError is not null) { <MudAlert Severity="Severity.Error" Dense="true">@_formError</MudAlert> }
+        <MudTextField @bind-Value="_name" Label="Name *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="form-name" />
+        <MudSelect T="string" @bind-Value="_source" Label="Lead source *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="form-source">
+            @foreach (var value in SourceValues())
+            {
+                <MudSelectItem T="string" Value="@value.Value">@value.Label</MudSelectItem>
+            }
+        </MudSelect>
+        <MudTextField @bind-Value="_successMessage" Label="Message after submit" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" HelperText="Shown to the visitor after they send the form." />
+
+        <MudText Typo="Typo.subtitle2" Class="mt-2">Fields the form collects</MudText>
+        <MudText Typo="Typo.caption" Class="ml-muted">First name is always required.</MudText>
+        <MudCheckBox T="bool" Value="true" Disabled="true" Label="First name (required)" Color="Color.Primary" />
+        @foreach (var field in OptionalFields)
+        {
+            var key = field.Key;
+            <MudCheckBox T="bool" Value="_fields.Contains(key)" ValueChanged="v => ToggleField(key, v)" Label="@field.Label" Color="Color.Primary" data-testid="@($"field-{key}")" />
+        }
+
+        <MudCheckBox @bind-Value="_active" Label="Accepting submissions" Color="Color.Primary" />
+    </div>
+</FormDrawer>
+
+@code {
+    private static readonly (string Key, string Label)[] OptionalFields =
+    [
+        ("last_name", "Last name"),
+        ("email", "Email"),
+        ("phone", "Phone"),
+        ("company_name", "Company"),
+        ("description", "Message"),
+    ];
+
+    private List<WebFormDto> _forms = [];
+    private bool _loading = true;
+    private bool _loadFailed;
+    private bool _busy;
+    private bool _open;
+    private Guid? _editId;
+    private string _title = "New form";
+    private string? _formError;
+    private string _name = string.Empty;
+    private string _source = "website";
+    private string _successMessage = "Thanks. We will be in touch soon.";
+    private bool _active = true;
+    private List<string> _fields = ["first_name", "email"];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!App.IsAdmin)
+        {
+            Nav.NavigateTo("/");
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _loadFailed = false;
+        try
+        {
+            _forms = await Http.GetFromJsonAsync<List<WebFormDto>>("api/v1/settings/web-forms") ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            _loadFailed = true;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private string FieldLabel(string key) => key switch
+    {
+        "first_name" => "First name",
+        _ => OptionalFields.FirstOrDefault(f => f.Key == key).Label ?? key,
+    };
+
+    private static string FormSubtitle(WebFormDto form) => form.IsActive ? "Accepting submissions" : "Paused";
+
+    private string EndpointFor(WebFormDto form) => $"{Nav.BaseUri.TrimEnd('/')}/api/v1/public/forms/{form.PublicToken}";
+
+    private IEnumerable<PicklistValueDto> SourceValues()
+        => App.Bootstrap?.Picklists.FirstOrDefault(p => p.Key == "lead_source")?.Values.Where(v => v.IsActive) ?? [];
+
+    private void OpenForm(WebFormDto? form)
+    {
+        _formError = null;
+        _editId = form?.Id;
+        _title = form is null ? "New form" : "Edit form";
+        _name = form?.Name ?? string.Empty;
+        _source = form?.DefaultSource ?? "website";
+        _successMessage = form?.SuccessMessage ?? "Thanks. We will be in touch soon.";
+        _active = form?.IsActive ?? true;
+        _fields = form is null ? ["first_name", "email"] : form.Fields.ToList();
+        _open = true;
+    }
+
+    private void ToggleField(string key, bool include)
+    {
+        if (include && !_fields.Contains(key))
+        {
+            _fields.Add(key);
+        }
+        else if (!include)
+        {
+            _fields.Remove(key);
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _formError = null;
+        if (string.IsNullOrWhiteSpace(_name))
+        {
+            _formError = "Give the form a name.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_source))
+        {
+            _formError = "Choose where these leads come from.";
+            return;
+        }
+
+        var fields = new List<string> { "first_name" };
+        fields.AddRange(OptionalFields.Select(f => f.Key).Where(_fields.Contains));
+        var body = new SaveWebFormRequest(_name.Trim(), _source, _successMessage.Trim(), _active, fields);
+
+        _busy = true;
+        try
+        {
+            var response = _editId is null
+                ? await Http.PostAsJsonAsync("api/v1/settings/web-forms", body)
+                : await Http.PutAsJsonAsync($"api/v1/settings/web-forms/{_editId}", body);
+            if (!response.IsSuccessStatusCode)
+            {
+                _formError = await ProblemText.FromAsync(response, "We could not save this form.");
+                return;
+            }
+
+            _open = false;
+            Snackbar.Add("Form saved", Severity.Success);
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

@@ -1,0 +1,175 @@
+@inherits LayoutComponentBase
+@inject AuthSession Session
+@inject AppState App
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@using MindLift.Shared.Validation
+@implements IDisposable
+
+<MudThemeProvider Theme="_theme" @bind-IsDarkMode="_isDark" />
+<MudPopoverProvider />
+<MudDialogProvider MaxWidth="MaxWidth.Small" FullWidth="true" CloseButton="true" BackdropClick="false" />
+<MudSnackbarProvider />
+
+<CascadingValue Value="_isDark" Name="IsDarkMode">
+<CascadingValue Value="App.IsArabic" Name="IsRtl">
+<MudRTLProvider RightToLeft="App.IsArabic">
+    <MudLayout>
+        <MudAppBar Elevation="0" Class="ml-appbar" Dense="false">
+            <MudIconButton Icon="@Icons.Material.Outlined.Menu" Color="Color.Inherit" OnClick="@(() => _drawerOpen = !_drawerOpen)" aria-label="Toggle navigation" />
+            <MudText Typo="Typo.subtitle1" Class="ml-hide-xs">@(App.Bootstrap?.Company.CompanyName ?? "MindLift")</MudText>
+            <MudSpacer />
+            @if (Session.IsSignedIn && App.Bootstrap is not null)
+            {
+                <GlobalSearch />
+                <QuickAdd />
+                <NotificationBell />
+                <MudMenu Icon="@Icons.Material.Outlined.Person" Color="Color.Inherit" AriaLabel="Account menu" Dense="true">
+                    <MudText Typo="Typo.body2" Class="px-4 py-2 ml-muted">@App.Bootstrap.User.FullName</MudText>
+                    <MudDivider />
+                    <MudMenuItem Href="/notifications/preferences">Notification preferences</MudMenuItem>
+                    <MudMenuItem OnClick="ToggleDark">@(_isDark ? "Light mode" : "Dark mode")</MudMenuItem>
+                    <MudMenuItem OnClick="ToggleLanguage">@(App.IsArabic ? "English" : "العربية")</MudMenuItem>
+                    <MudMenuItem OnClick="SignOut">Sign out</MudMenuItem>
+                </MudMenu>
+            }
+        </MudAppBar>
+
+        @if (Session.IsSignedIn && App.Bootstrap is not null)
+        {
+            <MudDrawer @bind-Open="_drawerOpen" Elevation="0" ClipMode="DrawerClipMode.Always" Variant="DrawerVariant.Responsive">
+                <MudNavMenu Class="ml-nav">
+                    <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Outlined.SpaceDashboard">Dashboard</MudNavLink>
+                    @foreach (var item in NavItems)
+                    {
+                        <MudNavLink Href="@item.Href" Icon="@item.Icon">@item.Label</MudNavLink>
+                    }
+                    <MudDivider Class="my-2" />
+                    @if (App.CanView(AppModule.Settings))
+                    {
+                        <MudNavLink Href="/settings/company" Icon="@Icons.Material.Outlined.Settings">Settings</MudNavLink>
+                    }
+                </MudNavMenu>
+            </MudDrawer>
+        }
+
+        <MudMainContent>
+            @Body
+        </MudMainContent>
+    </MudLayout>
+</MudRTLProvider>
+</CascadingValue>
+</CascadingValue>
+
+@code {
+    private MudTheme _theme = MindLiftTheme.Create();
+    private string? _themeColor;
+    private bool _isDark;
+    private bool _drawerOpen = true;
+
+    private sealed record NavItem(string Label, string Href, string Icon);
+
+    private IEnumerable<NavItem> NavItems
+    {
+        get
+        {
+            var items = new List<NavItem>();
+            if (App.CanView(AppModule.Leads)) items.Add(new(App.ModuleLabel(AppModule.Leads), "/leads", Icons.Material.Outlined.PersonSearch));
+            if (App.CanView(AppModule.Contacts)) items.Add(new(App.ModuleLabel(AppModule.Contacts), "/contacts", Icons.Material.Outlined.Contacts));
+            if (App.CanView(AppModule.Accounts)) items.Add(new(App.ModuleLabel(AppModule.Accounts), "/accounts", Icons.Material.Outlined.Business));
+            if (App.CanView(AppModule.Deals)) items.Add(new(App.ModuleLabel(AppModule.Deals), "/deals", Icons.Material.Outlined.Handshake));
+            if (App.CanView(AppModule.Activities)) items.Add(new(App.ModuleLabel(AppModule.Activities), "/activities", Icons.Material.Outlined.TaskAlt));
+            if (App.CanView(AppModule.Calendar)) items.Add(new(App.ModuleLabel(AppModule.Calendar), "/calendar", Icons.Material.Outlined.CalendarMonth));
+            if (App.CanView(AppModule.Communication)) items.Add(new("Unified Inbox", "/inbox", Icons.Material.Outlined.MarkChatUnread));
+            if (App.CanView(AppModule.Reports)) items.Add(new(App.ModuleLabel(AppModule.Reports), "/reports", Icons.Material.Outlined.Insights));
+            if (App.CanView(AppModule.Products)) items.Add(new(App.ModuleLabel(AppModule.Products), "/products", Icons.Material.Outlined.Inventory2));
+            if (App.CanView(AppModule.Quotations)) items.Add(new(App.ModuleLabel(AppModule.Quotations), "/quotes", Icons.Material.Outlined.RequestQuote));
+            if (App.CanView(AppModule.Invoices)) items.Add(new(App.ModuleLabel(AppModule.Invoices), "/invoices", Icons.Material.Outlined.ReceiptLong));
+            if (App.CanView(AppModule.Documents)) items.Add(new(App.ModuleLabel(AppModule.Documents), "/documents", Icons.Material.Outlined.DocumentScanner));
+            return items;
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        Session.Changed += StateHasChanged;
+        App.Changed += OnAppChanged;
+        Nav.LocationChanged += OnLocationChanged;
+        ApplyBrandColor();
+        RedirectToSetupIfPending();
+        _ = StartNotificationsAsync();
+    }
+
+    /// <summary>Listens for new notifications once the person is signed in and the app has loaded.</summary>
+    private async Task StartNotificationsAsync()
+    {
+        if (Session.IsSignedIn && App.Bootstrap is not null)
+        {
+            await Notifications.StartAsync();
+        }
+    }
+
+    private void OnAppChanged()
+    {
+        ApplyBrandColor();
+        RedirectToSetupIfPending();
+        _ = StartNotificationsAsync();
+        StateHasChanged();
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e) => RedirectToSetupIfPending();
+
+    /// <summary>The tenant's colour replaces the light primary (plan 18.4). Only a valid colour is used, so a bad value can never reach the page CSS.</summary>
+    private void ApplyBrandColor()
+    {
+        var color = App.Bootstrap?.Company.PrimaryColor;
+        color = BrandColor.Validate(color) is null && !string.IsNullOrWhiteSpace(color) ? color : null;
+        if (color == _themeColor)
+        {
+            return;
+        }
+
+        _themeColor = color;
+        _theme = MindLiftTheme.Create(color);
+    }
+
+    /// <summary>An admin whose setup is unfinished is sent to the wizard from every page except the wizard itself.</summary>
+    private void RedirectToSetupIfPending()
+    {
+        if (Session.IsSignedIn && App.SetupPending && !Nav.ToBaseRelativePath(Nav.Uri).StartsWith("onboarding", StringComparison.OrdinalIgnoreCase))
+        {
+            Nav.NavigateTo("/onboarding");
+        }
+    }
+
+    private async Task ToggleDark()
+    {
+        _isDark = !_isDark;
+        await JS.InvokeVoidAsync("mindlift.setTheme", _isDark ? "dark" : "light");
+    }
+
+    private async Task ToggleLanguage()
+    {
+        var next = App.IsArabic ? "en" : "ar";
+        await JS.InvokeVoidAsync("mindlift.setLanguage", next);
+    }
+
+    private async Task SignOut()
+    {
+        await Notifications.StopAsync();
+        await Http.PostAsync("api/v1/auth/logout", null);
+        Session.Clear();
+        App.Reset();
+        Nav.NavigateTo("/login", forceLoad: true);
+    }
+
+    [Inject] private HttpClient Http { get; set; } = default!;
+    [Inject] private NotificationClient Notifications { get; set; } = default!;
+
+    public void Dispose()
+    {
+        Session.Changed -= StateHasChanged;
+        App.Changed -= OnAppChanged;
+        Nav.LocationChanged -= OnLocationChanged;
+    }
+}

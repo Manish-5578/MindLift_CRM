@@ -1,0 +1,299 @@
+@page "/contacts/{Id:guid}"
+@inject HttpClient Http
+@inject AuthSession Session
+@inject AppState App
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+
+<PageTitle>Contact · MindLift</PageTitle>
+
+<div class="ml-page ml-page--narrow">
+    @if (_loading)
+    {
+        <MlCard Loading="true" />
+    }
+    else if (_summary is null)
+    {
+        <ErrorState Title="We could not open this contact" Message="@(_error ?? "It may have been deleted, or you may not have access to it.")" OnRetry="LoadAsync" />
+    }
+    else
+    {
+        var contact = _summary.Contact;
+        <RecordDetailLayout Title="@FullName" Subtitle="@Subtitle"
+                            Breadcrumbs="@(new List<BreadcrumbItem> { new(App.ModuleLabel(AppModule.Contacts), "/contacts"), new(contact.FirstName, null, true) })">
+            <Badges>
+                @if (contact.Type is not null) { <StatusChip Text="@TypeLabel(contact.Type)" Dot="false" /> }
+                <MudText Typo="Typo.body2" Class="ml-muted">Created <DateText Value="@contact.CreatedAtUtc" /></MudText>
+            </Badges>
+            <Actions>
+                @if (Can(p => p.CanEdit))
+                {
+                    <MudButton Variant="Variant.Outlined" OnClick="FindDuplicatesAsync" data-testid="find-duplicates">Find duplicates</MudButton>
+                }
+                @if (Can(p => p.CanEdit) && !string.IsNullOrWhiteSpace(contact.Email))
+                {
+                    <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.VpnKey" OnClick="InviteToPortalAsync" data-testid="invite-portal">Invite to Portal</MudButton>
+                }
+                @if (Can(p => p.CanDelete))
+                {
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="DeleteAsync" data-testid="delete-contact">Delete</MudButton>
+                }
+                @if (Can(p => p.CanEdit))
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenEdit" data-testid="primary-action">Edit</MudButton>
+                }
+            </Actions>
+            <ChildContent>
+                @if (_showDuplicates)
+                {
+                    <MlCard Title="Possible duplicates" Subtitle="Contacts with the same email or phone." TestId="duplicates-panel">
+                        <div class="ml-stack">
+                            @if (_candidates.Count == 0)
+                            {
+                                <MudText Typo="Typo.body2" Class="ml-muted" data-testid="no-duplicates">Nothing else shares this contact's email or phone.</MudText>
+                            }
+
+                            @foreach (var candidate in _candidates)
+                            {
+                                var current = candidate;
+                                <div class="ml-row" style="padding:6px 0;border-bottom:1px solid var(--ml-border)" data-testid="duplicate-row">
+                                    <MudCheckBox T="bool" Value="_selectedIds.Contains(current.Id)" ValueChanged="v => Toggle(current.Id, v)" Color="Color.Primary" aria-label="@("Merge " + current.FullName)" />
+                                    <div class="ml-grow">
+                                        <a href="@("/contacts/" + current.Id)" class="ml-link">@current.FullName</a>
+                                        <MudText Typo="Typo.caption" Class="ml-muted">@(current.Email ?? current.Phone ?? "No contact details") · @current.Reason</MudText>
+                                    </div>
+                                </div>
+                            }
+
+                            <div class="ml-row" style="justify-content:flex-end">
+                                <MudButton OnClick="() => _showDuplicates = false">Close</MudButton>
+                                @if (_candidates.Count > 0)
+                                {
+                                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="MergeAsync" data-testid="merge-submit">Merge selected</MudButton>
+                                }
+                            </div>
+                        </div>
+                    </MlCard>
+                }
+
+                <MlCard Title="Details">
+                    <div class="ml-kv" data-testid="contact-details">
+                        <div class="ml-kv__label">Email</div><div class="ml-kv__value"><FieldValue Kind="FormFieldKind.Email" Value="@contact.Email" /></div>
+                        <div class="ml-kv__label">Phone</div><div class="ml-kv__value"><FieldValue Kind="FormFieldKind.Phone" Value="@contact.Phone" /></div>
+                        <div class="ml-kv__label">Job title</div><div class="ml-kv__value"><FieldValue Value="@contact.JobTitle" /></div>
+                        <div class="ml-kv__label">Owner</div><div class="ml-kv__value"><FieldValue Kind="FormFieldKind.User" Value="@contact.OwnerId.ToString()" Users="_users" /></div>
+                        <div class="ml-kv__label">Notes</div><div class="ml-kv__value"><FieldValue Kind="FormFieldKind.Multiline" Value="@contact.Description" /></div>
+                        @foreach (var field in CustomFields)
+                        {
+                            <div class="ml-kv__label">@field.Label</div>
+                            <div class="ml-kv__value"><FieldValue Value="@CustomText(field.Key)" /></div>
+                        }
+                    </div>
+                </MlCard>
+
+                <RecordActivities ContactId="Id" OnChanged="ReloadTimelineAsync" />
+                <RecordTimeline @ref="_timeline" EntityType="contacts" EntityId="Id" />
+                <RecordFiles EntityType="contacts" EntityId="Id" />
+            </ChildContent>
+            <Aside>
+                <MlCard Title="Company">
+                    @if (contact.AccountId is { } accountId)
+                    {
+                        <a href="@("/accounts/" + accountId)" class="ml-link" data-testid="contact-account-link">@contact.AccountName</a>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Class="ml-muted">Not linked to a company.</MudText>
+                    }
+                </MlCard>
+                <MlCard Title="@($"Deals ({_summary.DealCount})")">
+                    @if (_summary.Deals.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Class="ml-muted">No deals yet.</MudText>
+                    }
+                    @foreach (var deal in _summary.Deals)
+                    {
+                        <div class="ml-row" style="padding:4px 0"><span class="ml-grow">@deal.Name</span><MoneyText Amount="deal.Amount" Currency="@deal.Currency" /></div>
+                    }
+                </MlCard>
+                <MlCard Title="Activity">
+                    <MudText Typo="Typo.body2" Class="ml-muted" data-testid="activity-count">@_summary.ActivityCount @(_summary.ActivityCount == 1 ? "activity" : "activities") logged.</MudText>
+                </MlCard>
+            </Aside>
+        </RecordDetailLayout>
+    }
+</div>
+
+<ContactFormDrawer @ref="_form" @bind-Open="_drawer" OnSaved="OnSaved" />
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private ContactFormDrawer? _form;
+    private bool _drawer;
+    private bool _loading = true;
+    private string? _error;
+    private ContactSummaryDto? _summary;
+    private List<UserListItem> _users = [];
+    private bool _showDuplicates;
+    private IReadOnlyList<DuplicateCandidateDto> _candidates = [];
+    private readonly HashSet<Guid> _selectedIds = [];
+
+    private string FullName => _summary is null ? string.Empty : $"{_summary.Contact.FirstName} {_summary.Contact.LastName}".Trim();
+
+    private string Subtitle => string.Join(" · ", new[] { _summary?.Contact.JobTitle, _summary?.Contact.AccountName }.Where(s => !string.IsNullOrWhiteSpace(s)));
+
+    private IReadOnlyList<FieldDto> CustomFields => App.Bootstrap?.Fields.GetValueOrDefault("contacts")?.Where(f => f.IsCustom).ToList() ?? [];
+
+    private bool Can(Func<ModulePermissionDto, bool> check) => App.Bootstrap?.Permissions.Any(p => p.Module == "Contacts" && check(p)) == true;
+
+    private string? TypeLabel(string code)
+        => App.Bootstrap?.Picklists.FirstOrDefault(p => p.Key == "contact_type")?.Values.FirstOrDefault(v => v.Value == code)?.Label ?? code;
+
+    private string? CustomText(string key)
+        => _summary!.Contact.CustomFields.TryGetValue(key, out var value) && value.ValueKind != JsonValueKind.Null ? value.ToString() : null;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Session.IsSignedIn)
+        {
+            Nav.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        _users = await RecordLookups.UsersAsync(Http);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var response = await Http.GetAsync($"api/v1/contacts/{Id}/summary");
+            _summary = response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<ContactSummaryDto>() : null;
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await ProblemText.FromAsync(response, "We could not open this contact.");
+            }
+        }
+        catch (HttpRequestException)
+        {
+            _summary = null;
+            _error = "We could not reach MindLift. Check your connection and try again.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private RecordTimeline? _timeline;
+
+    private async Task ReloadTimelineAsync()
+    {
+        if (_timeline is not null)
+        {
+            await _timeline.ReloadAsync();
+        }
+    }
+
+
+    private void OpenEdit()
+    {
+        _form?.OpenEdit(_summary!.Contact);
+        _drawer = true;
+    }
+
+    private async Task OnSaved()
+    {
+        Snackbar.Add("Contact saved", Severity.Success);
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (!await Dialogs.ConfirmAsync($"Delete {FullName}?", "The contact is removed from your lists. This cannot be undone from here.", "Delete", danger: true))
+        {
+            return;
+        }
+
+        var response = await Http.DeleteAsync($"api/v1/contacts/{Id}");
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "We could not delete this contact."), Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Contact deleted", Severity.Success);
+        Nav.NavigateTo("/contacts");
+    }
+
+    private async Task FindDuplicatesAsync()
+    {
+        var c = _summary!.Contact;
+        var response = await Http.PostAsJsonAsync("api/v1/contacts/check-duplicates", new CheckDuplicatesRequest(c.FirstName, c.LastName, c.Email, c.Phone, null));
+        _candidates = response.IsSuccessStatusCode
+            ? (await response.Content.ReadFromJsonAsync<List<DuplicateCandidateDto>>() ?? []).Where(d => d.Id != Id).ToList()
+            : [];
+        _selectedIds.Clear();
+        _showDuplicates = true;
+    }
+
+    private void Toggle(Guid id, bool selected)
+    {
+        if (selected) _selectedIds.Add(id); else _selectedIds.Remove(id);
+    }
+
+    private async Task MergeAsync()
+    {
+        if (_selectedIds.Count == 0)
+        {
+            Snackbar.Add("Tick at least one contact to merge.", Severity.Warning);
+            return;
+        }
+
+        var count = _selectedIds.Count;
+        var plural = count == 1 ? string.Empty : "s";
+        if (!await Dialogs.ConfirmAsync($"Merge {count} contact{plural} into {FullName}?",
+                $"The selected contact{plural} will be removed. Empty fields here are filled from {(count == 1 ? "it" : "them")}, and activities move to this contact.", "Merge", danger: true))
+        {
+            return;
+        }
+
+        var response = await Http.PostAsJsonAsync($"api/v1/contacts/{Id}/merge", new MergeContactsRequest(_selectedIds.ToList()));
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "We could not merge these contacts."), Severity.Error);
+            return;
+        }
+
+        Snackbar.Add($"Merged {count} contact{plural}", Severity.Success);
+        _showDuplicates = false;
+        await LoadAsync();
+    }
+
+    private async Task InviteToPortalAsync()
+    {
+        if (_summary?.Contact.Email is null) return;
+        try
+        {
+            var req = new InvitePortalUserRequest(Id, _summary.Contact.Email);
+            var response = await Http.PostAsJsonAsync($"api/v1/contacts/{Id}/portal/invite", req);
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add($"Portal invitation sent to {_summary.Contact.Email}", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Could not send portal invitation.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+}

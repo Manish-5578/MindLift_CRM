@@ -1,0 +1,14 @@
+<div class="ml-kv" data-testid="key-value-list">
+    @foreach (var (label, value) in Items)
+    {
+        <div class="ml-kv__label">@label</div>
+        <div class="ml-kv__value">
+            @if (value is null || string.IsNullOrWhiteSpace(value)) { <span class="ml-faint">—</span> }
+            else { @value }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<(string Label, string? Value)> Items { get; set; } = [];
+}

@@ -1,0 +1,504 @@
+@page "/quotes"
+@using MindLift.Shared.Contracts
+@using MindLift.Shared.Enums
+@using MindLift.UI.Components
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+@inject NavigationManager Nav
+
+<PageTitle>Quotations & Proposals · MindLift</PageTitle>
+
+<div class="ml-page">
+    <!-- Header -->
+    <div class="d-flex flex-wrap align-center justify-space-between gap-3 mb-4">
+        <div>
+            <MudText Typo="Typo.h5" Style="font-weight:700">Quotations & Proposals</MudText>
+            <MudText Typo="Typo.body2" Class="ml-muted">Configure complex quotes, manage product discounts, and convert accepted proposals into invoices.</MudText>
+        </div>
+
+        <div class="d-flex flex-wrap align-center gap-2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" OnClick="OpenNewQuoteDialog" Size="Size.Small">
+                Create Proposal
+            </MudButton>
+        </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <MudGrid Spacing="3" Class="mb-4">
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 d-flex align-center gap-3" Style="border-radius:12px">
+                <MudAvatar Color="Color.Primary" Variant="Variant.Filled" Size="Size.Medium">
+                    <MudIcon Icon="@Icons.Material.Outlined.RequestQuote" />
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.caption" Class="ml-muted">Total Proposals</MudText>
+                    <MudText Typo="Typo.h6" Style="font-weight:700">@_quotes.Count</MudText>
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 d-flex align-center gap-3" Style="border-radius:12px">
+                <MudAvatar Color="Color.Info" Variant="Variant.Filled" Size="Size.Medium">
+                    <MudIcon Icon="@Icons.Material.Outlined.Send" />
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.caption" Class="ml-muted">Sent / Pending</MudText>
+                    <MudText Typo="Typo.h6" Style="font-weight:700">@_quotes.Count(q => q.Status == QuoteStatus.Sent || q.Status == QuoteStatus.Draft)</MudText>
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 d-flex align-center gap-3" Style="border-radius:12px">
+                <MudAvatar Color="Color.Success" Variant="Variant.Filled" Size="Size.Medium">
+                    <MudIcon Icon="@Icons.Material.Outlined.CheckCircle" />
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.caption" Class="ml-muted">Accepted Proposals</MudText>
+                    <MudText Typo="Typo.h6" Style="font-weight:700">@_quotes.Count(q => q.Status == QuoteStatus.Accepted)</MudText>
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 d-flex align-center gap-3" Style="border-radius:12px">
+                <MudAvatar Color="Color.Warning" Variant="Variant.Filled" Size="Size.Medium">
+                    <MudIcon Icon="@Icons.Material.Outlined.AttachMoney" />
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.caption" Class="ml-muted">Total Quoted Value</MudText>
+                    <MudText Typo="Typo.h6" Style="font-weight:700">@_quotes.Sum(q => q.GrandTotal).ToString("N0")</MudText>
+                </div>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Filters & Search -->
+    <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-4 d-flex flex-wrap align-center justify-space-between gap-3" Style="border-radius:12px">
+        <div class="d-flex flex-wrap align-center gap-2">
+            <MudTextField @bind-Value="_searchQuery" Placeholder="Search proposals..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.Search" Immediate="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="min-width:260px" />
+            <MudSelect T="QuoteStatus?" @bind-Value="_statusFilter" Placeholder="All Statuses" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="min-width:160px">
+                <MudSelectItem T="QuoteStatus?" Value="@((QuoteStatus?)null)">All Statuses</MudSelectItem>
+                <MudSelectItem T="QuoteStatus?" Value="@QuoteStatus.Draft">Draft</MudSelectItem>
+                <MudSelectItem T="QuoteStatus?" Value="@QuoteStatus.Sent">Sent</MudSelectItem>
+                <MudSelectItem T="QuoteStatus?" Value="@QuoteStatus.Accepted">Accepted</MudSelectItem>
+                <MudSelectItem T="QuoteStatus?" Value="@QuoteStatus.Rejected">Rejected</MudSelectItem>
+                <MudSelectItem T="QuoteStatus?" Value="@QuoteStatus.Expired">Expired</MudSelectItem>
+            </MudSelect>
+        </div>
+    </MudPaper>
+
+    @if (_loading)
+    {
+        <SkeletonTable Rows="6" Columns="6" />
+    }
+    else if (FilteredQuotes.Count == 0)
+    {
+        <EmptyState Title="No proposals found" Subtitle="Start by creating a proposal for your deals or prospective accounts." ActionLabel="New Proposal" OnAction="OpenNewQuoteDialog" />
+    }
+    else
+    {
+        <MudTable Items="@FilteredQuotes" Dense="true" Hover="true" Outlined="true" Style="border-radius:12px; overflow:hidden">
+            <HeaderContent>
+                <MudTh>Quote #</MudTh>
+                <MudTh>Title</MudTh>
+                <MudTh>Linked Deal / Account</MudTh>
+                <MudTh>Expiry Date</MudTh>
+                <MudTh Style="text-align:right">Total Value</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh Style="text-align:right">Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Quote #">
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" Style="font-family:monospace; font-weight:600">
+                        @context.QuoteNumber
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Title">
+                    <MudText Typo="Typo.body2" Style="font-weight:600">@context.Title</MudText>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@context.LineItems.Count item(s)</MudText>
+                </MudTd>
+                <MudTd DataLabel="Linked">
+                    <div class="d-flex flex-column">
+                        <MudText Typo="Typo.body2">@(context.DealTitle ?? "—")</MudText>
+                        <MudText Typo="Typo.caption" Class="ml-muted">@(context.AccountName ?? "No Account")</MudText>
+                    </div>
+                </MudTd>
+                <MudTd DataLabel="Expiry">
+                    <MudText Typo="Typo.body2">@(context.ExpirationDate?.ToString("MMM dd, yyyy") ?? "—")</MudText>
+                </MudTd>
+                <MudTd DataLabel="Total Value" Style="text-align:right">
+                    <MudText Typo="Typo.body2" Style="font-weight:700">
+                        @context.Currency @context.GrandTotal.ToString("N2")
+                    </MudText>
+                    @if (context.DiscountPercent > 0)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Success">(@context.DiscountPercent% off)</MudText>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Status">
+                    <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)" Variant="Variant.Filled">
+                        @context.Status
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Actions" Style="text-align:right">
+                    <MudMenu Icon="@Icons.Material.Outlined.MoreVert" Size="Size.Small" Dense="true">
+                        <MudMenuItem Icon="@Icons.Material.Outlined.Visibility" OnClick="@(() => ViewQuoteDetails(context))">View Proposal</MudMenuItem>
+                        @if (context.Status != QuoteStatus.Accepted)
+                        {
+                            <MudMenuItem Icon="@Icons.Material.Outlined.CheckCircleOutline" OnClick="@(() => ChangeStatusAsync(context.Id, QuoteStatus.Accepted))">Mark Accepted</MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Outlined.Send" OnClick="@(() => ChangeStatusAsync(context.Id, QuoteStatus.Sent))">Mark Sent</MudMenuItem>
+                        }
+                        <MudMenuItem Icon="@Icons.Material.Outlined.ReceiptLong" OnClick="@(() => ConvertToInvoiceAsync(context.Id))">Convert to Invoice</MudMenuItem>
+                    </MudMenu>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</div>
+
+<!-- Create Quote Dialog -->
+<MudDialog @bind-Visible="_createDialogOpen" Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight:700">Create New Proposal / Quote</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid Spacing="2">
+            <MudItem xs="12" sm="8">
+                <MudTextField @bind-Value="_createForm.Title" Label="Proposal Title" Required="true" Margin="Margin.Dense" Variant="Variant.Outlined" Placeholder="e.g. Software License & Implementation 2026" />
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudTextField @bind-Value="_createForm.Currency" Label="Currency" Required="true" Margin="Margin.Dense" Variant="Variant.Outlined" MaxLength="3" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudDatePicker @bind-Date="_validUntilDate" Label="Expiration Date" Margin="Margin.Dense" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudNumericField @bind-Value="_createForm.DiscountPercent" Label="Overall Discount %" Margin="Margin.Dense" Variant="Variant.Outlined" Min="0m" Max="100m" OnBlur="RecalculateTotals" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_createForm.TermsAndConditions" Label="Terms & Conditions" Margin="Margin.Dense" Variant="Variant.Outlined" Placeholder="e.g. Net 30, 50% upfront" />
+            </MudItem>
+
+            <!-- Line Items Builder -->
+            <MudItem xs="12">
+                <div class="d-flex align-center justify-space-between mt-3 mb-2">
+                    <MudText Typo="Typo.subtitle2" Style="font-weight:700">Line Items & Rate Breakdown</MudText>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Add" OnClick="AddLineItem">
+                        Add Item
+                    </MudButton>
+                </div>
+
+                @for (int i = 0; i < _createForm.LineItems.Count; i++)
+                {
+                    var item = _createForm.LineItems[i];
+                    var idx = i;
+                    <MudPaper Elevation="0" Outlined="true" Class="pa-2 mb-2 d-flex flex-wrap align-center gap-2" Style="border-radius:8px">
+                        <MudTextField @bind-Value="item.ProductName" Label="Item Name" Required="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="flex: 2; min-width:180px" />
+                        <MudNumericField @bind-Value="item.Quantity" Label="Qty" Min="1m" Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:80px" OnBlur="RecalculateTotals" />
+                        <MudNumericField @bind-Value="item.UnitPrice" Label="Unit Price" Min="0m" Format="N2" Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:110px" OnBlur="RecalculateTotals" />
+                        <MudNumericField @bind-Value="item.TaxRate" Label="Tax %" Min="0m" Max="100m" Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:80px" OnBlur="RecalculateTotals" />
+                        <MudNumericField @bind-Value="item.DiscountPercent" Label="Disc %" Min="0m" Max="100m" Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:80px" OnBlur="RecalculateTotals" />
+                        <MudIconButton Icon="@Icons.Material.Outlined.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => RemoveLineItem(idx))" Disabled="@(_createForm.LineItems.Count <= 1)" />
+                    </MudPaper>
+                }
+            </MudItem>
+
+            <!-- Totals Strip -->
+            <MudItem xs="12">
+                <MudPaper Elevation="0" Class="pa-3 mt-2 d-flex justify-end gap-6" Style="background:var(--mud-palette-background-grey); border-radius:8px">
+                    <div class="text-right">
+                        <MudText Typo="Typo.caption" Class="ml-muted">SubTotal:</MudText>
+                        <MudText Typo="Typo.body2" Style="font-weight:600">@_createForm.Currency @_previewSubTotal.ToString("N2")</MudText>
+                    </div>
+                    <div class="text-right">
+                        <MudText Typo="Typo.caption" Class="ml-muted">Tax:</MudText>
+                        <MudText Typo="Typo.body2" Style="font-weight:600">@_createForm.Currency @_previewTax.ToString("N2")</MudText>
+                    </div>
+                    <div class="text-right">
+                        <MudText Typo="Typo.caption" Class="ml-muted">Grand Total:</MudText>
+                        <MudText Typo="Typo.h6" Style="font-weight:700; color:var(--mud-palette-primary)">@_createForm.Currency @_previewGrandTotal.ToString("N2")</MudText>
+                    </div>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _createDialogOpen = false)">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveQuoteAsync" Disabled="_saving">
+            @if (_saving) { <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" /> }
+            Save Proposal
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<!-- Details Dialog -->
+<MudDialog @bind-Visible="_detailsDialogOpen" Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true })">
+    <TitleContent>
+        <div class="d-flex align-center justify-space-between">
+            <MudText Typo="Typo.h6" Style="font-weight:700">Proposal @_activeQuote?.QuoteNumber</MudText>
+            <MudChip T="string" Color="@GetStatusColor(_activeQuote?.Status ?? QuoteStatus.Draft)" Size="Size.Small" Variant="Variant.Filled">
+                @_activeQuote?.Status
+            </MudChip>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (_activeQuote is not null)
+        {
+            <div class="mb-3">
+                <MudText Typo="Typo.h6">@_activeQuote.Title</MudText>
+                <MudText Typo="Typo.body2" Class="ml-muted">Valid until: @(_activeQuote.ExpirationDate?.ToString("MMM dd, yyyy") ?? "Open-ended") · Terms: @(_activeQuote.TermsAndConditions ?? "Standard")</MudText>
+            </div>
+
+            <MudTable Items="@_activeQuote.LineItems" Dense="true" Outlined="true" Class="mb-3">
+                <HeaderContent>
+                    <MudTh>Item</MudTh>
+                    <MudTh Style="text-align:right">Qty</MudTh>
+                    <MudTh Style="text-align:right">Price</MudTh>
+                    <MudTh Style="text-align:right">Tax %</MudTh>
+                    <MudTh Style="text-align:right">Disc %</MudTh>
+                    <MudTh Style="text-align:right">Total</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.ProductName</MudTd>
+                    <MudTd Style="text-align:right">@context.Quantity</MudTd>
+                    <MudTd Style="text-align:right">@_activeQuote.Currency @context.UnitPrice.ToString("N2")</MudTd>
+                    <MudTd Style="text-align:right">@context.TaxRate%</MudTd>
+                    <MudTd Style="text-align:right">@context.DiscountPercent%</MudTd>
+                    <MudTd Style="text-align:right; font-weight:600">@_activeQuote.Currency @context.TotalAmount.ToString("N2")</MudTd>
+                </RowTemplate>
+            </MudTable>
+
+            <div class="d-flex justify-end gap-6 pa-3" style="background:var(--mud-palette-background-grey); border-radius:8px">
+                <div class="text-right">
+                    <MudText Typo="Typo.caption" Class="ml-muted">SubTotal:</MudText>
+                    <MudText Typo="Typo.body2">@_activeQuote.Currency @_activeQuote.SubTotal.ToString("N2")</MudText>
+                </div>
+                <div class="text-right">
+                    <MudText Typo="Typo.caption" Class="ml-muted">Discount:</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Success">-@_activeQuote.Currency @_activeQuote.DiscountAmount.ToString("N2")</MudText>
+                </div>
+                <div class="text-right">
+                    <MudText Typo="Typo.caption" Class="ml-muted">Tax:</MudText>
+                    <MudText Typo="Typo.body2">@_activeQuote.Currency @_activeQuote.TaxAmount.ToString("N2")</MudText>
+                </div>
+                <div class="text-right">
+                    <MudText Typo="Typo.caption" Class="ml-muted">Grand Total:</MudText>
+                    <MudText Typo="Typo.h6" Style="font-weight:700">@_activeQuote.Currency @_activeQuote.GrandTotal.ToString("N2")</MudText>
+                </div>
+            </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _detailsDialogOpen = false)">Close</MudButton>
+        @if (_activeQuote is not null)
+        {
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Outlined.ReceiptLong" OnClick="@(() => ConvertToInvoiceAsync(_activeQuote.Id))">
+                Convert to Invoice
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private bool _loading = true;
+    private bool _saving = false;
+    private List<QuoteDto> _quotes = [];
+
+    private string _searchQuery = "";
+    private QuoteStatus? _statusFilter;
+
+    private bool _createDialogOpen = false;
+    private SaveQuoteRequest _createForm = new();
+    private DateTime? _validUntilDate = DateTime.UtcNow.AddDays(30);
+
+    private decimal _previewSubTotal = 0;
+    private decimal _previewTax = 0;
+    private decimal _previewGrandTotal = 0;
+
+    private bool _detailsDialogOpen = false;
+    private QuoteDto? _activeQuote;
+
+    private List<QuoteDto> FilteredQuotes => _quotes.Where(q =>
+        (string.IsNullOrWhiteSpace(_searchQuery) ||
+         q.Title.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase) ||
+         q.QuoteNumber.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase) ||
+         (q.DealTitle != null && q.DealTitle.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase)) ||
+         (q.AccountName != null && q.AccountName.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase))) &&
+        (!_statusFilter.HasValue || q.Status == _statusFilter.Value)
+    ).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadQuotesAsync();
+    }
+
+    private async Task LoadQuotesAsync()
+    {
+        _loading = true;
+        try
+        {
+            _quotes = await Http.GetFromJsonAsync<List<QuoteDto>>("api/v1/quotes") ?? [];
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load proposals: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private Color GetStatusColor(QuoteStatus s) => s switch
+    {
+        QuoteStatus.Accepted => Color.Success,
+        QuoteStatus.Sent => Color.Info,
+        QuoteStatus.Draft => Color.Default,
+        QuoteStatus.Rejected => Color.Error,
+        QuoteStatus.Expired => Color.Warning,
+        _ => Color.Default
+    };
+
+    private void OpenNewQuoteDialog()
+    {
+        _createForm = new SaveQuoteRequest
+        {
+            Currency = "AED",
+            TermsAndConditions = "Net 30",
+            LineItems =
+            [
+                new SaveQuoteLineItemRequest { ProductName = "Software License", Quantity = 1, UnitPrice = 1000m, TaxRate = 5m }
+            ]
+        };
+        _validUntilDate = DateTime.UtcNow.AddDays(30);
+        RecalculateTotals();
+        _createDialogOpen = true;
+    }
+
+    private void AddLineItem()
+    {
+        _createForm.LineItems.Add(new SaveQuoteLineItemRequest
+        {
+            ProductName = "Professional Service",
+            Quantity = 1,
+            UnitPrice = 500m,
+            TaxRate = 5m
+        });
+        RecalculateTotals();
+    }
+
+    private void RemoveLineItem(int index)
+    {
+        if (_createForm.LineItems.Count > 1)
+        {
+            _createForm.LineItems.RemoveAt(index);
+            RecalculateTotals();
+        }
+    }
+
+    private void RecalculateTotals()
+    {
+        decimal subTotal = 0;
+        decimal tax = 0;
+        foreach (var item in _createForm.LineItems)
+        {
+            var lineSub = item.Quantity * item.UnitPrice;
+            var lineDisc = lineSub * (item.DiscountPercent / 100m);
+            var net = lineSub - lineDisc;
+            subTotal += net;
+            tax += net * (item.TaxRate / 100m);
+        }
+
+        var overallDisc = subTotal * (_createForm.DiscountPercent / 100m);
+        _previewSubTotal = subTotal;
+        _previewTax = tax;
+        _previewGrandTotal = (subTotal - overallDisc) + tax;
+    }
+
+    private async Task SaveQuoteAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_createForm.Title))
+        {
+            Snackbar.Add("Proposal title is required.", Severity.Warning);
+            return;
+        }
+
+        _createForm.ExpirationDate = _validUntilDate;
+        _saving = true;
+        try
+        {
+            var resp = await Http.PostAsJsonAsync("api/v1/quotes", _createForm);
+            if (resp.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Proposal created successfully!", Severity.Success);
+                _createDialogOpen = false;
+                await LoadQuotesAsync();
+            }
+            else
+            {
+                var err = await resp.Content.ReadAsStringAsync();
+                Snackbar.Add($"Error: {err}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void ViewQuoteDetails(QuoteDto q)
+    {
+        _activeQuote = q;
+        _detailsDialogOpen = true;
+    }
+
+    private async Task ChangeStatusAsync(Guid quoteId, QuoteStatus status)
+    {
+        try
+        {
+            var resp = await Http.PostAsync($"api/v1/quotes/{quoteId}/status?status={status}", null);
+            if (resp.IsSuccessStatusCode)
+            {
+                Snackbar.Add($"Proposal marked as {status}.", Severity.Success);
+                await LoadQuotesAsync();
+            }
+            else
+            {
+                var err = await resp.Content.ReadAsStringAsync();
+                Snackbar.Add($"Status update failed: {err}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error updating status: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ConvertToInvoiceAsync(Guid quoteId)
+    {
+        try
+        {
+            var resp = await Http.PostAsync($"api/v1/quotes/{quoteId}/convert-to-invoice", null);
+            if (resp.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Invoice generated successfully from proposal!", Severity.Success);
+                _detailsDialogOpen = false;
+                Nav.NavigateTo("/invoices");
+            }
+            else
+            {
+                var err = await resp.Content.ReadAsStringAsync();
+                Snackbar.Add($"Conversion error: {err}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Conversion error: {ex.Message}", Severity.Error);
+        }
+    }
+}

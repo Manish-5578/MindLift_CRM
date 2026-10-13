@@ -1,0 +1,44 @@
+<MudAutocomplete T="LookupItem" Value="_selected" ValueChanged="OnPickedAsync" SearchFunc="SearchAsync" ToStringFunc="item => item?.Text"
+                 Label="@Label" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" CoerceText="false" ResetValueOnEmptyText="true"
+                 MinCharacters="1" DebounceInterval="250" Error="@(ErrorText is not null)" ErrorText="@ErrorText" data-testid="@TestId" />
+
+@code {
+    /// <summary>Looks up records by what the person typed.</summary>
+    [Parameter, EditorRequired] public Func<string, CancellationToken, Task<IReadOnlyList<LookupItem>>> Search { get; set; } = default!;
+
+    [Parameter] public string Label { get; set; } = string.Empty;
+    [Parameter] public Guid? Value { get; set; }
+
+    /// <summary>What to show for the current value before the person has typed anything.</summary>
+    [Parameter] public string? Text { get; set; }
+
+    [Parameter] public EventCallback<Guid?> ValueChanged { get; set; }
+    [Parameter] public string? TestId { get; set; }
+    [Parameter] public string? ErrorText { get; set; }
+
+    private LookupItem? _selected;
+
+    protected override void OnParametersSet()
+    {
+        if (Value is { } id)
+        {
+            if (_selected?.Id != id)
+            {
+                _selected = new LookupItem(id, Text ?? string.Empty);
+            }
+        }
+        else
+        {
+            _selected = null;
+        }
+    }
+
+    private async Task<IEnumerable<LookupItem>> SearchAsync(string text, CancellationToken cancellationToken)
+        => string.IsNullOrWhiteSpace(text) ? [] : await Search(text, cancellationToken);
+
+    private async Task OnPickedAsync(LookupItem? item)
+    {
+        _selected = item;
+        await ValueChanged.InvokeAsync(item?.Id);
+    }
+}

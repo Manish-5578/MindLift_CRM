@@ -1,0 +1,178 @@
+@typeparam TItem
+
+<div class="ml-stack" data-testid="kanban">
+    @* Phones show one column at a time and pick it here (plan 18.9.6). *@
+    <div class="ml-only-xs ml-row ml-row--wrap" data-testid="kanban-column-picker">
+        @foreach (var column in Columns)
+        {
+            var current = column;
+            <MudChip T="string" Size="Size.Small" Variant="@(ActiveKey == current.Key ? Variant.Filled : Variant.Outlined)" Color="@(ActiveKey == current.Key ? Color.Primary : Color.Default)"
+                     OnClick="() => _active = current.Key" data-testid="@PickerTestId(current)">@current.Label (@current.Total)</MudChip>
+        }
+    </div>
+
+    <div class="ml-kanban" data-testid="kanban-columns">
+        @foreach (var column in Columns)
+        {
+            var current = column;
+            <section class="@ColumnClass(current)" aria-label="@current.Label" data-testid="@ColumnTestId(current)"
+                     @ondragenter="() => OnDragEnter(current.Key)" @ondragover="() => OnDragEnter(current.Key)" @ondragover:preventDefault="true"
+                     @ondrop="() => DropAsync(current.Key)" @ondrop:preventDefault="true" @ondragleave="() => OnDragLeave(current.Key)">
+                <header class="ml-kanban__header">
+                    <div class="ml-row">
+                        @if (current.Color is not null)
+                        {
+                            <span class="ml-kanban__dot" style="@DotStyle(current)"></span>
+                        }
+                        <MudText Typo="Typo.subtitle2" Class="ml-grow ml-truncate">@current.Label</MudText>
+                    </div>
+                    <MudText Typo="Typo.caption" Class="ml-muted" data-testid="@CountTestId(current)">@CountText(current)</MudText>
+                </header>
+
+                <div class="ml-kanban__cards">
+                    @foreach (var item in ItemsIn(current.Key))
+                    {
+                        var card = item;
+                        <div class="@CardClass(card)" draggable="true" data-kanban-card="true" data-testid="kanban-card"
+                             @ondragstart="() => DragStart(card, current.Key)" @ondragend="DragEnd">
+                            <div class="ml-grow" style="min-width:0">@Card(card)</div>
+
+                            @* No dragging on phones, so each card has a menu to move it. *@
+                            <div class="ml-only-xs">
+                                <MudMenu Icon="@Icons.Material.Outlined.MoreVert" Size="Size.Small" AriaLabel="Move this card" Dense="true">
+                                    <MudText Typo="Typo.caption" Class="px-4 py-1 ml-muted">Move to</MudText>
+                                    @foreach (var target in Columns.Where(c => c.Key != current.Key))
+                                    {
+                                        var to = target;
+                                        <MudMenuItem OnClick="() => MoveAsync(card, current.Key, to.Key)" data-testid="@MoveTestId(to)">@to.Label</MudMenuItem>
+                                    }
+                                </MudMenu>
+                            </div>
+                        </div>
+                    }
+
+                    @if (!ItemsIn(current.Key).Any())
+                    {
+                        <MudText Typo="Typo.caption" Class="ml-muted ml-kanban__empty" data-testid="kanban-empty">@EmptyText</MudText>
+                    }
+
+                    @if (ColumnFooter is not null)
+                    {
+                        @ColumnFooter(current)
+                    }
+                </div>
+            </section>
+        }
+    </div>
+</div>
+
+@code {
+    private TItem? _dragItem;
+    private string? _dragFrom;
+    private string? _overKey;
+    private string? _active;
+
+    [Parameter, EditorRequired] public IReadOnlyList<KanbanColumn> Columns { get; set; } = [];
+
+    /// <summary>The cards loaded for each column key. A column with no entry is empty.</summary>
+    [Parameter, EditorRequired] public IReadOnlyDictionary<string, IReadOnlyList<TItem>> Items { get; set; } = new Dictionary<string, IReadOnlyList<TItem>>();
+
+    /// <summary>How one card looks inside its frame.</summary>
+    [Parameter, EditorRequired] public RenderFragment<TItem> Card { get; set; } = _ => _ => { };
+
+    /// <summary>Called when a card is dropped on a different column or moved with the menu. The page decides whether the move is allowed.</summary>
+    [Parameter] public EventCallback<KanbanMove<TItem>> OnMove { get; set; }
+
+    /// <summary>Extra content at the bottom of a column, for example a "Show more" button.</summary>
+    [Parameter] public RenderFragment<KanbanColumn>? ColumnFooter { get; set; }
+
+    [Parameter] public string EmptyText { get; set; } = "Nothing here";
+
+    /// <summary>Marks the card that cannot be dragged, for example a record the user may not edit.</summary>
+    [Parameter] public Func<TItem, bool>? IsLocked { get; set; }
+
+    private string? ActiveKey => _active is not null && Columns.Any(c => c.Key == _active) ? _active : Columns.FirstOrDefault()?.Key;
+
+    private IEnumerable<TItem> ItemsIn(string key) => Items.TryGetValue(key, out var list) ? list : [];
+
+    private string ColumnClass(KanbanColumn column)
+        => string.Join(' ', new[]
+        {
+            "ml-kanban__col",
+            _overKey == column.Key && _dragItem is not null ? "ml-kanban__col--over" : null,
+            ActiveKey == column.Key ? null : "ml-hide-xs",
+        }.Where(c => c is not null));
+
+    private string CardClass(TItem item)
+        => string.Join(' ', new[]
+        {
+            "ml-card ml-kanban__card",
+            _dragItem is not null && EqualityComparer<TItem>.Default.Equals(_dragItem, item) ? "ml-kanban__card--dragging" : null,
+        }.Where(c => c is not null));
+
+    private static string DotStyle(KanbanColumn column) => "background:" + column.Color;
+
+    private static string CountText(KanbanColumn column) => column.Summary is null ? $"{column.Total:N0}" : $"{column.Total:N0} · {column.Summary}";
+
+    private static string ColumnTestId(KanbanColumn column) => "kanban-column-" + column.Key;
+    private static string CountTestId(KanbanColumn column) => "kanban-count-" + column.Key;
+    private static string PickerTestId(KanbanColumn column) => "kanban-pick-" + column.Key;
+    private static string MoveTestId(KanbanColumn column) => "kanban-move-" + column.Key;
+
+    private void DragStart(TItem item, string fromKey)
+    {
+        if (IsLocked?.Invoke(item) == true)
+        {
+            return;
+        }
+
+        _dragItem = item;
+        _dragFrom = fromKey;
+    }
+
+    private void DragEnd()
+    {
+        _dragItem = default;
+        _dragFrom = null;
+        _overKey = null;
+    }
+
+    private void OnDragEnter(string key)
+    {
+        if (_dragItem is not null)
+        {
+            _overKey = key;
+        }
+    }
+
+    private void OnDragLeave(string key)
+    {
+        if (_overKey == key)
+        {
+            _overKey = null;
+        }
+    }
+
+    private async Task DropAsync(string toKey)
+    {
+        var item = _dragItem;
+        var from = _dragFrom;
+        DragEnd();
+        if (item is null || from is null)
+        {
+            return;
+        }
+
+        await MoveAsync(item, from, toKey);
+    }
+
+    private async Task MoveAsync(TItem item, string fromKey, string toKey)
+    {
+        if (fromKey == toKey)
+        {
+            return;
+        }
+
+        await OnMove.InvokeAsync(new KanbanMove<TItem>(item, fromKey, toKey));
+    }
+}

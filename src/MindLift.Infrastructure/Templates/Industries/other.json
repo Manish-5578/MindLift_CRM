@@ -1,0 +1,40 @@
+{
+  "key": "other",
+  "version": 1,
+  "name": "Other",
+  "nameAr": "أخرى",
+  "description": "Start from the general configuration and adjust everything yourself in Settings.",
+  "modules": {
+    "labels": {},
+    "enable": ["Dashboard", "Leads", "Contacts", "Accounts", "Deals", "Activities", "Calendar", "Communication", "Reports", "Notifications"],
+    "disable": []
+  },
+  "picklists": {},
+  "pipelines": [
+    {
+      "name": "Sales",
+      "nameAr": "المبيعات",
+      "isDefault": true,
+      "stages": [
+        { "name": "Qualification", "nameAr": "التأهيل", "probability": 10, "type": "Open", "rottingDays": 7 },
+        { "name": "Needs analysis", "nameAr": "تحليل الاحتياج", "probability": 30, "type": "Open", "rottingDays": 7 },
+        { "name": "Proposal", "nameAr": "العرض", "probability": 60, "type": "Open", "rottingDays": 14 },
+        { "name": "Negotiation", "nameAr": "التفاوض", "probability": 80, "type": "Open", "rottingDays": 14 },
+        { "name": "Won", "nameAr": "مكتملة - ناجحة", "probability": 100, "type": "Won" },
+        { "name": "Lost", "nameAr": "مكتملة - خاسرة", "probability": 0, "type": "Lost" }
+      ]
+    }
+  ],
+  "customFields": [],
+  "layouts": {
+    "leads": {
+      "Form": [
+        { "section": "Contact info", "sectionAr": "بيانات الاتصال", "columns": 2, "fields": ["first_name", "last_name", "email", "phone", "company_name"] },
+        { "section": "Lead details", "sectionAr": "تفاصيل العميل", "columns": 2, "fields": ["source", "status", "rating", "owner_id"] }
+      ]
+    }
+  },
+  "dashboardHighlights": ["deals_in_progress", "upcoming_meetings", "leads_by_source"],
+  "documentTypes": { "enable": ["generic"], "portalEnabled": false },
+  "sampleData": { "profile": "general" }
+}

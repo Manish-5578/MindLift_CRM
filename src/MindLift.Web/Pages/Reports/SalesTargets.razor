@@ -1,0 +1,390 @@
+@page "/reports/targets"
+@using MindLift.Shared.Contracts
+@using MindLift.Shared.Enums
+@using MindLift.UI.Components
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+
+<PageTitle>Sales Targets & Quotas · MindLift</PageTitle>
+
+<div class="ml-page">
+    <div class="d-flex flex-wrap align-center justify-space-between gap-3 mb-4">
+        <div class="d-flex align-center gap-3">
+            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Href="/reports" Size="Size.Small" aria-label="Back to Reports" />
+            <div>
+                <MudText Typo="Typo.h5" Style="font-weight:700">Sales Targets & Quotas</MudText>
+                <MudText Typo="Typo.body2" Class="ml-muted">Define team and rep performance quotas and track revenue progress in real time.</MudText>
+            </div>
+        </div>
+
+        <div class="d-flex flex-wrap align-center gap-2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" OnClick="OpenCreateDialog" Size="Size.Small">
+                New Target
+            </MudButton>
+        </div>
+    </div>
+
+    @if (_loading)
+    {
+        <SkeletonTable Rows="6" Columns="5" />
+    }
+    else if (_error != null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@_error</MudAlert>
+    }
+    else
+    {
+        <!-- Summary Cards -->
+        <div class="d-flex flex-wrap gap-3 mb-4">
+            <div class="pa-3 rounded-lg flex-1" style="background:var(--ml-card-bg, #fff); border:1px solid var(--ml-border); min-width:160px">
+                <MudText Typo="Typo.caption" Class="ml-muted" Style="font-weight:600; text-transform:uppercase">Active Targets</MudText>
+                <MudText Typo="Typo.h5" Style="font-weight:700">@_targets.Count</MudText>
+            </div>
+            <div class="pa-3 rounded-lg flex-1" style="background:var(--ml-card-bg, #fff); border:1px solid var(--ml-border); min-width:160px">
+                <MudText Typo="Typo.caption" Class="ml-muted" Style="font-weight:600; text-transform:uppercase">Revenue Target Goal</MudText>
+                <MudText Typo="Typo.h5" Style="font-weight:700; color:var(--mud-palette-primary)">
+                    @_targets.Where(t => t.Metric == SalesTargetMetric.WonAmount).Sum(t => t.TargetValue).ToString("C0")
+                </MudText>
+            </div>
+            <div class="pa-3 rounded-lg flex-1" style="background:var(--ml-card-bg, #fff); border:1px solid var(--ml-border); min-width:160px">
+                <MudText Typo="Typo.caption" Class="ml-muted" Style="font-weight:600; text-transform:uppercase">Deals Won Quota</MudText>
+                <MudText Typo="Typo.h5" Style="font-weight:700">
+                    @_targets.Where(t => t.Metric == SalesTargetMetric.WonDeals).Sum(t => t.TargetValue).ToString("N0") deals
+                </MudText>
+            </div>
+            <div class="pa-3 rounded-lg flex-1" style="background:var(--ml-card-bg, #fff); border:1px solid var(--ml-border); min-width:160px">
+                <MudText Typo="Typo.caption" Class="ml-muted" Style="font-weight:600; text-transform:uppercase">Leads Target</MudText>
+                <MudText Typo="Typo.h5" Style="font-weight:700">
+                    @_targets.Where(t => t.Metric == SalesTargetMetric.NewLeads).Sum(t => t.TargetValue).ToString("N0") leads
+                </MudText>
+            </div>
+        </div>
+
+        @if (_targets.Count == 0)
+        {
+            <EmptyState Title="No sales targets defined" Subtitle="Establish performance quotas for your sales reps or teams to start tracking goal attainment." ActionLabel="Create Target" OnAction="OpenCreateDialog" />
+        }
+        else
+        {
+            <!-- Targets Table -->
+            <MlCard Title="Target Quotas & Performance" Subtitle="@($"{_targets.Count} targets configured")">
+                <MudTable Items="_targets" Hover="true" Dense="true" Elevation="0">
+                    <HeaderContent>
+                        <MudTh>Assignee</MudTh>
+                        <MudTh>Metric</MudTh>
+                        <MudTh>Period</MudTh>
+                        <MudTh>Date Range</MudTh>
+                        <MudTh Style="text-align:right">Target Goal</MudTh>
+                        <MudTh Style="text-align:right; width:100px">Actions</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>
+                            <div class="d-flex align-center gap-2">
+                                <MudAvatar Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled">
+                                    @(context.UserName?.Length > 0 ? context.UserName[0].ToString().ToUpperInvariant() : "A")
+                                </MudAvatar>
+                                <div>
+                                    <MudText Typo="Typo.body2" Style="font-weight:600">
+                                        @(string.IsNullOrWhiteSpace(context.UserName) ? (string.IsNullOrWhiteSpace(context.TeamName) ? "All Team Members" : context.TeamName) : context.UserName)
+                                    </MudText>
+                                    <MudText Typo="Typo.caption" Class="ml-muted">
+                                        @(context.UserId.HasValue ? "Individual Rep" : (context.TeamId.HasValue ? "Team Target" : "Company Target"))
+                                    </MudText>
+                                </div>
+                            </div>
+                        </MudTd>
+                        <MudTd>
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="@GetMetricColor(context.Metric)">
+                                @FormatMetric(context.Metric)
+                            </MudChip>
+                        </MudTd>
+                        <MudTd>
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Default">
+                                @context.PeriodType.ToString()
+                            </MudChip>
+                        </MudTd>
+                        <MudTd>
+                            <MudText Typo="Typo.body2">@context.StartDate.ToString("MMM d, yyyy") – @context.EndDate.ToString("MMM d, yyyy")</MudText>
+                        </MudTd>
+                        <MudTd Style="text-align:right">
+                            <MudText Typo="Typo.subtitle2" Style="font-weight:700">
+                                @(context.Metric == SalesTargetMetric.WonAmount ? context.TargetValue.ToString("C0") : context.TargetValue.ToString("N0"))
+                            </MudText>
+                        </MudTd>
+                        <MudTd Style="text-align:right">
+                            <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="() => OpenEditDialog(context)" aria-label="Edit" />
+                            <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Color="Color.Error" OnClick="() => DeleteTargetAsync(context.Id)" aria-label="Delete" />
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            </MlCard>
+        }
+    }
+</div>
+
+<!-- Create / Edit Target Dialog -->
+<MudDialog @bind-Visible="_dialogOpen" Options="new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true }">
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@(_editingTargetId.HasValue ? Icons.Material.Outlined.Edit : Icons.Material.Outlined.AddChart)" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">@(_editingTargetId.HasValue ? "Edit Sales Target" : "New Sales Target")</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid Spacing="2">
+            <MudItem xs="12">
+                <MudSelect T="Guid?" @bind-Value="_targetUserId" Label="Assignee (Sales Rep)" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                    <MudSelectItem T="Guid?" Value="@((Guid?)null)">All Reps (Company Wide)</MudSelectItem>
+                    @foreach (var u in _users)
+                    {
+                        <MudSelectItem T="Guid?" Value="@((Guid?)u.Id)">@u.FullName</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12" sm="6">
+                <MudSelect T="SalesTargetMetric" @bind-Value="_targetMetric" Label="Target Metric" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem Value="@SalesTargetMetric.WonAmount">Revenue Won ($)</MudSelectItem>
+                    <MudSelectItem Value="@SalesTargetMetric.WonDeals">Deals Won (Count)</MudSelectItem>
+                    <MudSelectItem Value="@SalesTargetMetric.NewLeads">New Leads (Count)</MudSelectItem>
+                    <MudSelectItem Value="@SalesTargetMetric.CompletedActivities">Activities (Count)</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12" sm="6">
+                <MudSelect T="SalesTargetPeriod" Value="_targetPeriod" ValueChanged="OnPeriodChanged" Label="Period Type" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem Value="@SalesTargetPeriod.Month">Monthly</MudSelectItem>
+                    <MudSelectItem Value="@SalesTargetPeriod.Quarter">Quarterly</MudSelectItem>
+                    <MudSelectItem Value="@SalesTargetPeriod.Year">Annual</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12" sm="6">
+                <MudDatePicker Label="Start Date" Date="_targetStartDate" DateChanged="OnStartDateChanged" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+
+            <MudItem xs="12" sm="6">
+                <MudDatePicker Label="End Date" Date="_targetEndDate" DateChanged="OnEndDateChanged" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudNumericField T="decimal" @bind-Value="_targetValue" Label="Target Quota Value" Min="1" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _dialogOpen = false">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveTargetAsync" Disabled="_saving">
+            @if (_saving)
+            {
+                <MudProgressCircular Indeterminate="true" Size="Size.Small" Class="mr-2" />
+            }
+            @(_editingTargetId.HasValue ? "Update Target" : "Create Target")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<SalesTargetDto> _targets = [];
+    private List<UserListItem> _users = [];
+    private bool _loading = true;
+    private string? _error;
+
+    // Dialog state
+    private bool _dialogOpen;
+    private bool _saving;
+    private Guid? _editingTargetId;
+    private Guid? _targetUserId;
+    private SalesTargetMetric _targetMetric = SalesTargetMetric.WonAmount;
+    private SalesTargetPeriod _targetPeriod = SalesTargetPeriod.Month;
+    private DateTime? _targetStartDate = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+    private DateTime? _targetEndDate = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, DateTime.DaysInMonth(DateTime.UtcNow.Year, DateTime.UtcNow.Month));
+    private decimal _targetValue = 50000m;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var targetsTask = Http.GetFromJsonAsync<List<SalesTargetDto>>("api/v1/sales-targets");
+            var usersTask = Http.GetFromJsonAsync<PagedResult<UserListItem>>("api/v1/users?pageSize=200");
+
+            await Task.WhenAll(targetsTask, usersTask);
+
+            _targets = (await targetsTask) ?? [];
+            _users = (await usersTask)?.Items.ToList() ?? [];
+        }
+        catch (Exception ex)
+        {
+            _error = $"Could not load sales targets: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OpenCreateDialog()
+    {
+        _editingTargetId = null;
+        _targetUserId = null;
+        _targetMetric = SalesTargetMetric.WonAmount;
+        _targetPeriod = SalesTargetPeriod.Month;
+        _targetValue = 50000m;
+        SetDatesForPeriod(SalesTargetPeriod.Month);
+        _dialogOpen = true;
+    }
+
+    private void OpenEditDialog(SalesTargetDto t)
+    {
+        _editingTargetId = t.Id;
+        _targetUserId = t.UserId;
+        _targetMetric = t.Metric;
+        _targetPeriod = t.PeriodType;
+        _targetStartDate = t.StartDate.ToDateTime(TimeOnly.MinValue);
+        _targetEndDate = t.EndDate.ToDateTime(TimeOnly.MinValue);
+        _targetValue = t.TargetValue;
+        _dialogOpen = true;
+    }
+
+    private void OnPeriodChanged(SalesTargetPeriod period)
+    {
+        _targetPeriod = period;
+        SetDatesForPeriod(period);
+    }
+
+    private void OnStartDateChanged(DateTime? dt) => _targetStartDate = dt;
+    private void OnEndDateChanged(DateTime? dt) => _targetEndDate = dt;
+
+    private void SetDatesForPeriod(SalesTargetPeriod period)
+    {
+        var now = DateTime.UtcNow;
+        if (period == SalesTargetPeriod.Month)
+        {
+            _targetStartDate = new DateTime(now.Year, now.Month, 1);
+            _targetEndDate = new DateTime(now.Year, now.Month, DateTime.DaysInMonth(now.Year, now.Month));
+        }
+        else if (period == SalesTargetPeriod.Quarter)
+        {
+            int q = (now.Month - 1) / 3;
+            int startMonth = (q * 3) + 1;
+            int endMonth = startMonth + 2;
+            _targetStartDate = new DateTime(now.Year, startMonth, 1);
+            _targetEndDate = new DateTime(now.Year, endMonth, DateTime.DaysInMonth(now.Year, endMonth));
+        }
+        else
+        {
+            _targetStartDate = new DateTime(now.Year, 1, 1);
+            _targetEndDate = new DateTime(now.Year, 12, 31);
+        }
+    }
+
+    private async Task SaveTargetAsync()
+    {
+        if (_targetValue <= 0)
+        {
+            Snackbar.Add("Target quota must be greater than zero.", Severity.Warning);
+            return;
+        }
+
+        var start = _targetStartDate.HasValue ? DateOnly.FromDateTime(_targetStartDate.Value) : DateOnly.FromDateTime(DateTime.UtcNow);
+        var end = _targetEndDate.HasValue ? DateOnly.FromDateTime(_targetEndDate.Value) : start.AddMonths(1);
+
+        if (end < start)
+        {
+            Snackbar.Add("End date cannot be earlier than start date.", Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var req = new SaveSalesTargetRequest(
+                _targetUserId,
+                null,
+                _targetMetric,
+                _targetPeriod,
+                start,
+                end,
+                _targetValue
+            );
+
+            HttpResponseMessage resp;
+            if (_editingTargetId.HasValue)
+            {
+                resp = await Http.PutAsJsonAsync($"api/v1/sales-targets/{_editingTargetId.Value}", req);
+            }
+            else
+            {
+                resp = await Http.PostAsJsonAsync("api/v1/sales-targets", req);
+            }
+
+            if (resp.IsSuccessStatusCode)
+            {
+                Snackbar.Add(_editingTargetId.HasValue ? "Sales target updated!" : "Sales target created!", Severity.Success);
+                _dialogOpen = false;
+                await LoadDataAsync();
+            }
+            else
+            {
+                Snackbar.Add("Failed to save sales target.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task DeleteTargetAsync(Guid id)
+    {
+        try
+        {
+            var resp = await Http.DeleteAsync($"api/v1/sales-targets/{id}");
+            if (resp.IsSuccessStatusCode)
+            {
+                _targets.RemoveAll(t => t.Id == id);
+                Snackbar.Add("Sales target deleted.", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Failed to delete target.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error deleting target: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private static Color GetMetricColor(SalesTargetMetric m) => m switch
+    {
+        SalesTargetMetric.WonAmount => Color.Success,
+        SalesTargetMetric.WonDeals => Color.Primary,
+        SalesTargetMetric.NewLeads => Color.Info,
+        SalesTargetMetric.CompletedActivities => Color.Warning,
+        _ => Color.Default
+    };
+
+    private static string FormatMetric(SalesTargetMetric m) => m switch
+    {
+        SalesTargetMetric.WonAmount => "Revenue Won",
+        SalesTargetMetric.WonDeals => "Deals Won",
+        SalesTargetMetric.NewLeads => "New Leads",
+        SalesTargetMetric.CompletedActivities => "Activities",
+        _ => m.ToString()
+    };
+}

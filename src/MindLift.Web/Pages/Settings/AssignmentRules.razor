@@ -1,0 +1,322 @@
+@page "/settings/assignment-rules"
+@using MindLift.Shared.Filtering
+@using FilterOperator = MindLift.Shared.Filtering.FilterOperator
+@using System.Text.Json
+@inject HttpClient Http
+@inject AppState App
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageTitle>Lead assignment · MindLift</PageTitle>
+
+<div class="ml-page ml-page--form">
+    <PageHeader Title="Lead assignment" Subtitle="Decides who owns a new lead. Rules run from the lowest priority number. The first rule that matches and has an active user wins.">
+        <Actions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => OpenRule(null)" data-testid="primary-action">New rule</MudButton>
+        </Actions>
+    </PageHeader>
+    <SettingsNav Current="/settings/assignment-rules" />
+
+    @if (_loading)
+    {
+        <SkeletonTable Rows="4" Columns="3" />
+    }
+    else if (_loadFailed)
+    {
+        <ErrorState OnRetry="LoadAsync" />
+    }
+    else
+    {
+        <MlCard Flush="true" Class="mb-4" TestId="rules">
+            @foreach (var rule in _rules)
+            {
+                <div class="ml-row" style="padding:12px 20px;border-bottom:1px solid var(--ml-border);min-height:56px" data-testid="rule-row">
+                    <div class="ml-grow">
+                        <MudText Typo="Typo.subtitle2">@rule.Name</MudText>
+                        <MudText Typo="Typo.caption" Class="ml-muted">Priority @rule.Priority · @MethodLabel(rule.Method) · @UsersSummary(rule.UserIds) · @ConditionText(rule.Conditions)</MudText>
+                    </div>
+                    @if (!rule.IsActive)
+                    {
+                        <StatusChip Text="Off" Color="@StatusColors.For("Expired")" Dot="false" />
+                    }
+                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="() => OpenRule(rule)" aria-label="Edit rule" />
+                    @if (_confirmId == rule.Id)
+                    {
+                        <MudButton Size="Size.Small" OnClick="() => _confirmId = null">Keep</MudButton>
+                        <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeleteAsync(rule)">Delete</MudButton>
+                    }
+                    else
+                    {
+                        <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" OnClick="() => _confirmId = rule.Id" aria-label="Delete rule" />
+                    }
+                </div>
+            }
+            @if (_rules.Count == 0)
+            {
+                <EmptyState Title="No assignment rules" Message="New leads go to the workspace owner until you add a rule." Compact="true" />
+            }
+        </MlCard>
+    }
+</div>
+
+<FormDrawer Open="_open" OpenChanged="v => _open = v" Title="@_title" SubmitText="Save rule" Busy="_busy" OnSubmit="SaveAsync">
+    <div class="ml-stack">
+        @if (_formError is not null) { <MudAlert Severity="Severity.Error" Dense="true">@_formError</MudAlert> }
+        <MudTextField @bind-Value="_name" Label="Name *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="rule-name" />
+        <MudNumericField @bind-Value="_priority" Label="Priority" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" HelperText="Lower numbers run first." />
+        <MudSelect T="string" @bind-Value="_method" Label="How to pick the owner *" Variant="Variant.Outlined" Margin="Margin.Dense">
+            <MudSelectItem T="string" Value="MethodRoundRobin">Take turns (round robin)</MudSelectItem>
+            <MudSelectItem T="string" Value="MethodLoadBalanced">Fewest open leads</MudSelectItem>
+            <MudSelectItem T="string" Value="MethodSpecificUser">One specific person</MudSelectItem>
+        </MudSelect>
+
+        <MudText Typo="Typo.subtitle2" Class="mt-2">Users in this rule</MudText>
+        <MudText Typo="Typo.caption" Class="ml-muted">For round robin, the order below is the turn order. For a specific person, the first user gets every matching lead.</MudText>
+        @foreach (var (userId, index) in _userIds.Select((id, i) => (id, i)))
+        {
+            var current = index;
+            <div class="ml-row" style="padding:6px 0;border-bottom:1px solid var(--ml-border)" data-testid="rule-user">
+                <MudText Typo="Typo.body2" Class="ml-grow">@(index + 1). @UserName(userId)</MudText>
+                <MudIconButton Icon="@Icons.Material.Outlined.ArrowUpward" Size="Size.Small" Disabled="index == 0" OnClick="() => MoveUser(current, -1)" aria-label="Move user up" />
+                <MudIconButton Icon="@Icons.Material.Outlined.ArrowDownward" Size="Size.Small" Disabled="index == _userIds.Count - 1" OnClick="() => MoveUser(current, 1)" aria-label="Move user down" />
+                <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small" OnClick="() => RemoveUser(current)" aria-label="Remove user" />
+            </div>
+        }
+        <MudSelect T="Guid?" Value="_pickUser" ValueChanged="AddUser" Label="Add a user" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="rule-add-user">
+            @foreach (var user in ActiveUsers())
+            {
+                <MudSelectItem T="Guid?" Value="@user.Id">@user.FullName</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudText Typo="Typo.subtitle2" Class="mt-2">Only when</MudText>
+        <MudSelect T="string" @bind-Value="_condField" Label="Lead field" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="rule-field">
+            <MudSelectItem T="string" Value="FieldAny">Any lead</MudSelectItem>
+            <MudSelectItem T="string" Value="FieldSource">Source</MudSelectItem>
+            <MudSelectItem T="string" Value="FieldRating">Rating</MudSelectItem>
+            <MudSelectItem T="string" Value="FieldStatus">Status</MudSelectItem>
+        </MudSelect>
+        @if (_condField != FieldAny)
+        {
+            <MudSelect T="string" @bind-Value="_condValue" Label="Equals" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="rule-value">
+                @foreach (var value in PicklistValues(_condField))
+                {
+                    <MudSelectItem T="string" Value="@value.Value">@value.Label</MudSelectItem>
+                }
+            </MudSelect>
+        }
+
+        <MudCheckBox @bind-Value="_active" Label="Active" Color="Color.Primary" />
+    </div>
+</FormDrawer>
+
+@code {
+    private const string MethodRoundRobin = "RoundRobin";
+    private const string MethodLoadBalanced = "LoadBalanced";
+    private const string MethodSpecificUser = "SpecificUser";
+    private const string FieldAny = "";
+    private const string FieldSource = "source";
+    private const string FieldRating = "rating";
+    private const string FieldStatus = "status";
+
+    private List<AssignmentRuleDto> _rules = [];
+    private List<UserListItem> _users = [];
+    private bool _loading = true;
+    private bool _loadFailed;
+    private bool _busy;
+    private Guid? _confirmId;
+
+    private bool _open;
+    private Guid? _editId;
+    private string _title = "New rule";
+    private string? _formError;
+    private string _name = string.Empty;
+    private int? _priority = 1;
+    private string _method = MethodRoundRobin;
+    private bool _active = true;
+    private List<Guid> _userIds = [];
+    private Guid? _pickUser;
+    private string _condField = FieldAny;
+    private string _condValue = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!App.IsAdmin)
+        {
+            Nav.NavigateTo("/");
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _loadFailed = false;
+        try
+        {
+            _rules = await Http.GetFromJsonAsync<List<AssignmentRuleDto>>("api/v1/settings/assignment-rules") ?? [];
+            var users = await Http.GetFromJsonAsync<PagedResult<UserListItem>>("api/v1/users?pageSize=200");
+            _users = users?.Items.ToList() ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            _loadFailed = true;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private IEnumerable<UserListItem> ActiveUsers() => _users.Where(u => u.IsActive && !_userIds.Contains(u.Id));
+
+    private string UserName(Guid id) => _users.FirstOrDefault(u => u.Id == id)?.FullName ?? "Removed user";
+
+    private string UsersSummary(IReadOnlyList<Guid> ids) => ids.Count == 0 ? "no users" : string.Join(", ", ids.Select(UserName));
+
+    private static string MethodLabel(string method) => method switch
+    {
+        MethodRoundRobin => "Round robin",
+        MethodLoadBalanced => "Fewest open leads",
+        MethodSpecificUser => "Specific person",
+        _ => method,
+    };
+
+    private string ConditionText(FilterGroup? group)
+    {
+        var condition = group?.Conditions.FirstOrDefault();
+        if (condition is null)
+        {
+            return "any lead";
+        }
+
+        var value = condition.Value?.ValueKind == JsonValueKind.String ? condition.Value.Value.GetString() : condition.Value?.ToString();
+        return $"{condition.Field} = {LabelFor(condition.Field, value)}";
+    }
+
+    private string LabelFor(string field, string? value)
+        => PicklistValues(field).FirstOrDefault(v => v.Value == value)?.Label ?? value ?? string.Empty;
+
+    private IEnumerable<PicklistValueDto> PicklistValues(string field)
+    {
+        var key = field switch
+        {
+            FieldSource => "lead_source",
+            FieldRating => "lead_rating",
+            FieldStatus => "lead_status",
+            _ => null,
+        };
+        return key is null ? [] : App.Bootstrap?.Picklists.FirstOrDefault(p => p.Key == key)?.Values.Where(v => v.IsActive) ?? [];
+    }
+
+    private void OpenRule(AssignmentRuleDto? rule)
+    {
+        _formError = null;
+        _confirmId = null;
+        _editId = rule?.Id;
+        _title = rule is null ? "New rule" : "Edit rule";
+        _name = rule?.Name ?? string.Empty;
+        _priority = rule?.Priority ?? (_rules.Count == 0 ? 1 : _rules.Max(r => r.Priority) + 1);
+        _method = rule?.Method ?? MethodRoundRobin;
+        _active = rule?.IsActive ?? true;
+        _userIds = rule is null ? [] : rule.UserIds.ToList();
+        _pickUser = null;
+        var condition = rule?.Conditions?.Conditions.FirstOrDefault();
+        _condField = condition?.Field ?? FieldAny;
+        _condValue = condition?.Value is { ValueKind: JsonValueKind.String } v ? v.GetString() ?? string.Empty : string.Empty;
+        _open = true;
+    }
+
+    private void AddUser(Guid? id)
+    {
+        if (id is { } userId && !_userIds.Contains(userId))
+        {
+            _userIds.Add(userId);
+        }
+
+        _pickUser = null;
+    }
+
+    private void MoveUser(int index, int delta)
+    {
+        var next = index + delta;
+        if (next < 0 || next >= _userIds.Count)
+        {
+            return;
+        }
+
+        (_userIds[index], _userIds[next]) = (_userIds[next], _userIds[index]);
+    }
+
+    private void RemoveUser(int index) => _userIds.RemoveAt(index);
+
+    private async Task SaveAsync()
+    {
+        _formError = null;
+        if (string.IsNullOrWhiteSpace(_name))
+        {
+            _formError = "Give the rule a name.";
+            return;
+        }
+
+        if (_userIds.Count == 0)
+        {
+            _formError = "Add at least one user to this rule.";
+            return;
+        }
+
+        if (_condField != FieldAny && string.IsNullOrWhiteSpace(_condValue))
+        {
+            _formError = "Choose the value the lead field must equal.";
+            return;
+        }
+
+        FilterGroup? conditions = _condField == FieldAny
+            ? null
+            : new FilterGroup
+            {
+                Conditions =
+                [
+                    new FilterCondition { Field = _condField, Op = FilterOperator.Eq, Value = JsonSerializer.SerializeToElement(_condValue) },
+                ],
+            };
+
+        var body = new SaveAssignmentRuleRequest(_name.Trim(), _active, _priority ?? 1, _method, _userIds.ToList(), conditions);
+        _busy = true;
+        try
+        {
+            var response = _editId is null
+                ? await Http.PostAsJsonAsync("api/v1/settings/assignment-rules", body)
+                : await Http.PutAsJsonAsync($"api/v1/settings/assignment-rules/{_editId}", body);
+            if (!response.IsSuccessStatusCode)
+            {
+                _formError = await ProblemText.FromAsync(response, "We could not save this rule.");
+                return;
+            }
+
+            _open = false;
+            Snackbar.Add("Rule saved", Severity.Success);
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DeleteAsync(AssignmentRuleDto rule)
+    {
+        var response = await Http.DeleteAsync($"api/v1/settings/assignment-rules/{rule.Id}");
+        _confirmId = null;
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "We could not delete this rule."), Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Rule deleted", Severity.Success);
+        await LoadAsync();
+    }
+}

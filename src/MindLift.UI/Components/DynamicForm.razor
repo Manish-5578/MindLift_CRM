@@ -1,0 +1,109 @@
+<div class="ml-stack" data-testid="dynamic-form">
+    <MudGrid Spacing="3">
+        @foreach (var field in Fields)
+        {
+            var current = field;
+            <MudItem xs="12" sm="@current.Columns">
+                @switch (current.Kind)
+                {
+                    case FormFieldKind.Picklist:
+                        <MudSelect T="string" Value="Get(current.Key)" ValueChanged="v => SetAsync(current.Key, v)" Label="@LabelOf(current)" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                   Clearable="true" Error="HasError(current.Key)" ErrorText="@ErrorOf(current.Key)" data-testid="@TestIdOf(current)">
+                            @foreach (var option in (current.Options ?? []).Where(o => o.IsActive))
+                            {
+                                <MudSelectItem T="string" Value="@option.Value">@option.Label</MudSelectItem>
+                            }
+                        </MudSelect>
+                        break;
+                    case FormFieldKind.User:
+                        <UserPicker Users="Users" Label="@LabelOf(current)" Value="GetGuid(current.Key)" ValueChanged="v => SetAsync(current.Key, v?.ToString())" Clearable="true" TestId="@TestIdOf(current)" />
+                        break;
+                    case FormFieldKind.Account:
+                        <RecordPicker Label="@LabelOf(current)" Search="AccountSearch" ErrorText="@ErrorOf(current.Key)" Value="GetGuid(current.Key)" Text="@Get(current.Key + LabelSuffix)"
+                                      ValueChanged="v => SetAsync(current.Key, v?.ToString())" TestId="@TestIdOf(current)" />
+                        break;
+                    case FormFieldKind.Contact:
+                        <RecordPicker Label="@LabelOf(current)" Search="ContactSearch" ErrorText="@ErrorOf(current.Key)" Value="GetGuid(current.Key)" Text="@Get(current.Key + LabelSuffix)"
+                                      ValueChanged="v => SetAsync(current.Key, v?.ToString())" TestId="@TestIdOf(current)" />
+                        break;
+                    case FormFieldKind.Checkbox:
+                        <MudCheckBox T="bool" Value="IsChecked(current.Key)" ValueChanged="v => SetAsync(current.Key, FlagText(v))" Label="@LabelOf(current)" Color="Color.Primary" data-testid="@TestIdOf(current)" />
+                        break;
+                    case FormFieldKind.Users:
+                        <MudSelect T="string" MultiSelection="true" SelectedValues="SelectedIds(current.Key)" SelectedValuesChanged="values => SetAsync(current.Key, string.Join(',', values))" Label="@LabelOf(current)"
+                                   Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" data-testid="@TestIdOf(current)">
+                            @foreach (var user in Users)
+                            {
+                                <MudSelectItem T="string" Value="@user.Id.ToString()">@user.FullName</MudSelectItem>
+                            }
+                        </MudSelect>
+                        break;
+                    case FormFieldKind.Multiline:
+                        <MudTextField T="string" Value="Get(current.Key)" ValueChanged="v => SetAsync(current.Key, v)" Label="@LabelOf(current)" Lines="3" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                      Error="HasError(current.Key)" ErrorText="@ErrorOf(current.Key)" data-testid="@TestIdOf(current)" />
+                        break;
+                    default:
+                        <MudTextField T="string" Value="Get(current.Key)" ValueChanged="v => SetAsync(current.Key, v)" Label="@LabelOf(current)" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                      InputType="@InputTypeOf(current.Kind)" Error="HasError(current.Key)" ErrorText="@ErrorOf(current.Key)" data-testid="@TestIdOf(current)" />
+                        break;
+                }
+            </MudItem>
+        }
+    </MudGrid>
+
+    @if (CustomFields.Count > 0)
+    {
+        <MudText Typo="Typo.overline" Class="ml-muted mt-2">Details</MudText>
+        <CustomFieldEditor Fields="CustomFields" Values="CustomValues" ValuesChanged="CustomValuesChanged" />
+    }
+</div>
+
+@code {
+    /// <summary>The key suffix under which the text shown for a looked-up record is kept in Values.</summary>
+    public const string LabelSuffix = ":label";
+
+    [Parameter, EditorRequired] public IReadOnlyList<FormField> Fields { get; set; } = [];
+
+    /// <summary>The current value of every field, by key. A looked-up record holds its id, and its name is kept under the key plus ":label".</summary>
+    [Parameter, EditorRequired] public Dictionary<string, string?> Values { get; set; } = new();
+
+    [Parameter] public IReadOnlyList<UserListItem> Users { get; set; } = [];
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<LookupItem>>> AccountSearch { get; set; } = (_, _) => Task.FromResult<IReadOnlyList<LookupItem>>([]);
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<LookupItem>>> ContactSearch { get; set; } = (_, _) => Task.FromResult<IReadOnlyList<LookupItem>>([]);
+
+    /// <summary>Error messages by field key, shown under the matching field.</summary>
+    [Parameter] public IReadOnlyDictionary<string, string>? Errors { get; set; }
+
+    [Parameter] public IReadOnlyList<FieldDto> CustomFields { get; set; } = [];
+    [Parameter] public Dictionary<string, JsonElement?> CustomValues { get; set; } = new();
+    [Parameter] public EventCallback<Dictionary<string, JsonElement?>> CustomValuesChanged { get; set; }
+
+    [Parameter] public EventCallback<string> OnFieldChanged { get; set; }
+
+    private string? Get(string key) => Values.GetValueOrDefault(key);
+    private Guid? GetGuid(string key) => Guid.TryParse(Get(key), out var id) ? id : null;
+    private IReadOnlyCollection<string> SelectedIds(string key) => (Get(key) ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
+    private bool IsChecked(string key) => Get(key) == "true";
+    private static string FlagText(bool value) => value ? "true" : "false";
+    private bool HasError(string key) => Errors?.ContainsKey(key) == true;
+    private string? ErrorOf(string key) => Errors?.GetValueOrDefault(key);
+    private static string LabelOf(FormField field) => field.Required ? field.Label + " *" : field.Label;
+    private static string TestIdOf(FormField field) => field.TestId ?? "field-" + field.Key;
+
+    private static InputType InputTypeOf(FormFieldKind kind) => kind switch
+    {
+        FormFieldKind.Email => InputType.Email,
+        FormFieldKind.Url => InputType.Url,
+        FormFieldKind.Phone => InputType.Telephone,
+        FormFieldKind.Number => InputType.Number,
+        FormFieldKind.Date => InputType.Date,
+        FormFieldKind.DateTime => InputType.DateTimeLocal,
+        _ => InputType.Text,
+    };
+
+    private async Task SetAsync(string key, string? value)
+    {
+        Values[key] = value;
+        await OnFieldChanged.InvokeAsync(key);
+    }
+}

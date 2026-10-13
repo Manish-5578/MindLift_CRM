@@ -1,0 +1,138 @@
+@page "/_styleguide"
+@layout AuthLayout
+@using Microsoft.AspNetCore.Components.WebAssembly.Hosting
+@inject IWebAssemblyHostEnvironment Env
+@using ApexCharts
+@inject NavigationManager Nav
+@inject IDialogService Dialogs
+
+<PageTitle>Style guide · MindLift</PageTitle>
+
+@if (Env.IsDevelopment())
+{
+<div class="ml-page ml-page--narrow" data-testid="styleguide">
+    <PageHeader Title="Style guide" Subtitle="Every shared component in every state. Development only." />
+
+    <div class="ml-stack-lg">
+        <MlCard Title="Cards">
+            <div class="ml-stack">
+                <MudText Typo="Typo.body1">A plain card with a title and body.</MudText>
+                <MlCard Loading="true" />
+            </div>
+        </MlCard>
+
+        <MlCard Title="KPI tiles">
+            <MudGrid Spacing="4">
+                <MudItem xs="6" md="3"><StatCard Key="sales" Label="Sales this month" Value="AED 1.2M" Delta="@(12.5m)" Caption="vs last month" /></MudItem>
+                <MudItem xs="6" md="3"><StatCard Key="pipeline" Label="Open pipeline" Value="AED 8.4M" Caption="weighted 3.1M" /></MudItem>
+                <MudItem xs="6" md="3"><StatCard Key="overdue" Label="Tasks overdue" Value="4" Delta="-2" GoodWhenUp="false" /></MudItem>
+                <MudItem xs="6" md="3"><StatCard Key="loading" Label="Loading" Value="—" Loading="true" /></MudItem>
+            </MudGrid>
+        </MlCard>
+
+        <MlCard Title="Status chips">
+            <div class="ml-row ml-row--wrap">
+                <StatusChip Text="New" Color="@StatusColors.For("New")" />
+                <StatusChip Text="Working" Color="@StatusColors.For("Working")" />
+                <StatusChip Text="Qualified" Color="@StatusColors.For("Qualified")" />
+                <StatusChip Text="Won" Color="@StatusColors.For("Won")" />
+                <StatusChip Text="Lost" Color="@StatusColors.For("Lost")" />
+                <StatusChip Text="Cancelled" Color="@StatusColors.For("Cancelled")" />
+            </div>
+        </MlCard>
+
+        <MlCard Title="Money and dates">
+            <div class="ml-stack-sm">
+                <div>Full: <MoneyText Amount="@(2500000m)" Currency="AED" /></div>
+                <div>Compact: <MoneyText Amount="@(2500000m)" Currency="AED" Compact="true" /></div>
+                <div>Empty: <MoneyText Amount="@null" /></div>
+                <div>Relative: <DateText Value="@DateTime.UtcNow.AddMinutes(-5)" /></div>
+                <div>Absolute: <DateText Value="@DateTime.UtcNow.AddDays(-30)" Relative="false" /></div>
+            </div>
+        </MlCard>
+
+        <MlCard Title="Key-value list">
+            <KeyValueList Items="@(new List<(string Label, string? Value)>
+            {
+                ("Company", "Al Noor Properties"),
+                ("Trade license", "CN-1234567"),
+                ("Notes", null),
+            })" />
+        </MlCard>
+
+        <MlCard Title="Empty state">
+            <EmptyState Title="No leads yet" Message="Leads from web forms, WhatsApp, email or imports appear here." Compact="true">
+                <Actions>
+                    <MudButton Variant="Variant.Filled" Color="MudBlazor.Color.Primary">New lead</MudButton>
+                </Actions>
+            </EmptyState>
+        </MlCard>
+
+        <MlCard Title="Error state">
+            <ErrorState />
+        </MlCard>
+
+        <MlCard Title="Skeleton table">
+            <SkeletonTable Rows="3" Columns="4" />
+        </MlCard>
+
+        <SectionCard Title="Section card" Description="Groups a block of fields or settings. The description says what the block is for.">
+            <MudText Typo="Typo.body1">Fields go here.</MudText>
+        </SectionCard>
+
+        <MlCard Title="Skeleton cards">
+            <SkeletonCards Count="2" />
+        </MlCard>
+
+        <MlCard Title="Confirm dialog">
+            <div class="ml-row">
+                <MudButton Variant="Variant.Outlined" OnClick="() => AskAsync(false)" data-testid="confirm-normal">Confirm</MudButton>
+                <MudButton Variant="Variant.Outlined" Color="MudBlazor.Color.Error" OnClick="() => AskAsync(true)" data-testid="confirm-danger">Confirm (danger)</MudButton>
+                <MudText Typo="Typo.body2" Class="ml-muted" data-testid="confirm-result">@_confirmResult</MudText>
+            </div>
+        </MlCard>
+
+        <MlCard Title="File drop zone">
+            <FileDropZone FilesChanged="OnFiles" />
+            <MudText Typo="Typo.caption" Class="ml-muted" data-testid="file-count">@_fileCount accepted files</MudText>
+        </MlCard>
+
+        <div class="ml-stack">
+            <ChartCard TItem="Point" Title="Chart card" Subtitle="Sample data" TestId="chart-normal">
+                <ApexPointSeries TItem="Point" Items="_points" Name="Won" SeriesType="SeriesType.Bar" XValue="@(p => p.Month)" YAggregate="@(g => g.Sum(p => p.Value))" />
+            </ChartCard>
+            <ChartCard TItem="Point" Title="Chart card, loading" Loading="true" />
+            <ChartCard TItem="Point" Title="Chart card, empty" IsEmpty="true" />
+        </div>
+    </div>
+</div>
+}
+
+@code {
+    private sealed record Point(string Month, decimal Value);
+
+    private readonly List<Point> _points =
+    [
+        new("May", 120), new("Jun", 180), new("Jul", 150), new("Aug", 240), new("Sep", 210), new("Oct", 290),
+    ];
+
+    private string _confirmResult = string.Empty;
+    private int _fileCount;
+
+    private void OnFiles(IReadOnlyList<Microsoft.AspNetCore.Components.Forms.IBrowserFile> files) => _fileCount = files.Count;
+
+    private async Task AskAsync(bool danger)
+    {
+        var yes = await Dialogs.ConfirmAsync(danger ? "Delete this record?" : "Continue?", "This is only a demo of the confirmation dialog.", danger ? "Delete" : "Continue", danger);
+        _confirmResult = yes ? "Confirmed" : "Cancelled";
+    }
+
+    protected override void OnInitialized()
+    {
+        // The style guide is a development aid. In any other environment it is not shown.
+        if (!Env.IsDevelopment())
+        {
+            Nav.NavigateTo("/", replace: true);
+        }
+    }
+}

@@ -1,0 +1,446 @@
+using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using MindLift.Application.Abstractions;
+using MindLift.Domain.Entities;
+using MindLift.Infrastructure.Persistence;
+using MindLift.Shared.Contracts;
+
+namespace MindLift.Infrastructure.Communication;
+
+public sealed class CommunicationService(
+    AppDbContext dbContext,
+    IEnumerable<IChannelSender> channelSenders,
+    IOptOutService optOutService,
+    IMessageTemplateService templateService,
+    ITenantContext tenant,
+    ILogger<CommunicationService> logger) : ICommunicationService
+{
+    public async Task<MessageDto> SendMessageAsync(SendMessageRequest request, Guid userId, CancellationToken ct = default)
+    {
+        // 1. Opt-out validation
+        if (await optOutService.IsOptedOutAsync(request.To, request.Channel, ct))
+        {
+            throw new InvalidOperationException($"Recipient '{request.To}' has opted out of communication via {request.Channel}.");
+        }
+
+        // 2. Resolve Channel Account
+        ChannelAccount? account = null;
+        if (request.ChannelAccountId.HasValue)
+        {
+            account = await dbContext.ChannelAccounts.FindAsync([request.ChannelAccountId.Value], ct);
+        }
+        account ??= await dbContext.ChannelAccounts
+            .Where(a => a.Channel == request.Channel && a.IsActive)
+            .OrderByDescending(a => a.IsDefault)
+            .FirstOrDefaultAsync(ct);
+
+        account ??= new ChannelAccount
+        {
+            Channel = request.Channel,
+            Name = $"{request.Channel} Default",
+            SenderAddress = request.Channel == CommunicationChannel.Email ? "noreply@mindlift.com" : "+10000000000",
+            IsActive = true
+        };
+
+        // 3. Resolve Body (Template or Direct)
+        var body = request.Body;
+        if (request.TemplateId.HasValue && string.IsNullOrWhiteSpace(body))
+        {
+            var entityType = request.LeadId.HasValue ? "lead" : request.ContactId.HasValue ? "contact" : request.DealId.HasValue ? "deal" : "";
+            var entityId = request.LeadId ?? request.ContactId ?? request.DealId ?? Guid.Empty;
+            body = await templateService.RenderTemplateAsync(request.TemplateId.Value, entityType, entityId, request.TemplateParameters, ct);
+        }
+
+        // 4. Resolve Lead / Contact association if not provided
+        var leadId = request.LeadId;
+        var contactId = request.ContactId;
+        var accountId = request.AccountId;
+        var dealId = request.DealId;
+
+        if (!leadId.HasValue && !contactId.HasValue)
+        {
+            var normalizedTarget = OptOutService.NormalizeTarget(request.To, request.Channel);
+            var lead = await dbContext.Leads.FirstOrDefaultAsync(l => l.NormalizedEmail == normalizedTarget || l.NormalizedPhone == normalizedTarget, ct);
+            if (lead != null)
+            {
+                leadId = lead.Id;
+            }
+            else
+            {
+                var contact = await dbContext.Contacts.FirstOrDefaultAsync(c => c.NormalizedEmail == normalizedTarget || c.NormalizedPhone == normalizedTarget, ct);
+                if (contact != null)
+                {
+                    contactId = contact.Id;
+                    accountId ??= contact.AccountId;
+                }
+            }
+        }
+
+        // 5. Thread ID resolution
+        var existingMessage = await dbContext.Messages
+            .Where(m => m.Channel == request.Channel && (m.To == request.To || m.From == request.To))
+            .OrderByDescending(m => m.CreatedAt)
+            .FirstOrDefaultAsync(ct);
+
+        var threadId = existingMessage?.ThreadId ?? Guid.NewGuid();
+
+        // 6. Create Message record
+        var message = new Message
+        {
+            Channel = request.Channel,
+            Direction = MessageDirection.Outbound,
+            Status = MessageStatus.Sending,
+            From = account.SenderAddress,
+            To = request.To,
+            Subject = request.Subject,
+            Body = body,
+            ThreadId = threadId,
+            ChannelAccountId = account.Id != Guid.Empty ? account.Id : null,
+            LeadId = leadId,
+            ContactId = contactId,
+            AccountId = accountId,
+            DealId = dealId,
+            SentByUserId = userId
+        };
+
+        if (request.AttachmentFileIds != null && request.AttachmentFileIds.Count > 0)
+        {
+            var files = await dbContext.Files.Where(f => request.AttachmentFileIds.Contains(f.Id)).ToListAsync(ct);
+            var attachments = files.Select(f => new MessageAttachmentDto(f.Id, f.FileName, f.SizeBytes, f.ContentType)).ToList();
+            message.AttachmentsJson = JsonSerializer.Serialize(attachments);
+        }
+
+        dbContext.Messages.Add(message);
+        await dbContext.SaveChangesAsync(ct);
+
+        // 7. Dispatch to provider
+        var sender = channelSenders.FirstOrDefault(s => s.Channel == request.Channel);
+        if (sender != null)
+        {
+            var sendResult = await sender.SendAsync(account, request.To, request.Subject, body, request.AttachmentFileIds, ct);
+            if (sendResult.Success)
+            {
+                message.Status = MessageStatus.Sent;
+                message.ExternalMessageId = sendResult.ExternalMessageId;
+            }
+            else
+            {
+                message.Status = MessageStatus.Failed;
+                message.ErrorMessage = sendResult.ErrorMessage;
+            }
+        }
+        else
+        {
+            message.Status = MessageStatus.Sent;
+            message.ExternalMessageId = $"sim_{Guid.NewGuid():N}";
+        }
+
+        // 8. Create record timeline Activity
+        try
+        {
+            var act = new Activity
+            {
+                Type = request.Channel == CommunicationChannel.Email ? "Note" : "Call",
+                Subject = $"{request.Channel} Outbound: {(string.IsNullOrEmpty(request.Subject) ? request.To : request.Subject)}",
+                Description = body,
+                Status = "Completed",
+                CompletedAt = DateTime.UtcNow,
+                CompletedById = userId,
+                OwnerId = userId,
+                LeadId = leadId,
+                ContactId = contactId,
+                AccountId = accountId,
+                DealId = dealId
+            };
+            dbContext.Activities.Add(act);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to create timeline activity for outbound message {MessageId}", message.Id);
+        }
+
+        await dbContext.SaveChangesAsync(ct);
+        return MapToDto(message, null, null, null);
+    }
+
+    public async Task<List<MessageDto>> GetThreadMessagesAsync(Guid threadId, CancellationToken ct = default)
+    {
+        var messages = await dbContext.Messages
+            .Where(m => m.ThreadId == threadId)
+            .OrderBy(m => m.CreatedAt)
+            .ToListAsync(ct);
+
+        var leadIds = messages.Where(m => m.LeadId.HasValue).Select(m => m.LeadId!.Value).Distinct().ToList();
+        var contactIds = messages.Where(m => m.ContactId.HasValue).Select(m => m.ContactId!.Value).Distinct().ToList();
+        var userIds = messages.Where(m => m.SentByUserId.HasValue).Select(m => m.SentByUserId!.Value).Distinct().ToList();
+
+        var leads = await dbContext.Leads.Where(l => leadIds.Contains(l.Id)).ToDictionaryAsync(l => l.Id, l => $"{l.FirstName} {l.LastName}".Trim(), ct);
+        var contacts = await dbContext.Contacts.Where(c => contactIds.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => $"{c.FirstName} {c.LastName}".Trim(), ct);
+        var users = await dbContext.Users.Where(u => userIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => $"{u.FirstName} {u.LastName}".Trim(), ct);
+
+        return messages.Select(m => MapToDto(
+            m,
+            m.LeadId.HasValue && leads.TryGetValue(m.LeadId.Value, out var ln) ? ln : null,
+            m.ContactId.HasValue && contacts.TryGetValue(m.ContactId.Value, out var cn) ? cn : null,
+            m.SentByUserId.HasValue && users.TryGetValue(m.SentByUserId.Value, out var un) ? un : null
+        )).ToList();
+    }
+
+    public async Task<List<InboxThreadDto>> GetInboxThreadsAsync(CommunicationChannel? channel = null, string? search = null, CancellationToken ct = default)
+    {
+        var query = dbContext.Messages.AsQueryable();
+        if (channel.HasValue)
+        {
+            query = query.Where(m => m.Channel == channel.Value);
+        }
+
+        var allMessages = await query
+            .OrderByDescending(m => m.CreatedAt)
+            .ToListAsync(ct);
+
+        var grouped = allMessages.GroupBy(m => m.ThreadId);
+
+        var leadIds = allMessages.Where(m => m.LeadId.HasValue).Select(m => m.LeadId!.Value).Distinct().ToList();
+        var contactIds = allMessages.Where(m => m.ContactId.HasValue).Select(m => m.ContactId!.Value).Distinct().ToList();
+
+        var leads = await dbContext.Leads.Where(l => leadIds.Contains(l.Id)).ToDictionaryAsync(l => l.Id, l => $"{l.FirstName} {l.LastName}".Trim(), ct);
+        var contacts = await dbContext.Contacts.Where(c => contactIds.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => $"{c.FirstName} {c.LastName}".Trim(), ct);
+
+        var results = new List<InboxThreadDto>();
+        foreach (var group in grouped)
+        {
+            var latest = group.First();
+            var unreadCount = group.Count(m => m.Direction == MessageDirection.Inbound && m.ReadAt == null);
+
+            var participantAddress = latest.Direction == MessageDirection.Inbound ? latest.From : latest.To;
+            string? participantName = null;
+
+            if (latest.LeadId.HasValue && leads.TryGetValue(latest.LeadId.Value, out var ln))
+                participantName = ln;
+            else if (latest.ContactId.HasValue && contacts.TryGetValue(latest.ContactId.Value, out var cn))
+                participantName = cn;
+
+            var snippet = latest.Body.Length > 80 ? latest.Body[..80] + "..." : latest.Body;
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var match = participantAddress.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                            (participantName != null && participantName.Contains(search, StringComparison.OrdinalIgnoreCase)) ||
+                            snippet.Contains(search, StringComparison.OrdinalIgnoreCase);
+                if (!match) continue;
+            }
+
+            results.Add(new InboxThreadDto(
+                group.Key,
+                latest.Channel,
+                participantAddress,
+                participantName,
+                latest.LeadId,
+                latest.ContactId,
+                snippet,
+                latest.CreatedAt,
+                unreadCount,
+                latest.Status
+            ));
+        }
+
+        return results.OrderByDescending(t => t.LastMessageAt).ToList();
+    }
+
+    public async Task<List<MessageDto>> GetRecordMessagesAsync(string entityType, Guid entityId, CancellationToken ct = default)
+    {
+        var type = entityType.Trim().ToLowerInvariant();
+        IQueryable<Message> query = dbContext.Messages;
+
+        if (type is "lead" or "leads") query = query.Where(m => m.LeadId == entityId);
+        else if (type is "contact" or "contacts") query = query.Where(m => m.ContactId == entityId);
+        else if (type is "account" or "accounts") query = query.Where(m => m.AccountId == entityId);
+        else if (type is "deal" or "deals") query = query.Where(m => m.DealId == entityId);
+        else return [];
+
+        var list = await query.OrderByDescending(m => m.CreatedAt).ToListAsync(ct);
+        return list.Select(m => MapToDto(m, null, null, null)).ToList();
+    }
+
+    public async Task MarkThreadReadAsync(Guid threadId, CancellationToken ct = default)
+    {
+        var unread = await dbContext.Messages
+            .Where(m => m.ThreadId == threadId && m.Direction == MessageDirection.Inbound && m.ReadAt == null)
+            .ToListAsync(ct);
+
+        foreach (var msg in unread)
+        {
+            msg.ReadAt = DateTime.UtcNow;
+            msg.Status = MessageStatus.Read;
+        }
+
+        if (unread.Count > 0)
+        {
+            await dbContext.SaveChangesAsync(ct);
+        }
+    }
+
+    public async Task HandleInboundMessageAsync(InboundMessagePayload payload, CancellationToken ct = default)
+    {
+        var cleanTo = payload.To.Trim().TrimStart('+');
+        // 1. Find channel account across all tenants
+        var account = await dbContext.ChannelAccounts.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(a => a.Channel == payload.Channel && (a.SenderAddress == payload.To || a.PhoneNumberId == payload.To || a.PhoneNumberId == cleanTo || a.SenderAddress == cleanTo), ct);
+
+        if (account == null)
+        {
+            logger.LogWarning("Inbound message received for unknown channel account: {To}", payload.To);
+            return;
+        }
+
+        var owner = await dbContext.Users.IgnoreQueryFilters().Where(u => u.TenantId == account.TenantId).OrderBy(u => u.CreatedAt).FirstOrDefaultAsync(ct);
+        using var scope = tenant.Use(account.TenantId, owner?.Id);
+
+        // 2. Resolve matching Lead or Contact
+        var normalizedSender = OptOutService.NormalizeTarget(payload.From, payload.Channel);
+        var lead = await dbContext.Leads.FirstOrDefaultAsync(l => l.NormalizedEmail == normalizedSender || l.NormalizedPhone == normalizedSender, ct);
+        var contact = lead == null ? await dbContext.Contacts.FirstOrDefaultAsync(c => c.NormalizedEmail == normalizedSender || c.NormalizedPhone == normalizedSender, ct) : null;
+
+        Guid? leadId = lead?.Id;
+        Guid? contactId = contact?.Id;
+        Guid? accountId = contact?.AccountId;
+
+        // Auto-create lead if enabled and no entity found
+        if (leadId == null && contactId == null && account.AutoCreateLeads)
+        {
+            var newLead = new Lead
+            {
+                FirstName = "Inbound",
+                LastName = payload.From,
+                Email = payload.Channel == CommunicationChannel.Email ? payload.From : null,
+                Phone = payload.Channel != CommunicationChannel.Email ? payload.From : null,
+                NormalizedEmail = payload.Channel == CommunicationChannel.Email ? normalizedSender : null,
+                NormalizedPhone = payload.Channel != CommunicationChannel.Email ? normalizedSender : null,
+                Status = "new",
+                Source = payload.Channel.ToString(),
+                OwnerId = owner?.Id ?? Guid.Empty
+            };
+            dbContext.Leads.Add(newLead);
+            await dbContext.SaveChangesAsync(ct);
+            leadId = newLead.Id;
+        }
+
+        // 3. Resolve ThreadId
+        var existingMessage = await dbContext.Messages
+            .Where(m => m.Channel == payload.Channel && (m.From == payload.From || m.To == payload.From))
+            .OrderByDescending(m => m.CreatedAt)
+            .FirstOrDefaultAsync(ct);
+
+        var threadId = existingMessage?.ThreadId ?? Guid.NewGuid();
+
+        // 4. Save Message
+        var message = new Message
+        {
+            Channel = payload.Channel,
+            Direction = MessageDirection.Inbound,
+            Status = MessageStatus.Delivered,
+            From = payload.From,
+            To = payload.To,
+            Subject = payload.Subject,
+            Body = payload.Body,
+            ExternalMessageId = payload.ExternalMessageId,
+            DeliveredAt = payload.ReceivedAt,
+            ThreadId = threadId,
+            ChannelAccountId = account.Id,
+            LeadId = leadId,
+            ContactId = contactId,
+            AccountId = accountId
+        };
+
+        if (payload.Attachments != null && payload.Attachments.Count > 0)
+        {
+            message.AttachmentsJson = JsonSerializer.Serialize(payload.Attachments);
+        }
+
+        dbContext.Messages.Add(message);
+
+        // 5. Add timeline activity
+        var act = new Activity
+        {
+            Type = payload.Channel == CommunicationChannel.Email ? "Note" : "Call",
+            Subject = $"{payload.Channel} Inbound: {payload.From}",
+            Description = payload.Body,
+            Status = "Completed",
+            CompletedAt = DateTime.UtcNow,
+            LeadId = leadId,
+            ContactId = contactId,
+            AccountId = accountId
+        };
+        dbContext.Activities.Add(act);
+
+        await dbContext.SaveChangesAsync(ct);
+    }
+
+    public async Task UpdateMessageStatusAsync(string externalMessageId, MessageStatus status, DateTime? timestamp = null, string? error = null, CancellationToken ct = default)
+    {
+        var message = await dbContext.Messages.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(m => m.ExternalMessageId == externalMessageId, ct);
+
+        if (message == null) return;
+
+        using var scope = tenant.Use(message.TenantId);
+
+        message.Status = status;
+        if (status == MessageStatus.Delivered && !message.DeliveredAt.HasValue)
+        {
+            message.DeliveredAt = timestamp ?? DateTime.UtcNow;
+        }
+        else if (status == MessageStatus.Read && !message.ReadAt.HasValue)
+        {
+            message.ReadAt = timestamp ?? DateTime.UtcNow;
+        }
+
+        if (!string.IsNullOrEmpty(error))
+        {
+            message.ErrorMessage = error;
+        }
+
+        await dbContext.SaveChangesAsync(ct);
+    }
+
+    private static MessageDto MapToDto(Message m, string? leadName, string? contactName, string? userName)
+    {
+        List<MessageAttachmentDto>? attachments = null;
+        if (!string.IsNullOrWhiteSpace(m.AttachmentsJson) && m.AttachmentsJson != "[]")
+        {
+            try
+            {
+                attachments = JsonSerializer.Deserialize<List<MessageAttachmentDto>>(m.AttachmentsJson);
+            }
+            catch { }
+        }
+
+        return new MessageDto(
+            m.Id,
+            m.Channel,
+            m.Direction,
+            m.Status,
+            m.From,
+            m.To,
+            m.Subject,
+            m.Body,
+            m.ErrorMessage,
+            m.ThreadId,
+            m.ChannelAccountId,
+            m.LeadId,
+            leadName,
+            m.ContactId,
+            contactName,
+            m.AccountId,
+            m.DealId,
+            m.SentByUserId,
+            userName,
+            m.CreatedAt,
+            m.DeliveredAt,
+            m.ReadAt,
+            m.ExternalMessageId,
+            attachments
+        );
+    }
+}

@@ -1,0 +1,36 @@
+<div class="ml-timeline" data-testid="@TestId">
+    @if (Items.Count == 0)
+    {
+        <MudText Typo="Typo.body2" Class="ml-muted" data-testid="timeline-empty">@EmptyText</MudText>
+    }
+    @foreach (var item in Items)
+    {
+        <div class="ml-timeline__item" data-testid="timeline-item">
+            <span class="ml-timeline__dot"><MudIcon Icon="@(item.Icon ?? Icons.Material.Outlined.History)" Size="Size.Small" /></span>
+            <div class="ml-timeline__body">
+                @if (item.Href is not null)
+                {
+                    <a href="@item.Href" class="ml-link">@item.Title</a>
+                }
+                else
+                {
+                    <MudText Typo="Typo.subtitle2">@item.Title</MudText>
+                }
+                @if (!string.IsNullOrWhiteSpace(item.Detail))
+                {
+                    <MudText Typo="Typo.body2" Class="ml-muted">@item.Detail</MudText>
+                }
+                @if (item.WhenUtc is not null)
+                {
+                    <MudText Typo="Typo.caption" Class="ml-faint"><DateText Value="item.WhenUtc" /></MudText>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<TimelineItem> Items { get; set; } = [];
+    [Parameter] public string EmptyText { get; set; } = "Nothing here yet.";
+    [Parameter] public string TestId { get; set; } = "timeline";
+}

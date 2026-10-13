@@ -1,0 +1,184 @@
+@page "/book/{Tenant}/{Page}"
+@using System.Globalization
+@layout AuthLayout
+@inject HttpClient Http
+
+<PageTitle>Book a time · MindLift</PageTitle>
+
+<div class="ml-wizard" style="max-width:520px;margin-top:32px">
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else if (_info is null)
+    {
+        <MudAlert Severity="Severity.Error" data-testid="book-missing">This booking page is not available.</MudAlert>
+    }
+    else if (_confirmation is not null)
+    {
+        <div class="ml-stack" data-testid="book-confirmed">
+            <MudText Typo="Typo.h4">You are booked</MudText>
+            <MudText Typo="Typo.body1">@_info.Name · @_confirmation.StartUtc.ToString("dddd d MMMM, HH:mm", CultureInfo.InvariantCulture) UTC</MudText>
+            <MudText Typo="Typo.body2" Class="ml-muted">We emailed you a calendar invitation. To cancel or move it, use the link in that email.</MudText>
+            <MudButton Variant="Variant.Outlined" Href="@_confirmation.ManagePath">Manage this booking</MudButton>
+        </div>
+    }
+    else
+    {
+        <div class="ml-stack">
+            <MudText Typo="Typo.h4" data-testid="book-title">@_info.Name</MudText>
+            <MudText Typo="Typo.body2" Class="ml-muted">@_info.CompanyName · @_info.DurationMinutes minutes</MudText>
+            @if (!string.IsNullOrWhiteSpace(_info.Description))
+            {
+                <MudText Typo="Typo.body2">@_info.Description</MudText>
+            }
+
+            <MudText Typo="Typo.subtitle2">1. Choose a day</MudText>
+            <div class="ml-row ml-row--wrap" data-testid="book-days">
+                @foreach (var day in _days)
+                {
+                    var current = day;
+                    <MudChip T="string" Variant="@(_day == current ? Variant.Filled : Variant.Outlined)" Color="@(_day == current ? Color.Primary : Color.Default)"
+                             OnClick="() => PickDayAsync(current)" data-testid="@("day-" + current.ToString("yyyy-MM-dd"))">@current.ToString("ddd d MMM", CultureInfo.InvariantCulture)</MudChip>
+                }
+            </div>
+
+            @if (_day is not null)
+            {
+                <MudText Typo="Typo.subtitle2">2. Choose a time</MudText>
+                @if (_slots.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Class="ml-muted" data-testid="book-no-times">No free times on this day. Try another day.</MudText>
+                }
+                <div class="ml-row ml-row--wrap" data-testid="book-slots">
+                    @foreach (var slot in _slots)
+                    {
+                        var current = slot;
+                        <MudButton Variant="@(_chosen == current.StartUtc ? Variant.Filled : Variant.Outlined)" Color="Color.Primary" Size="Size.Small"
+                                   OnClick="() => _chosen = current.StartUtc" data-testid="@("slot-" + current.StartUtc.ToString("HHmm"))">@current.StartUtc.ToString("HH:mm", CultureInfo.InvariantCulture)</MudButton>
+                    }
+                </div>
+            }
+
+            @if (_chosen is not null)
+            {
+                <MudText Typo="Typo.subtitle2">3. Your details</MudText>
+                @if (_error is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true" data-testid="book-error">@_error</MudAlert>
+                }
+
+                <MudTextField @bind-Value="_name" Label="Your name *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="book-name" />
+                <MudTextField @bind-Value="_email" Label="Email *" InputType="InputType.Email" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="book-email" />
+                <MudTextField @bind-Value="_phone" Label="Phone" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                @foreach (var question in _info.Questions)
+                {
+                    var key = question.Key;
+                    <MudTextField T="string" Value="@AnswerOf(key)" ValueChanged="v => _answers[key] = v ?? string.Empty" Label="@(question.Label + (question.Required ? " *" : ""))"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" Lines="@(question.Type == "textarea" ? 3 : 1)" />
+                }
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Size="Size.Large" Disabled="_busy" OnClick="BookAsync" data-testid="primary-action">Book this time</MudButton>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Tenant { get; set; } = string.Empty;
+    [Parameter] public string Page { get; set; } = string.Empty;
+
+    private PublicBookingPageDto? _info;
+    private bool _loading = true;
+    private List<DateOnly> _days = [];
+    private DateOnly? _day;
+    private List<SlotDto> _slots = [];
+    private DateTime? _chosen;
+    private string _name = string.Empty;
+    private string _email = string.Empty;
+    private string _phone = string.Empty;
+    private readonly Dictionary<string, string> _answers = new();
+    private BookingConfirmationDto? _confirmation;
+    private string? _error;
+    private bool _busy;
+
+    private string Base => $"api/v1/public/booking/{Uri.EscapeDataString(Tenant)}/{Uri.EscapeDataString(Page)}";
+
+    private string AnswerOf(string key) => _answers.GetValueOrDefault(key, string.Empty);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        try
+        {
+            _info = await Http.GetFromJsonAsync<PublicBookingPageDto>(Base);
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            _days = Enumerable.Range(1, 14).Select(i => today.AddDays(i)).Where(d => d.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday)).ToList();
+        }
+        catch (HttpRequestException)
+        {
+            _info = null;
+        }
+        finally
+        {
+            _loading = false;
+        }
+
+        if (_info is not null && _days.Count > 0)
+        {
+            await PickDayAsync(_days[0]);
+        }
+    }
+
+    private async Task PickDayAsync(DateOnly day)
+    {
+        _day = day;
+        _chosen = null;
+        _error = null;
+        var tz = TimeZoneInfo.Local.Id;
+        try
+        {
+            _slots = await Http.GetFromJsonAsync<List<SlotDto>>($"{Base}/slots?from={day:yyyy-MM-dd}&to={day:yyyy-MM-dd}&tz={Uri.EscapeDataString(tz)}") ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            _slots = [];
+            _error = "We could not load the free times. Try again.";
+        }
+    }
+
+    private async Task BookAsync()
+    {
+        _error = null;
+        if (_chosen is null)
+        {
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            var body = new BookRequest(_chosen.Value, _name, _email, string.IsNullOrWhiteSpace(_phone) ? null : _phone, _answers, TimeZoneInfo.Local.Id, null);
+            var response = await Http.PostAsJsonAsync($"{Base}/book", body);
+            if (response.IsSuccessStatusCode)
+            {
+                _confirmation = await response.Content.ReadFromJsonAsync<BookingConfirmationDto>();
+                return;
+            }
+
+            var fields = await ProblemText.FieldErrorsAsync(response);
+            _error = fields.Count > 0 ? string.Join(" ", fields.Values) : await ProblemText.FromAsync(response, "We could not book this time. Please choose another.");
+            if (response.StatusCode == System.Net.HttpStatusCode.Conflict && _day is { } day)
+            {
+                await PickDayAsync(day);
+            }
+        }
+        catch (HttpRequestException)
+        {
+            _error = "We could not reach MindLift. Check your connection and try again.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

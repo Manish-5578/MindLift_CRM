@@ -1,0 +1,598 @@
+@page "/inbox"
+@using System.Net.Http.Json
+@using MindLift.Shared.Contracts
+@using MindLift.Shared.Enums
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+@inject NavigationManager Nav
+
+<PageTitle>Unified Inbox | MindLift CRM</PageTitle>
+
+<div class="pa-4" style="height: calc(100vh - 80px); display: flex; flex-direction: column;">
+    <!-- Top Bar -->
+    <div class="d-flex align-center justify-space-between mb-3">
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.MarkChatUnread" Color="Color.Primary" Size="Size.Large" />
+            <div>
+                <MudText Typo="Typo.h5" Class="font-weight-bold">Unified Inbox</MudText>
+                <MudText Typo="Typo.caption" Class="ml-muted">WhatsApp, Email and SMS in a single collaborative interface</MudText>
+            </div>
+        </div>
+        <div class="d-flex align-center gap-2">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Settings" OnClick="@(() => _channelsDrawerOpen = true)">
+                Channels & Accounts
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Outlined.Block" OnClick="@(() => _optOutsDrawerOpen = true)">
+                Opt-Outs
+            </MudButton>
+            <MudIconButton Icon="@Icons.Material.Outlined.Refresh" Color="Color.Default" OnClick="LoadThreadsAsync" />
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <MudPaper Elevation="2" Class="d-flex flex-grow-1 overflow-hidden" Style="border-radius: 12px; height: 100%;">
+        <!-- Left Pane: Thread List -->
+        <div style="width: 380px; min-width: 320px; border-right: 1px solid var(--mud-palette-divider); display: flex; flex-direction: column; height: 100%;">
+            <!-- Search & Filters -->
+            <div class="pa-3 border-b">
+                <MudTextField @bind-Value="_searchQuery"
+                              Placeholder="Search messages or contacts..."
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Outlined.Search"
+                              Immediate="true"
+                              DebounceInterval="300"
+                              OnDebounceIntervalElapsed="LoadThreadsAsync"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Clearable="true" />
+
+                <div class="d-flex gap-1 mt-2">
+                    <MudChip T="string" Size="Size.Small" Variant="@(_selectedChannel == null ? Variant.Filled : Variant.Outlined)" Color="Color.Primary" OnClick="@(() => FilterByChannel(null))">All</MudChip>
+                    <MudChip T="string" Size="Size.Small" Variant="@(_selectedChannel == CommunicationChannel.WhatsApp ? Variant.Filled : Variant.Outlined)" Color="Color.Success" OnClick="@(() => FilterByChannel(CommunicationChannel.WhatsApp))">WhatsApp</MudChip>
+                    <MudChip T="string" Size="Size.Small" Variant="@(_selectedChannel == CommunicationChannel.Email ? Variant.Filled : Variant.Outlined)" Color="Color.Info" OnClick="@(() => FilterByChannel(CommunicationChannel.Email))">Email</MudChip>
+                    <MudChip T="string" Size="Size.Small" Variant="@(_selectedChannel == CommunicationChannel.Sms ? Variant.Filled : Variant.Outlined)" Color="Color.Secondary" OnClick="@(() => FilterByChannel(CommunicationChannel.Sms))">SMS</MudChip>
+                </div>
+            </div>
+
+            <!-- Thread List -->
+            <div class="flex-grow-1 overflow-y-auto">
+                @if (_loadingThreads)
+                {
+                    <div class="d-flex justify-center align-center pa-8">
+                        <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+                    </div>
+                }
+                else if (_threads.Count == 0)
+                {
+                    <div class="d-flex flex-column justify-center align-center pa-8 text-center ml-muted">
+                        <MudIcon Icon="@Icons.Material.Outlined.Inbox" Size="Size.Large" Class="mb-2" />
+                        <MudText Typo="Typo.body2">No conversations found</MudText>
+                    </div>
+                }
+                else
+                {
+                    <MudList T="InboxThreadDto" Dense="false" Class="pa-0">
+                        @foreach (var thread in _threads)
+                        {
+                            var isSelected = _selectedThread?.ThreadId == thread.ThreadId;
+                            <div @onclick="@(() => SelectThreadAsync(thread))"
+                                 class="pa-3 thread-item cursor-pointer @(isSelected ? "selected-thread" : "")"
+                                 style="border-bottom: 1px solid var(--mud-palette-divider); transition: background-color 0.15s ease;">
+                                <div class="d-flex align-center justify-space-between mb-1">
+                                    <div class="d-flex align-center gap-2">
+                                        <MudAvatar Size="Size.Small" Color="@GetChannelColor(thread.Channel)">
+                                            @GetChannelIconLetter(thread.Channel)
+                                        </MudAvatar>
+                                        <MudText Typo="Typo.subtitle2" Class="font-weight-bold text-truncate" Style="max-width: 170px;">
+                                            @(thread.ParticipantName ?? thread.ParticipantAddress)
+                                        </MudText>
+                                    </div>
+                                    <MudText Typo="Typo.caption" Class="ml-muted">
+                                        @thread.LastMessageAt.ToLocalTime().ToString("t")
+                                    </MudText>
+                                </div>
+                                <div class="d-flex align-center justify-space-between">
+                                    <MudText Typo="Typo.body2" Class="ml-muted text-truncate" Style="max-width: 250px;">
+                                        @thread.LastMessageSnippet
+                                    </MudText>
+                                    @if (thread.UnreadCount > 0)
+                                    {
+                                        <MudBadge Content="@thread.UnreadCount" Color="Color.Primary" Overlap="false" Class="ml-1" />
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </MudList>
+                }
+            </div>
+        </div>
+
+        <!-- Right Pane: Active Conversation & Composer -->
+        <div class="flex-grow-1 d-flex flex-column" style="height: 100%; background: var(--mud-palette-background-grey);">
+            @if (_selectedThread == null)
+            {
+                <div class="d-flex flex-column justify-center align-center flex-grow-1 ml-muted text-center pa-8">
+                    <MudIcon Icon="@Icons.Material.Outlined.Forum" Style="font-size: 64px;" Class="mb-3" />
+                    <MudText Typo="Typo.h6">Select a conversation to start chatting</MudText>
+                    <MudText Typo="Typo.body2">View messages across WhatsApp, Email and SMS in real-time</MudText>
+                </div>
+            }
+            else
+            {
+                <!-- Conversation Header -->
+                <div class="pa-3 d-flex align-center justify-space-between" style="background: var(--mud-palette-surface); border-bottom: 1px solid var(--mud-palette-divider);">
+                    <div class="d-flex align-center gap-3">
+                        <MudAvatar Color="@GetChannelColor(_selectedThread.Channel)">
+                            @GetChannelIconLetter(_selectedThread.Channel)
+                        </MudAvatar>
+                        <div>
+                            <div class="d-flex align-center gap-2">
+                                <MudText Typo="Typo.subtitle1" Class="font-weight-bold">
+                                    @(_selectedThread.ParticipantName ?? _selectedThread.ParticipantAddress)
+                                </MudText>
+                                <MudChip T="string" Size="Size.Small" Color="@GetChannelColor(_selectedThread.Channel)">
+                                    @_selectedThread.Channel
+                                </MudChip>
+                            </div>
+                            <MudText Typo="Typo.caption" Class="ml-muted">
+                                @_selectedThread.ParticipantAddress
+                            </MudText>
+                        </div>
+                    </div>
+                    <div class="d-flex align-center gap-2">
+                        @if (_selectedThread.LeadId.HasValue)
+                        {
+                            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Person" OnClick="@(() => Nav.NavigateTo($"/leads/{_selectedThread.LeadId}"))">
+                                Open Lead
+                            </MudButton>
+                        }
+                        else if (_selectedThread.ContactId.HasValue)
+                        {
+                            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Outlined.ContactMail" OnClick="@(() => Nav.NavigateTo($"/contacts/{_selectedThread.ContactId}"))">
+                                Open Contact
+                            </MudButton>
+                        }
+                    </div>
+                </div>
+
+                <!-- Messages Stream -->
+                <div class="flex-grow-1 overflow-y-auto pa-4 d-flex flex-column gap-3" id="messages-container">
+                    @if (_loadingMessages)
+                    {
+                        <div class="d-flex justify-center align-center flex-grow-1">
+                            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var msg in _activeMessages)
+                        {
+                            var isOutbound = msg.Direction == MessageDirection.Outbound;
+                            <div class="d-flex flex-column @(isOutbound ? "align-end" : "align-start")">
+                                <div class="pa-3" style="max-width: 70%; border-radius: @(isOutbound ? "16px 16px 2px 16px" : "16px 16px 16px 2px"); background: @(isOutbound ? "var(--mud-palette-primary)" : "var(--mud-palette-surface)"); color: @(isOutbound ? "white" : "inherit"); box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                                    @if (!string.IsNullOrEmpty(msg.Subject))
+                                    {
+                                        <div class="font-weight-bold mb-1" style="font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 2px;">
+                                            @msg.Subject
+                                        </div>
+                                    }
+                                    <div style="white-space: pre-wrap; font-size: 0.92rem; line-height: 1.4;">
+                                        @msg.Body
+                                    </div>
+                                    @if (msg.Attachments != null && msg.Attachments.Count > 0)
+                                    {
+                                        <div class="mt-2 pt-1 border-t d-flex flex-column gap-1">
+                                            @foreach (var att in msg.Attachments)
+                                            {
+                                                <div class="d-flex align-center gap-1" style="font-size: 0.8rem;">
+                                                    <MudIcon Icon="@Icons.Material.Outlined.AttachFile" Size="Size.Small" />
+                                                    <span>@att.FileName (@(att.FileSizeBytes / 1024) KB)</span>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                                <div class="d-flex align-center gap-1 mt-1 px-1" style="font-size: 0.72rem; color: var(--mud-palette-text-secondary);">
+                                    <span>@msg.CreatedAt.ToLocalTime().ToString("t")</span>
+                                    @if (isOutbound)
+                                    {
+                                        @if (msg.Status == MessageStatus.Read)
+                                        {
+                                            <MudIcon Icon="@Icons.Material.Filled.DoneAll" Size="Size.Small" Color="Color.Info" Style="font-size: 14px;" />
+                                        }
+                                        else if (msg.Status == MessageStatus.Delivered)
+                                        {
+                                            <MudIcon Icon="@Icons.Material.Filled.DoneAll" Size="Size.Small" Style="font-size: 14px;" />
+                                        }
+                                        else if (msg.Status == MessageStatus.Sent)
+                                        {
+                                            <MudIcon Icon="@Icons.Material.Filled.Done" Size="Size.Small" Style="font-size: 14px;" />
+                                        }
+                                        else if (msg.Status == MessageStatus.Failed)
+                                        {
+                                            <MudTooltip Text="@msg.ErrorMessage">
+                                                <MudIcon Icon="@Icons.Material.Filled.Error" Size="Size.Small" Color="Color.Error" Style="font-size: 14px;" />
+                                            </MudTooltip>
+                                        }
+                                    }
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+
+                <!-- Composer -->
+                <div class="pa-3 border-t" style="background: var(--mud-palette-surface);">
+                    <div class="d-flex align-center gap-2 mb-2">
+                        @if (_templates.Count > 0)
+                        {
+                            <MudMenu Label="Insert Template" StartIcon="@Icons.Material.Outlined.AutoAwesome" Variant="Variant.Text" Size="Size.Small" Dense="true">
+                                @foreach (var tpl in _templates.Where(t => t.Channel == _selectedThread.Channel))
+                                {
+                                    <MudMenuItem OnClick="@(() => ApplyTemplate(tpl))">@tpl.Name</MudMenuItem>
+                                }
+                            </MudMenu>
+                        }
+                    </div>
+
+                    @if (_selectedThread.Channel == CommunicationChannel.Email)
+                    {
+                        <MudTextField @bind-Value="_emailSubject"
+                                      Placeholder="Subject..."
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      Class="mb-2" />
+                    }
+
+                    <div class="d-flex align-end gap-2">
+                        <MudTextField @bind-Value="_composeText"
+                                      Placeholder="Type your message..."
+                                      Variant="Variant.Outlined"
+                                      Lines="2"
+                                      Sizing="InputSizing.Auto"
+                                      Class="flex-grow-1" />
+
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   EndIcon="@Icons.Material.Filled.Send"
+                                   Disabled="@(string.IsNullOrWhiteSpace(_composeText) || _sending)"
+                                   OnClick="SendMessageAsync"
+                                   Style="height: 52px; border-radius: 8px;">
+                            @if (_sending)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
+                            }
+                            else
+                            {
+                                <span>Send</span>
+                            }
+                        </MudButton>
+                    </div>
+                </div>
+            }
+        </div>
+    </MudPaper>
+</div>
+
+<!-- Channels Drawer -->
+<MudDrawer @bind-Open="_channelsDrawerOpen" Anchor="Anchor.End" Width="450px" Elevation="4" Variant="DrawerVariant.Temporary">
+    <MudDrawerHeader Class="d-flex align-center justify-space-between border-b">
+        <MudText Typo="Typo.h6">Channels & Accounts</MudText>
+        <MudIconButton Icon="@Icons.Material.Filled.Close" OnClick="@(() => _channelsDrawerOpen = false)" />
+    </MudDrawerHeader>
+    <div class="pa-4">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" FullWidth="true" Class="mb-3" OnClick="OpenNewAccountDialog">
+            Add Channel Account
+        </MudButton>
+
+        @if (_accounts.Count == 0)
+        {
+            <MudText Typo="Typo.body2" Class="ml-muted text-center pa-4">No custom accounts configured. Using system default SMTP.</MudText>
+        }
+        else
+        {
+            @foreach (var acc in _accounts)
+            {
+                <MudCard Outlined="true" Class="mb-3">
+                    <MudCardHeader>
+                        <CardHeaderAvatar>
+                            <MudAvatar Color="@GetChannelColor(acc.Channel)">@GetChannelIconLetter(acc.Channel)</MudAvatar>
+                        </CardHeaderAvatar>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.subtitle2" Class="font-weight-bold">@acc.Name</MudText>
+                            <MudText Typo="Typo.caption" Class="ml-muted">@acc.SenderAddress</MudText>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            @if (acc.IsDefault)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">Default</MudChip>
+                            }
+                        </CardHeaderActions>
+                    </MudCardHeader>
+                    <MudCardActions Class="d-flex justify-space-between">
+                        <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => TestConnectionAsync(acc.Id))">
+                            Test Connection
+                        </MudButton>
+                        <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => DeleteAccountAsync(acc.Id))" />
+                    </MudCardActions>
+                </MudCard>
+            }
+        }
+    </div>
+</MudDrawer>
+
+<!-- Opt-Outs Drawer -->
+<MudDrawer @bind-Open="_optOutsDrawerOpen" Anchor="Anchor.End" Width="400px" Elevation="4" Variant="DrawerVariant.Temporary">
+    <MudDrawerHeader Class="d-flex align-center justify-space-between border-b">
+        <MudText Typo="Typo.h6">Communication Opt-Outs</MudText>
+        <MudIconButton Icon="@Icons.Material.Filled.Close" OnClick="@(() => _optOutsDrawerOpen = false)" />
+    </MudDrawerHeader>
+    <div class="pa-4">
+        <MudText Typo="Typo.caption" Class="ml-muted mb-3 d-block">Contacts or leads in this registry will be strictly blocked from receiving outbound messages.</MudText>
+        <MudTextField @bind-Value="_newOptOutTarget" Label="Phone or Email" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+        <MudButton Variant="Variant.Filled" Color="Color.Error" FullWidth="true" OnClick="RegisterOptOutAsync" Disabled="@string.IsNullOrWhiteSpace(_newOptOutTarget)">
+            Block Recipient
+        </MudButton>
+
+        <MudDivider Class="my-3" />
+
+        @foreach (var opt in _optOuts)
+        {
+            <div class="d-flex align-center justify-space-between py-2 border-b">
+                <div>
+                    <MudText Typo="Typo.body2" Class="font-weight-bold">@opt.Target</MudText>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@(opt.Channel?.ToString() ?? "All Channels")</MudText>
+                </div>
+                <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Color="Color.Default" OnClick="@(() => RemoveOptOutAsync(opt.Id))" />
+            </div>
+        }
+    </div>
+</MudDrawer>
+
+<style>
+    .selected-thread {
+        background-color: var(--mud-palette-action-default-hover) !important;
+        border-left: 4px solid var(--mud-palette-primary) !important;
+    }
+    .thread-item:hover {
+        background-color: var(--mud-palette-action-default-hover);
+    }
+</style>
+
+@code {
+    private List<InboxThreadDto> _threads = [];
+    private List<MessageDto> _activeMessages = [];
+    private List<MessageTemplateDto> _templates = [];
+    private List<ChannelAccountDto> _accounts = [];
+    private List<OptOutDto> _optOuts = [];
+
+    private InboxThreadDto? _selectedThread;
+    private CommunicationChannel? _selectedChannel;
+    private string? _searchQuery;
+
+    private string _composeText = string.Empty;
+    private string _emailSubject = string.Empty;
+    private string _newOptOutTarget = string.Empty;
+
+    private bool _loadingThreads = true;
+    private bool _loadingMessages = false;
+    private bool _sending = false;
+    private bool _channelsDrawerOpen = false;
+    private bool _optOutsDrawerOpen = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadThreadsAsync();
+        await LoadAuxiliaryDataAsync();
+    }
+
+    private async Task LoadThreadsAsync()
+    {
+        _loadingThreads = true;
+        try
+        {
+            var url = "/api/v1/communication/inbox?";
+            if (_selectedChannel.HasValue) url += $"channel={_selectedChannel.Value}&";
+            if (!string.IsNullOrWhiteSpace(_searchQuery)) url += $"search={Uri.EscapeDataString(_searchQuery)}";
+
+            _threads = await Http.GetFromJsonAsync<List<InboxThreadDto>>(url) ?? [];
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load conversations: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingThreads = false;
+        }
+    }
+
+    private async Task LoadAuxiliaryDataAsync()
+    {
+        try
+        {
+            _templates = await Http.GetFromJsonAsync<List<MessageTemplateDto>>("/api/v1/message-templates") ?? [];
+            _accounts = await Http.GetFromJsonAsync<List<ChannelAccountDto>>("/api/v1/channels") ?? [];
+            _optOuts = await Http.GetFromJsonAsync<List<OptOutDto>>("/api/v1/opt-outs") ?? [];
+        }
+        catch { }
+    }
+
+    private async Task FilterByChannel(CommunicationChannel? channel)
+    {
+        _selectedChannel = channel;
+        await LoadThreadsAsync();
+    }
+
+    private async Task SelectThreadAsync(InboxThreadDto thread)
+    {
+        _selectedThread = thread;
+        _loadingMessages = true;
+        try
+        {
+            _activeMessages = await Http.GetFromJsonAsync<List<MessageDto>>($"/api/v1/communication/threads/{thread.ThreadId}") ?? [];
+
+            if (thread.UnreadCount > 0)
+            {
+                await Http.PostAsync($"/api/v1/communication/threads/{thread.ThreadId}/read", null);
+                var idx = _threads.FindIndex(t => t.ThreadId == thread.ThreadId);
+                if (idx >= 0)
+                {
+                    _threads[idx] = thread with { UnreadCount = 0 };
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load messages: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingMessages = false;
+        }
+    }
+
+    private void ApplyTemplate(MessageTemplateDto tpl)
+    {
+        _composeText = tpl.Body;
+        if (!string.IsNullOrEmpty(tpl.Subject))
+        {
+            _emailSubject = tpl.Subject;
+        }
+    }
+
+    private async Task SendMessageAsync()
+    {
+        if (_selectedThread == null || string.IsNullOrWhiteSpace(_composeText)) return;
+
+        _sending = true;
+        try
+        {
+            var req = new SendMessageRequest(
+                _selectedThread.Channel,
+                null,
+                _selectedThread.ParticipantAddress,
+                _selectedThread.Channel == CommunicationChannel.Email ? _emailSubject : null,
+                _composeText,
+                LeadId: _selectedThread.LeadId,
+                ContactId: _selectedThread.ContactId
+            );
+
+            var postResp = await Http.PostAsJsonAsync("/api/v1/communication/send", req);
+            if (postResp.IsSuccessStatusCode)
+            {
+                var resp = await postResp.Content.ReadFromJsonAsync<MessageDto>();
+                if (resp != null)
+                {
+                    _activeMessages.Add(resp);
+                    _composeText = string.Empty;
+                    _emailSubject = string.Empty;
+                    await LoadThreadsAsync();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Send failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _sending = false;
+        }
+    }
+
+    private async Task TestConnectionAsync(Guid accountId)
+    {
+        try
+        {
+            var postResp = await Http.PostAsync($"/api/v1/channels/{accountId}/test", null);
+            var result = await postResp.Content.ReadFromJsonAsync<TestConnectionResult>();
+            if (result != null && result.Success)
+            {
+                Snackbar.Add(result.Message, Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add(result?.Message ?? "Connection failed", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Test error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task DeleteAccountAsync(Guid accountId)
+    {
+        try
+        {
+            await Http.DeleteAsync($"/api/v1/channels/{accountId}");
+            _accounts.RemoveAll(a => a.Id == accountId);
+            Snackbar.Add("Channel account removed", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Delete failed: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task RegisterOptOutAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newOptOutTarget)) return;
+
+        try
+        {
+            var postResp = await Http.PostAsJsonAsync("/api/v1/opt-outs", new RegisterOptOutRequest(null, _newOptOutTarget, "Manual opt-out via UI"));
+            if (postResp.IsSuccessStatusCode)
+            {
+                var opt = await postResp.Content.ReadFromJsonAsync<OptOutDto>();
+                if (opt != null)
+                {
+                    _optOuts.Add(opt);
+                    _newOptOutTarget = string.Empty;
+                    Snackbar.Add("Opt-out registered successfully", Severity.Success);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task RemoveOptOutAsync(Guid id)
+    {
+        try
+        {
+            await Http.DeleteAsync($"/api/v1/opt-outs/{id}");
+            _optOuts.RemoveAll(o => o.Id == id);
+            Snackbar.Add("Opt-out removed", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Remove failed: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void OpenNewAccountDialog()
+    {
+        Snackbar.Add("Configure WhatsApp Cloud or Twilio credentials under Settings > Integrations.", Severity.Info);
+    }
+
+    private static Color GetChannelColor(CommunicationChannel ch) => ch switch
+    {
+        CommunicationChannel.WhatsApp => Color.Success,
+        CommunicationChannel.Email => Color.Info,
+        CommunicationChannel.Sms => Color.Secondary,
+        _ => Color.Default
+    };
+
+    private static string GetChannelIconLetter(CommunicationChannel ch) => ch switch
+    {
+        CommunicationChannel.WhatsApp => "WA",
+        CommunicationChannel.Email => "EM",
+        CommunicationChannel.Sms => "SMS",
+        _ => "CH"
+    };
+}

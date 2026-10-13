@@ -1,0 +1,40 @@
+<div class="ml-card @(OnClick.HasDelegate ? "ml-card--clickable" : "") @Class" @onclick="OnClick" data-testid="@TestId">
+    @if (Title is not null || HeaderActions is not null)
+    {
+        <div class="ml-card__header">
+            <div class="ml-stack-sm" style="gap:2px;min-width:0">
+                @if (Title is not null) { <MudText Typo="Typo.h6" Class="ml-truncate">@Title</MudText> }
+                @if (Subtitle is not null) { <MudText Typo="Typo.body2" Class="ml-muted ml-truncate">@Subtitle</MudText> }
+            </div>
+            @HeaderActions
+        </div>
+    }
+    <div class="ml-card__body @(Flush ? "ml-card__body--flush" : "")">
+        @if (Loading)
+        {
+            @if (LoadingContent is not null) { @LoadingContent }
+            else
+            {
+                <MudSkeleton Width="40%" Height="20px" />
+                <MudSkeleton Width="90%" Height="16px" Class="mt-2" />
+                <MudSkeleton Width="75%" Height="16px" Class="mt-2" />
+            }
+        }
+        else { @ChildContent }
+    </div>
+    @if (Footer is not null) { <div class="ml-card__footer">@Footer</div> }
+</div>
+
+@code {
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public RenderFragment? HeaderActions { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment? Footer { get; set; }
+    [Parameter] public RenderFragment? LoadingContent { get; set; }
+    [Parameter] public bool Loading { get; set; }
+    [Parameter] public bool Flush { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public string? TestId { get; set; }
+    [Parameter] public EventCallback OnClick { get; set; }
+}

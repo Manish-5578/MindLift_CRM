@@ -1,0 +1,131 @@
+@using Microsoft.AspNetCore.Components.Forms
+
+<div class="ml-dropzone @(_active ? "ml-dropzone--active" : "")" data-testid="file-dropzone"
+     @ondragenter="() => _active = true" @ondragleave="() => _active = false" @ondrop="() => _active = false">
+    <InputFile OnChange="OnChange" multiple="@Multiple" accept="@Accept" capture="@Capture" aria-label="Choose files to upload" />
+    <div class="ml-stack" style="align-items:center;text-align:center;pointer-events:none">
+        <MudIcon Icon="@Icons.Material.Outlined.CloudUpload" Color="Color.Primary" Style="font-size:36px" />
+        <MudText Typo="Typo.body1"><strong>Drag &amp; drop files here</strong> or <span class="ml-link">browse</span></MudText>
+        <MudText Typo="Typo.caption" Class="ml-muted">@Hint</MudText>
+    </div>
+</div>
+
+@if (_items.Count > 0)
+{
+    <div class="ml-stack" style="margin-top:12px" data-testid="file-list">
+        @foreach (var item in _items)
+        {
+            var current = item;
+            <div class="ml-row" style="gap:12px" data-testid="file-item">
+                <MudIcon Icon="@Icons.Material.Outlined.InsertDriveFile" Class="ml-muted" />
+                <div class="ml-grow" style="min-width:0">
+                    <div class="ml-row ml-row--between">
+                        <MudText Typo="Typo.body2" Class="ml-truncate">@current.Name</MudText>
+                        <MudText Typo="Typo.caption" Class="ml-muted">@Formatting.FileSize(current.Size)</MudText>
+                    </div>
+                    @if (current.Error is not null)
+                    {
+                        <MudText Typo="Typo.caption" Style="color:var(--ml-error)" data-testid="file-error">@current.Error</MudText>
+                    }
+                    else if (Progress is not null && Progress.TryGetValue(current.Name, out var percent))
+                    {
+                        <MudProgressLinear Value="percent" Size="Size.Small" Color="Color.Primary" Style="height:4px" />
+                    }
+                </div>
+                <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small" OnClick="() => Remove(current)" aria-label="@("Remove " + current.Name)" />
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private sealed record Item(string Name, long Size, IBrowserFile? File, string? Error);
+
+    private readonly List<Item> _items = [];
+    private bool _active;
+
+    /// <summary>Comma-separated extensions (".pdf"), MIME types ("image/png") or wildcards ("image/*").</summary>
+    [Parameter] public string Accept { get; set; } = ".pdf,.jpg,.jpeg,.png";
+
+    /// <summary>Largest file allowed, in megabytes.</summary>
+    [Parameter] public int MaxSizeMb { get; set; } = 25;
+
+    [Parameter] public bool Multiple { get; set; } = true;
+
+    /// <summary>For phones: "environment" opens the rear camera so a document can be photographed.</summary>
+    [Parameter] public string? Capture { get; set; }
+
+    /// <summary>Text under the prompt. Defaults to the accepted types and the size limit.</summary>
+    [Parameter] public string? HintText { get; set; }
+
+    /// <summary>Upload percentage per file name, set by the page while it uploads. Files without an entry show no bar.</summary>
+    [Parameter] public IReadOnlyDictionary<string, double>? Progress { get; set; }
+
+    /// <summary>Raised with the files that passed the checks, after every change to the list.</summary>
+    [Parameter] public EventCallback<IReadOnlyList<IBrowserFile>> FilesChanged { get; set; }
+
+    private string Hint => HintText ?? $"{DescribeAccept()} · up to {MaxSizeMb} MB each";
+
+    private string DescribeAccept()
+        => string.Join(", ", Accept.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(t => t.TrimStart('.').ToUpperInvariant().Replace("/*", string.Empty)));
+
+    private async Task OnChange(InputFileChangeEventArgs args)
+    {
+        if (!Multiple)
+        {
+            _items.Clear();
+        }
+
+        // Read the metadata only. The page decides when to stream the bytes.
+        foreach (var file in args.GetMultipleFiles(maximumFileCount: 50))
+        {
+            var error = Check(file);
+            _items.Add(new Item(file.Name, file.Size, error is null ? file : null, error));
+        }
+
+        await NotifyAsync();
+    }
+
+    private string? Check(IBrowserFile file)
+    {
+        if (!IsAccepted(file))
+        {
+            return "File type not supported";
+        }
+
+        return file.Size > MaxSizeMb * 1024L * 1024L ? $"File is larger than {MaxSizeMb} MB" : null;
+    }
+
+    private bool IsAccepted(IBrowserFile file)
+    {
+        var extension = Path.GetExtension(file.Name).ToLowerInvariant();
+        foreach (var token in Accept.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var t = token.ToLowerInvariant();
+            if (t.StartsWith('.') ? extension == t
+                : t.EndsWith("/*") ? file.ContentType.StartsWith(t[..^1], StringComparison.OrdinalIgnoreCase)
+                : string.Equals(file.ContentType, t, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private async Task Remove(Item item)
+    {
+        _items.Remove(item);
+        await NotifyAsync();
+    }
+
+    /// <summary>Clears the list, for example after a successful upload.</summary>
+    public async Task ClearAsync()
+    {
+        _items.Clear();
+        await NotifyAsync();
+    }
+
+    private Task NotifyAsync() => FilesChanged.InvokeAsync(_items.Where(i => i.File is not null).Select(i => i.File!).ToList());
+}

@@ -1,0 +1,318 @@
+@page "/settings/roles"
+@using MindLift.Shared.Enums
+@inject HttpClient Http
+@inject AppState App
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageTitle>Roles · MindLift</PageTitle>
+
+<div class="ml-page">
+    <PageHeader Title="Roles & permissions" Subtitle="What each role can see and do in every module, and which records it reaches.">
+        <Actions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => _create = true" data-testid="primary-action">New role</MudButton>
+        </Actions>
+    </PageHeader>
+    <SettingsNav Current="/settings/roles" />
+
+    @if (_loading)
+    {
+        <SkeletonCards Count="2" />
+    }
+    else if (_loadFailed)
+    {
+        <ErrorState OnRetry="LoadAsync" />
+    }
+    else if (_roles.Count == 0)
+    {
+        <EmptyState Title="No roles yet" Message="Roles appear here once your workspace is set up." />
+    }
+    else
+    {
+        <div class="ml-row ml-row--wrap" style="align-items:flex-start">
+            <MlCard Flush="true" Class="ml-roles-list" TestId="role-list">
+                @foreach (var role in _roles)
+                {
+                    <div class="ml-row" style="@RowStyle(role)" @onclick="() => SelectAsync(role)" data-testid="role-row">
+                        <div class="ml-grow">
+                            <MudText Typo="Typo.subtitle2">@role.Name</MudText>
+                            <MudText Typo="Typo.caption" Class="ml-muted">@role.UserCount @(role.UserCount == 1 ? "user" : "users")</MudText>
+                        </div>
+                        @if (role.IsAdmin) { <StatusChip Text="Admin" Color="@StatusColors.For("Won")" /> }
+                        else if (role.IsSystem) { <StatusChip Text="Built in" Color="@StatusColors.For("Open")" Dot="false" /> }
+                    </div>
+                }
+            </MlCard>
+
+            @if (_selected is not null)
+            {
+                <MlCard Title="@_selected.Name" Subtitle="@MatrixSubtitle" Class="ml-matrix" TestId="matrix">
+                    @if (!_selected.IsAdmin)
+                    {
+                        <div class="ml-row" style="justify-content:flex-end;margin-bottom:12px">
+                            @if (!_selected.IsSystem)
+                            {
+                                @if (_confirmDelete)
+                                {
+                                    <MudText Typo="Typo.body2">Delete this role? Its users need another role first.</MudText>
+                                    <MudButton Size="Size.Small" OnClick="() => _confirmDelete = false">Keep</MudButton>
+                                    <MudButton Size="Size.Small" Color="Color.Error" OnClick="DeleteRoleAsync">Delete role</MudButton>
+                                }
+                                else
+                                {
+                                    <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => _confirmDelete = true">Delete role</MudButton>
+                                }
+                            }
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="!_dirty || _busy" OnClick="SaveMatrixAsync" data-testid="save-matrix">Save permissions</MudButton>
+                        </div>
+                    }
+
+                    <div data-testid="matrix-table" style="overflow-x:auto">
+                        <table class="ml-table" style="width:100%;border-collapse:collapse;min-width:720px">
+                            <thead>
+                                <tr style="background:var(--ml-surface-2);color:var(--ml-text-2);font-size:12px;font-weight:600;text-align:start">
+                                    <th style="padding:10px 12px">Module</th>
+                                    <th style="text-align:center">View</th>
+                                    <th style="text-align:center">Create</th>
+                                    <th style="text-align:center">Edit</th>
+                                    <th style="text-align:center">Delete</th>
+                                    <th style="text-align:center">Export</th>
+                                    <th style="text-align:center">Import</th>
+                                    <th style="padding-inline-start:12px">Records</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var row in _rows)
+                                {
+                                    <tr style="border-top:1px solid var(--ml-border)" data-testid="matrix-row">
+                                        <td style="padding:6px 12px">@App.ModuleLabel(row.Module)</td>
+                                        <td style="text-align:center"><MudCheckBox T="bool" Value="row.CanView" ValueChanged="v => SetFlag(row, PermFlag.View, v)" Disabled="_selected.IsAdmin" Size="Size.Small" aria-label="@($"{row.Module} view")" /></td>
+                                        <td style="text-align:center"><MudCheckBox T="bool" Value="row.CanCreate" ValueChanged="v => SetFlag(row, PermFlag.Create, v)" Disabled="_selected.IsAdmin" Size="Size.Small" aria-label="@($"{row.Module} create")" /></td>
+                                        <td style="text-align:center"><MudCheckBox T="bool" Value="row.CanEdit" ValueChanged="v => SetFlag(row, PermFlag.Edit, v)" Disabled="_selected.IsAdmin" Size="Size.Small" aria-label="@($"{row.Module} edit")" /></td>
+                                        <td style="text-align:center"><MudCheckBox T="bool" Value="row.CanDelete" ValueChanged="v => SetFlag(row, PermFlag.Delete, v)" Disabled="_selected.IsAdmin" Size="Size.Small" aria-label="@($"{row.Module} delete")" /></td>
+                                        <td style="text-align:center"><MudCheckBox T="bool" Value="row.CanExport" ValueChanged="v => SetFlag(row, PermFlag.Export, v)" Disabled="_selected.IsAdmin" Size="Size.Small" aria-label="@($"{row.Module} export")" /></td>
+                                        <td style="text-align:center"><MudCheckBox T="bool" Value="row.CanImport" ValueChanged="v => SetFlag(row, PermFlag.Import, v)" Disabled="_selected.IsAdmin" Size="Size.Small" aria-label="@($"{row.Module} import")" /></td>
+                                        <td style="padding-inline-start:12px">
+                                            <MudSelect T="DataScope" Value="row.Scope" ValueChanged="v => SetScope(row, v)" Disabled="_selected.IsAdmin" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:150px" aria-label="@($"{row.Module} records")">
+                                                <MudSelectItem T="DataScope" Value="DataScope.Own">Own records</MudSelectItem>
+                                                <MudSelectItem T="DataScope" Value="DataScope.Team">Team's records</MudSelectItem>
+                                                <MudSelectItem T="DataScope" Value="DataScope.All">All records</MudSelectItem>
+                                            </MudSelect>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </MlCard>
+            }
+        </div>
+    }
+</div>
+
+<FormDrawer Open="_create" OpenChanged="v => _create = v" Title="New role" SubmitText="Create role" Busy="_busy" OnSubmit="CreateAsync">
+    <div class="ml-stack">
+        <MudTextField @bind-Value="_newName" Label="Name *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="role-name" />
+        <MudTextField @bind-Value="_newDescription" Label="Description" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />
+        <MudSelect T="DashboardView" @bind-Value="_newView" Label="Home dashboard" Variant="Variant.Outlined" Margin="Margin.Dense">
+            <MudSelectItem T="DashboardView" Value="DashboardView.Staff">Personal</MudSelectItem>
+            <MudSelectItem T="DashboardView" Value="DashboardView.Manager">Team</MudSelectItem>
+            <MudSelectItem T="DashboardView" Value="DashboardView.Admin">Company</MudSelectItem>
+        </MudSelect>
+        @if (_formError is not null) { <MudAlert Severity="Severity.Error" Dense="true">@_formError</MudAlert> }
+    </div>
+</FormDrawer>
+
+@code {
+    /// <summary>One editable row of the matrix. The DTO is a record, so edits happen here and are sent back as a whole.</summary>
+    private enum PermFlag { View, Create, Edit, Delete, Export, Import }
+
+    private sealed class PermRow(RolePermissionDto source)
+    {
+        public AppModule Module { get; } = source.Module;
+        public bool CanView { get; set; } = source.CanView;
+        public bool CanCreate { get; set; } = source.CanCreate;
+        public bool CanEdit { get; set; } = source.CanEdit;
+        public bool CanDelete { get; set; } = source.CanDelete;
+        public bool CanExport { get; set; } = source.CanExport;
+        public bool CanImport { get; set; } = source.CanImport;
+        public DataScope Scope { get; set; } = source.Scope;
+
+        public RolePermissionDto ToDto() => new(Module, CanView, CanCreate, CanEdit, CanDelete, CanExport, CanImport, Scope);
+    }
+
+    private List<RoleDto> _roles = [];
+    private List<PermRow> _rows = [];
+    private RoleDto? _selected;
+    private bool _loading = true;
+    private bool _loadFailed;
+    private bool _dirty;
+    private bool _busy;
+    private bool _confirmDelete;
+    private bool _create;
+    private string _newName = string.Empty;
+    private string? _newDescription;
+    private DashboardView _newView = DashboardView.Staff;
+    private string? _formError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!App.IsAdmin)
+        {
+            Nav.NavigateTo("/");
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _loadFailed = false;
+        try
+        {
+            _roles = await Http.GetFromJsonAsync<List<RoleDto>>("api/v1/roles") ?? [];
+            var keep = _selected is null ? null : _roles.FirstOrDefault(r => r.Id == _selected.Id);
+            _selected = null;
+            if (keep is not null || _roles.Count > 0)
+            {
+                await SelectAsync(keep ?? _roles[0]);
+            }
+        }
+        catch (HttpRequestException)
+        {
+            _loadFailed = true;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SelectAsync(RoleDto role)
+    {
+        _selected = role;
+        _confirmDelete = false;
+        _dirty = false;
+        var permissions = await Http.GetFromJsonAsync<List<RolePermissionDto>>($"api/v1/roles/{role.Id}/permissions") ?? [];
+        _rows = permissions.Select(p => new PermRow(p)).ToList();
+    }
+
+    private void SetFlag(PermRow row, PermFlag flag, bool value)
+    {
+        switch (flag)
+        {
+            case PermFlag.View: row.CanView = value; break;
+            case PermFlag.Create: row.CanCreate = value; break;
+            case PermFlag.Edit: row.CanEdit = value; break;
+            case PermFlag.Delete: row.CanDelete = value; break;
+            case PermFlag.Export: row.CanExport = value; break;
+            case PermFlag.Import: row.CanImport = value; break;
+        }
+
+        _dirty = true;
+    }
+
+    private string MatrixSubtitle => _selected?.IsAdmin == true
+        ? "Admins always have full access. This matrix is read-only."
+        : "Tick what this role can do. Scope limits which records it reaches.";
+
+    private string RowStyle(RoleDto role) => "padding:12px 16px;border-bottom:1px solid var(--ml-border);cursor:pointer;min-height:56px;"
+        + (_selected?.Id == role.Id ? "background:var(--ml-surface-2)" : string.Empty);
+
+    private void SetScope(PermRow row, DataScope scope)
+    {
+        row.Scope = scope;
+        _dirty = true;
+    }
+
+    private async Task SaveMatrixAsync()
+    {
+        if (_selected is null)
+        {
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"api/v1/roles/{_selected.Id}/permissions",
+                new SaveRolePermissionsRequest(_rows.Select(r => r.ToDto()).ToList()));
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add(await ProblemText.FromAsync(response, "We could not save these permissions."), Severity.Error);
+                return;
+            }
+
+            _dirty = false;
+            Snackbar.Add("Permissions saved. They apply on the user's next page load.", Severity.Success);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        _formError = null;
+        if (string.IsNullOrWhiteSpace(_newName))
+        {
+            _formError = "Give the role a name.";
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/v1/roles",
+                new SaveRoleRequest(_newName.Trim(), string.IsNullOrWhiteSpace(_newDescription) ? null : _newDescription.Trim(), _newView));
+            if (!response.IsSuccessStatusCode)
+            {
+                _formError = await ProblemText.FromAsync(response, "We could not create this role.");
+                return;
+            }
+
+            var created = await response.Content.ReadFromJsonAsync<RoleDto>();
+            _create = false;
+            _newName = string.Empty;
+            _newDescription = null;
+            _newView = DashboardView.Staff;
+            Snackbar.Add("Role created. Set its permissions below.", Severity.Success);
+            await LoadAsync();
+            if (created is not null)
+            {
+                var added = _roles.FirstOrDefault(r => r.Id == created.Id);
+                if (added is not null)
+                {
+                    await SelectAsync(added);
+                }
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DeleteRoleAsync()
+    {
+        if (_selected is null)
+        {
+            return;
+        }
+
+        var response = await Http.DeleteAsync($"api/v1/roles/{_selected.Id}");
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "We could not delete this role."), Severity.Error);
+            _confirmDelete = false;
+            return;
+        }
+
+        Snackbar.Add("Role deleted", Severity.Success);
+        _selected = null;
+        await LoadAsync();
+    }
+}

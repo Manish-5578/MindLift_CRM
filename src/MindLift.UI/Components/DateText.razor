@@ -1,0 +1,14 @@
+<span class="@(Danger ? "ml-num ml-delta--bad" : "ml-num")" title="@Tooltip">@Display</span>
+
+@code {
+    /// <summary>A UTC instant from the API.</summary>
+    [Parameter] public DateTime? Value { get; set; }
+    [Parameter] public bool Relative { get; set; } = true;
+    [Parameter] public bool Danger { get; set; }
+
+    private string Display => Value is null ? "—"
+        : Relative ? Formatting.Relative(Value.Value, DateTime.UtcNow)
+        : Value.Value.ToString("dd MMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
+
+    private string? Tooltip => Value?.ToString("dddd, dd MMMM yyyy, HH:mm 'UTC'", System.Globalization.CultureInfo.InvariantCulture);
+}

@@ -1,0 +1,218 @@
+@using System.Globalization
+<FormDrawer Open="Open" OpenChanged="OnOpenChanged" Title="@(_dealId is null ? "New deal" : "Edit deal")" SubmitText="@(_dealId is null ? "Create deal" : "Save changes")" Busy="_busy" OnSubmit="SaveAsync" IsDirty="IsDirty">
+    @if (_error is not null)
+    {
+        <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3" data-testid="deal-error">@_error</MudAlert>
+    }
+
+    <DynamicForm Fields="Fields" Values="_values" Users="_users" AccountSearch="SearchAccountsAsync" ContactSearch="SearchContactsAsync" Errors="_fieldErrors"
+                 CustomFields="_customFields" CustomValues="_custom" CustomValuesChanged="v => _custom = v" OnFieldChanged="OnFieldChanged" />
+</FormDrawer>
+
+@code {
+    [Inject] private HttpClient Http { get; set; } = default!;
+    [Inject] private AppState App { get; set; } = default!;
+
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+    [Parameter] public EventCallback OnSaved { get; set; }
+
+    /// <summary>Opening from an account page fills the company in.</summary>
+    [Parameter] public Guid? DefaultAccountId { get; set; }
+    [Parameter] public string? DefaultAccountName { get; set; }
+    [Parameter] public Guid? DefaultContactId { get; set; }
+    [Parameter] public string? DefaultContactName { get; set; }
+
+    private Dictionary<string, string?> _values = new();
+    private Dictionary<string, JsonElement?> _custom = new();
+    private IReadOnlyList<FieldDto> _customFields = [];
+    private IReadOnlyDictionary<string, string> _fieldErrors = new Dictionary<string, string>();
+    private List<UserListItem> _users = [];
+    private IReadOnlyList<PipelineDto> _pipelines = [];
+    private Guid? _dealId;
+    private IReadOnlyList<DealContactInput> _otherContacts = [];
+    private bool _busy;
+    private string? _error;
+    private string _snapshot = string.Empty;
+
+    private bool IsDirty => TakeSnapshot() != _snapshot;
+
+    private string TakeSnapshot() => JsonSerializer.Serialize(new { Form = _values, Custom = _custom });
+
+    private IReadOnlyList<FormField> Fields
+    {
+        get
+        {
+            var currencies = (App.Bootstrap?.Currencies.EnabledCurrencies ?? []).Select((c, i) => Option(c, c, i)).ToList();
+            var pipelineId = Guid.TryParse(_values.GetValueOrDefault("pipelineId"), out var id) ? id : _pipelines.FirstOrDefault(p => p.IsDefault)?.Id;
+            var stages = _pipelines.FirstOrDefault(p => p.Id == pipelineId)?.Stages.Where(s => s.StageType == "Open" || _dealId is not null)
+                .OrderBy(s => s.SortOrder).Select((s, i) => Option(s.Id.ToString(), s.Name, i)).ToList() ?? [];
+            return
+            [
+                new("name", "Deal name", Required: true, TestId: "deal-name"),
+                new("pipelineId", "Pipeline", FormFieldKind.Picklist, Options: _pipelines.Select((p, i) => Option(p.Id.ToString(), p.Name, i)).ToList(), Columns: 6, TestId: "deal-pipeline"),
+                new("stageId", "Stage", FormFieldKind.Picklist, Options: stages, Columns: 6, TestId: "deal-stage"),
+                new("amount", "Amount", FormFieldKind.Number, Columns: 6, TestId: "deal-amount"),
+                new("currency", "Currency", FormFieldKind.Picklist, Options: currencies, Columns: 6),
+                new("probability", "Probability (%)", FormFieldKind.Number, Columns: 6),
+                new("expectedCloseDate", "Expected close", FormFieldKind.Date, Columns: 6),
+                new("accountId", "Company", FormFieldKind.Account, TestId: "deal-account"),
+                new("contactId", "Main contact", FormFieldKind.Contact, TestId: "deal-contact"),
+                new("ownerId", "Owner", FormFieldKind.User),
+                new("description", "Notes", FormFieldKind.Multiline),
+            ];
+        }
+    }
+
+    private static PicklistValueDto Option(string value, string label, int order) => new(Guid.Empty, value, label, null, null, null, order, false, true, false);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _users = await RecordLookups.UsersAsync(Http);
+        _pipelines = App.Bootstrap?.Pipelines.Where(p => p.IsActive).ToList() ?? [];
+    }
+
+    private Task<IReadOnlyList<LookupItem>> SearchAccountsAsync(string text, CancellationToken cancellationToken) => RecordLookups.AccountsAsync(Http, text, cancellationToken);
+
+    private Task<IReadOnlyList<LookupItem>> SearchContactsAsync(string text, CancellationToken cancellationToken) => RecordLookups.ContactsAsync(Http, text, cancellationToken);
+
+    /// <summary>Changing the pipeline offers that pipeline's stages and starts at its first open stage.</summary>
+    private Task OnFieldChanged(string key)
+    {
+        if (key == "pipelineId")
+        {
+            _values["stageId"] = FirstOpenStage(Guid.TryParse(_values.GetValueOrDefault("pipelineId"), out var id) ? id : null)?.ToString();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private Guid? FirstOpenStage(Guid? pipelineId)
+        => _pipelines.FirstOrDefault(p => p.Id == pipelineId)?.Stages.Where(s => s.StageType == "Open").OrderBy(s => s.SortOrder).FirstOrDefault()?.Id;
+
+    public void OpenNew()
+    {
+        _dealId = null;
+        _otherContacts = [];
+        var pipeline = _pipelines.FirstOrDefault(p => p.IsDefault) ?? _pipelines.FirstOrDefault();
+        _values = new Dictionary<string, string?>
+        {
+            ["pipelineId"] = pipeline?.Id.ToString(),
+            ["stageId"] = FirstOpenStage(pipeline?.Id)?.ToString(),
+            ["currency"] = App.Bootstrap?.Currencies.BaseCurrency,
+        };
+        if (DefaultAccountId is { } accountId)
+        {
+            _values["accountId"] = accountId.ToString();
+            _values["accountId" + DynamicForm.LabelSuffix] = DefaultAccountName;
+        }
+
+        if (DefaultContactId is { } contactId)
+        {
+            _values["contactId"] = contactId.ToString();
+            _values["contactId" + DynamicForm.LabelSuffix] = DefaultContactName;
+        }
+
+        Reset([]);
+    }
+
+    public void OpenEdit(DealDto deal)
+    {
+        _dealId = deal.Id;
+        var primary = deal.Contacts.FirstOrDefault(c => c.IsPrimary);
+        _otherContacts = deal.Contacts.Where(c => !c.IsPrimary).Select(c => new DealContactInput(c.ContactId, c.Role, false)).ToList();
+        _values = new Dictionary<string, string?>
+        {
+            ["name"] = deal.Name, ["pipelineId"] = deal.PipelineId.ToString(), ["stageId"] = deal.StageId.ToString(),
+            ["amount"] = deal.Amount.ToString(CultureInfo.InvariantCulture), ["currency"] = deal.Currency, ["probability"] = deal.Probability.ToString(CultureInfo.InvariantCulture),
+            ["expectedCloseDate"] = deal.ExpectedCloseDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            ["accountId"] = deal.AccountId?.ToString(), ["accountId" + DynamicForm.LabelSuffix] = deal.AccountName,
+            ["contactId"] = primary?.ContactId.ToString(), ["contactId" + DynamicForm.LabelSuffix] = primary?.FullName,
+            ["ownerId"] = deal.OwnerId.ToString(), ["description"] = deal.Description,
+        };
+        Reset(deal.CustomFields.ToDictionary(kv => kv.Key, kv => (JsonElement?)kv.Value));
+    }
+
+    private void Reset(Dictionary<string, JsonElement?> custom)
+    {
+        _custom = custom;
+        _customFields = App.Bootstrap?.Fields.GetValueOrDefault("deals")?.Where(f => f.IsCustom).ToList() ?? [];
+        _error = null;
+        _fieldErrors = new Dictionary<string, string>();
+        _snapshot = TakeSnapshot();
+    }
+
+    private async Task OnOpenChanged(bool value) => await OpenChanged.InvokeAsync(value);
+
+    private string? Value(string key) => string.IsNullOrWhiteSpace(_values.GetValueOrDefault(key)) ? null : _values[key]!.Trim();
+
+    private Guid? GuidValue(string key) => Guid.TryParse(Value(key), out var id) ? id : null;
+
+    private async Task SaveAsync()
+    {
+        _error = null;
+        _fieldErrors = new Dictionary<string, string>();
+        if (Value("name") is null)
+        {
+            _fieldErrors = new Dictionary<string, string> { ["name"] = "Enter the deal name." };
+            return;
+        }
+
+        if (Value("amount") is { } text && !decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out _))
+        {
+            _fieldErrors = new Dictionary<string, string> { ["amount"] = "Enter the amount as a number." };
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            var amount = decimal.TryParse(Value("amount"), NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed) ? parsed : 0m;
+            int? probability = int.TryParse(Value("probability"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var p) ? p : null;
+            DateTime? closes = DateTime.TryParse(Value("expectedCloseDate"), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var date) ? date : null;
+
+            var contacts = new List<DealContactInput>();
+            if (GuidValue("contactId") is { } main)
+            {
+                contacts.Add(new DealContactInput(main, _otherContacts.FirstOrDefault(c => c.ContactId == main)?.Role, true));
+            }
+
+            contacts.AddRange(_otherContacts.Where(c => c.ContactId != GuidValue("contactId")));
+
+            var request = new SaveDealRequest(
+                Value("name")!, GuidValue("pipelineId"), GuidValue("stageId"), amount, Value("currency"), probability, closes,
+                GuidValue("accountId"), contacts, Value("description"), GuidValue("ownerId"),
+                _custom.Where(kv => kv.Value is not null).ToDictionary(kv => kv.Key, kv => kv.Value!.Value));
+
+            var response = _dealId is null
+                ? await Http.PostAsJsonAsync("api/v1/deals", request)
+                : await Http.PutAsJsonAsync($"api/v1/deals/{_dealId}", request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var fields = await ProblemText.FieldErrorsAsync(response);
+                if (fields.Count > 0)
+                {
+                    _fieldErrors = fields.ToDictionary(kv => kv.Key == "contacts" ? "contactId" : kv.Key, kv => kv.Value);
+                }
+                else
+                {
+                    _error = await ProblemText.FromAsync(response, "We could not save this deal.");
+                }
+
+                return;
+            }
+
+            await OpenChanged.InvokeAsync(false);
+            await OnSaved.InvokeAsync();
+        }
+        catch (HttpRequestException)
+        {
+            _error = "We could not reach MindLift. Check your connection and try again.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

@@ -1,0 +1,5 @@
+@page "/leads/import"
+@using MindLift.Shared.Imports
+
+<ImportWizard Module="AppModule.Leads" Endpoint="api/v1/leads/import" ListHref="/leads" Fields="LeadImportColumns.Fields"
+              RequiredField="@LeadImportColumns.RequiredField" RequiredLabel="First name" Singular="lead" />

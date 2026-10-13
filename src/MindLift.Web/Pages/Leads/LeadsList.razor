@@ -1,0 +1,236 @@
+@page "/leads"
+@using MindLift.Shared.Filtering
+@using FilterOperator = MindLift.Shared.Filtering.FilterOperator
+@inject HttpClient Http
+@inject AuthSession Session
+@inject AppState App
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+<PageTitle>@App.ModuleLabel(AppModule.Leads) · MindLift</PageTitle>
+
+<div class="ml-page ml-page--narrow">
+    @if (App.Bootstrap is not null)
+    {
+        <EntityListPage @ref="_list" TItem="LeadListItemDto" Title="@App.ModuleLabel(AppModule.Leads)" ItemLabel="@ItemLabel"
+                        Views="_views" DefaultView="@AllView" Columns="_columns" CardTemplate="_card" Loader="LoadAsync" RowHref="LeadHref"
+                        Fields="LeadFields" Picklists="App.Bootstrap.Picklists" Users="_users"
+                        SearchPlaceholder="Search name, email, company or phone" EmptyIcon="@Icons.Material.Outlined.PersonSearch"
+                        EmptyTitle="No leads yet" EmptyMessage="Leads from web forms, WhatsApp, email or imports appear here."
+                        DefaultSortField="created_at" DefaultSortDir="desc">
+            <HeaderActions>
+                <MudButtonGroup Variant="Variant.Outlined" Size="Size.Medium" data-testid="layout-toggle">
+                    <MudButton Href="/leads/board">Board</MudButton>
+                    <MudButton Color="Color.Primary" Href="/leads">List</MudButton>
+                </MudButtonGroup>
+                @if (CanImport)
+                {
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Upload" Href="/leads/import" data-testid="import-leads">Import</MudButton>
+                }
+                @if (CanExport)
+                {
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Download" OnClick="ExportAsync" data-testid="export-leads">Export</MudButton>
+                }
+                @if (CanCreate)
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" OnClick="OpenNewLead" data-testid="primary-action">New lead</MudButton>
+                }
+            </HeaderActions>
+            <EmptyActions>
+                @if (CanCreate)
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenNewLead">New lead</MudButton>
+                }
+            </EmptyActions>
+        </EntityListPage>
+    }
+</div>
+
+<LeadFormDrawer @ref="_form" @bind-Open="_drawer" OnSaved="OnSaved" />
+
+@code {
+    private const string MineView = "mine";
+    private const string AllView = "all";
+    private const string NewView = "new";
+
+    private EntityListPage<LeadListItemDto>? _list;
+    private LeadFormDrawer? _form;
+    private bool _drawer;
+    private List<UserListItem> _users = [];
+
+    private IReadOnlyList<ListView> _views = [];
+    private IReadOnlyList<ListColumn<LeadListItemDto>> _columns = [];
+    private RenderFragment<LeadListItemDto> _card = _ => _ => { };
+
+    private bool CanCreate => App.Bootstrap?.Permissions.Any(p => p.Module == "Leads" && p.CanCreate) == true;
+
+    private bool CanImport => App.Bootstrap?.Permissions.Any(p => p.Module == "Leads" && p.CanImport) == true;
+
+    private bool CanExport => App.Bootstrap?.Permissions.Any(p => p.Module == "Leads" && p.CanExport) == true;
+
+    /// <summary>Downloads the leads the list is showing now: the same view, search, filters and sort.</summary>
+    private async Task ExportAsync()
+    {
+        if (_list is null)
+        {
+            return;
+        }
+
+        var response = await Http.PostAsJsonAsync("api/v1/leads/export", _list.CurrentQuery with { Page = 1, PageSize = 200 });
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "We could not export your leads."), Severity.Error);
+            return;
+        }
+
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        await JS.InvokeVoidAsync("mindlift.downloadFile", "leads.csv", "text/csv", Convert.ToBase64String(bytes));
+        Snackbar.Add("Export ready", Severity.Success);
+    }
+
+    private string ItemLabel => App.ModuleLabel(AppModule.Leads).ToLowerInvariant();
+
+    private IReadOnlyList<FieldDto> LeadFields => App.Bootstrap?.Fields.GetValueOrDefault("leads") ?? [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.IsSignedIn)
+        {
+            Nav.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        _views = BuildViews();
+        _columns = BuildColumns();
+        _card = lead =>
+            @<div class="ml-cell-primary">
+                <UserAvatar Name="@lead.FullName" Id="@lead.Id" Size="40" />
+                <div class="ml-cell-primary__text ml-grow">
+                    <MudText Typo="Typo.subtitle1" Class="ml-truncate">@lead.FullName</MudText>
+                    <MudText Typo="Typo.body2" Class="ml-muted ml-truncate">@Secondary(lead)</MudText>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@(lead.Source is null ? "No source" : SourceLabel(lead.Source)) · <DateText Value="@lead.CreatedAtUtc" /></MudText>
+                </div>
+                <StatusChip Text="@StatusLabel(lead.Status)" Color="@StatusColors.For(StatusCategory(lead.Status))" />
+            </div>;
+
+        await LoadUsersAsync();
+    }
+
+    /// <summary>People for the owner filter. Staff without access to the user list only get "Me".</summary>
+    private async Task LoadUsersAsync()
+    {
+        try
+        {
+            var page = await Http.GetFromJsonAsync<PagedResult<UserListItem>>("api/v1/users?pageSize=200");
+            _users = page?.Items.Where(u => u.IsActive).ToList() ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            _users = [];
+        }
+    }
+
+    private static string? LeadHref(LeadListItemDto lead) => "/leads/" + lead.Id;
+
+    private static string Secondary(LeadListItemDto lead) => lead.Email ?? lead.Phone ?? lead.CompanyName ?? "—";
+
+    private void OpenNewLead()
+    {
+        _form?.OpenNew();
+        _drawer = true;
+    }
+
+    private async Task OnSaved()
+    {
+        Snackbar.Add("Lead saved", Severity.Success);
+        if (_list is not null)
+        {
+            await _list.ReloadAsync();
+        }
+    }
+
+    private async Task<PagedResult<LeadListItemDto>> LoadAsync(ListQuery query)
+    {
+        var response = await Http.PostAsJsonAsync("api/v1/leads/query", query);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new ListLoadException(await ProblemText.FromAsync(response, "We could not load your leads. Try again."));
+        }
+
+        return (await response.Content.ReadFromJsonAsync<PagedResult<LeadListItemDto>>())!;
+    }
+
+    private IReadOnlyList<ListColumn<LeadListItemDto>> BuildColumns() =>
+    [
+        new()
+        {
+            Header = "Name", SortField = "first_name",
+            Cell = lead =>
+                @<div class="ml-cell-primary">
+                    <UserAvatar Name="@lead.FullName" Id="@lead.Id" Size="32" />
+                    <div class="ml-cell-primary__text">
+                        <MudText Typo="Typo.subtitle2" Class="ml-truncate">@lead.FullName</MudText>
+                        <MudText Typo="Typo.caption" Class="ml-muted ml-truncate">@Secondary(lead)</MudText>
+                    </div>
+                </div>,
+        },
+        new()
+        {
+            Header = "Status", SortField = "status",
+            Cell = lead => @<StatusChip Text="@StatusLabel(lead.Status)" Color="@StatusColors.For(StatusCategory(lead.Status))" />,
+        },
+        new()
+        {
+            Header = "Source", SortField = "source", HideOnTablet = true,
+            Cell = lead => @<span class="ml-muted">@SourceLabel(lead.Source)</span>,
+        },
+        new()
+        {
+            Header = "Owner", HideOnTablet = false,
+            Cell = lead => @<span>@(lead.OwnerName ?? "—")</span>,
+        },
+        new()
+        {
+            Header = "Created", SortField = "created_at", AlignEnd = true,
+            Cell = lead => @<DateText Value="@lead.CreatedAtUtc" />,
+        },
+    ];
+
+    /// <summary>The three views are saved filters (plan 4.6.6). Converted leads are already excluded by the API.</summary>
+    private static IReadOnlyList<ListView> BuildViews() =>
+    [
+        new(MineView, "My open leads", new FilterGroup
+        {
+            Conditions =
+            [
+                new FilterCondition { Field = "owner_id", Op = FilterOperator.Eq, Value = JsonSerializer.SerializeToElement("@me") },
+                new FilterCondition { Field = "status", Op = FilterOperator.In, Value = JsonSerializer.SerializeToElement(new[] { "new", "working", "qualified" }) },
+            ],
+        }),
+        new(AllView, "All open", new FilterGroup
+        {
+            Conditions = [new FilterCondition { Field = "status", Op = FilterOperator.NotIn, Value = JsonSerializer.SerializeToElement(new[] { "disqualified" }) }],
+        }),
+        new(NewView, "New", new FilterGroup
+        {
+            Conditions = [new FilterCondition { Field = "status", Op = FilterOperator.Eq, Value = JsonSerializer.SerializeToElement("new") }],
+        }),
+    ];
+
+    private string SourceLabel(string? code)
+        => code is null ? "—" : App.Bootstrap?.Picklists.FirstOrDefault(p => p.Key == "lead_source")?.Values.FirstOrDefault(v => v.Value == code)?.Label ?? code;
+
+    private string StatusLabel(string code)
+        => App.Bootstrap?.Picklists.FirstOrDefault(p => p.Key == "lead_status")?.Values.FirstOrDefault(v => v.Value == code)?.Label ?? code;
+
+    private static string StatusCategory(string code) => code switch
+    {
+        "new" => "New",
+        "working" => "Working",
+        "qualified" => "Qualified",
+        "disqualified" => "Lost",
+        "converted" => "Won",
+        _ => code,
+    };
+}

@@ -1,0 +1,56 @@
+@if (string.IsNullOrWhiteSpace(Value))
+{
+    <span class="ml-faint" data-testid="field-empty">—</span>
+}
+else
+{
+    switch (Kind)
+    {
+        case FormFieldKind.Email:
+            <a href="@("mailto:" + Value)" class="ml-link" data-testid="field-email">@Value</a>
+            break;
+        case FormFieldKind.Phone:
+            <a href="@("tel:" + Value)" class="ml-link" dir="ltr" data-testid="field-phone">@Value</a>
+            break;
+        case FormFieldKind.Url:
+            if (WebAddress is { } address)
+            {
+                <a href="@address" target="_blank" rel="noopener noreferrer" class="ml-link" data-testid="field-url">@Value</a>
+            }
+            else
+            {
+                <span style="overflow-wrap:anywhere" data-testid="field-url">@Value</span>
+            }
+            break;
+        case FormFieldKind.Picklist:
+            <span>@(Options?.FirstOrDefault(o => o.Value == Value)?.Label ?? Value)</span>
+            break;
+        case FormFieldKind.User:
+            <span>@(Users?.FirstOrDefault(u => u.Id.ToString() == Value)?.FullName ?? "—")</span>
+            break;
+        case FormFieldKind.Multiline:
+            <span style="white-space:pre-wrap;overflow-wrap:anywhere">@Value</span>
+            break;
+        default:
+            <span style="overflow-wrap:anywhere">@Value</span>
+            break;
+    }
+}
+
+@code {
+    [Parameter] public FormFieldKind Kind { get; set; } = FormFieldKind.Text;
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public IReadOnlyList<PicklistValueDto>? Options { get; set; }
+    [Parameter] public IReadOnlyList<UserListItem>? Users { get; set; }
+
+    /// <summary>Only web links are made clickable. Anything else (for example a javascript: link) is shown as plain text.</summary>
+    private string? WebAddress
+    {
+        get
+        {
+            var text = Value!.Trim();
+            var candidate = text.Contains("://") ? text : "https://" + text;
+            return Uri.TryCreate(candidate, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps) ? uri.ToString() : null;
+        }
+    }
+}

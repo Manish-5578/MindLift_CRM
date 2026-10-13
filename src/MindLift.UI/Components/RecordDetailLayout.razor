@@ -1,0 +1,28 @@
+<div class="ml-detail" data-testid="record-detail">
+    <PageHeader Title="@Title" Subtitle="@Subtitle" Breadcrumbs="Breadcrumbs">
+        <Actions>
+            @if (Badges is not null)
+            {
+                <span class="ml-row ml-row--wrap">@Badges</span>
+            }
+            @Actions
+        </Actions>
+    </PageHeader>
+    <div class="ml-detail__grid">
+        <div class="ml-detail__main">@ChildContent</div>
+        @if (Aside is not null)
+        {
+            <aside class="ml-detail__aside" data-testid="detail-aside">@Aside</aside>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public List<BreadcrumbItem>? Breadcrumbs { get; set; }
+    [Parameter] public RenderFragment? Badges { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment? Aside { get; set; }
+}

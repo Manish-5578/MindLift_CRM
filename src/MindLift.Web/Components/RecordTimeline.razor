@@ -1,0 +1,74 @@
+@inject HttpClient Http
+
+<MlCard Title="Timeline" TestId="record-timeline-card">
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else if (_failed)
+    {
+        <MudText Typo="Typo.body2" Class="ml-muted" data-testid="timeline-failed">We could not load the timeline.</MudText>
+    }
+    else
+    {
+        <Timeline Items="_items" EmptyText="Nothing has happened yet." TestId="record-timeline" />
+    }
+</MlCard>
+
+@code {
+    /// <summary>The kind of record: leads, contacts, accounts or deals.</summary>
+    [Parameter, EditorRequired] public string EntityType { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired] public Guid EntityId { get; set; }
+
+    private IReadOnlyList<TimelineItem> _items = [];
+    private bool _loading = true;
+    private bool _failed;
+    private Guid _loadedFor;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (EntityId != _loadedFor)
+        {
+            _loadedFor = EntityId;
+            await ReloadAsync();
+        }
+    }
+
+    /// <summary>Loads the timeline again, for example after an activity was added on the same page.</summary>
+    public async Task ReloadAsync()
+    {
+        _failed = false;
+        try
+        {
+            var entries = await Http.GetFromJsonAsync<List<TimelineEntryDto>>($"api/v1/timeline?entityType={EntityType}&entityId={EntityId}") ?? [];
+            _items = entries.Select(e => new TimelineItem(e.WhenUtc, e.Title, string.Join(" · ", new[] { e.Detail, e.ActorName }.Where(s => !string.IsNullOrWhiteSpace(s))), IconFor(e), e.Href)).ToList();
+        }
+        catch (HttpRequestException)
+        {
+            _failed = true;
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private static string IconFor(TimelineEntryDto entry) => entry.Kind switch
+    {
+        "activity" => entry.ActivityType switch
+        {
+            "Call" => Icons.Material.Outlined.Call,
+            "Meeting" => Icons.Material.Outlined.Event,
+            "Note" => Icons.Material.Outlined.StickyNote2,
+            _ => Icons.Material.Outlined.TaskAlt,
+        },
+        "stage" => Icons.Material.Outlined.SwapHoriz,
+        "converted" => Icons.Material.Outlined.SwapHoriz,
+        "contact" => Icons.Material.Outlined.Contacts,
+        "deal" => Icons.Material.Outlined.Handshake,
+        "changed" => Icons.Material.Outlined.Edit,
+        _ => Icons.Material.Outlined.History,
+    };
+}

@@ -1,0 +1,41 @@
+<MlCard Loading="Loading" OnClick="Navigate" TestId="@($"kpi-{Key}")">
+    <div class="ml-stack-sm">
+        <div class="ml-row ml-row--between">
+            <MudText Typo="Typo.overline" Class="ml-muted">@Label</MudText>
+            @if (Icon is not null) { <MudIcon Icon="@Icon" Size="Size.Small" Class="ml-faint" /> }
+        </div>
+        <div class="ml-kpi-value" title="@Tooltip">@Value</div>
+        <div class="ml-row">
+            @if (Delta is null)
+            {
+                <span class="ml-delta ml-delta--flat">—</span>
+            }
+            else
+            {
+                var up = Delta.Value >= 0;
+                var good = up == GoodWhenUp;
+                <span class="ml-delta @(Delta.Value == 0 ? "ml-delta--flat" : good ? "ml-delta--good" : "ml-delta--bad")">
+                    <MudIcon Icon="@(up ? Icons.Material.Outlined.ArrowUpward : Icons.Material.Outlined.ArrowDownward)" Style="font-size:14px" />
+                    @($"{Math.Abs(Delta.Value):0.#}%")
+                </span>
+            }
+            @if (Caption is not null) { <MudText Typo="Typo.caption" Class="ml-faint">@Caption</MudText> }
+        </div>
+    </div>
+</MlCard>
+
+@code {
+    [Inject] NavigationManager Nav { get; set; } = default!;
+    [Parameter, EditorRequired] public string Key { get; set; } = "";
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter] public string Value { get; set; } = "—";
+    [Parameter] public string? Tooltip { get; set; }
+    [Parameter] public decimal? Delta { get; set; }
+    [Parameter] public bool GoodWhenUp { get; set; } = true;
+    [Parameter] public string? Caption { get; set; }
+    [Parameter] public string? Icon { get; set; }
+    [Parameter] public string? Href { get; set; }
+    [Parameter] public bool Loading { get; set; }
+
+    private void Navigate() { if (Href is not null) Nav.NavigateTo(Href); }
+}

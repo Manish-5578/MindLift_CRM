@@ -1,0 +1,227 @@
+@page "/accounts/{Id:guid}"
+@inject HttpClient Http
+@inject AuthSession Session
+@inject AppState App
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+
+<PageTitle>Account · MindLift</PageTitle>
+
+<div class="ml-page ml-page--narrow">
+    @if (_loading)
+    {
+        <MlCard Loading="true" />
+    }
+    else if (_summary is null)
+    {
+        <ErrorState Title="We could not open this account" Message="@(_error ?? "It may have been deleted, or you may not have access to it.")" OnRetry="LoadAsync" />
+    }
+    else
+    {
+        var account = _summary.Account;
+        <RecordDetailLayout Title="@account.Name" Subtitle="@(account.Industry ?? account.Website ?? string.Empty)"
+                            Breadcrumbs="@(new List<BreadcrumbItem> { new(App.ModuleLabel(AppModule.Accounts), "/accounts"), new(account.Name, null, true) })">
+            <Badges>
+                @if (account.ParentAccountId is { } parentId)
+                {
+                    <a href="@("/accounts/" + parentId)" class="ml-link" data-testid="parent-link">Part of @account.ParentName</a>
+                }
+                <MudText Typo="Typo.body2" Class="ml-muted">Created <DateText Value="@account.CreatedAtUtc" /></MudText>
+            </Badges>
+            <Actions>
+                @if (Can(p => p.CanDelete))
+                {
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="DeleteAsync" data-testid="delete-account">Delete</MudButton>
+                }
+                @if (Can(p => p.CanEdit))
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenEdit" data-testid="primary-action">Edit</MudButton>
+                }
+            </Actions>
+            <ChildContent>
+                <MlCard Title="Details">
+                    <div class="ml-kv" data-testid="account-details">
+                        <div class="ml-kv__label">Website</div><div class="ml-kv__value"><FieldValue Kind="FormFieldKind.Url" Value="@account.Website" /></div>
+                        <div class="ml-kv__label">Phone</div><div class="ml-kv__value"><FieldValue Kind="FormFieldKind.Phone" Value="@account.Phone" /></div>
+                        <div class="ml-kv__label">Industry</div><div class="ml-kv__value"><FieldValue Value="@account.Industry" /></div>
+                        <div class="ml-kv__label">Owner</div><div class="ml-kv__value"><FieldValue Kind="FormFieldKind.User" Value="@account.OwnerId.ToString()" Users="_users" /></div>
+                        <div class="ml-kv__label">Notes</div><div class="ml-kv__value"><FieldValue Kind="FormFieldKind.Multiline" Value="@account.Description" /></div>
+                        @foreach (var field in CustomFields)
+                        {
+                            <div class="ml-kv__label">@field.Label</div>
+                            <div class="ml-kv__value"><FieldValue Value="@CustomText(field.Key)" /></div>
+                        }
+                    </div>
+                </MlCard>
+
+                <MlCard Title="@($"Contacts ({_summary.Contacts.Count})")">
+                    <div class="ml-stack-sm">
+                        @if (_summary.Contacts.Count == 0)
+                        {
+                            <MudText Typo="Typo.body2" Class="ml-muted" data-testid="no-contacts">No contacts at this company yet.</MudText>
+                        }
+                        @foreach (var contact in _summary.Contacts)
+                        {
+                            <div class="ml-row" style="padding:6px 0;border-bottom:1px solid var(--ml-border)" data-testid="account-contact">
+                                <UserAvatar Name="@contact.FullName" Id="@contact.Id" Size="32" />
+                                <div class="ml-grow">
+                                    <a href="@("/contacts/" + contact.Id)" class="ml-link">@contact.FullName</a>
+                                    <MudText Typo="Typo.caption" Class="ml-muted">@(contact.JobTitle ?? contact.Email ?? contact.Phone ?? "—")</MudText>
+                                </div>
+                            </div>
+                        }
+                        @if (Can(p => p.CanCreate, "Contacts"))
+                        {
+                            <div><MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Outlined.Add" OnClick="AddContact" data-testid="add-contact">Add contact</MudButton></div>
+                        }
+                    </div>
+                </MlCard>
+
+                <MlCard Title="@($"Deals ({_summary.Deals.Count})")">
+                    @if (_summary.Deals.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Class="ml-muted">No deals yet.</MudText>
+                    }
+                    @foreach (var deal in _summary.Deals)
+                    {
+                        <div class="ml-row" style="padding:4px 0"><span class="ml-grow">@deal.Name</span><StatusChip Text="@deal.Status" Dot="false" /><MoneyText Amount="deal.Amount" Currency="@deal.Currency" /></div>
+                    }
+                </MlCard>
+
+                <RecordActivities AccountId="Id" OnChanged="ReloadTimelineAsync" />
+                <RecordTimeline @ref="_timeline" EntityType="accounts" EntityId="Id" />
+                <RecordFiles EntityType="accounts" EntityId="Id" />
+            </ChildContent>
+            <Aside>
+                <MlCard Title="At a glance">
+                    <div class="ml-kv" data-testid="account-totals">
+                        <div class="ml-kv__label">Open deals</div><div class="ml-kv__value">@_summary.OpenDealsAmount.ToString("N0")</div>
+                        <div class="ml-kv__label">Won deals</div><div class="ml-kv__value">@_summary.WonDealsAmount.ToString("N0")</div>
+                        <div class="ml-kv__label">Activities</div><div class="ml-kv__value">@_summary.ActivityCount</div>
+                    </div>
+                </MlCard>
+                <MlCard Title="@($"Child accounts ({_summary.Children.Count})")">
+                    @if (_summary.Children.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Class="ml-muted">No child accounts.</MudText>
+                    }
+                    @foreach (var child in _summary.Children)
+                    {
+                        <div><a href="@("/accounts/" + child.Id)" class="ml-link" data-testid="child-link">@child.Name</a></div>
+                    }
+                </MlCard>
+            </Aside>
+        </RecordDetailLayout>
+    }
+</div>
+
+<AccountFormDrawer @ref="_form" @bind-Open="_drawer" OnSaved="OnSaved" />
+<ContactFormDrawer @ref="_contactForm" @bind-Open="_contactDrawer" OnSaved="OnContactSaved" DefaultAccountId="Id" DefaultAccountName="@_summary?.Account.Name" />
+
+@code {
+    private RecordTimeline? _timeline;
+
+    private async Task ReloadTimelineAsync()
+    {
+        if (_timeline is not null)
+        {
+            await _timeline.ReloadAsync();
+        }
+    }
+    [Parameter] public Guid Id { get; set; }
+
+    private AccountFormDrawer? _form;
+    private ContactFormDrawer? _contactForm;
+    private bool _drawer;
+    private bool _contactDrawer;
+    private bool _loading = true;
+    private string? _error;
+    private AccountSummaryDto? _summary;
+    private List<UserListItem> _users = [];
+
+    private IReadOnlyList<FieldDto> CustomFields => App.Bootstrap?.Fields.GetValueOrDefault("accounts")?.Where(f => f.IsCustom).ToList() ?? [];
+
+    private bool Can(Func<ModulePermissionDto, bool> check, string module = "Accounts") => App.Bootstrap?.Permissions.Any(p => p.Module == module && check(p)) == true;
+
+    private string? CustomText(string key)
+        => _summary!.Account.CustomFields.TryGetValue(key, out var value) && value.ValueKind != JsonValueKind.Null ? value.ToString() : null;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Session.IsSignedIn)
+        {
+            Nav.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        _users = await RecordLookups.UsersAsync(Http);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var response = await Http.GetAsync($"api/v1/accounts/{Id}/summary");
+            _summary = response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<AccountSummaryDto>() : null;
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await ProblemText.FromAsync(response, "We could not open this account.");
+            }
+        }
+        catch (HttpRequestException)
+        {
+            _summary = null;
+            _error = "We could not reach MindLift. Check your connection and try again.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OpenEdit()
+    {
+        _form?.OpenEdit(_summary!.Account);
+        _drawer = true;
+    }
+
+    private void AddContact()
+    {
+        _contactForm?.OpenNew();
+        _contactDrawer = true;
+    }
+
+    private async Task OnSaved()
+    {
+        Snackbar.Add("Account saved", Severity.Success);
+        await LoadAsync();
+    }
+
+    private async Task OnContactSaved()
+    {
+        Snackbar.Add("Contact saved", Severity.Success);
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (!await Dialogs.ConfirmAsync($"Delete {_summary!.Account.Name}?", "Its contacts stay, but they will no longer belong to a company.", "Delete", danger: true))
+        {
+            return;
+        }
+
+        var response = await Http.DeleteAsync($"api/v1/accounts/{Id}");
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "We could not delete this account."), Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Account deleted", Severity.Success);
+        Nav.NavigateTo("/accounts");
+    }
+}

@@ -1,0 +1,284 @@
+@page "/deals/{Id:guid}"
+@inject HttpClient Http
+@inject AuthSession Session
+@inject AppState App
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+
+<PageTitle>Deal · MindLift</PageTitle>
+
+<div class="ml-page ml-page--narrow">
+    @if (_loading)
+    {
+        <MlCard Loading="true" />
+    }
+    else if (_deal is null)
+    {
+        <ErrorState Title="We could not open this deal" Message="@(_error ?? "It may have been deleted, or you may not have access to it.")" OnRetry="LoadAsync" />
+    }
+    else
+    {
+        <RecordDetailLayout Title="@_deal.Name" Subtitle="@(_deal.AccountName ?? string.Empty)"
+                            Breadcrumbs="@(new List<BreadcrumbItem> { new(App.ModuleLabel(AppModule.Deals), "/deals"), new(_deal.Name, null, true) })">
+            <Badges>
+                <StatusChip Text="@_deal.Status" Color="@StatusColors.For(_deal.Status == "Won" ? "Won" : _deal.Status == "Lost" ? "Lost" : "Working")" />
+                @if (_deal.IsRotting) { <StatusChip Text="Rotting" Color="@StatusColors.For("Lost")" Dot="false" /> }
+                <MoneyText Amount="_deal.Amount" Currency="@_deal.Currency" />
+            </Badges>
+            <Actions>
+                @if (Can(p => p.CanDelete))
+                {
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="DeleteAsync" data-testid="delete-deal">Delete</MudButton>
+                }
+                @if (Can(p => p.CanEdit))
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenEdit" data-testid="primary-action">Edit</MudButton>
+                }
+            </Actions>
+            <ChildContent>
+                <MlCard Title="Stage">
+                    <div class="ml-row ml-row--wrap" data-testid="stage-bar">
+                        @foreach (var stage in Stages)
+                        {
+                            var current = stage;
+                            <MudButton Variant="@(current.Id == _deal.StageId ? Variant.Filled : Variant.Outlined)" Size="Size.Small"
+                                       Color="@StageColor(current)" Disabled="@(!Can(p => p.CanEdit))"
+                                       OnClick="() => MoveAsync(current)" data-testid="@("stage-" + current.Id)">@current.Name</MudButton>
+                        }
+                    </div>
+                    <MudText Typo="Typo.caption" Class="ml-muted mt-2" data-testid="days-in-stage">In this stage for @((int)(DateTime.UtcNow - _deal.StageChangedAtUtc).TotalDays) days</MudText>
+                </MlCard>
+
+                <MlCard Title="Details">
+                    <div class="ml-kv" data-testid="deal-details">
+                        <div class="ml-kv__label">Amount</div><div class="ml-kv__value"><MoneyText Amount="_deal.Amount" Currency="@_deal.Currency" />@if (_deal.Currency != BaseCurrency) { <span class="ml-muted"> ≈ @_deal.AmountInBase.ToString("N0") @BaseCurrency</span> }</div>
+                        <div class="ml-kv__label">Probability</div><div class="ml-kv__value">@_deal.Probability%</div>
+                        <div class="ml-kv__label">Expected close</div><div class="ml-kv__value"><DateText Value="@_deal.ExpectedCloseDate" /></div>
+                        @if (_deal.ClosedAtUtc is not null)
+                        {
+                            <div class="ml-kv__label">Closed</div><div class="ml-kv__value"><DateText Value="@_deal.ClosedAtUtc" /></div>
+                        }
+                        @if (_deal.LostReason is not null)
+                        {
+                            <div class="ml-kv__label">Lost because</div><div class="ml-kv__value" data-testid="lost-reason-text">@LostReasonLabel(_deal.LostReason)@(string.IsNullOrWhiteSpace(_deal.LostNotes) ? "" : " — " + _deal.LostNotes)</div>
+                        }
+                        <div class="ml-kv__label">Company</div><div class="ml-kv__value">@if (_deal.AccountId is { } accountId) { <a href="@("/accounts/" + accountId)" class="ml-link">@_deal.AccountName</a> } else { <span class="ml-faint">—</span> }</div>
+                        <div class="ml-kv__label">Owner</div><div class="ml-kv__value"><FieldValue Kind="FormFieldKind.User" Value="@_deal.OwnerId.ToString()" Users="_users" /></div>
+                        <div class="ml-kv__label">Notes</div><div class="ml-kv__value"><FieldValue Kind="FormFieldKind.Multiline" Value="@_deal.Description" /></div>
+                        @foreach (var field in CustomFields)
+                        {
+                            <div class="ml-kv__label">@field.Label</div>
+                            <div class="ml-kv__value"><FieldValue Value="@CustomText(field.Key)" /></div>
+                        }
+                    </div>
+                </MlCard>
+
+                <MlCard Title="Stage history">
+                    <Timeline Items="HistoryItems()" EmptyText="No moves yet." />
+                </MlCard>
+
+                @if (_deal.Status == "Won")
+                {
+                    <MlCard Title="Onboarding" TestId="onboarding-card">
+                        @if (_onboarding.Count == 0)
+                        {
+                            <MudText Typo="Typo.body2" Class="ml-muted" data-testid="no-onboarding">No onboarding checklist applies to this deal. Add one in Settings, Onboarding checklists.</MudText>
+                        }
+                        @foreach (var progress in _onboarding)
+                        {
+                            <div class="ml-stack-sm" data-testid="onboarding-progress">
+                                <div class="ml-row ml-row--between"><MudText Typo="Typo.subtitle2">@progress.TemplateName</MudText><MudText Typo="Typo.caption" Class="ml-muted" data-testid="onboarding-count">@progress.Completed of @progress.Total done</MudText></div>
+                                <MudProgressLinear Color="Color.Success" Value="@(progress.Total == 0 ? 0 : 100.0 * progress.Completed / progress.Total)" />
+                            </div>
+                        }
+                    </MlCard>
+                }
+
+                <RecordActivities @ref="_activities" DealId="Id" OnChanged="LoadAsync" />
+                <RecordTimeline @ref="_timeline" EntityType="deals" EntityId="Id" />
+                <RecordFiles EntityType="deals" EntityId="Id" />
+            </ChildContent>
+            <Aside>
+                <MlCard Title="@($"People ({_deal.Contacts.Count})")">
+                    @if (_deal.Contacts.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Class="ml-muted">No contacts on this deal.</MudText>
+                    }
+                    @foreach (var contact in _deal.Contacts)
+                    {
+                        <div class="ml-row" style="padding:4px 0" data-testid="deal-contact-row">
+                            <div class="ml-grow">
+                                <a href="@("/contacts/" + contact.ContactId)" class="ml-link">@contact.FullName</a>
+                                <MudText Typo="Typo.caption" Class="ml-muted">@(contact.Role ?? (contact.IsPrimary ? "Main contact" : "—"))</MudText>
+                            </div>
+                            @if (contact.IsPrimary) { <StatusChip Text="Main" Dot="false" /> }
+                        </div>
+                    }
+                </MlCard>
+            </Aside>
+        </RecordDetailLayout>
+    }
+</div>
+
+<DealFormDrawer @ref="_form" @bind-Open="_drawer" OnSaved="OnSaved" />
+
+@code {
+    private RecordTimeline? _timeline;
+
+    private async Task ReloadTimelineAsync()
+    {
+        if (_timeline is not null)
+        {
+            await _timeline.ReloadAsync();
+        }
+    }
+    [Parameter] public Guid Id { get; set; }
+
+    private DealFormDrawer? _form;
+    private RecordActivities? _activities;
+    private bool _drawer;
+    private bool _loading = true;
+    private string? _error;
+    private DealDto? _deal;
+    private IReadOnlyList<DealStageHistoryDto> _history = [];
+    private IReadOnlyList<OnboardingProgressDto> _onboarding = [];
+    private List<UserListItem> _users = [];
+
+    private string BaseCurrency => App.Bootstrap?.Currencies.BaseCurrency ?? string.Empty;
+
+    private IReadOnlyList<PipelineStageDto> Stages
+        => App.Bootstrap?.Pipelines.FirstOrDefault(p => p.Id == _deal?.PipelineId)?.Stages.OrderBy(s => s.SortOrder).ToList() ?? [];
+
+    private IReadOnlyList<FieldDto> CustomFields => App.Bootstrap?.Fields.GetValueOrDefault("deals")?.Where(f => f.IsCustom).ToList() ?? [];
+
+    private bool Can(Func<ModulePermissionDto, bool> check) => App.Bootstrap?.Permissions.Any(p => p.Module == "Deals" && check(p)) == true;
+
+    private Color StageColor(PipelineStageDto stage) => stage.StageType switch { "Won" => Color.Success, "Lost" => Color.Error, _ => Color.Primary };
+
+    private string? CustomText(string key)
+        => _deal!.CustomFields.TryGetValue(key, out var value) && value.ValueKind != JsonValueKind.Null ? value.ToString() : null;
+
+    private string LostReasonLabel(string code)
+        => App.Bootstrap?.Picklists.FirstOrDefault(p => p.Key == "lost_reason")?.Values.FirstOrDefault(v => v.Value == code)?.Label ?? code;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Session.IsSignedIn)
+        {
+            Nav.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        _users = await RecordLookups.UsersAsync(Http);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var response = await Http.GetAsync($"api/v1/deals/{Id}");
+            _deal = response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<DealDto>() : null;
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await ProblemText.FromAsync(response, "We could not open this deal.");
+            }
+            else
+            {
+                _history = await Http.GetFromJsonAsync<List<DealStageHistoryDto>>($"api/v1/deals/{Id}/history") ?? [];
+                _onboarding = _deal!.Status == "Won" ? await Http.GetFromJsonAsync<List<OnboardingProgressDto>>($"api/v1/activities/onboarding/{Id}") ?? [] : [];
+            }
+        }
+        catch (HttpRequestException)
+        {
+            _deal = null;
+            _error = "We could not reach MindLift. Check your connection and try again.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private IReadOnlyList<TimelineItem> HistoryItems()
+        => _history.Select(h => new TimelineItem(h.ChangedAtUtc,
+            h.FromStage is null ? $"Created in {h.ToStage}" : $"{h.FromStage} → {h.ToStage}",
+            string.Join(" · ", new[] { h.ChangedBy, h.DaysInFromStage is { } days ? $"{days:0.#} days in {h.FromStage}" : null }.Where(s => !string.IsNullOrWhiteSpace(s))),
+            Icons.Material.Outlined.SwapHoriz)).ToList();
+
+    private void OpenEdit()
+    {
+        _form?.OpenEdit(_deal!);
+        _drawer = true;
+    }
+
+    private async Task OnSaved()
+    {
+        Snackbar.Add("Deal saved", Severity.Success);
+        await LoadAsync();
+    }
+
+    private async Task MoveAsync(PipelineStageDto stage)
+    {
+        if (stage.Id == _deal!.StageId)
+        {
+            return;
+        }
+
+        string? lostReason = null;
+        string? lostNotes = null;
+        if (stage.StageType == "Lost")
+        {
+            var reasons = App.Bootstrap?.Picklists.FirstOrDefault(p => p.Key == "lost_reason")?.Values.Where(v => v.IsActive).OrderBy(v => v.SortOrder).ToList() ?? [];
+            var parameters = new DialogParameters<LostDealDialog> { { x => x.Title, $"Mark {_deal.Name} as lost?" }, { x => x.Reasons, reasons } };
+            var reference = await Dialogs.ShowAsync<LostDealDialog>("Lost", parameters, new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, BackdropClick = false, CloseButton = false });
+            var result = await reference.Result;
+            if (result is not { Canceled: false } || result.Data is not LostDealDialog.Result lost)
+            {
+                return;
+            }
+
+            lostReason = lost.Reason;
+            lostNotes = lost.Notes;
+        }
+        else if (stage.StageType == "Won" && !await Dialogs.ConfirmAsync($"Mark {_deal.Name} as won?", "The close date is set to today.", "Mark as won"))
+        {
+            return;
+        }
+
+        var response = await Http.PatchAsJsonAsync($"api/v1/deals/{Id}/stage", new ChangeDealStageRequest(stage.Id, lostReason, lostNotes, null, _deal.Version));
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "We could not move this deal."), Severity.Error);
+        }
+
+        await LoadAsync();
+        if (_activities is not null)
+        {
+            await _activities.LoadAsync();
+        }
+
+        await ReloadTimelineAsync();
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (!await Dialogs.ConfirmAsync($"Delete {_deal!.Name}?", "The deal is removed from your lists. This cannot be undone from here.", "Delete", danger: true))
+        {
+            return;
+        }
+
+        var response = await Http.DeleteAsync($"api/v1/deals/{Id}");
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "We could not delete this deal."), Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Deal deleted", Severity.Success);
+        Nav.NavigateTo("/deals");
+    }
+}

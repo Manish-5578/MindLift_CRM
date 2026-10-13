@@ -1,0 +1,257 @@
+@using FilterOperator = MindLift.Shared.Filtering.FilterOperator
+@using FieldType = MindLift.Shared.Filtering.FieldType
+@using MindLift.Shared.Filtering
+
+<div class="ml-stack" data-testid="filter-builder">
+    @if (_rows.Count > 1)
+    {
+        <div class="ml-row">
+            <MudText Typo="Typo.body2">Show records that match</MudText>
+            <MudSelect T="string" @bind-Value="_logic" @bind-Value:after="EmitAsync" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:110px" aria-label="Match all or any" data-testid="filter-logic">
+                <MudSelectItem T="string" Value="LogicAnd">all</MudSelectItem>
+                <MudSelectItem T="string" Value="LogicOr">any</MudSelectItem>
+            </MudSelect>
+            <MudText Typo="Typo.body2">of these</MudText>
+        </div>
+    }
+
+    @foreach (var row in _rows)
+    {
+        var current = row;
+        var field = FieldOf(current);
+        <div class="ml-stack-sm" style="padding:12px;border:1px solid var(--ml-border);border-radius:var(--ml-radius)" data-testid="filter-row">
+            <div class="ml-row">
+                <MudSelect T="string" Value="current.Field" ValueChanged="key => ChangeFieldAsync(current, key)" Label="Field" Variant="Variant.Outlined" Margin="Margin.Dense" Class="ml-grow" data-testid="filter-field">
+                    @foreach (var f in FilterableFields)
+                    {
+                        <MudSelectItem T="string" Value="@f.Key">@f.Label</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small" OnClick="() => RemoveRowAsync(current)" aria-label="Remove filter" data-testid="filter-remove" />
+            </div>
+
+            @if (field is not null)
+            {
+                <MudSelect T="FilterOperator" Value="current.Op" ValueChanged="op => ChangeOperatorAsync(current, field, op)" Label="Condition" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="filter-operator">
+                    @foreach (var op in FilterOperators.For(field.Type))
+                    {
+                        <MudSelectItem T="FilterOperator" Value="@op">@FilterOperators.Label(op)</MudSelectItem>
+                    }
+                </MudSelect>
+
+                @switch (KindOf(field, current.Op))
+                {
+                    case Editor.Text:
+                        <MudTextField T="string" @bind-Value="current.Text" @bind-Value:after="EmitAsync" Label="Value" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" DebounceInterval="300" data-testid="filter-value" />
+                        break;
+                    case Editor.Number:
+                        <MudNumericField T="decimal?" @bind-Value="current.Number" @bind-Value:after="EmitAsync" Label="Value" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="filter-value" />
+                        break;
+                    case Editor.NumberRange:
+                        <div class="ml-row">
+                            <MudNumericField T="decimal?" @bind-Value="current.Number" @bind-Value:after="EmitAsync" Label="From" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="filter-from" />
+                            <MudNumericField T="decimal?" @bind-Value="current.Number2" @bind-Value:after="EmitAsync" Label="To" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="filter-to" />
+                        </div>
+                        break;
+                    case Editor.Date:
+                        <MudDatePicker T="DateTime?" @bind-Date="current.From" @bind-Date:after="EmitAsync" Label="Date" Variant="Variant.Outlined" Margin="Margin.Dense" Editable="true" data-testid="filter-value" />
+                        break;
+                    case Editor.DateRange:
+                        <div class="ml-row">
+                            <MudDatePicker T="DateTime?" @bind-Date="current.From" @bind-Date:after="EmitAsync" Label="From" Variant="Variant.Outlined" Margin="Margin.Dense" Editable="true" data-testid="filter-from" />
+                            <MudDatePicker T="DateTime?" @bind-Date="current.To" @bind-Date:after="EmitAsync" Label="To" Variant="Variant.Outlined" Margin="Margin.Dense" Editable="true" data-testid="filter-to" />
+                        </div>
+                        break;
+                    case Editor.Preset:
+                        <MudSelect T="string" @bind-Value="current.Preset" @bind-Value:after="EmitAsync" Label="Period" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="filter-value">
+                            @foreach (var (presetCode, presetLabel) in FilterOperators.DatePresets)
+                            {
+                                <MudSelectItem T="string" Value="@presetCode">@presetLabel</MudSelectItem>
+                            }
+                        </MudSelect>
+                        break;
+                    case Editor.Flag:
+                        <MudSelect T="bool?" @bind-Value="current.Flag" @bind-Value:after="EmitAsync" Label="Value" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="filter-value">
+                            <MudSelectItem T="bool?" Value="true">Yes</MudSelectItem>
+                            <MudSelectItem T="bool?" Value="false">No</MudSelectItem>
+                        </MudSelect>
+                        break;
+                    case Editor.Choices:
+                        <MudSelect T="string" MultiSelection="true" SelectedValues="current.Choices" SelectedValuesChanged="values => ChangeChoicesAsync(current, values)" Label="Values" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="filter-value">
+                            @foreach (var (value, label) in OptionsFor(field))
+                            {
+                                <MudSelectItem T="string" Value="@value">@label</MudSelectItem>
+                            }
+                        </MudSelect>
+                        break;
+                    case Editor.Person:
+                        <MudSelect T="string" @bind-Value="current.Text" @bind-Value:after="EmitAsync" Label="Person" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="filter-value">
+                            <MudSelectItem T="string" Value="@MeValue">Me</MudSelectItem>
+                            @foreach (var user in Users ?? [])
+                            {
+                                <MudSelectItem T="string" Value="@user.Id.ToString()">@user.FullName</MudSelectItem>
+                            }
+                        </MudSelect>
+                        break;
+                }
+            }
+        </div>
+    }
+
+    <div>
+        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Outlined.Add" OnClick="AddRowAsync" Disabled="FilterableFields.Count == 0" data-testid="add-filter">Add filter</MudButton>
+    </div>
+</div>
+
+@code {
+    private const string LogicAnd = "and";
+    private const string LogicOr = "or";
+    private const string MeValue = "@me";
+
+    private enum Editor { None, Text, Number, NumberRange, Date, DateRange, Preset, Flag, Choices, Person }
+
+    private readonly List<FilterRow> _rows = [];
+    private List<FilterGroup> _keepGroups = [];
+    private string _logic = LogicAnd;
+    private FilterGroup? _lastEmitted;
+    private FilterGroup? _lastLoaded;
+
+    /// <summary>The fields of the record type. Only filterable ones are offered.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<FieldDto> Fields { get; set; } = [];
+
+    /// <summary>Picklist values, used for fields whose options are not on the field itself.</summary>
+    [Parameter] public IReadOnlyList<PicklistDto>? Picklists { get; set; }
+
+    /// <summary>People offered for user fields, besides "Me".</summary>
+    [Parameter] public IReadOnlyList<UserListItem>? Users { get; set; }
+
+    [Parameter] public FilterGroup? Value { get; set; }
+    [Parameter] public EventCallback<FilterGroup> ValueChanged { get; set; }
+
+    private List<FieldDto> FilterableFields => Fields.Where(f => f.Filterable && !f.IsHidden).ToList();
+
+    protected override void OnParametersSet()
+    {
+        // Rebuild the rows only when the page gives a different filter than the one this component just reported,
+        // so typing in a row is never overwritten by its own echo.
+        if (ReferenceEquals(Value, _lastEmitted) || ReferenceEquals(Value, _lastLoaded))
+        {
+            return;
+        }
+
+        _lastLoaded = Value;
+        _rows.Clear();
+        _logic = Value?.Logic is LogicOr ? LogicOr : LogicAnd;
+        _keepGroups = Value?.Groups.ToList() ?? [];
+        foreach (var condition in Value?.Conditions ?? [])
+        {
+            if (Fields.FirstOrDefault(f => f.Key == condition.Field) is { } field)
+            {
+                _rows.Add(FilterConverter.ToRow(condition, field));
+            }
+        }
+    }
+
+    private FieldDto? FieldOf(FilterRow row) => Fields.FirstOrDefault(f => f.Key == row.Field);
+
+    private static Editor KindOf(FieldDto field, FilterOperator op)
+    {
+        if (FilterOperators.NeedsNoValue(op))
+        {
+            return Editor.None;
+        }
+
+        var isDate = field.Type is FieldType.Date or FieldType.DateTime;
+        var isNumber = field.Type is FieldType.Number or FieldType.Decimal or FieldType.Currency or FieldType.Percent;
+
+        return op switch
+        {
+            FilterOperator.DatePreset => Editor.Preset,
+            FilterOperator.Between => isDate ? Editor.DateRange : Editor.NumberRange,
+            FilterOperator.In or FilterOperator.NotIn => Editor.Choices,
+            _ when field.Type == FieldType.Boolean => Editor.Flag,
+            _ when isDate => Editor.Date,
+            _ when isNumber => Editor.Number,
+            _ when field.Type is FieldType.User or FieldType.Lookup => Editor.Person,
+            _ => Editor.Text,
+        };
+    }
+
+    private IEnumerable<(string Value, string Label)> OptionsFor(FieldDto field)
+    {
+        if (field.Options is { Count: > 0 })
+        {
+            return field.Options.Select(o => (o.Value, o.Label));
+        }
+
+        var list = Picklists?.FirstOrDefault(p => p.Key == field.PicklistKey);
+        return list is null ? [] : list.Values.Where(v => v.IsActive).Select(v => (v.Value, v.Label));
+    }
+
+    private async Task AddRowAsync()
+    {
+        var field = FilterableFields.FirstOrDefault();
+        if (field is null)
+        {
+            return;
+        }
+
+        _rows.Add(new FilterRow { Field = field.Key, Op = FilterOperators.For(field.Type)[0] });
+        await EmitAsync();
+    }
+
+    private async Task RemoveRowAsync(FilterRow row)
+    {
+        _rows.Remove(row);
+        await EmitAsync();
+    }
+
+    private async Task ChangeFieldAsync(FilterRow row, string key)
+    {
+        var field = Fields.FirstOrDefault(f => f.Key == key);
+        if (field is null)
+        {
+            return;
+        }
+
+        // A different field means different operators and a different kind of value, so start the line again.
+        row.Field = key;
+        row.Op = FilterOperators.For(field.Type)[0];
+        Clear(row);
+        await EmitAsync();
+    }
+
+    private async Task ChangeOperatorAsync(FilterRow row, FieldDto field, FilterOperator op)
+    {
+        var before = KindOf(field, row.Op);
+        row.Op = op;
+        if (KindOf(field, op) != before)
+        {
+            Clear(row);
+        }
+
+        await EmitAsync();
+    }
+
+    private async Task ChangeChoicesAsync(FilterRow row, IEnumerable<string>? values)
+    {
+        row.Choices = values?.ToHashSet() ?? [];
+        await EmitAsync();
+    }
+
+    private static void Clear(FilterRow row)
+    {
+        row.Text = null;
+        row.Number = row.Number2 = null;
+        row.From = row.To = null;
+        row.Preset = null;
+        row.Flag = null;
+        row.Choices = [];
+    }
+
+    private async Task EmitAsync()
+    {
+        _lastEmitted = FilterConverter.ToGroup(_rows, Fields, _logic, _keepGroups);
+        await ValueChanged.InvokeAsync(_lastEmitted);
+    }
+}

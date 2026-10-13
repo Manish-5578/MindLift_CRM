@@ -1,0 +1,94 @@
+@page "/settings/modules"
+@inject HttpClient Http
+@inject AppState App
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageTitle>Modules · MindLift</PageTitle>
+
+<div class="ml-page ml-page--form">
+    <PageHeader Title="Modules" Subtitle="Switch modules on or off, and rename them for your business." />
+    <SettingsNav Current="/settings/modules" />
+
+    @if (_loading)
+    {
+        <SkeletonTable Rows="6" Columns="4" />
+    }
+    else if (_modules is null)
+    {
+        <ErrorState OnRetry="LoadAsync" />
+    }
+    else if (_modules.Count == 0)
+    {
+        <EmptyState Title="No modules yet" Message="Modules appear here once your workspace is set up." />
+    }
+    else
+    {
+        <MlCard Flush="true">
+            <div style="padding:0">
+                @foreach (var module in _modules)
+                {
+                    <div class="ml-row" style="padding:12px 20px;border-bottom:1px solid var(--ml-border);min-height:56px">
+                        <MudSwitch T="bool" Value="module.IsEnabled" ValueChanged="v => ToggleAsync(module, v)" Color="Color.Primary" Disabled="IsCore(module.Module)" aria-label="@($"Enable {module.PluralLabel}")" />
+                        <div class="ml-grow">
+                            <MudText Typo="Typo.subtitle2">@module.PluralLabel</MudText>
+                            <MudText Typo="Typo.caption" Class="ml-muted">Singular: @module.SingularLabel · Key: @module.Module@(IsCore(module.Module) ? " · Always on" : "")</MudText>
+                        </div>
+                        <MudChip T="string" Size="Size.Small" Color="@(module.IsEnabled ? Color.Success : Color.Default)">@(module.IsEnabled ? "On" : "Off")</MudChip>
+                    </div>
+                }
+            </div>
+        </MlCard>
+    }
+</div>
+
+@code {
+    private List<ModuleSettingDto>? _modules;
+    private bool _loading = true;
+
+    /// <summary>How an admin runs the workspace. The server refuses to switch these off, so the switch is not offered.</summary>
+    private static bool IsCore(string module) => module is "Dashboard" or "Users" or "Settings";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!App.IsAdmin)
+        {
+            Nav.NavigateTo("/");
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _modules = await Http.GetFromJsonAsync<List<ModuleSettingDto>>("api/v1/settings/modules");
+        }
+        catch (HttpRequestException)
+        {
+            _modules = null;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ToggleAsync(ModuleSettingDto module, bool enabled)
+    {
+        var response = await Http.PutAsJsonAsync($"api/v1/settings/modules/{module.Module}",
+            new SaveModuleSettingRequest(enabled, module.SingularLabel, module.PluralLabel, module.SortOrder));
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "Could not change this module."), Severity.Error);
+            return;
+        }
+
+        Snackbar.Add($"{module.PluralLabel} {(enabled ? "turned on" : "turned off")}", Severity.Success);
+        await LoadAsync();
+        await App.LoadAsync();
+    }
+}

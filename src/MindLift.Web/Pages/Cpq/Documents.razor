@@ -1,0 +1,556 @@
+@page "/documents"
+@using MindLift.Shared.Contracts
+@using MindLift.Shared.Enums
+@using MindLift.UI.Components
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components.Forms
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+
+<PageTitle>Documents & Smart OCR · MindLift</PageTitle>
+
+<div class="ml-page">
+    <!-- Header -->
+    <div class="d-flex flex-wrap align-center justify-space-between gap-3 mb-4">
+        <div>
+            <MudText Typo="Typo.h5" Style="font-weight:700">Documents & Smart OCR</MudText>
+            <MudText Typo="Typo.body2" Class="ml-muted">Upload contracts, customer proposals, vendor invoices, and track secure customer portal document requests.</MudText>
+        </div>
+
+        <div class="d-flex flex-wrap align-center gap-2">
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Outlined.AssignmentReturn" OnClick="OpenNewRequestDialog" Size="Size.Small">
+                Request Customer File
+            </MudButton>
+            <MudFileUpload T="IBrowserFile" FilesChanged="UploadDocumentAsync" Accept=".pdf,.png,.jpg,.jpeg,.txt">
+                <MudButton HtmlTag="label" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.CloudUpload" Disabled="_uploading" Size="Size.Small">
+                    @if (_uploading) { <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" /> }
+                    Upload Document
+                </MudButton>
+            </MudFileUpload>
+        </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <MudGrid Spacing="3" Class="mb-4">
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 d-flex align-center gap-3" Style="border-radius:12px">
+                <MudAvatar Color="Color.Primary" Variant="Variant.Filled" Size="Size.Medium">
+                    <MudIcon Icon="@Icons.Material.Outlined.FolderShared" />
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.caption" Class="ml-muted">Total Documents</MudText>
+                    <MudText Typo="Typo.h6" Style="font-weight:700">@_documents.Count</MudText>
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 d-flex align-center gap-3" Style="border-radius:12px">
+                <MudAvatar Color="Color.Success" Variant="Variant.Filled" Size="Size.Medium">
+                    <MudIcon Icon="@Icons.Material.Outlined.AutoAwesome" />
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.caption" Class="ml-muted">OCR Processed</MudText>
+                    <MudText Typo="Typo.h6" Style="font-weight:700">@_documents.Count(d => d.OcrStatus == DocumentOcrStatus.Completed)</MudText>
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 d-flex align-center gap-3" Style="border-radius:12px">
+                <MudAvatar Color="Color.Info" Variant="Variant.Filled" Size="Size.Medium">
+                    <MudIcon Icon="@Icons.Material.Outlined.PendingActions" />
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.caption" Class="ml-muted">Open Portal Requests</MudText>
+                    <MudText Typo="Typo.h6" Style="font-weight:700">@_requests.Count(r => r.Status == "Open")</MudText>
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 d-flex align-center gap-3" Style="border-radius:12px">
+                <MudAvatar Color="Color.Warning" Variant="Variant.Filled" Size="Size.Medium">
+                    <MudIcon Icon="@Icons.Material.Outlined.Storage" />
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.caption" Class="ml-muted">Total Storage</MudText>
+                    <MudText Typo="Typo.h6" Style="font-weight:700">@FormatFileSize(_documents.Sum(d => d.FileSizeBytes))</MudText>
+                </div>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Tab Navigation -->
+    <MudTabs @bind-ActivePanelIndex="_activeTab" Rounded="true" Border="true" ApplyEffectsToContainer="true" Class="mb-4">
+        <MudTabPanel Text="Documents & OCR" Icon="@Icons.Material.Outlined.FolderShared" />
+        <MudTabPanel Text="Customer Portal Requests" Icon="@Icons.Material.Outlined.PendingActions" BadgeData="@_requests.Count(r => r.Status == "Open")" BadgeColor="Color.Warning" />
+    </MudTabs>
+
+    @if (_activeTab == 0)
+    {
+        <!-- Filters Bar -->
+        <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-4 d-flex flex-wrap align-center justify-space-between gap-3" Style="border-radius:12px">
+            <div class="d-flex flex-wrap align-center gap-2">
+                <MudTextField @bind-Value="_searchQuery" Placeholder="Search by file name, vendor, invoice #..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.Search" Immediate="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="min-width:280px" />
+                <MudSelect T="string" @bind-Value="_categoryFilter" Placeholder="All Categories" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="min-width:160px">
+                    <MudSelectItem T="string" Value="@("")">All Categories</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Invoice")">Invoice</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Contract")">Contract</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Receipt")">Receipt</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Identity")">Identity</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("General")">General</MudSelectItem>
+                </MudSelect>
+            </div>
+        </MudPaper>
+
+        @if (_loading)
+        {
+            <SkeletonTable Rows="6" Columns="6" />
+        }
+        else if (FilteredDocuments.Count == 0)
+        {
+            <EmptyState Title="No documents found" Subtitle="Upload your first business document to extract vendor names, totals, and invoice numbers." ActionLabel="Upload Document" />
+        }
+        else
+        {
+            <MudTable Items="@FilteredDocuments" Dense="true" Hover="true" Outlined="true" Style="border-radius:12px; overflow:hidden">
+                <HeaderContent>
+                    <MudTh>File</MudTh>
+                    <MudTh>Category</MudTh>
+                    <MudTh>OCR Status</MudTh>
+                    <MudTh>Detected Intelligence</MudTh>
+                    <MudTh>Portal</MudTh>
+                    <MudTh>Upload Date</MudTh>
+                    <MudTh Style="text-align:right">Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="File">
+                        <div class="d-flex align-center gap-2">
+                            <MudAvatar Color="@GetFileColor(context.ContentType)" Variant="Variant.Outlined" Size="Size.Small">
+                                <MudIcon Icon="@GetFileIcon(context.ContentType)" Size="Size.Small" />
+                            </MudAvatar>
+                            <div>
+                                <MudText Typo="Typo.body2" Style="font-weight:600">@context.FileName</MudText>
+                                <MudText Typo="Typo.caption" Class="ml-muted">@FormatFileSize(context.FileSizeBytes)</MudText>
+                            </div>
+                        </div>
+                    </MudTd>
+                    <MudTd DataLabel="Category">
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Default">
+                            @context.Category
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="OCR Status">
+                        <MudChip T="string" Size="Size.Small" Color="@GetOcrColor(context.OcrStatus)" Variant="Variant.Filled">
+                            @context.OcrStatus
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Intelligence">
+                        @if (context.OcrResult != null && (!string.IsNullOrWhiteSpace(context.OcrResult.DetectedVendor) || !string.IsNullOrWhiteSpace(context.OcrResult.DetectedInvoiceNumber) || context.OcrResult.DetectedTotal.HasValue))
+                        {
+                            <div class="d-flex flex-column gap-1">
+                                @if (!string.IsNullOrWhiteSpace(context.OcrResult.DetectedVendor))
+                                {
+                                    <MudText Typo="Typo.body2" Style="font-weight:600">@context.OcrResult.DetectedVendor</MudText>
+                                }
+                                <div class="d-flex align-center gap-2">
+                                    @if (!string.IsNullOrWhiteSpace(context.OcrResult.DetectedInvoiceNumber))
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" Style="font-size:0.75rem">#@context.OcrResult.DetectedInvoiceNumber</MudChip>
+                                    }
+                                    @if (context.OcrResult.DetectedTotal.HasValue)
+                                    {
+                                        <MudText Typo="Typo.caption" Style="font-weight:700; color:var(--mud-palette-success)">@context.OcrResult.DetectedTotal.Value.ToString("N2")</MudText>
+                                    }
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.caption" Class="ml-muted">No structured fields extracted</MudText>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Portal">
+                        @if (context.SharedWithPortal)
+                        {
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Info" Icon="@Icons.Material.Outlined.Public">Shared</MudChip>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.caption" Class="ml-muted">Internal</MudText>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Date">
+                        <MudText Typo="Typo.body2">@context.UploadedAt.ToString("MMM dd, yyyy HH:mm")</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Actions" Style="text-align:right">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Visibility" OnClick="@(() => ViewDocumentDetails(context))">
+                            OCR Details
+                        </MudButton>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    }
+    else
+    {
+        <!-- Customer Requests Table -->
+        @if (_loadingRequests)
+        {
+            <SkeletonTable Rows="5" Columns="5" />
+        }
+        else if (_requests.Count == 0)
+        {
+            <EmptyState Title="No document requests" Subtitle="Request compliance, tax, or contract files from your clients to receive them directly into MindLift." ActionLabel="New Request" OnAction="OpenNewRequestDialog" />
+        }
+        else
+        {
+            <MudTable Items="@_requests" Dense="true" Hover="true" Outlined="true" Style="border-radius:12px; overflow:hidden">
+                <HeaderContent>
+                    <MudTh>Title</MudTh>
+                    <MudTh>Description</MudTh>
+                    <MudTh>Due Date</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Requested Date</MudTh>
+                    <MudTh Style="text-align:right">Action</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Title">
+                        <MudText Typo="Typo.body2" Style="font-weight:600">@context.Title</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Description">
+                        <MudText Typo="Typo.caption" Class="ml-muted">@(context.Description ?? "No instructions provided")</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Due Date">
+                        @if (context.DueDate.HasValue)
+                        {
+                            var isOverdue = context.DueDate.Value < DateOnly.FromDateTime(DateTime.UtcNow) && context.Status == "Open";
+                            <MudChip T="string" Size="Size.Small" Color="@(isOverdue ? Color.Error : Color.Default)" Variant="Variant.Outlined">
+                                @context.DueDate.Value.ToString("MMM dd, yyyy")
+                            </MudChip>
+                        }
+                        else
+                        {
+                            <span class="ml-muted">No deadline</span>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Status">
+                        <MudChip T="string" Size="Size.Small" Color="@GetRequestStatusColor(context.Status)" Variant="Variant.Filled">
+                            @context.Status
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Requested Date">
+                        <MudText Typo="Typo.body2">@context.CreatedAt.ToString("MMM dd, yyyy")</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Action" Style="text-align:right">
+                        @if (context.Status == "Submitted")
+                        {
+                            <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small" StartIcon="@Icons.Material.Outlined.CheckCircle">
+                                Approved
+                            </MudButton>
+                        }
+                        else if (context.Status == "Open")
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Outlined">Awaiting Client</MudChip>
+                        }
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    }
+</div>
+
+<!-- OCR Details Dialog -->
+<MudDialog @bind-Visible="_detailsDialogOpen" Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true })">
+    <TitleContent>
+        <div class="d-flex align-center justify-space-between">
+            <MudText Typo="Typo.h6" Style="font-weight:700">OCR Intelligence · @_activeDoc?.FileName</MudText>
+            <MudChip T="string" Color="@GetOcrColor(_activeDoc?.OcrStatus ?? DocumentOcrStatus.Pending)" Size="Size.Small" Variant="Variant.Filled">
+                @_activeDoc?.OcrStatus
+            </MudChip>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (_activeDoc is not null)
+        {
+            <MudGrid Spacing="2" Class="mb-3">
+                <MudItem xs="12" sm="4">
+                    <MudPaper Elevation="0" Outlined="true" Class="pa-2" Style="border-radius:8px">
+                        <MudText Typo="Typo.caption" Class="ml-muted">Vendor Detected</MudText>
+                        <MudText Typo="Typo.body2" Style="font-weight:600">@(_activeDoc.OcrResult?.DetectedVendor ?? "Not found")</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudPaper Elevation="0" Outlined="true" Class="pa-2" Style="border-radius:8px">
+                        <MudText Typo="Typo.caption" Class="ml-muted">Invoice / Doc #</MudText>
+                        <MudText Typo="Typo.body2" Style="font-weight:600">@(_activeDoc.OcrResult?.DetectedInvoiceNumber ?? "Not found")</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudPaper Elevation="0" Outlined="true" Class="pa-2" Style="border-radius:8px">
+                        <MudText Typo="Typo.caption" Class="ml-muted">Extracted Total</MudText>
+                        <MudText Typo="Typo.body2" Style="font-weight:600; color:var(--mud-palette-success)">@(_activeDoc.OcrResult?.DetectedTotal?.ToString("N2") ?? "Not found")</MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+
+            <MudText Typo="Typo.subtitle2" Style="font-weight:700" Class="mb-1">Extracted Text Content</MudText>
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-3" Style="background:var(--mud-palette-background-grey); border-radius:8px; max-height:220px; overflow-y:auto; font-family:monospace; font-size:0.85rem">
+                @if (!string.IsNullOrWhiteSpace(_activeDoc.OcrResult?.ExtractedText))
+                {
+                    <pre style="white-space:pre-wrap; margin:0">@_activeDoc.OcrResult.ExtractedText</pre>
+                }
+                else
+                {
+                    <span class="ml-muted">No text extracted.</span>
+                }
+            </MudPaper>
+
+            <div class="d-flex align-center justify-space-between">
+                <MudText Typo="Typo.caption" Class="ml-muted">Fields Extracted: @(_activeDoc.OcrResult?.ExtractedFields.Count ?? 0)</MudText>
+                <MudText Typo="Typo.caption" Class="ml-muted">Uploaded: @_activeDoc.UploadedAt.ToString("MMM dd, yyyy HH:mm")</MudText>
+            </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _detailsDialogOpen = false)">Close</MudButton>
+        @if (_activeDoc is not null)
+        {
+            <MudButton Color="Color.Primary" Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Refresh" OnClick="@(() => ReprocessOcrAsync(_activeDoc.Id))">
+                Re-process OCR
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+<!-- Request Customer File Dialog -->
+<MudDialog @bind-Visible="_requestDialogOpen" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight:700">Request Document from Customer</MudText>
+    </TitleContent>
+    <DialogContent>
+        <div class="d-flex flex-column gap-3 py-2">
+            <MudTextField @bind-Value="_newReqTitle" Label="Document Name / Title" Placeholder="e.g. Valid Trade License 2026" Required="true" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudTextField @bind-Value="_newReqDescription" Label="Instructions for Customer" Lines="3" Placeholder="Please ensure the trade license is valid for at least 6 months and stamped." Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudDatePicker @bind-Date="_newReqDueDate" Label="Due Date" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _requestDialogOpen = false)">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SubmitNewRequestAsync" Disabled="@(string.IsNullOrWhiteSpace(_newReqTitle) || _submittingReq)">
+            @if (_submittingReq) { <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" /> }
+            Send Request
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private int _activeTab = 0;
+    private bool _loading = true;
+    private bool _loadingRequests = false;
+    private bool _uploading = false;
+    private List<BusinessDocumentDto> _documents = [];
+    private List<PortalDocumentRequestDto> _requests = [];
+
+    private string _searchQuery = "";
+    private string _categoryFilter = "";
+
+    private bool _detailsDialogOpen = false;
+    private BusinessDocumentDto? _activeDoc;
+
+    // Document request dialog fields
+    private bool _requestDialogOpen = false;
+    private bool _submittingReq = false;
+    private string _newReqTitle = "";
+    private string _newReqDescription = "";
+    private DateTime? _newReqDueDate = DateTime.Today.AddDays(14);
+
+    private List<BusinessDocumentDto> FilteredDocuments => _documents.Where(d =>
+        (string.IsNullOrWhiteSpace(_searchQuery) ||
+         d.FileName.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase) ||
+         (d.OcrResult?.DetectedVendor != null && d.OcrResult.DetectedVendor.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase)) ||
+         (d.OcrResult?.DetectedInvoiceNumber != null && d.OcrResult.DetectedInvoiceNumber.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase))) &&
+        (string.IsNullOrWhiteSpace(_categoryFilter) || d.Category.Equals(_categoryFilter, StringComparison.OrdinalIgnoreCase))
+    ).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDocumentsAsync();
+        await LoadRequestsAsync();
+    }
+
+    private async Task LoadDocumentsAsync()
+    {
+        _loading = true;
+        try
+        {
+            _documents = await Http.GetFromJsonAsync<List<BusinessDocumentDto>>("api/v1/documents") ?? [];
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load documents: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadRequestsAsync()
+    {
+        _loadingRequests = true;
+        try
+        {
+            _requests = await Http.GetFromJsonAsync<List<PortalDocumentRequestDto>>("api/v1/document-requests") ?? [];
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load document requests: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingRequests = false;
+        }
+    }
+
+    private void OpenNewRequestDialog()
+    {
+        _newReqTitle = "";
+        _newReqDescription = "";
+        _newReqDueDate = DateTime.Today.AddDays(14);
+        _requestDialogOpen = true;
+    }
+
+    private async Task SubmitNewRequestAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newReqTitle)) return;
+        _submittingReq = true;
+        try
+        {
+            var req = new SaveDocumentRequest(
+                ContactId: Guid.Empty,
+                AccountId: null,
+                DealId: null,
+                Title: _newReqTitle.Trim(),
+                Description: string.IsNullOrWhiteSpace(_newReqDescription) ? null : _newReqDescription.Trim(),
+                DueDate: _newReqDueDate.HasValue ? DateOnly.FromDateTime(_newReqDueDate.Value) : null
+            );
+
+            var resp = await Http.PostAsJsonAsync("api/v1/document-requests", req);
+            if (resp.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Document request published to customer portal!", Severity.Success);
+                _requestDialogOpen = false;
+                await LoadRequestsAsync();
+                _activeTab = 1;
+            }
+            else
+            {
+                Snackbar.Add("Failed to create document request.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _submittingReq = false;
+        }
+    }
+
+    private Color GetOcrColor(DocumentOcrStatus s) => s switch
+    {
+        DocumentOcrStatus.Completed => Color.Success,
+        DocumentOcrStatus.Processing => Color.Info,
+        DocumentOcrStatus.Failed => Color.Error,
+        _ => Color.Default
+    };
+
+    private Color GetRequestStatusColor(string status) => status switch
+    {
+        "Submitted" => Color.Info,
+        "Completed" => Color.Success,
+        "Cancelled" => Color.Error,
+        _ => Color.Warning
+    };
+
+    private Color GetFileColor(string ct) => ct switch
+    {
+        var x when x.Contains("pdf") => Color.Error,
+        var x when x.Contains("image") => Color.Info,
+        _ => Color.Primary
+    };
+
+    private string GetFileIcon(string ct) => ct switch
+    {
+        var x when x.Contains("pdf") => Icons.Material.Outlined.PictureAsPdf,
+        var x when x.Contains("image") => Icons.Material.Outlined.Image,
+        _ => Icons.Material.Outlined.Description
+    };
+
+    private string FormatFileSize(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024.0):F2} MB";
+    }
+
+    private async Task UploadDocumentAsync(IBrowserFile file)
+    {
+        if (file == null) return;
+        _uploading = true;
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            var streamContent = new StreamContent(file.OpenReadStream(10 * 1024 * 1024)); // 10MB limit
+            streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType ?? "application/octet-stream");
+            content.Add(streamContent, "file", file.Name);
+            content.Add(new StringContent("General"), "category");
+
+            var resp = await Http.PostAsync("api/v1/documents/upload", content);
+            if (resp.IsSuccessStatusCode)
+            {
+                var doc = await resp.Content.ReadFromJsonAsync<BusinessDocumentDto>();
+                Snackbar.Add($"Document '{file.Name}' uploaded and OCR completed!", Severity.Success);
+                await LoadDocumentsAsync();
+            }
+            else
+            {
+                var err = await resp.Content.ReadAsStringAsync();
+                Snackbar.Add($"Upload error: {err}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Upload error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _uploading = false;
+        }
+    }
+
+    private void ViewDocumentDetails(BusinessDocumentDto doc)
+    {
+        _activeDoc = doc;
+        _detailsDialogOpen = true;
+    }
+
+    private async Task ReprocessOcrAsync(Guid id)
+    {
+        try
+        {
+            var resp = await Http.PostAsync($"api/v1/documents/{id}/ocr", null);
+            if (resp.IsSuccessStatusCode)
+            {
+                Snackbar.Add("OCR re-processed successfully!", Severity.Success);
+                await LoadDocumentsAsync();
+                _activeDoc = _documents.FirstOrDefault(d => d.Id == id);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+    }
+}

@@ -1,0 +1,133 @@
+@page "/notifications/preferences"
+@inject HttpClient Http
+@inject AuthSession Session
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>Notification preferences · MindLift</PageTitle>
+
+<div class="ml-page ml-page--form">
+    <PageHeader Title="Notification preferences" Subtitle="Choose what reaches you in MindLift and by email."
+                Breadcrumbs="@(new List<BreadcrumbItem> { new("Notifications", "/notifications"), new("Preferences", null, true) })">
+        <Actions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="_busy || !_dirty" data-testid="primary-action">Save preferences</MudButton>
+        </Actions>
+    </PageHeader>
+
+    @if (_loading)
+    {
+        <SkeletonTable Rows="6" Columns="3" />
+    }
+    else if (_failed)
+    {
+        <ErrorState OnRetry="LoadAsync" />
+    }
+    else
+    {
+        <MlCard>
+            <div style="overflow-x:auto" data-testid="preferences-table">
+                <table style="width:100%;border-collapse:collapse">
+                    <thead>
+                        <tr>
+                            <th style="text-align:start;padding:8px">Tell me when</th>
+                            <th style="padding:8px">In MindLift</th>
+                            <th style="padding:8px">By email</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in _rows)
+                        {
+                            var current = row;
+                            <tr style="border-top:1px solid var(--ml-border)" data-testid="preference-row">
+                                <td style="padding:8px">@current.Label</td>
+                                <td style="text-align:center"><MudCheckBox T="bool" Value="current.InApp" ValueChanged="v => SetInApp(current, v)" Color="Color.Primary" aria-label="@(current.Label + ", in MindLift")" data-testid="@("inapp-" + current.Type)" /></td>
+                                <td style="text-align:center"><MudCheckBox T="bool" Value="current.Email" ValueChanged="v => SetEmail(current, v)" Color="Color.Primary" aria-label="@(current.Label + ", by email")" data-testid="@("email-" + current.Type)" /></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </MlCard>
+
+        <MlCard Title="Daily summary" Class="mt-4">
+            <MudSwitch T="bool" Value="_digest" ValueChanged="v => { _digest = v; _dirty = true; }" Label="Email me my day at 8:00 each morning" Color="Color.Primary" data-testid="digest-switch" />
+            <MudText Typo="Typo.caption" Class="ml-muted">Your tasks and meetings for the day and anything overdue. Nothing is sent on a day with nothing in it.</MudText>
+        </MlCard>
+    }
+</div>
+
+@code {
+    private List<NotificationPreferenceDto> _rows = [];
+    private bool _digest;
+    private bool _loading = true;
+    private bool _failed;
+    private bool _busy;
+    private bool _dirty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.IsSignedIn)
+        {
+            Nav.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _failed = false;
+        try
+        {
+            var prefs = await Http.GetFromJsonAsync<NotificationPreferencesDto>("api/v1/notifications/preferences");
+            _rows = prefs?.Preferences.ToList() ?? [];
+            _digest = prefs?.DailyDigest ?? false;
+            _dirty = false;
+        }
+        catch (HttpRequestException)
+        {
+            _failed = true;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void SetInApp(NotificationPreferenceDto row, bool value) => Replace(row, row with { InApp = value });
+
+    private void SetEmail(NotificationPreferenceDto row, bool value) => Replace(row, row with { Email = value });
+
+    private void Replace(NotificationPreferenceDto old, NotificationPreferenceDto updated)
+    {
+        _rows[_rows.IndexOf(old)] = updated;
+        _dirty = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        _busy = true;
+        try
+        {
+            var response = await Http.PutAsJsonAsync("api/v1/notifications/preferences", new SaveNotificationPreferencesRequest(_rows, _digest));
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add(await ProblemText.FromAsync(response, "We could not save your preferences."), Severity.Error);
+                return;
+            }
+
+            _dirty = false;
+            Snackbar.Add("Preferences saved", Severity.Success);
+        }
+        catch (HttpRequestException)
+        {
+            Snackbar.Add("We could not reach MindLift. Check your connection and try again.", Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

@@ -1,0 +1,197 @@
+@page "/settings/company"
+@inject HttpClient Http
+@inject AuthSession Session
+@inject AppState App
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+@using MindLift.Shared.Validation
+
+<PageTitle>Company settings · MindLift</PageTitle>
+
+<div class="ml-page ml-page--form">
+    <PageHeader Title="Company" Subtitle="Your business details, time zone and tax settings." />
+    <SettingsNav Current="/settings/company" />
+
+    @if (_loading)
+    {
+        <MlCard Loading="true" />
+    }
+    else if (_model is null)
+    {
+        <ErrorState OnRetry="LoadAsync" />
+    }
+    else
+    {
+        <MlCard Title="Business details">
+            <div class="ml-stack">
+                <MudTextField @bind-Value="_draft.CompanyName" Label="Company name" Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" Error="@(_errors.ContainsKey("companyName"))" ErrorText="@(Err("companyName"))" />
+                <MudGrid Spacing="3">
+                    <MudItem xs="12" sm="6"><MudTextField @bind-Value="_draft.Email" Label="Email" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+                    <MudItem xs="12" sm="6"><MudTextField @bind-Value="_draft.Phone" Label="Phone" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+                </MudGrid>
+                <MudGrid Spacing="3">
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="string" @bind-Value="_draft.DefaultLanguage" Label="Default language" Variant="Variant.Outlined" Margin="Margin.Dense">
+                            <MudSelectItem T="string" Value="@("en")">English</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("ar")">العربية</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6"><MudTextField @bind-Value="_draft.TimeZoneId" Label="Time zone (IANA)" Variant="Variant.Outlined" Margin="Margin.Dense" Error="@(_errors.ContainsKey("timeZoneId"))" ErrorText="@(Err("timeZoneId"))" /></MudItem>
+                </MudGrid>
+                <MudGrid Spacing="3">
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="int" @bind-Value="_draft.WeekStartDay" Label="Week starts on" Variant="Variant.Outlined" Margin="Margin.Dense">
+                            <MudSelectItem T="int" Value="1">Monday</MudSelectItem>
+                            <MudSelectItem T="int" Value="0">Sunday</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6"><MudNumericField @bind-Value="_draft.FiscalYearStartMonth" Label="Fiscal year starts (month 1–12)" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" Max="12" /></MudItem>
+                </MudGrid>
+            </div>
+        </MlCard>
+
+        <div style="height:24px"></div>
+
+        <MlCard Title="Tax">
+            <div class="ml-stack">
+                <MudSwitch @bind-Value="_draft.TaxEnabled" Label="We charge tax" Color="Color.Primary" />
+                <MudGrid Spacing="3">
+                    <MudItem xs="12" sm="4"><MudTextField @bind-Value="_draft.TaxLabel" Label="Tax label" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+                    <MudItem xs="12" sm="4"><MudNumericField @bind-Value="_draft.DefaultTaxRate" Label="Rate (%)" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0m" Max="100m" Error="@(_errors.ContainsKey("defaultTaxRate"))" ErrorText="@(Err("defaultTaxRate"))" /></MudItem>
+                    <MudItem xs="12" sm="4"><MudTextField @bind-Value="_draft.TaxRegistrationNumber" Label="Tax registration number" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+                </MudGrid>
+            </div>
+        </MlCard>
+
+        <div style="height:24px"></div>
+
+        <MlCard Title="Brand colour" Subtitle="Replaces the main colour of buttons and links for everyone in your workspace." TestId="brand-colour">
+            <div class="ml-row">
+                <MudTextField @bind-Value="_draft.PrimaryColor" Label="Colour (#RRGGBB)" Placeholder="#4F46E5" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:220px"
+                              Error="@(_errors.ContainsKey("primaryColor") || BrandProblem is not null)" ErrorText="@(Err("primaryColor") ?? BrandProblem)"
+                              HelperText="Leave empty for the MindLift colour." data-testid="brand-colour-input" />
+                <span style="@SwatchStyle" aria-label="Colour preview" data-testid="brand-colour-swatch"></span>
+            </div>
+        </MlCard>
+
+        <div class="ml-row" style="justify-content:flex-end;margin-top:24px">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_busy" OnClick="SaveAsync" data-testid="primary-action">Save changes</MudButton>
+        </div>
+    }
+</div>
+
+@code {
+    private CompanySettingsDto? _model;
+    private EditModel _draft = new();
+    private bool _loading = true;
+    private bool _busy;
+    private Dictionary<string, string> _errors = new();
+
+    private sealed class EditModel
+    {
+        public string CompanyName { get; set; } = string.Empty;
+        public string? Email { get; set; }
+        public string? Phone { get; set; }
+        public string DefaultLanguage { get; set; } = "en";
+        public string TimeZoneId { get; set; } = "UTC";
+        public int WeekStartDay { get; set; } = 1;
+        public int FiscalYearStartMonth { get; set; } = 1;
+        public bool TaxEnabled { get; set; }
+        public string? TaxLabel { get; set; }
+        public decimal DefaultTaxRate { get; set; }
+        public string? TaxRegistrationNumber { get; set; }
+        public string? PrimaryColor { get; set; }
+    }
+
+    private string? Err(string field) => _errors.TryGetValue(field, out var message) ? message : null;
+
+    /// <summary>The same rules as the server (hex format and contrast with white text), so the mistake shows before saving.</summary>
+    private string? BrandProblem => BrandColor.Validate(_draft.PrimaryColor);
+
+    private string SwatchStyle => "display:inline-block;width:32px;height:32px;border-radius:8px;border:1px solid var(--ml-border);background:"
+        + (BrandColor.IsHex(_draft.PrimaryColor) ? _draft.PrimaryColor : "transparent");
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!App.IsAdmin)
+        {
+            Nav.NavigateTo("/");
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _model = await Http.GetFromJsonAsync<CompanySettingsDto>("api/v1/settings/company");
+            _draft = _model is null ? new EditModel() : new EditModel
+            {
+                CompanyName = _model.CompanyName,
+                Email = _model.Email,
+                Phone = _model.Phone,
+                DefaultLanguage = _model.DefaultLanguage,
+                TimeZoneId = _model.TimeZoneId,
+                WeekStartDay = _model.WeekStartDay,
+                FiscalYearStartMonth = _model.FiscalYearStartMonth,
+                TaxEnabled = _model.TaxEnabled,
+                TaxLabel = _model.TaxLabel,
+                DefaultTaxRate = _model.DefaultTaxRate,
+                TaxRegistrationNumber = _model.TaxRegistrationNumber,
+                PrimaryColor = _model.PrimaryColor,
+            };
+        }
+        catch (HttpRequestException)
+        {
+            _model = null;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        // The button stays enabled so people can see why a save is refused (plan 18.8.4). The message is already under the field.
+        if (BrandProblem is not null)
+        {
+            Snackbar.Add("Please fix the highlighted fields.", Severity.Error);
+            return;
+        }
+
+        _busy = true;
+        _errors = new();
+        try
+        {
+            var request = new SaveCompanySettingsRequest(
+                _draft.CompanyName, _draft.Email, _draft.Phone, _draft.DefaultLanguage, _draft.TimeZoneId,
+                _draft.WeekStartDay, _draft.FiscalYearStartMonth, _draft.TaxEnabled, _draft.TaxLabel,
+                _draft.DefaultTaxRate, _draft.TaxRegistrationNumber, string.IsNullOrWhiteSpace(_draft.PrimaryColor) ? null : _draft.PrimaryColor.Trim());
+
+            var response = await Http.PutAsJsonAsync("api/v1/settings/company", request);
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Saved", Severity.Success);
+                await App.LoadAsync();
+                return;
+            }
+
+            _errors = await ProblemText.FieldErrorsAsync(response);
+            Snackbar.Add(_errors.Count > 0 ? "Please fix the highlighted fields." : await ProblemText.FromAsync(response, "Could not save. Try again."), Severity.Error);
+        }
+        catch (HttpRequestException)
+        {
+            Snackbar.Add("We could not reach MindLift. Check your connection and try again.", Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}
+
+

@@ -1,0 +1,675 @@
+@page "/reports/view/{Id:guid}"
+@page "/reports/system/{Key}"
+@using MindLift.Shared.Contracts
+@using MindLift.Shared.Enums
+@using MindLift.UI.Components
+@using System.Net.Http.Json
+@using System.Text.Json
+@using System.Globalization
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+<PageTitle>@(_report?.Name ?? "View Report") · MindLift</PageTitle>
+
+<div class="ml-page">
+    <div class="d-flex flex-wrap align-center justify-space-between gap-3 mb-4">
+        <div class="d-flex align-center gap-3">
+            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Href="/reports" Size="Size.Small" />
+            <div>
+                <div class="d-flex align-center gap-2">
+                    <MudText Typo="Typo.h5" Style="font-weight:700">@(_report?.Name ?? "Loading report...")</MudText>
+                    @if (_report?.IsSystem == true)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Outlined">System</MudChip>
+                    }
+                    else if (_report != null)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">@_report.Visibility</MudChip>
+                    }
+                </div>
+                <MudText Typo="Typo.body2" Class="ml-muted">@(_report?.Description ?? "Analytics and insights")</MudText>
+            </div>
+        </div>
+
+        <div class="d-flex flex-wrap align-center gap-2">
+            <MudSelect T="string" Value="_selectedPeriod" ValueChanged="OnPeriodChanged" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Style="min-width:140px">
+                <MudSelectItem T="string" Value="@("all_time")">All Time</MudSelectItem>
+                <MudSelectItem T="string" Value="@("today")">Today</MudSelectItem>
+                <MudSelectItem T="string" Value="@("this_week")">This Week</MudSelectItem>
+                <MudSelectItem T="string" Value="@("this_month")">This Month</MudSelectItem>
+                <MudSelectItem T="string" Value="@("last_month")">Last Month</MudSelectItem>
+                <MudSelectItem T="string" Value="@("this_quarter")">This Quarter</MudSelectItem>
+                <MudSelectItem T="string" Value="@("this_year")">This Year</MudSelectItem>
+            </MudSelect>
+
+            <MudIconButton Icon="@Icons.Material.Outlined.Refresh" Size="Size.Small" OnClick="() => ExecuteReportAsync()" aria-label="Refresh" />
+
+            <MudMenu Icon="@Icons.Material.Outlined.Download" Label="Export" Variant="Variant.Outlined" Size="Size.Small" Dense="true" EndIcon="@Icons.Material.Filled.KeyboardArrowDown">
+                <MudMenuItem Icon="@Icons.Material.Outlined.PictureAsPdf" OnClick="@(() => ExportAsync("pdf"))">Export as PDF</MudMenuItem>
+                <MudMenuItem Icon="@Icons.Material.Outlined.FilePresent" OnClick="@(() => ExportAsync("csv"))">Export as CSV</MudMenuItem>
+                <MudMenuItem Icon="@Icons.Material.Outlined.TableChart" OnClick="@(() => ExportAsync("excel"))">Export as Excel (XML)</MudMenuItem>
+            </MudMenu>
+
+            @if (Id.HasValue && Id.Value != Guid.Empty)
+            {
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.ScheduleSend" OnClick="OpenScheduleDialogAsync" Size="Size.Small">
+                    Schedule
+                </MudButton>
+            }
+
+            @if (_report != null && !_report.IsSystem)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Edit" Href="@($"/reports/builder/{_report.Id}")" Size="Size.Small">
+                    Edit Builder
+                </MudButton>
+            }
+        </div>
+    </div>
+
+    @if (_loading)
+    {
+        <SkeletonTable Rows="8" Columns="5" />
+    }
+    else if (_error != null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@_error</MudAlert>
+    }
+    else if (_result != null)
+    {
+        <!-- Metrics / Summary Ribbon -->
+        <div class="d-flex flex-wrap gap-3 mb-4">
+            <div class="pa-3 rounded-lg flex-1" style="background:var(--ml-card-bg, #fff); border:1px solid var(--ml-border); min-width:150px">
+                <MudText Typo="Typo.caption" Class="ml-muted" Style="font-weight:600; text-transform:uppercase">Total Rows</MudText>
+                <MudText Typo="Typo.h5" Style="font-weight:700">@_result.RowCount.ToString("N0")</MudText>
+            </div>
+            <div class="pa-3 rounded-lg flex-1" style="background:var(--ml-card-bg, #fff); border:1px solid var(--ml-border); min-width:150px">
+                <MudText Typo="Typo.caption" Class="ml-muted" Style="font-weight:600; text-transform:uppercase">Execution Time</MudText>
+                <MudText Typo="Typo.h5" Style="font-weight:700">@(_result.ExecutionMs) ms</MudText>
+            </div>
+            @if (_result.Totals != null && _result.Totals.Count > 0)
+            {
+                @foreach (var t in _result.Totals.Take(3))
+                {
+                    <div class="pa-3 rounded-lg flex-1" style="background:var(--ml-card-bg, #fff); border:1px solid var(--ml-border); min-width:160px">
+                        <MudText Typo="Typo.caption" Class="ml-muted" Style="font-weight:600; text-transform:uppercase">@FormatColumnHeader(t.Key)</MudText>
+                        <MudText Typo="Typo.h5" Style="font-weight:700; color:var(--mud-palette-primary)">@(t.Value?.ToString() ?? "0")</MudText>
+                    </div>
+                }
+            }
+        </div>
+
+        <!-- Visual Chart Card (if visualization specified) -->
+        @if (HasVisualization)
+        {
+            <MlCard Title="Data Visualization" Class="mb-4">
+                @RenderChart()
+            </MlCard>
+        }
+
+        <!-- Tabular / Grouped Data Table -->
+        <MlCard Title="Report Records" Subtitle="@($"{_result.Rows.Count} of {_result.RowCount} rows loaded")">
+            <div style="overflow-x:auto">
+                <table class="mud-table-root" style="width:100%; border-collapse:collapse; font-size:0.875rem">
+                    <thead style="background:rgba(0,0,0,0.03); border-bottom:2px solid var(--ml-border)">
+                        <tr>
+                            @foreach (var col in _result.Columns)
+                            {
+                                <th style="padding:10px 14px; text-align:@(col.Type == "Decimal" || col.Type == "Integer" ? "right" : "left"); font-weight:600; font-size:0.8rem; text-transform:uppercase; letter-spacing:0.5px" class="ml-muted">
+                                    @col.Label
+                                </th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (_result.Rows.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="@_result.Columns.Count" style="text-align:center; padding:32px" class="ml-muted">
+                                    No records match this reporting period and filter criteria.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @for (int i = 0; i < _result.Rows.Count; i++)
+                            {
+                                var row = _result.Rows[i];
+                                <tr style="border-bottom:1px solid var(--ml-border); background:@(i % 2 == 1 ? "rgba(0,0,0,0.015)" : "transparent")">
+                                    @foreach (var col in _result.Columns)
+                                    {
+                                        row.TryGetValue(col.Key, out var cellVal);
+                                        <td style="padding:9px 14px; text-align:@(col.Type == "Decimal" || col.Type == "Integer" ? "right" : "left")">
+                                            @FormatCellValue(cellVal, col)
+                                        </td>
+                                    }
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                    @if (_result.Totals != null && _result.Totals.Count > 0)
+                    {
+                        <tfoot style="background:rgba(0,0,0,0.04); font-weight:700; border-top:2px solid var(--ml-border)">
+                            <tr>
+                                @foreach (var col in _result.Columns)
+                                {
+                                    <td style="padding:10px 14px; text-align:@(col.Type == "Decimal" || col.Type == "Integer" ? "right" : "left")">
+                                        @if (_result.Totals.TryGetValue(col.Key, out var totVal))
+                                        {
+                                            @(totVal?.ToString() ?? "0")
+                                        }
+                                        else if (col == _result.Columns.FirstOrDefault())
+                                        {
+                                            <span>TOTAL</span>
+                                        }
+                                    </td>
+                                }
+                            </tr>
+                        </tfoot>
+                    }
+                </table>
+            </div>
+        </MlCard>
+    }
+</div>
+
+<MudDialog @bind-Visible="_schedulesDialogOpen" Options="new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true }">
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Outlined.ScheduleSend" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">Scheduled Deliveries · @(_report?.Name)</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="ml-muted mb-4">
+            Automatically generate and email this report to your team or stakeholders on a recurring schedule.
+        </MudText>
+
+        <!-- Existing Schedules -->
+        <MudText Typo="Typo.subtitle2" Style="font-weight:600" Class="mb-2">Configured Schedules</MudText>
+        @if (_loadingSchedules)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-3" />
+        }
+        else if (_schedules.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-4">
+                No schedules configured for this report yet. Configure your first scheduled delivery below.
+            </MudAlert>
+        }
+        else
+        {
+            <div class="d-flex flex-column gap-2 mb-4">
+                @foreach (var s in _schedules)
+                {
+                    <div class="d-flex align-center justify-space-between pa-3 rounded-lg" style="background:rgba(0,0,0,0.02); border:1px solid var(--ml-border)">
+                        <div>
+                            <div class="d-flex align-center gap-2">
+                                <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled">@s.Format.ToUpperInvariant()</MudChip>
+                                <MudText Typo="Typo.subtitle2" Style="font-weight:600">@FormatCronDescription(s.CronExpression)</MudText>
+                                <MudChip T="string" Size="Size.Small" Color="@(s.IsActive ? Color.Success : Color.Default)" Variant="Variant.Outlined">
+                                    @(s.IsActive ? "Active" : "Paused")
+                                </MudChip>
+                            </div>
+                            <MudText Typo="Typo.caption" Class="ml-muted mt-1">
+                                Recipients: @string.Join(", ", s.Recipients)
+                                @if (s.LastRunAt.HasValue)
+                                {
+                                    <span> · Last sent @s.LastRunAt.Value.ToShortDateString()</span>
+                                }
+                            </MudText>
+                        </div>
+                        <div class="d-flex align-center gap-1">
+                            <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Color="Color.Error" OnClick="() => DeleteScheduleAsync(s.Id)" aria-label="Delete schedule" />
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        <!-- Add New Schedule Form -->
+        <MudDivider Class="my-3" />
+        <MudText Typo="Typo.subtitle2" Style="font-weight:600" Class="mb-3">Add New Schedule</MudText>
+
+        <MudGrid Spacing="2">
+            <MudItem xs="12" sm="6">
+                <MudSelect T="string" @bind-Value="_newScheduleFrequency" Label="Delivery Frequency" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem Value="@("daily")">Daily (8:00 AM UTC)</MudSelectItem>
+                    <MudSelectItem Value="@("weekly")">Weekly (Monday 8:00 AM UTC)</MudSelectItem>
+                    <MudSelectItem Value="@("monthly")">Monthly (1st of month 8:00 AM UTC)</MudSelectItem>
+                    <MudSelectItem Value="@("custom")">Custom Cron Expression</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="string" @bind-Value="_newScheduleFormat" Label="Export Format" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem Value="@("pdf")">PDF Document</MudSelectItem>
+                    <MudSelectItem Value="@("csv")">CSV Spreadsheet</MudSelectItem>
+                    <MudSelectItem Value="@("excel")">Excel Spreadsheet (XML)</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            @if (_newScheduleFrequency == "custom")
+            {
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_newScheduleCron" Label="Cron Expression" Placeholder="0 8 * * 1" HelperText="Standard 5-part cron: min hour dom month dow" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+            }
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_newScheduleRecipients" Label="Recipient Email Addresses" Placeholder="alice@company.com, bob@company.com" HelperText="Comma-separated email addresses" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _schedulesDialogOpen = false">Close</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveNewScheduleAsync" Disabled="_savingSchedule">
+            @if (_savingSchedule)
+            {
+                <MudProgressCircular Indeterminate="true" Size="Size.Small" Class="mr-2" />
+            }
+            Save Schedule
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public Guid? Id { get; set; }
+    [Parameter] public string? Key { get; set; }
+
+    private ReportDefinitionDto? _report;
+    private ReportResult? _result;
+    private bool _loading = true;
+    private string? _error;
+    private string _selectedPeriod = "this_month";
+
+    // Schedule Dialog State
+    private bool _schedulesDialogOpen;
+    private List<ReportScheduleDto> _schedules = [];
+    private bool _loadingSchedules;
+    private bool _savingSchedule;
+    private string _newScheduleFrequency = "weekly";
+    private string _newScheduleFormat = "pdf";
+    private string _newScheduleCron = "0 8 * * 1";
+    private string _newScheduleRecipients = "";
+
+    private bool HasVisualization =>
+        _report?.Query?.Visualization != null &&
+        _report.Query.Visualization.ChartType != ReportChartType.Table &&
+        _report.Query.Visualization.ChartType != ReportChartType.None &&
+        _result != null && _result.Rows.Count > 0;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadReportAsync();
+    }
+
+    private async Task LoadReportAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            if (Id.HasValue)
+            {
+                _report = await Http.GetFromJsonAsync<ReportDefinitionDto>($"api/v1/reports/{Id.Value}");
+            }
+            else if (!string.IsNullOrWhiteSpace(Key))
+            {
+                var systemReports = await Http.GetFromJsonAsync<List<ReportDefinitionDto>>("api/v1/reports") ?? [];
+                _report = systemReports.FirstOrDefault(r => string.Equals(r.SystemKey, Key, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (_report != null)
+            {
+                await ExecuteReportAsync();
+            }
+            else
+            {
+                _error = "Report not found.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Could not load report: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ExecuteReportAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var query = _report?.Query ?? new ReportQuery();
+
+            // Override date filter preset based on dropdown
+            if (_selectedPeriod != "all_time")
+            {
+                var dateCol = query.DateFilter?.Field ?? "created_at";
+                query.DateFilter = new ReportDateFilter(dateCol, _selectedPeriod);
+            }
+            else
+            {
+                query.DateFilter = null;
+            }
+
+            var resp = await Http.PostAsJsonAsync("api/v1/reports/run", query);
+            if (resp.IsSuccessStatusCode)
+            {
+                _result = await resp.Content.ReadFromJsonAsync<ReportResult>();
+            }
+            else
+            {
+                _error = "Failed to execute report query.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Execution error: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OnPeriodChanged(string period)
+    {
+        _selectedPeriod = period;
+        await ExecuteReportAsync();
+    }
+
+    private async Task ExportAsync(string format)
+    {
+        try
+        {
+            var query = _report?.Query ?? new ReportQuery();
+            if (_selectedPeriod != "all_time")
+            {
+                var dateCol = query.DateFilter?.Field ?? "created_at";
+                query.DateFilter = new ReportDateFilter(dateCol, _selectedPeriod);
+            }
+            else
+            {
+                query.DateFilter = null;
+            }
+
+            HttpResponseMessage resp;
+            if (Id.HasValue && Id.Value != Guid.Empty)
+            {
+                resp = await Http.GetAsync($"api/v1/reports/{Id.Value}/export?format={format}");
+            }
+            else if (!string.IsNullOrWhiteSpace(Key))
+            {
+                resp = await Http.GetAsync($"api/v1/reports/system/{Key}/export?format={format}");
+            }
+            else
+            {
+                // For ad-hoc queries, run and export CSV locally
+                var runResp = await Http.PostAsJsonAsync("api/v1/reports/run", query);
+                if (!runResp.IsSuccessStatusCode)
+                {
+                    Snackbar.Add("Could not export report.", Severity.Error);
+                    return;
+                }
+                var res = await runResp.Content.ReadFromJsonAsync<ReportResult>();
+                if (res == null) return;
+
+                var csv = GenerateCsv(res);
+                var bytes = System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(csv)).ToArray();
+                var safeName = (_report?.Name ?? "report").Replace(" ", "_");
+                await JS.InvokeVoidAsync("mindlift.downloadFile", $"{safeName}.csv", "text/csv", Convert.ToBase64String(bytes));
+                Snackbar.Add("Export downloaded", Severity.Success);
+                return;
+            }
+
+            if (resp.IsSuccessStatusCode)
+            {
+                var bytes = await resp.Content.ReadAsByteArrayAsync();
+                var (ext, mime) = format.ToLowerInvariant() switch
+                {
+                    "pdf" => ("pdf", "application/pdf"),
+                    "excel" => ("xml", "application/vnd.ms-excel"),
+                    _ => ("csv", "text/csv")
+                };
+                var safeName = (_report?.Name ?? "report").Replace(" ", "_");
+                await JS.InvokeVoidAsync("mindlift.downloadFile", $"{safeName}.{ext}", mime, Convert.ToBase64String(bytes));
+                Snackbar.Add("Export downloaded", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Export failed.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Export error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task OpenScheduleDialogAsync()
+    {
+        if (!Id.HasValue) return;
+        _schedulesDialogOpen = true;
+        _loadingSchedules = true;
+        try
+        {
+            _schedules = await Http.GetFromJsonAsync<List<ReportScheduleDto>>($"api/v1/reports/{Id.Value}/schedules") ?? [];
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Could not load schedules: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loadingSchedules = false;
+        }
+    }
+
+    private async Task SaveNewScheduleAsync()
+    {
+        if (!Id.HasValue) return;
+        var emails = _newScheduleRecipients
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(e => e.Contains('@'))
+            .ToList();
+
+        if (emails.Count == 0)
+        {
+            Snackbar.Add("Please enter at least one valid recipient email address.", Severity.Warning);
+            return;
+        }
+
+        var cron = _newScheduleFrequency switch
+        {
+            "daily" => "0 8 * * *",
+            "weekly" => "0 8 * * 1",
+            "monthly" => "0 8 1 * *",
+            _ => string.IsNullOrWhiteSpace(_newScheduleCron) ? "0 8 * * 1" : _newScheduleCron
+        };
+
+        _savingSchedule = true;
+        try
+        {
+            var req = new SaveReportScheduleRequest
+            {
+                CronExpression = cron,
+                Format = _newScheduleFormat,
+                Recipients = emails,
+                IsActive = true
+            };
+
+            var resp = await Http.PostAsJsonAsync($"api/v1/reports/{Id.Value}/schedules", req);
+            if (resp.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Schedule saved successfully!", Severity.Success);
+                _newScheduleRecipients = "";
+                _schedules = await Http.GetFromJsonAsync<List<ReportScheduleDto>>($"api/v1/reports/{Id.Value}/schedules") ?? [];
+            }
+            else
+            {
+                Snackbar.Add("Failed to save schedule.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving schedule: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _savingSchedule = false;
+        }
+    }
+
+    private async Task DeleteScheduleAsync(Guid scheduleId)
+    {
+        try
+        {
+            var resp = await Http.DeleteAsync($"api/v1/reports/schedules/{scheduleId}");
+            if (resp.IsSuccessStatusCode)
+            {
+                _schedules.RemoveAll(s => s.Id == scheduleId);
+                Snackbar.Add("Schedule deleted.", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Failed to delete schedule.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error deleting schedule: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private static string FormatCronDescription(string cron) => cron switch
+    {
+        "0 8 * * *" => "Daily at 8:00 AM UTC",
+        "0 8 * * 1" => "Every Monday at 8:00 AM UTC",
+        "0 8 1 * *" => "1st of every month at 8:00 AM UTC",
+        _ => $"Cron: {cron}"
+    };
+
+    private static string GenerateCsv(ReportResult res)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine(string.Join(",", res.Columns.Select(c => $"\"{c.Label.Replace("\"", "\"\"")}\"")));
+        foreach (var r in res.Rows)
+        {
+            var vals = res.Columns.Select(c =>
+            {
+                r.TryGetValue(c.Key, out var v);
+                return $"\"{v?.ToString()?.Replace("\"", "\"\"")}\"";
+            });
+            sb.AppendLine(string.Join(",", vals));
+        }
+        return sb.ToString();
+    }
+
+    private RenderFragment RenderChart() => __builder =>
+    {
+        if (_result == null || _result.Rows.Count == 0 || _report?.Query?.Visualization == null) return;
+        var vis = _report.Query.Visualization;
+        var xCol = vis.XAxisField ?? _result.Columns.FirstOrDefault()?.Key ?? "";
+        var valCol = vis.SeriesFields.FirstOrDefault() ?? _result.Columns.Skip(1).FirstOrDefault()?.Key ?? "";
+
+        var items = _result.Rows.Select(r =>
+        {
+            r.TryGetValue(xCol, out var xVal);
+            r.TryGetValue(valCol, out var yVal);
+            decimal num = 0;
+            if (yVal != null) decimal.TryParse(yVal.ToString(), out num);
+            return (Label: xVal?.ToString() ?? "Unknown", Value: num);
+        }).ToList();
+
+        var maxVal = items.Count == 0 ? 1m : Math.Max(1m, items.Max(i => i.Value));
+
+        if (vis.ChartType == ReportChartType.Bar || vis.ChartType == ReportChartType.StackedBar)
+        {
+            <div class="d-flex flex-column gap-3 py-2">
+                @foreach (var item in items.Take(12))
+                {
+                    var pct = (int)(item.Value / maxVal * 100);
+                    <div>
+                        <div class="d-flex justify-space-between align-center mb-1">
+                            <MudText Typo="Typo.body2" Style="font-weight:600">@item.Label</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight:700">@item.Value.ToString("N0")</MudText>
+                        </div>
+                        <MudProgressLinear Value="@pct" Color="Color.Primary" Rounded="true" Size="Size.Medium" />
+                    </div>
+                }
+            </div>
+        }
+        else if (vis.ChartType == ReportChartType.Column || vis.ChartType == ReportChartType.Line || vis.ChartType == ReportChartType.Area)
+        {
+            <div class="d-flex align-end gap-2 pt-4 pb-2" style="height:220px; overflow-x:auto">
+                @foreach (var item in items.Take(16))
+                {
+                    var barHeight = Math.Max(4, (int)(item.Value / maxVal * 100));
+                    <div class="flex-1 d-flex flex-column align-center" style="height:100%; min-width:48px; justify-content:flex-end">
+                        <div style="@($"width:100%; height:{barHeight}%; background:linear-gradient(180deg, var(--mud-palette-primary) 0%, rgba(99,102,241,0.6) 100%); border-radius:6px 6px 0 0")" title="@($"{item.Label}: {item.Value:N0}")"></div>
+                        <MudText Typo="Typo.caption" Style="font-size:11px; margin-top:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:60px" Class="ml-muted">
+                            @item.Label
+                        </MudText>
+                    </div>
+                }
+            </div>
+        }
+        else if (vis.ChartType == ReportChartType.Funnel)
+        {
+            <div class="d-flex flex-column gap-2 py-2">
+                @foreach (var item in items)
+                {
+                    var pct = (int)(item.Value / maxVal * 100);
+                    <div class="mb-2">
+                        <div class="d-flex justify-space-between align-center mb-1">
+                            <MudText Typo="Typo.body2" Style="font-weight:600">@item.Label</MudText>
+                            <MudText Typo="Typo.body2">@item.Value.ToString("N0") (@pct%)</MudText>
+                        </div>
+                        <MudProgressLinear Value="@pct" Color="Color.Primary" Rounded="true" Size="Size.Small" />
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="d-flex flex-wrap gap-3 py-2">
+                @foreach (var item in items.Take(8))
+                {
+                    <div class="pa-3 rounded-lg flex-1" style="background:rgba(0,0,0,0.02); border:1px solid var(--ml-border); min-width:140px">
+                        <MudText Typo="Typo.caption" Class="ml-muted" Style="font-weight:600">@item.Label</MudText>
+                        <MudText Typo="Typo.h6" Style="font-weight:700">@item.Value.ToString("N0")</MudText>
+                    </div>
+                }
+            </div>
+        }
+    };
+
+    private static string FormatCellValue(object? val, ReportColumn col)
+    {
+        if (val == null) return "—";
+        var str = val.ToString() ?? "";
+        if (col.Type == "Decimal" && decimal.TryParse(str, out var d))
+        {
+            return d.ToString("N2");
+        }
+        if (col.Type == "Integer" && long.TryParse(str, out var n))
+        {
+            return n.ToString("N0");
+        }
+        if (col.Type == "Date" && DateTime.TryParse(str, out var dt))
+        {
+            return dt.ToLocalTime().ToString("g");
+        }
+        return str;
+    }
+
+    private static string FormatColumnHeader(string key)
+    {
+        var clean = key.Replace("_", " ");
+        return CultureInfo.CurrentCulture.TextInfo.ToTitleCase(clean);
+    }
+}

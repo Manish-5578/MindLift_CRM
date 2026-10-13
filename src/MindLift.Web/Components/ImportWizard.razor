@@ -1,0 +1,289 @@
+@using System.Text
+@using Microsoft.AspNetCore.Components.Forms
+@using MindLift.Shared.Imports
+@inject HttpClient Http
+@inject AuthSession Session
+@inject AppState App
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>Import @ItemLabel · MindLift</PageTitle>
+
+<div class="ml-page ml-page--form">
+    <PageHeader Title="@("Import " + ItemLabel)" Subtitle="Bring in a list from a CSV file. Nothing is changed until you press Import."
+                Breadcrumbs="@(new List<BreadcrumbItem> { new(App.ModuleLabel(Module), ListHref), new("Import", null, true) })" />
+
+    <div class="ml-row ml-row--wrap" style="margin-bottom:16px" data-testid="import-steps">
+        @foreach (var (number, title) in Steps)
+        {
+            <StatusChip Text="@($"{number}. {title}")" Dot="false" Color="@StepColor(number)" />
+        }
+    </div>
+
+    @if (_step == 1)
+    {
+        <MlCard Title="Choose a file" Subtitle="@("A CSV file with one " + Singular + " per row and the column names in the first row.")" TestId="import-step-file">
+            <div class="ml-stack">
+                <FileDropZone @ref="_drop" Accept=".csv,text/csv" MaxSizeMb="5" Multiple="false" HintText="CSV · up to 5,000 rows" FilesChanged="OnFileChosen" />
+                @if (_fileError is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true" data-testid="import-file-error">@_fileError</MudAlert>
+                }
+
+                <MudText Typo="Typo.body2" Class="ml-muted">
+                    We read these columns: @string.Join(", ", Fields.Select(f => f.Label)). Anything else is ignored. @RequiredLabel is required.
+                </MudText>
+                <div>
+                    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Outlined.Download" Href="@TemplateHref" download="@TemplateFileName" data-testid="download-template">Download a template</MudButton>
+                </div>
+            </div>
+        </MlCard>
+    }
+    else if (_step == 2)
+    {
+        <MlCard Title="@_fileName" Subtitle="@($"{_rows.Count - 1:N0} rows found")" Class="mb-4" TestId="import-step-check">
+            <div class="ml-stack">
+                <MudText Typo="Typo.subtitle2">How we read your columns</MudText>
+                @foreach (var match in _matches)
+                {
+                    <div class="ml-row" style="padding:4px 0;border-bottom:1px solid var(--ml-border)" data-testid="column-match">
+                        <MudText Typo="Typo.body2" Class="ml-grow">@(string.IsNullOrWhiteSpace(match.Header) ? "(no name)" : match.Header)</MudText>
+                        @if (match.Field is null)
+                        {
+                            <StatusChip Text="Ignored" Dot="false" />
+                        }
+                        else
+                        {
+                            <StatusChip Text="@("Used as " + match.FieldLabel)" Color="@StatusColors.For("Won")" Dot="false" />
+                        }
+                    </div>
+                }
+
+                @if (!HasRequired)
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true" data-testid="import-no-first-name">There is no @RequiredLabel column, so nothing can be imported. Rename a column or choose another file.</MudAlert>
+                }
+
+                @if (TooManyRows)
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true" data-testid="import-too-many">This file has more than 5,000 rows. Split it into smaller files.</MudAlert>
+                }
+                else if (HasRequired && _rows.Count - 1 > 0)
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true">Rows with an email or phone that already exists are skipped. Rows without a first name are reported.</MudAlert>
+                }
+            </div>
+        </MlCard>
+
+        <MlCard Title="Preview" Subtitle="The first rows of your file." Class="mb-4" TestId="import-preview">
+            <div style="overflow-x:auto">
+                <table class="ml-table">
+                    <thead>
+                        <tr>
+                            @foreach (var header in _rows[0])
+                            {
+                                <th>@header</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in _rows.Skip(1).Take(5))
+                        {
+                            <tr>
+                                @for (var i = 0; i < _rows[0].Count; i++)
+                                {
+                                    <td>@(i < row.Count ? row[i] : string.Empty)</td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </MlCard>
+
+        <div class="ml-row" style="justify-content:space-between">
+            <MudButton Variant="Variant.Outlined" OnClick="Back" Disabled="_busy">Back</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ImportAsync" Disabled="_busy" data-testid="import-submit">
+                @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }
+                else { @("Import " + (_rows.Count - 1).ToString("N0") + " " + ItemLabel) }
+            </MudButton>
+        </div>
+    }
+    else
+    {
+        <MlCard Title="Import finished" Subtitle="@_fileName" Class="mb-4" TestId="import-step-result">
+            <div class="ml-stack">
+                <div class="ml-row ml-row--wrap">
+                    <StatusChip Text="@($"{_result!.Created:N0} imported")" Color="@StatusColors.For("Won")" />
+                    <StatusChip Text="@($"{_result.Skipped:N0} skipped as duplicates")" Dot="false" />
+                    @if (_result.Failed > 0)
+                    {
+                        <StatusChip Text="@($"{_result.Failed:N0} could not be imported")" Color="@StatusColors.For("Lost")" />
+                    }
+                </div>
+
+                @if (_result.Errors.Count > 0)
+                {
+                    <MudText Typo="Typo.subtitle2">What went wrong</MudText>
+                    <div class="ml-stack-sm" data-testid="import-errors">
+                        @foreach (var error in _result.Errors)
+                        {
+                            <MudText Typo="Typo.body2" Class="ml-muted">@error</MudText>
+                        }
+                    </div>
+                }
+            </div>
+        </MlCard>
+
+        <div class="ml-row" style="justify-content:flex-end">
+            <MudButton Variant="Variant.Outlined" OnClick="StartOver">Import another file</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="@ListHref" data-testid="import-done">View @ItemLabel</MudButton>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public AppModule Module { get; set; }
+    [Parameter, EditorRequired] public string Endpoint { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string ListHref { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public IReadOnlyList<(string Field, string Label, string[] Aliases)> Fields { get; set; } = [];
+    [Parameter, EditorRequired] public string RequiredField { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string RequiredLabel { get; set; } = string.Empty;
+
+    /// <summary>One record in plain words, for example "contact".</summary>
+    [Parameter, EditorRequired] public string Singular { get; set; } = string.Empty;
+
+    private const long MaxFileBytes = 5L * 1024 * 1024;
+    private const int MaxRows = 5000;
+
+    private static readonly (int Number, string Title)[] Steps = [(1, "Choose file"), (2, "Check"), (3, "Done")];
+
+    private FileDropZone? _drop;
+    private int _step = 1;
+    private bool _busy;
+    private string? _fileError;
+    private string _fileName = string.Empty;
+    private string _csv = string.Empty;
+    private List<List<string>> _rows = [];
+    private IReadOnlyList<ColumnMatch> _matches = [];
+    private ImportResultDto? _result;
+
+    private string ItemLabel => App.ModuleLabel(Module).ToLowerInvariant();
+
+    private bool HasRequired => _matches.Any(m => m.Field == RequiredField);
+
+    private bool TooManyRows => _rows.Count - 1 > MaxRows;
+
+    private string TemplateFileName => ItemLabel + "-template.csv";
+
+    private string TemplateHref => "data:text/csv;charset=utf-8," + Uri.EscapeDataString(ImportColumns.TemplateCsv(Fields));
+
+    private string StepColor(int number) => StatusColors.For(number == _step ? "Working" : number < _step ? "Won" : "Open");
+
+    protected override void OnInitialized()
+    {
+        if (!Session.IsSignedIn)
+        {
+            Nav.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        if (App.Bootstrap is not null && !CanImport)
+        {
+            Nav.NavigateTo(ListHref);
+        }
+    }
+
+    private bool CanImport => App.Bootstrap?.Permissions.Any(p => p.Module == Module.ToString() && p.CanImport) == true;
+
+    private async Task OnFileChosen(IReadOnlyList<IBrowserFile> files)
+    {
+        _fileError = null;
+        var file = files.FirstOrDefault();
+        if (file is null)
+        {
+            return;
+        }
+
+        try
+        {
+            using var stream = file.OpenReadStream(MaxFileBytes);
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer);
+            var text = CsvText.Decode(buffer.ToArray());
+            var rows = CsvText.Parse(text);
+            if (rows.Count < 2)
+            {
+                _fileError = "The file needs a header row and at least one row of " + ItemLabel + ".";
+                return;
+            }
+
+            _fileName = file.Name;
+            _csv = text;
+            _rows = rows;
+            _matches = ImportColumns.Recognize(rows[0], Fields);
+            _step = 2;
+        }
+        catch (IOException)
+        {
+            _fileError = "We could not read this file. Try saving it as CSV again.";
+        }
+    }
+
+    private void Back()
+    {
+        _step = 1;
+        _rows = [];
+        _csv = string.Empty;
+    }
+
+    private async Task ImportAsync()
+    {
+        if (!HasRequired)
+        {
+            Snackbar.Add("Add a " + RequiredLabel + " column before importing.", Severity.Error);
+            return;
+        }
+
+        if (TooManyRows)
+        {
+            Snackbar.Add("Split the file into smaller files of up to 5,000 rows.", Severity.Error);
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            var response = await Http.PostAsync(Endpoint, new StringContent(_csv, Encoding.UTF8, "text/csv"));
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add(await ProblemText.FromAsync(response, "We could not import this file."), Severity.Error);
+                return;
+            }
+
+            _result = await response.Content.ReadFromJsonAsync<ImportResultDto>();
+            _step = 3;
+        }
+        catch (HttpRequestException)
+        {
+            Snackbar.Add("We could not reach MindLift. Check your connection and try again.", Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task StartOver()
+    {
+        _step = 1;
+        _result = null;
+        _rows = [];
+        _csv = string.Empty;
+        _fileName = string.Empty;
+        if (_drop is not null)
+        {
+            await _drop.ClearAsync();
+        }
+    }
+}

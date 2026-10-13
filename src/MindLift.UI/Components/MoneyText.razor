@@ -1,0 +1,10 @@
+<span class="ml-num" title="@FullValue">@Display</span>
+
+@code {
+    [Parameter] public decimal? Amount { get; set; }
+    [Parameter] public string Currency { get; set; } = "AED";
+    [Parameter] public bool Compact { get; set; }
+
+    private string Display => Amount is null ? "—" : Compact ? Formatting.Compact(Amount.Value, Currency) : Formatting.Full(Amount.Value, Currency);
+    private string? FullValue => Amount is null ? null : Formatting.Full(Amount.Value, Currency);
+}

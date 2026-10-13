@@ -1,0 +1,168 @@
+@page "/settings/users"
+@inject HttpClient Http
+@inject AppState App
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+
+<PageTitle>Users · MindLift</PageTitle>
+
+<div class="ml-page ml-page--form">
+    <PageHeader Title="Users" Subtitle="Invite people, change roles and deactivate accounts.">
+        <Actions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => _invite = true" data-testid="primary-action">Invite user</MudButton>
+        </Actions>
+    </PageHeader>
+    <SettingsNav Current="/settings/users" />
+
+    @if (_loading)
+    {
+        <SkeletonTable Rows="6" Columns="4" />
+    }
+    else if (_users is null)
+    {
+        <ErrorState OnRetry="LoadAsync" />
+    }
+    else
+    {
+        @if (_pending is not null)
+        {
+            <MudAlert Severity="Severity.Warning" Class="mb-3" data-testid="deactivate-confirm">
+                Deactivate @_pending.FullName? They lose access straight away. Their records stay in the workspace.
+                <div class="ml-row" style="justify-content:flex-end;margin-top:8px">
+                    <MudButton Size="Size.Small" OnClick="() => _pending = null">Cancel</MudButton>
+                    <MudButton Size="Size.Small" Color="Color.Error" Variant="Variant.Filled" OnClick="ConfirmDeactivateAsync">Deactivate</MudButton>
+                </div>
+            </MudAlert>
+        }
+        <MlCard Flush="true">
+            @foreach (var user in _users.Items)
+            {
+                <div class="ml-row ml-row--wrap" style="padding:12px 20px;border-bottom:1px solid var(--ml-border);min-height:56px" data-testid="row">
+                    <UserAvatar Name="@user.FullName" Id="@user.Id" Size="32" />
+                    <div class="ml-grow" style="min-width:0;overflow-wrap:anywhere">
+                        <MudText Typo="Typo.subtitle2">@user.FullName</MudText>
+                        <MudText Typo="Typo.caption" Class="ml-muted">@user.Email · @(user.RoleName ?? "No role")</MudText>
+                    </div>
+                    @if (!user.IsActive) { <StatusChip Text="Inactive" Color="@StatusColors.For("Expired")" /> }
+                    else if (user.IsTenantOwner) { <StatusChip Text="Owner" Color="@StatusColors.For("Won")" /> }
+                    @if (user.IsActive && !user.IsTenantOwner && user.Id != App.Bootstrap!.User.UserId)
+                    {
+                        <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => _pending = user">Deactivate</MudButton>
+                    }
+                </div>
+            }
+            @if (_users.Items.Count == 0)
+            {
+                <EmptyState Title="No users yet" Message="Invite your team to get started." Compact="true" />
+            }
+        </MlCard>
+    }
+</div>
+
+<FormDrawer Open="_invite" OpenChanged="v => _invite = v" Title="Invite user" SubmitText="Send invitation" Busy="_busy" OnSubmit="InviteAsync">
+    <div class="ml-stack">
+        <MudTextField @bind-Value="_email" Label="Email *" InputType="InputType.Email" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="invite-email" />
+        <MudGrid Spacing="3">
+            <MudItem xs="12" sm="6"><MudTextField @bind-Value="_first" Label="First name *" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+            <MudItem xs="12" sm="6"><MudTextField @bind-Value="_last" Label="Last name *" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+        </MudGrid>
+        <MudSelect T="Guid?" @bind-Value="_roleId" Label="Role *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="invite-role">
+            @foreach (var role in _roles)
+            {
+                <MudSelectItem T="Guid?" Value="@role.Id">@role.Name</MudSelectItem>
+            }
+        </MudSelect>
+        @if (_error is not null) { <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert> }
+    </div>
+</FormDrawer>
+
+@code {
+    private PagedResult<UserListItem>? _users;
+    private List<RoleDto> _roles = [];
+    private bool _loading = true;
+    private bool _invite;
+    private bool _busy;
+    private string _email = string.Empty;
+    private string _first = string.Empty;
+    private string _last = string.Empty;
+    private Guid? _roleId;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!App.IsAdmin)
+        {
+            Nav.NavigateTo("/");
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _users = await Http.GetFromJsonAsync<PagedResult<UserListItem>>("api/v1/users?pageSize=200");
+            _roles = await Http.GetFromJsonAsync<List<RoleDto>>("api/v1/roles") ?? [];
+            _roleId ??= _roles.FirstOrDefault(r => r.Name == "Staff")?.Id;
+        }
+        catch (HttpRequestException)
+        {
+            _users = null;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task InviteAsync()
+    {
+        _error = null;
+        if (string.IsNullOrWhiteSpace(_email) || string.IsNullOrWhiteSpace(_first) || string.IsNullOrWhiteSpace(_last) || _roleId is null)
+        {
+            _error = "Fill in every field marked with *.";
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/v1/invitations",
+                new CreateInvitationRequest(_email.Trim(), _first.Trim(), _last.Trim(), _roleId.Value, null));
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await ProblemText.FromAsync(response, "We could not send the invitation.");
+                return;
+            }
+
+            _invite = false;
+            _email = _first = _last = string.Empty;
+            Snackbar.Add("Invitation sent", Severity.Success);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private UserListItem? _pending;
+
+    private async Task ConfirmDeactivateAsync()
+    {
+        var user = _pending!;
+        _pending = null;
+        var response = await Http.PostAsync($"api/v1/users/{user.Id}/deactivate", JsonContent.Create(new DeactivateUserRequest(null)));
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "Could not deactivate this user."), Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("User deactivated", Severity.Success);
+        await LoadAsync();
+    }
+}

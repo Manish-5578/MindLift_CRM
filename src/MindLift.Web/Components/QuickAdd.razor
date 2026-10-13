@@ -1,0 +1,29 @@
+@inject AppState App
+@inject ISnackbar Snackbar
+
+@if (CanCreate)
+{
+    <MudMenu Icon="@Icons.Material.Filled.Add" Color="Color.Inherit" AriaLabel="Quick add" Dense="true" data-testid="quick-add">
+        <MudMenuItem OnClick="() => Open(ActivityTypes.Task)" data-testid="quick-add-task">New task</MudMenuItem>
+        <MudMenuItem OnClick="() => Open(ActivityTypes.Call)" data-testid="quick-add-call">Log a call</MudMenuItem>
+        <MudMenuItem OnClick="() => Open(ActivityTypes.Meeting)" data-testid="quick-add-meeting">New meeting</MudMenuItem>
+        <MudMenuItem OnClick="() => Open(ActivityTypes.Note)" data-testid="quick-add-note">New note</MudMenuItem>
+    </MudMenu>
+
+    <ActivityFormDrawer @ref="_form" @bind-Open="_open" OnSaved="OnSaved" />
+}
+
+@code {
+    private ActivityFormDrawer? _form;
+    private bool _open;
+
+    private bool CanCreate => App.Bootstrap?.Permissions.Any(p => p.Module == "Activities" && p.CanCreate) == true;
+
+    private void Open(string type)
+    {
+        _form?.OpenNew(type);
+        _open = true;
+    }
+
+    private void OnSaved() => Snackbar.Add("Activity saved", Severity.Success);
+}

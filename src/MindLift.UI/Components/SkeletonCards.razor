@@ -1,0 +1,15 @@
+<div class="ml-stack" data-testid="skeleton-cards" aria-busy="true" aria-label="Loading">
+    @for (var i = 0; i < Count; i++)
+    {
+        <div class="ml-card" style="padding:20px;height:120px;overflow:hidden">
+            <MudSkeleton Width="35%" Height="18px" />
+            <MudSkeleton Width="90%" Height="12px" Class="mt-3" />
+            <MudSkeleton Width="70%" Height="12px" Class="mt-2" />
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>How many placeholder cards to show. Each is 120 px high with three lines (plan 18.7).</summary>
+    [Parameter] public int Count { get; set; } = 4;
+}

@@ -1,0 +1,316 @@
+@page "/settings/pipelines"
+@inject HttpClient Http
+@inject AppState App
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageTitle>Pipelines · MindLift</PageTitle>
+
+<div class="ml-page ml-page--form">
+    <PageHeader Title="Pipelines" Subtitle="The stages a deal moves through. Every pipeline needs open stages, then exactly one Won and one Lost stage at the end.">
+        <Actions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => OpenPipeline(null)" data-testid="primary-action">New pipeline</MudButton>
+        </Actions>
+    </PageHeader>
+    <SettingsNav Current="/settings/pipelines" />
+
+    @if (_loading)
+    {
+        <SkeletonCards Count="2" />
+    }
+    else if (_loadFailed)
+    {
+        <ErrorState OnRetry="LoadAsync" />
+    }
+    else if (_pipelines.Count == 0)
+    {
+        <EmptyState Title="No pipelines yet" Message="Create a pipeline to start tracking deals." />
+    }
+    else
+    {
+        @foreach (var pipeline in _pipelines)
+        {
+            <MlCard Title="@pipeline.Name" Subtitle="@PipelineSubtitle(pipeline)" Class="mb-4" TestId="@($"pipeline-{pipeline.Name}")">
+                <div class="ml-row ml-row--wrap" style="margin-bottom:12px">
+                    @foreach (var stage in pipeline.Stages)
+                    {
+                        <StatusChip Text="@StageLabel(stage)" Color="@StageColor(stage)" Dot="false" />
+                    }
+                </div>
+
+                <div data-testid="stage-list">
+                    @foreach (var stage in pipeline.Stages)
+                    {
+                        <div class="ml-row" style="padding:8px 0;border-bottom:1px solid var(--ml-border)" data-testid="stage-row">
+                            <div class="ml-grow">
+                                <MudText Typo="Typo.body1">@stage.Name</MudText>
+                                <MudText Typo="Typo.caption" Class="ml-muted">@stage.StageType · @stage.Probability% @(stage.RottingDays is { } days ? "· stale after " + days + " days" : "")</MudText>
+                            </div>
+                            <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="() => OpenStage(pipeline, stage)" aria-label="Edit stage" />
+                            @if (_confirmStageId == stage.Id)
+                            {
+                                <MudButton Size="Size.Small" OnClick="() => _confirmStageId = null">Keep</MudButton>
+                                <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeleteStageAsync(pipeline, stage)">Delete</MudButton>
+                            }
+                            else
+                            {
+                                <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" OnClick="() => _confirmStageId = stage.Id" aria-label="Delete stage" />
+                            }
+                        </div>
+                    }
+                </div>
+
+                <div class="ml-row ml-row--wrap" style="justify-content:space-between;margin-top:12px">
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="() => OpenStage(pipeline, null)">Add stage</MudButton>
+                    <div class="ml-row">
+                        <MudButton Size="Size.Small" OnClick="() => OpenPipeline(pipeline)">Edit pipeline</MudButton>
+                        @if (_confirmPipelineId == pipeline.Id)
+                        {
+                            <MudButton Size="Size.Small" OnClick="() => _confirmPipelineId = null">Keep</MudButton>
+                            <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeletePipelineAsync(pipeline)">Delete pipeline</MudButton>
+                        }
+                        else
+                        {
+                            <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => _confirmPipelineId = pipeline.Id">Delete</MudButton>
+                        }
+                    </div>
+                </div>
+            </MlCard>
+        }
+    }
+</div>
+
+<FormDrawer Open="_pipelineOpen" OpenChanged="v => _pipelineOpen = v" Title="@_pipelineTitle" SubmitText="Save pipeline" Busy="_busy" OnSubmit="SavePipelineAsync">
+    <div class="ml-stack">
+        <MudTextField @bind-Value="_pipelineName" Label="Name *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="pipeline-name" />
+        <MudTextField @bind-Value="_pipelineNameAr" Label="Name (Arabic)" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudCheckBox @bind-Value="_pipelineDefault" Label="Default pipeline for new deals" Color="Color.Primary" />
+        <MudCheckBox @bind-Value="_pipelineActive" Label="Active" Color="Color.Primary" />
+        @if (_formError is not null) { <MudAlert Severity="Severity.Error" Dense="true">@_formError</MudAlert> }
+    </div>
+</FormDrawer>
+
+<FormDrawer Open="_stageOpen" OpenChanged="v => _stageOpen = v" Title="@_stageTitle" SubmitText="Save stage" Busy="_busy" OnSubmit="SaveStageAsync">
+    <div class="ml-stack">
+        <MudTextField @bind-Value="_stageName" Label="Name *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="stage-name" />
+        <MudTextField @bind-Value="_stageNameAr" Label="Name (Arabic)" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudSelect T="string" @bind-Value="_stageType" Label="Stage type *" Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="Won and Lost close the deal. Open stages come before them.">
+            <MudSelectItem T="string" Value="StageOpen">Open</MudSelectItem>
+            <MudSelectItem T="string" Value="StageWon">Won</MudSelectItem>
+            <MudSelectItem T="string" Value="StageLost">Lost</MudSelectItem>
+        </MudSelect>
+        <MudNumericField @bind-Value="_stageProbability" Label="Win probability %" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" Max="100" />
+        <MudNumericField @bind-Value="_stageRotting" Label="Mark stale after (days)" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" HelperText="Leave empty to never mark it stale." />
+        <MudNumericField @bind-Value="_stageSortOrder" Label="Position" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" HelperText="1 is first. The stages after it move down to make room. Won and Lost stay last." />
+        @if (_formError is not null) { <MudAlert Severity="Severity.Error" Dense="true">@_formError</MudAlert> }
+    </div>
+</FormDrawer>
+
+@code {
+    private const string StageOpen = "Open";
+    private const string StageWon = "Won";
+    private const string StageLost = "Lost";
+
+    private List<PipelineDto> _pipelines = [];
+    private bool _loading = true;
+    private bool _loadFailed;
+    private bool _busy;
+    private string? _formError;
+    private Guid? _confirmPipelineId;
+    private Guid? _confirmStageId;
+
+    private bool _pipelineOpen;
+    private Guid? _pipelineEditId;
+    private string _pipelineTitle = "New pipeline";
+    private string _pipelineName = string.Empty;
+    private string? _pipelineNameAr;
+    private bool _pipelineDefault;
+    private bool _pipelineActive = true;
+
+    private bool _stageOpen;
+    private Guid _stagePipelineId;
+    private Guid? _stageEditId;
+    private string _stageTitle = "New stage";
+    private string _stageName = string.Empty;
+    private string? _stageNameAr;
+    private string _stageType = StageOpen;
+    private int? _stageProbability = 10;
+    private int? _stageRotting;
+    private int? _stageSortOrder = 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!App.IsAdmin)
+        {
+            Nav.NavigateTo("/");
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _loadFailed = false;
+        try
+        {
+            _pipelines = await Http.GetFromJsonAsync<List<PipelineDto>>("api/v1/settings/pipelines") ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            _loadFailed = true;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static string PipelineSubtitle(PipelineDto pipeline)
+    {
+        var parts = new List<string> { pipeline.Stages.Count + (pipeline.Stages.Count == 1 ? " stage" : " stages") };
+        if (pipeline.IsDefault)
+        {
+            parts.Add("Default");
+        }
+
+        if (!pipeline.IsActive)
+        {
+            parts.Add("Inactive");
+        }
+
+        return string.Join(" · ", parts);
+    }
+
+    private static string StageLabel(PipelineStageDto stage) => stage.Name;
+
+    private static string StageColor(PipelineStageDto stage) => stage.StageType switch
+    {
+        StageWon => StatusColors.For("Won"),
+        StageLost => StatusColors.For("Lost"),
+        _ => StatusColors.For("Open"),
+    };
+
+    private void OpenPipeline(PipelineDto? pipeline)
+    {
+        _formError = null;
+        _pipelineEditId = pipeline?.Id;
+        _pipelineName = pipeline?.Name ?? string.Empty;
+        _pipelineNameAr = pipeline?.NameAr;
+        _pipelineDefault = pipeline?.IsDefault ?? false;
+        _pipelineActive = pipeline?.IsActive ?? true;
+        _pipelineTitle = pipeline is null ? "New pipeline" : "Edit pipeline";
+        _pipelineOpen = true;
+    }
+
+    private void OpenStage(PipelineDto pipeline, PipelineStageDto? stage)
+    {
+        _formError = null;
+        _stagePipelineId = pipeline.Id;
+        _stageEditId = stage?.Id;
+        _stageName = stage?.Name ?? string.Empty;
+        _stageNameAr = stage?.NameAr;
+        _stageType = stage?.StageType ?? StageOpen;
+        _stageProbability = stage?.Probability ?? 10;
+        _stageRotting = stage?.RottingDays;
+        // A new stage goes after the last open stage and before Won and Lost, which have to stay at the end.
+        _stageSortOrder = stage?.SortOrder ?? (pipeline.Stages.Count(s => s.StageType == StageOpen) + 1);
+        _stageTitle = stage is null ? "New stage" : "Edit stage";
+        _stageOpen = true;
+    }
+
+    private async Task SavePipelineAsync()
+    {
+        _formError = null;
+        if (string.IsNullOrWhiteSpace(_pipelineName))
+        {
+            _formError = "Give the pipeline a name.";
+            return;
+        }
+
+        var body = new SavePipelineRequest(_pipelineName.Trim(), string.IsNullOrWhiteSpace(_pipelineNameAr) ? null : _pipelineNameAr.Trim(),
+            _pipelineDefault, _pipelineActive, _pipelineEditId is null ? _pipelines.Count + 1 : _pipelines.FindIndex(p => p.Id == _pipelineEditId) + 1);
+        _busy = true;
+        try
+        {
+            var response = _pipelineEditId is null
+                ? await Http.PostAsJsonAsync("api/v1/settings/pipelines", body)
+                : await Http.PutAsJsonAsync($"api/v1/settings/pipelines/{_pipelineEditId}", body);
+            if (!response.IsSuccessStatusCode)
+            {
+                _formError = await ProblemText.FromAsync(response, "We could not save this pipeline.");
+                return;
+            }
+
+            _pipelineOpen = false;
+            Snackbar.Add("Pipeline saved", Severity.Success);
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task SaveStageAsync()
+    {
+        _formError = null;
+        if (string.IsNullOrWhiteSpace(_stageName))
+        {
+            _formError = "Give the stage a name.";
+            return;
+        }
+
+        var body = new SaveStageRequest(_stageName.Trim(), string.IsNullOrWhiteSpace(_stageNameAr) ? null : _stageNameAr.Trim(),
+            _stageProbability ?? 0, _stageType, null, _stageRotting, _stageSortOrder ?? 1);
+        _busy = true;
+        try
+        {
+            var response = _stageEditId is null
+                ? await Http.PostAsJsonAsync($"api/v1/settings/pipelines/{_stagePipelineId}/stages", body)
+                : await Http.PutAsJsonAsync($"api/v1/settings/pipelines/{_stagePipelineId}/stages/{_stageEditId}", body);
+            if (!response.IsSuccessStatusCode)
+            {
+                _formError = await ProblemText.FromAsync(response, "We could not save this stage.");
+                return;
+            }
+
+            _stageOpen = false;
+            Snackbar.Add("Stage saved", Severity.Success);
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DeletePipelineAsync(PipelineDto pipeline)
+    {
+        var response = await Http.DeleteAsync($"api/v1/settings/pipelines/{pipeline.Id}");
+        _confirmPipelineId = null;
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "We could not delete this pipeline."), Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Pipeline deleted", Severity.Success);
+        await LoadAsync();
+    }
+
+    private async Task DeleteStageAsync(PipelineDto pipeline, PipelineStageDto stage)
+    {
+        var response = await Http.DeleteAsync($"api/v1/settings/pipelines/{pipeline.Id}/stages/{stage.Id}");
+        _confirmStageId = null;
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "We could not delete this stage."), Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Stage deleted", Severity.Success);
+        await LoadAsync();
+    }
+}

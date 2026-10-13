@@ -1,0 +1,29 @@
+<div class="ml-row ml-row--wrap" style="margin-bottom:24px" data-testid="settings-nav">
+    @foreach (var (label, href) in Items)
+    {
+        <MudButton Variant="@(Current == href ? Variant.Filled : Variant.Outlined)" Color="@(Current == href ? Color.Primary : Color.Default)" Size="Size.Small" Href="@href">@label</MudButton>
+    }
+</div>
+
+@code {
+    [Parameter] public string Current { get; set; } = "";
+
+    private static readonly (string Label, string Href)[] Items =
+    [
+        ("Company", "/settings/company"),
+        ("Modules", "/settings/modules"),
+        ("Users", "/settings/users"),
+        ("Roles", "/settings/roles"),
+        ("Teams & branches", "/settings/teams"),
+        ("Pipelines", "/settings/pipelines"),
+        ("Onboarding checklists", "/settings/checklists"),
+        ("Booking pages", "/settings/booking-pages"),
+        ("Fields & layouts", "/settings/layouts"),
+        ("Lead assignment", "/settings/assignment-rules"),
+        ("Automation rules", "/settings/automation-rules"),
+        ("Web forms", "/settings/web-forms"),
+        ("Custom fields", "/settings/custom-fields"),
+        ("Picklists", "/settings/picklists"),
+        ("Currencies", "/settings/currencies"),
+    ];
+}

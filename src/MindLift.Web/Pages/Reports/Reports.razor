@@ -1,0 +1,297 @@
+@page "/reports"
+@using MindLift.Shared.Contracts
+@using MindLift.Shared.Enums
+@using MindLift.UI.Components
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+
+<PageTitle>Reports & Analytics · MindLift</PageTitle>
+
+<div class="ml-page">
+    <div class="d-flex flex-wrap align-center justify-space-between gap-3 mb-4">
+        <div>
+            <MudText Typo="Typo.h5" Style="font-weight:700">Reports & Analytics</MudText>
+            <MudText Typo="Typo.body2" Class="ml-muted">Pre-built executive reports, custom queries, and cross-module business intelligence.</MudText>
+        </div>
+
+        <div class="d-flex flex-wrap align-center gap-2">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.TrackChanges" Href="/reports/targets" Size="Size.Small">
+                Sales Targets
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.CreateNewFolder" OnClick="() => _folderDrawerOpen = true" Size="Size.Small">
+                New Folder
+            </MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" Href="/reports/builder" Size="Size.Small">
+                New Report
+            </MudButton>
+        </div>
+    </div>
+
+    <!-- Filter & Search Bar -->
+    <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-4 d-flex flex-wrap align-center justify-space-between gap-3" Style="border-radius:12px">
+        <div class="d-flex flex-wrap align-center gap-2">
+            <MudChipSet T="string" SelectedValue="_selectedCategory" SelectedValueChanged="OnCategoryChanged" CheckMark="false">
+                <MudChip T="string" Value="@("all")" Variant="@(_selectedCategory == "all" ? Variant.Filled : Variant.Outlined)" Color="Color.Primary" Size="Size.Small">All Reports</MudChip>
+                <MudChip T="string" Value="@("favorites")" Variant="@(_selectedCategory == "favorites" ? Variant.Filled : Variant.Outlined)" Color="Color.Warning" Size="Size.Small" Icon="@Icons.Material.Filled.Star">Favorites</MudChip>
+                <MudChip T="string" Value="@("system")" Variant="@(_selectedCategory == "system" ? Variant.Filled : Variant.Outlined)" Color="Color.Secondary" Size="Size.Small">System Reports</MudChip>
+                <MudChip T="string" Value="@("custom")" Variant="@(_selectedCategory == "custom" ? Variant.Filled : Variant.Outlined)" Color="Color.Info" Size="Size.Small">Custom Reports</MudChip>
+            </MudChipSet>
+
+            @if (_folders.Count > 0)
+            {
+                <MudSelect T="Guid?" Value="_selectedFolderId" ValueChanged="OnFolderSelected" Placeholder="All Folders" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="min-width:180px">
+                    <MudSelectItem T="Guid?" Value="@((Guid?)null)">All Folders</MudSelectItem>
+                    @foreach (var f in _folders)
+                    {
+                        <MudSelectItem T="Guid?" Value="@f.Id">@f.Name (@f.ReportCount)</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+        </div>
+
+        <MudTextField @bind-Value="_searchQuery" Placeholder="Search reports..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.Search" Immediate="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="max-width:280px" />
+    </MudPaper>
+
+    @if (_loading)
+    {
+        <SkeletonTable Rows="6" Columns="4" />
+    }
+    else if (FilteredReports.Count == 0)
+    {
+        <EmptyState Title="No reports found" Subtitle="Try changing your search terms or create a new custom report with the report builder." ActionLabel="Create Report" OnAction="@(() => Nav.NavigateTo("/reports/builder"))" />
+    }
+    else
+    {
+        <!-- Reports Grid -->
+        <MudGrid Spacing="3">
+            @foreach (var r in FilteredReports)
+            {
+                <MudItem xs="12" sm="6" md="4" lg="3">
+                    <MudCard Outlined="true" Style="height:100%; border-radius:12px; display:flex; flex-direction:column; justify-content:space-between; transition: box-shadow 0.2s;" Class="hover-elevation">
+                        <MudCardHeader>
+                            <CardHeaderAvatar>
+                                <MudAvatar Color="@(r.IsSystem ? Color.Secondary : Color.Primary)" Variant="Variant.Outlined" Size="Size.Medium">
+                                    <MudIcon Icon="@GetChartIcon(r)" />
+                                </MudAvatar>
+                            </CardHeaderAvatar>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.subtitle1" Style="font-weight:600; line-height:1.3">@r.Name</MudText>
+                                <MudText Typo="Typo.caption" Class="ml-muted">@(r.IsSystem ? "Built-in System Report" : (r.FolderName ?? "General"))</MudText>
+                            </CardHeaderContent>
+                            <CardHeaderActions>
+                                @if (!r.IsSystem)
+                                {
+                                    <MudIconButton Icon="@(r.IsFavorite ? Icons.Material.Filled.Star : Icons.Material.Outlined.StarBorder)" Color="@(r.IsFavorite ? Color.Warning : Color.Default)" Size="Size.Small" OnClick="() => ToggleFavorite(r)" />
+                                }
+                            </CardHeaderActions>
+                        </MudCardHeader>
+
+                        <MudCardContent Class="pt-0">
+                            <MudText Typo="Typo.body2" Class="ml-muted" Style="min-height:40px; font-size:0.85rem">
+                                @(string.IsNullOrWhiteSpace(r.Description) ? "Comprehensive analytics report." : r.Description)
+                            </MudText>
+
+                            <div class="d-flex align-center justify-space-between mt-3">
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Default">
+                                    @r.Source.ToUpperInvariant()
+                                </MudChip>
+                                @if (r.LastRunAt.HasValue)
+                                {
+                                    <MudText Typo="Typo.caption" Class="ml-muted">Run @r.LastRunAt.Value.ToShortDateString()</MudText>
+                                }
+                            </div>
+                        </MudCardContent>
+
+                        <MudCardActions Class="justify-space-between pt-0 pb-3 px-3">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" EndIcon="@Icons.Material.Filled.ArrowForward" OnClick="() => OpenReport(r)">
+                                Run
+                            </MudButton>
+
+                            @if (!r.IsSystem)
+                            {
+                                <MudMenu Icon="@Icons.Material.Outlined.MoreVert" Dense="true" Size="Size.Small">
+                                    <MudMenuItem Icon="@Icons.Material.Outlined.Edit" Href="@($"/reports/builder/{r.Id}")">Edit</MudMenuItem>
+                                    <MudMenuItem Icon="@Icons.Material.Outlined.Delete" OnClick="() => DeleteReport(r)">Delete</MudMenuItem>
+                                </MudMenu>
+                            }
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+</div>
+
+<!-- Folder Drawer -->
+<FormDrawer Open="_folderDrawerOpen" OpenChanged="v => _folderDrawerOpen = v" Title="New Report Folder" SubmitText="Create Folder" Busy="_savingFolder" OnSubmit="CreateFolderAsync" IsDirty="!string.IsNullOrWhiteSpace(_newFolderName)">
+    <div class="ml-stack">
+        <MudTextField @bind-Value="_newFolderName" Label="Folder Name *" Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" Placeholder="e.g. Sales KPIs" />
+        <MudTextField @bind-Value="_newFolderDescription" Label="Description" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" Placeholder="Optional description" />
+    </div>
+</FormDrawer>
+
+@code {
+    private List<ReportDefinitionDto> _reports = [];
+    private List<ReportFolderDto> _folders = [];
+    private string _selectedCategory = "all";
+    private Guid? _selectedFolderId;
+    private string _searchQuery = "";
+    private bool _loading = true;
+
+    // Folder modal
+    private bool _folderDrawerOpen = false;
+    private bool _savingFolder = false;
+    private string _newFolderName = "";
+    private string? _newFolderDescription;
+
+    private List<ReportDefinitionDto> FilteredReports => _reports
+        .Where(r =>
+        {
+            if (_selectedCategory == "favorites" && !r.IsFavorite) return false;
+            if (_selectedCategory == "system" && !r.IsSystem) return false;
+            if (_selectedCategory == "custom" && r.IsSystem) return false;
+            if (_selectedFolderId.HasValue && r.FolderId != _selectedFolderId.Value) return false;
+
+            if (!string.IsNullOrWhiteSpace(_searchQuery))
+            {
+                var q = _searchQuery.Trim().ToLowerInvariant();
+                return r.Name.ToLowerInvariant().Contains(q) || (r.Description?.ToLowerInvariant().Contains(q) ?? false);
+            }
+
+            return true;
+        })
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _loading = true;
+        try
+        {
+            _folders = await Http.GetFromJsonAsync<List<ReportFolderDto>>("api/v1/report-folders") ?? [];
+            _reports = await Http.GetFromJsonAsync<List<ReportDefinitionDto>>("api/v1/reports") ?? [];
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load reports: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OnCategoryChanged(string val)
+    {
+        _selectedCategory = val ?? "all";
+    }
+
+    private void OnFolderSelected(Guid? folderId)
+    {
+        _selectedFolderId = folderId;
+    }
+
+    private void OpenReport(ReportDefinitionDto r)
+    {
+        if (r.IsSystem && !string.IsNullOrWhiteSpace(r.SystemKey))
+        {
+            Nav.NavigateTo($"/reports/system/{r.SystemKey}");
+        }
+        else
+        {
+            Nav.NavigateTo($"/reports/view/{r.Id}");
+        }
+    }
+
+    private async Task ToggleFavorite(ReportDefinitionDto r)
+    {
+        try
+        {
+            var resp = await Http.PostAsync($"api/v1/reports/{r.Id}/favorite", null);
+            if (resp.IsSuccessStatusCode)
+            {
+                r.IsFavorite = !r.IsFavorite;
+                Snackbar.Add(r.IsFavorite ? "Added to favorites" : "Removed from favorites", Severity.Info);
+            }
+        }
+        catch { }
+    }
+
+    private async Task DeleteReport(ReportDefinitionDto r)
+    {
+        bool confirmed = await Dialogs.ConfirmAsync(
+            "Delete Report",
+            $"Are you sure you want to delete report '{r.Name}'?",
+            "Delete",
+            danger: true);
+
+        if (confirmed)
+        {
+            var resp = await Http.DeleteAsync($"api/v1/reports/{r.Id}");
+            if (resp.IsSuccessStatusCode)
+            {
+                _reports.Remove(r);
+                Snackbar.Add("Report deleted.", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Failed to delete report.", Severity.Error);
+            }
+        }
+    }
+
+    private async Task CreateFolderAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newFolderName)) return;
+
+        _savingFolder = true;
+        try
+        {
+            var resp = await Http.PostAsJsonAsync("api/v1/report-folders", new SaveReportFolderRequest
+            {
+                Name = _newFolderName.Trim()
+            });
+
+            if (resp.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Folder created", Severity.Success);
+                _folderDrawerOpen = false;
+                _newFolderName = "";
+                _newFolderDescription = null;
+                await LoadDataAsync();
+            }
+            else
+            {
+                Snackbar.Add("Failed to create folder", Severity.Error);
+            }
+        }
+        finally
+        {
+            _savingFolder = false;
+        }
+    }
+
+    private static string GetChartIcon(ReportDefinitionDto r)
+    {
+        var chartType = r.Query?.Visualization?.ChartType ?? ReportChartType.Table;
+        return chartType switch
+        {
+            ReportChartType.Bar => Icons.Material.Outlined.BarChart,
+            ReportChartType.Column => Icons.Material.Outlined.Equalizer,
+            ReportChartType.StackedBar => Icons.Material.Outlined.AlignHorizontalLeft,
+            ReportChartType.StackedColumn => Icons.Material.Outlined.ViewColumn,
+            ReportChartType.Line => Icons.Material.Outlined.ShowChart,
+            ReportChartType.Area => Icons.Material.Outlined.AreaChart,
+            ReportChartType.Donut => Icons.Material.Outlined.DonutLarge,
+            ReportChartType.Funnel => Icons.Material.Outlined.FilterAlt,
+            _ => Icons.Material.Outlined.TableChart
+        };
+    }
+}

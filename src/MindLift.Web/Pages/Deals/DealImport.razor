@@ -1,0 +1,5 @@
+@page "/deals/import"
+@using MindLift.Shared.Imports
+
+<ImportWizard Module="AppModule.Deals" Endpoint="api/v1/deals/import" ListHref="/deals" Fields="ImportFieldSets.Deals"
+              RequiredField="name" RequiredLabel="Name" Singular="deal" />

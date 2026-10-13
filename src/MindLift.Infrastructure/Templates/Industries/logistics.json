@@ -1,0 +1,61 @@
+{
+  "key": "logistics",
+  "version": 1,
+  "name": "Logistics",
+  "nameAr": "الخدمات اللوجستية",
+  "description": "Freight forwarders and shipping companies tracking quotes, bookings and shipments.",
+  "modules": {
+    "labels": {
+      "Deals": { "singular": "Shipment", "plural": "Shipments", "singularAr": "شحنة", "pluralAr": "الشحنات" }
+    },
+    "enable": ["Dashboard", "Leads", "Contacts", "Accounts", "Deals", "Activities", "Calendar", "Communication", "Reports", "Notifications", "Tickets", "Invoices"],
+    "disable": []
+  },
+  "picklists": {
+    "lead_source": {
+      "mode": "merge",
+      "values": [
+        { "value": "freight_partner", "label": "Freight partner", "labelAr": "شريك شحن" }
+      ]
+    }
+  },
+  "pipelines": [
+    {
+      "name": "Shipments",
+      "nameAr": "الشحنات",
+      "isDefault": true,
+      "stages": [
+        { "name": "Quote", "nameAr": "عرض سعر", "probability": 10, "type": "Open", "rottingDays": 3 },
+        { "name": "Booked", "nameAr": "تم الحجز", "probability": 50, "type": "Open", "rottingDays": 5 },
+        { "name": "In transit", "nameAr": "في الطريق", "probability": 75, "type": "Open", "rottingDays": 10 },
+        { "name": "Delivered", "nameAr": "تم التسليم", "probability": 90, "type": "Open", "rottingDays": 5 },
+        { "name": "Invoiced", "nameAr": "تمت الفوترة", "probability": 100, "type": "Won" },
+        { "name": "Lost", "nameAr": "خاسرة", "probability": 0, "type": "Lost" }
+      ]
+    }
+  ],
+  "customFields": [
+    { "entity": "deals", "key": "cf_origin", "label": "Origin", "labelAr": "المنشأ", "type": "Text", "section": "Route", "showInList": true },
+    { "entity": "deals", "key": "cf_destination", "label": "Destination", "labelAr": "الوجهة", "type": "Text", "section": "Route", "showInList": true },
+    { "entity": "deals", "key": "cf_weight_kg", "label": "Weight (kg)", "labelAr": "الوزن (كغ)", "type": "Decimal", "section": "Cargo" },
+    { "entity": "deals", "key": "cf_container_type", "label": "Container type", "labelAr": "نوع الحاوية", "type": "Picklist", "section": "Cargo",
+      "options": [
+        { "value": "20ft", "label": "20 ft", "labelAr": "20 قدم" },
+        { "value": "40ft", "label": "40 ft", "labelAr": "40 قدم" },
+        { "value": "40ft_hc", "label": "40 ft high cube", "labelAr": "40 قدم عالية" },
+        { "value": "lcl", "label": "LCL", "labelAr": "شحنة جزئية" },
+        { "value": "air", "label": "Air", "labelAr": "جوي" }
+      ] }
+  ],
+  "layouts": {
+    "leads": {
+      "Form": [
+        { "section": "Contact info", "sectionAr": "بيانات الاتصال", "columns": 2, "fields": ["first_name", "last_name", "email", "phone", "company_name"] },
+        { "section": "Lead details", "sectionAr": "تفاصيل العميل", "columns": 2, "fields": ["source", "status", "rating", "owner_id"] }
+      ]
+    }
+  },
+  "dashboardHighlights": ["deals_in_progress", "open_tickets", "unpaid_invoices"],
+  "documentTypes": { "enable": ["invoice", "generic"], "portalEnabled": true },
+  "sampleData": { "profile": "logistics" }
+}

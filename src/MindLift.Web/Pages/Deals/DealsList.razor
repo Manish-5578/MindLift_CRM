@@ -1,0 +1,171 @@
+@page "/deals"
+@using MindLift.Shared.Filtering
+@using FilterOperator = MindLift.Shared.Filtering.FilterOperator
+@inject HttpClient Http
+@inject AuthSession Session
+@inject AppState App
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+<PageTitle>@App.ModuleLabel(AppModule.Deals) · MindLift</PageTitle>
+
+<div class="ml-page ml-page--narrow">
+    @if (App.Bootstrap is not null)
+    {
+        <EntityListPage @ref="_list" TItem="DealListItemDto" Title="@App.ModuleLabel(AppModule.Deals)" ItemLabel="@ItemLabel"
+                        Views="_views" DefaultView="open" Columns="_columns" CardTemplate="_card" Loader="LoadAsync" RowHref="Href"
+                        Fields="Fields" Picklists="App.Bootstrap.Picklists" Users="_users"
+                        SearchPlaceholder="Search deal or company" EmptyIcon="@Icons.Material.Outlined.Handshake"
+                        EmptyTitle="No deals yet" EmptyMessage="Deals appear here when you add them, import them, or convert a lead."
+                        DefaultSortField="created_at" DefaultSortDir="desc">
+            <HeaderActions>
+                <MudButtonGroup Variant="Variant.Outlined" Size="Size.Medium" data-testid="layout-toggle">
+                    <MudButton Href="/deals/board">Board</MudButton>
+                    <MudButton Color="Color.Primary" Href="/deals">List</MudButton>
+                </MudButtonGroup>
+                @if (Can(p => p.CanImport))
+                {
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Upload" Href="/deals/import" data-testid="import-deals">Import</MudButton>
+                }
+                @if (Can(p => p.CanExport))
+                {
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Download" OnClick="ExportAsync" data-testid="export-deals">Export</MudButton>
+                }
+                @if (Can(p => p.CanCreate))
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" OnClick="OpenNew" data-testid="primary-action">New deal</MudButton>
+                }
+            </HeaderActions>
+            <EmptyActions>
+                @if (Can(p => p.CanCreate))
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenNew">New deal</MudButton>
+                }
+            </EmptyActions>
+        </EntityListPage>
+    }
+</div>
+
+<DealFormDrawer @ref="_form" @bind-Open="_drawer" OnSaved="OnSaved" />
+
+@code {
+    private EntityListPage<DealListItemDto>? _list;
+    private DealFormDrawer? _form;
+    private bool _drawer;
+    private List<UserListItem> _users = [];
+    private IReadOnlyList<ListView> _views = [];
+    private IReadOnlyList<ListColumn<DealListItemDto>> _columns = [];
+    private RenderFragment<DealListItemDto> _card = _ => _ => { };
+
+    private bool Can(Func<ModulePermissionDto, bool> check) => App.Bootstrap?.Permissions.Any(p => p.Module == "Deals" && check(p)) == true;
+
+    private string ItemLabel => App.ModuleLabel(AppModule.Deals).ToLowerInvariant();
+
+    private IReadOnlyList<FieldDto> Fields => App.Bootstrap?.Fields.GetValueOrDefault("deals") ?? [];
+
+    private static string? Href(DealListItemDto deal) => "/deals/" + deal.Id;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.IsSignedIn)
+        {
+            Nav.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        _views =
+        [
+            new("open", "Open deals", Status("Open")),
+            new("mine", "My open deals", new FilterGroup
+            {
+                Conditions =
+                [
+                    new FilterCondition { Field = "status", Op = FilterOperator.Eq, Value = JsonSerializer.SerializeToElement("Open") },
+                    new FilterCondition { Field = "owner_id", Op = FilterOperator.Eq, Value = JsonSerializer.SerializeToElement("@me") },
+                ],
+            }),
+            new("won", "Won", Status("Won")),
+            new("lost", "Lost", Status("Lost")),
+            new("all", "All deals", new FilterGroup()),
+        ];
+
+        _columns =
+        [
+            new()
+            {
+                Header = "Deal", SortField = "name",
+                Cell = d =>
+                    @<div class="ml-cell-primary__text">
+                        <MudText Typo="Typo.subtitle2" Class="ml-truncate">@d.Name</MudText>
+                        <MudText Typo="Typo.caption" Class="ml-muted ml-truncate">@(d.AccountName ?? d.PrimaryContactName ?? "—")</MudText>
+                    </div>,
+            },
+            new() { Header = "Stage", Cell = d => @<StatusChip Text="@d.StageName" Color="@StatusColors.For(d.Status == "Won" ? "Won" : d.Status == "Lost" ? "Lost" : "Working")" /> },
+            new() { Header = "Amount", SortField = "amount", AlignEnd = true, Cell = d => @<MoneyText Amount="d.Amount" Currency="@d.Currency" /> },
+            new() { Header = "Expected close", SortField = "expected_close_date", HideOnTablet = true, Cell = d => @<DateText Value="@d.ExpectedCloseDate" /> },
+            new() { Header = "Owner", Cell = d => @<span>@(d.OwnerName ?? "—")</span> },
+        ];
+
+        _card = d =>
+            @<div class="ml-cell-primary__text ml-grow">
+                <div class="ml-row ml-row--between">
+                    <MudText Typo="Typo.subtitle1" Class="ml-truncate">@d.Name</MudText>
+                    <MoneyText Amount="d.Amount" Currency="@d.Currency" />
+                </div>
+                <MudText Typo="Typo.body2" Class="ml-muted ml-truncate">@(d.AccountName ?? d.PrimaryContactName ?? "—")</MudText>
+                <StatusChip Text="@d.StageName" Color="@StatusColors.For(d.Status == "Won" ? "Won" : d.Status == "Lost" ? "Lost" : "Working")" />
+            </div>;
+
+        _users = await RecordLookups.UsersAsync(Http);
+    }
+
+    private static FilterGroup Status(string status) => new()
+    {
+        Conditions = [new FilterCondition { Field = "status", Op = FilterOperator.Eq, Value = JsonSerializer.SerializeToElement(status) }],
+    };
+
+    private void OpenNew()
+    {
+        _form?.OpenNew();
+        _drawer = true;
+    }
+
+    private async Task OnSaved()
+    {
+        Snackbar.Add("Deal saved", Severity.Success);
+        if (_list is not null)
+        {
+            await _list.ReloadAsync();
+        }
+    }
+
+    private async Task<PagedResult<DealListItemDto>> LoadAsync(ListQuery query)
+    {
+        var response = await Http.PostAsJsonAsync("api/v1/deals/query", query);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new ListLoadException(await ProblemText.FromAsync(response, "We could not load your deals. Try again."));
+        }
+
+        return (await response.Content.ReadFromJsonAsync<PagedResult<DealListItemDto>>())!;
+    }
+
+    private async Task ExportAsync()
+    {
+        if (_list is null)
+        {
+            return;
+        }
+
+        var response = await Http.PostAsJsonAsync("api/v1/deals/export", _list.CurrentQuery with { Page = 1, PageSize = 200 });
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "We could not export your deals."), Severity.Error);
+            return;
+        }
+
+        await JS.InvokeVoidAsync("mindlift.downloadFile", "deals.csv", "text/csv", Convert.ToBase64String(await response.Content.ReadAsByteArrayAsync()));
+        Snackbar.Add("Export ready", Severity.Success);
+    }
+}

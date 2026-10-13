@@ -1,0 +1,52 @@
+{
+  "key": "finance_consulting",
+  "version": 1,
+  "name": "Finance consulting",
+  "nameAr": "الاستشارات المالية",
+  "description": "Accounting, tax and financial advisory firms managing client engagements and recurring services.",
+  "modules": {
+    "labels": {
+      "Deals": { "singular": "Engagement", "plural": "Engagements", "singularAr": "ارتباط", "pluralAr": "الارتباطات" }
+    },
+    "enable": ["Dashboard", "Leads", "Contacts", "Accounts", "Deals", "Activities", "Calendar", "Communication", "Reports", "Notifications", "Documents", "Projects", "Invoices"],
+    "disable": []
+  },
+  "picklists": {},
+  "pipelines": [
+    {
+      "name": "Engagements",
+      "nameAr": "الارتباطات",
+      "isDefault": true,
+      "stages": [
+        { "name": "Discovery", "nameAr": "الاستكشاف", "probability": 10, "type": "Open", "rottingDays": 7 },
+        { "name": "Proposal", "nameAr": "العرض", "probability": 40, "type": "Open", "rottingDays": 10 },
+        { "name": "Signed", "nameAr": "موقع", "probability": 70, "type": "Open", "rottingDays": 14 },
+        { "name": "In progress", "nameAr": "قيد التنفيذ", "probability": 90, "type": "Open", "rottingDays": 30 },
+        { "name": "Closed", "nameAr": "مغلق", "probability": 100, "type": "Won" },
+        { "name": "Lost", "nameAr": "خاسر", "probability": 0, "type": "Lost" }
+      ]
+    }
+  ],
+  "customFields": [
+    { "entity": "deals", "key": "cf_service_type", "label": "Service type", "labelAr": "نوع الخدمة", "type": "Text", "showInList": true },
+    { "entity": "deals", "key": "cf_fee_basis", "label": "Fee basis", "labelAr": "أساس الرسوم", "type": "Picklist",
+      "options": [
+        { "value": "fixed", "label": "Fixed", "labelAr": "ثابت" },
+        { "value": "hourly", "label": "Hourly", "labelAr": "بالساعة" },
+        { "value": "retainer", "label": "Retainer", "labelAr": "اشتراك" },
+        { "value": "success_fee", "label": "Success fee", "labelAr": "نسبة من النجاح" }
+      ] },
+    { "entity": "deals", "key": "cf_renewal_date", "label": "Renewal date", "labelAr": "تاريخ التجديد", "type": "Date", "showInList": true }
+  ],
+  "layouts": {
+    "leads": {
+      "Form": [
+        { "section": "Contact info", "sectionAr": "بيانات الاتصال", "columns": 2, "fields": ["first_name", "last_name", "email", "phone", "company_name"] },
+        { "section": "Lead details", "sectionAr": "تفاصيل العميل", "columns": 2, "fields": ["source", "status", "rating", "owner_id"] }
+      ]
+    }
+  },
+  "dashboardHighlights": ["deals_in_progress", "upcoming_meetings", "deals_closing_soon"],
+  "documentTypes": { "enable": ["financial_statement", "trade_license", "invoice", "generic"], "portalEnabled": true },
+  "sampleData": { "profile": "finance_consulting" }
+}

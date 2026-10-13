@@ -1,0 +1,573 @@
+@page "/invoices"
+@using MindLift.Shared.Contracts
+@using MindLift.Shared.Enums
+@using MindLift.UI.Components
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+
+<PageTitle>Invoices & Collections · MindLift</PageTitle>
+
+<div class="ml-page">
+    <!-- Header -->
+    <div class="d-flex flex-wrap align-center justify-space-between gap-3 mb-4">
+        <div>
+            <MudText Typo="Typo.h5" Style="font-weight:700">Invoices & Collections</MudText>
+            <MudText Typo="Typo.body2" Class="ml-muted">Track billing records, manage payment collections, and reconcile outstanding balances.</MudText>
+        </div>
+
+        <div class="d-flex flex-wrap align-center gap-2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" OnClick="OpenNewInvoiceDialog" Size="Size.Small">
+                Create Invoice
+            </MudButton>
+        </div>
+    </div>
+
+    <!-- KPI Summary Cards -->
+    <MudGrid Spacing="3" Class="mb-4">
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 d-flex align-center gap-3" Style="border-radius:12px">
+                <MudAvatar Color="Color.Primary" Variant="Variant.Filled" Size="Size.Medium">
+                    <MudIcon Icon="@Icons.Material.Outlined.ReceiptLong" />
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.caption" Class="ml-muted">Total Invoiced</MudText>
+                    <MudText Typo="Typo.h6" Style="font-weight:700">@_invoices.Sum(i => i.GrandTotal).ToString("N0")</MudText>
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 d-flex align-center gap-3" Style="border-radius:12px">
+                <MudAvatar Color="Color.Success" Variant="Variant.Filled" Size="Size.Medium">
+                    <MudIcon Icon="@Icons.Material.Outlined.AccountBalanceWallet" />
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.caption" Class="ml-muted">Collected Revenue</MudText>
+                    <MudText Typo="Typo.h6" Style="font-weight:700">@_invoices.Sum(i => i.PaidAmount).ToString("N0")</MudText>
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 d-flex align-center gap-3" Style="border-radius:12px">
+                <MudAvatar Color="Color.Warning" Variant="Variant.Filled" Size="Size.Medium">
+                    <MudIcon Icon="@Icons.Material.Outlined.PendingActions" />
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.caption" Class="ml-muted">Outstanding Balance</MudText>
+                    <MudText Typo="Typo.h6" Style="font-weight:700">@_invoices.Sum(i => i.BalanceDue).ToString("N0")</MudText>
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 d-flex align-center gap-3" Style="border-radius:12px">
+                <MudAvatar Color="Color.Error" Variant="Variant.Filled" Size="Size.Medium">
+                    <MudIcon Icon="@Icons.Material.Outlined.WarningAmber" />
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.caption" Class="ml-muted">Overdue Invoices</MudText>
+                    <MudText Typo="Typo.h6" Style="font-weight:700">@_invoices.Count(i => i.Status == InvoiceStatus.Overdue || (i.DueDate < DateTime.UtcNow && i.BalanceDue > 0))</MudText>
+                </div>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Filters & Search Bar -->
+    <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-4 d-flex flex-wrap align-center justify-space-between gap-3" Style="border-radius:12px">
+        <div class="d-flex flex-wrap align-center gap-2">
+            <MudTextField @bind-Value="_searchQuery" Placeholder="Search by invoice #, customer..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.Search" Immediate="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="min-width:260px" />
+            <MudSelect T="InvoiceStatus?" @bind-Value="_statusFilter" Placeholder="All Statuses" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="min-width:160px">
+                <MudSelectItem T="InvoiceStatus?" Value="@((InvoiceStatus?)null)">All Statuses</MudSelectItem>
+                <MudSelectItem T="InvoiceStatus?" Value="@InvoiceStatus.Draft">Draft</MudSelectItem>
+                <MudSelectItem T="InvoiceStatus?" Value="@InvoiceStatus.Issued">Issued</MudSelectItem>
+                <MudSelectItem T="InvoiceStatus?" Value="@InvoiceStatus.PartiallyPaid">Partially Paid</MudSelectItem>
+                <MudSelectItem T="InvoiceStatus?" Value="@InvoiceStatus.Paid">Paid</MudSelectItem>
+                <MudSelectItem T="InvoiceStatus?" Value="@InvoiceStatus.Overdue">Overdue</MudSelectItem>
+                <MudSelectItem T="InvoiceStatus?" Value="@InvoiceStatus.Cancelled">Cancelled</MudSelectItem>
+            </MudSelect>
+        </div>
+    </MudPaper>
+
+    @if (_loading)
+    {
+        <SkeletonTable Rows="6" Columns="7" />
+    }
+    else if (FilteredInvoices.Count == 0)
+    {
+        <EmptyState Title="No invoices found" Subtitle="Create an invoice or convert accepted proposals into billing records." ActionLabel="Create Invoice" OnAction="OpenNewInvoiceDialog" />
+    }
+    else
+    {
+        <MudTable Items="@FilteredInvoices" Dense="true" Hover="true" Outlined="true" Style="border-radius:12px; overflow:hidden">
+            <HeaderContent>
+                <MudTh>Invoice #</MudTh>
+                <MudTh>Account / Customer</MudTh>
+                <MudTh>Issue Date</MudTh>
+                <MudTh>Due Date</MudTh>
+                <MudTh Style="text-align:right">Total</MudTh>
+                <MudTh Style="min-width:150px">Collection Progress</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh Style="text-align:right">Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Invoice #">
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" Style="font-family:monospace; font-weight:600">
+                        @context.InvoiceNumber
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Account">
+                    <div class="d-flex flex-column">
+                        <MudText Typo="Typo.body2" Style="font-weight:600">@(context.AccountName ?? "Direct Customer")</MudText>
+                        @if (!string.IsNullOrWhiteSpace(context.ContactName))
+                        {
+                            <MudText Typo="Typo.caption" Class="ml-muted">Attn: @context.ContactName</MudText>
+                        }
+                    </div>
+                </MudTd>
+                <MudTd DataLabel="Issue Date">
+                    <MudText Typo="Typo.body2">@context.IssueDate.ToString("MMM dd, yyyy")</MudText>
+                </MudTd>
+                <MudTd DataLabel="Due Date">
+                    <MudText Typo="Typo.body2" Color="@(context.DueDate < DateTime.UtcNow && context.BalanceDue > 0 ? Color.Error : Color.Default)">
+                        @context.DueDate.ToString("MMM dd, yyyy")
+                    </MudText>
+                </MudTd>
+                <MudTd DataLabel="Total" Style="text-align:right">
+                    <MudText Typo="Typo.body2" Style="font-weight:700">
+                        @context.Currency @context.GrandTotal.ToString("N2")
+                    </MudText>
+                </MudTd>
+                <MudTd DataLabel="Progress">
+                    @{
+                        var pct = context.GrandTotal > 0 ? (double)(context.PaidAmount / context.GrandTotal * 100) : 0;
+                    }
+                    <div class="d-flex flex-column gap-1">
+                        <div class="d-flex justify-space-between">
+                            <MudText Typo="Typo.caption" Class="ml-muted">Paid: @context.PaidAmount.ToString("N0")</MudText>
+                            <MudText Typo="Typo.caption" Style="font-weight:600">Due: @context.BalanceDue.ToString("N0")</MudText>
+                        </div>
+                        <MudProgressLinear Color="@(context.BalanceDue == 0 ? Color.Success : Color.Primary)" Value="@pct" Rounded="true" Size="Size.Small" />
+                    </div>
+                </MudTd>
+                <MudTd DataLabel="Status">
+                    <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)" Variant="Variant.Filled">
+                        @context.Status
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Actions" Style="text-align:right">
+                    <MudMenu Icon="@Icons.Material.Outlined.MoreVert" Size="Size.Small" Dense="true">
+                        <MudMenuItem Icon="@Icons.Material.Outlined.Visibility" OnClick="@(() => ViewInvoice(context))">View Invoice</MudMenuItem>
+                        @if (context.BalanceDue > 0 && context.Status != InvoiceStatus.Cancelled)
+                        {
+                            <MudMenuItem Icon="@Icons.Material.Outlined.Payment" OnClick="@(() => OpenRecordPaymentDialog(context))">Record Payment</MudMenuItem>
+                        }
+                        @if (context.Status != InvoiceStatus.Cancelled && context.Status != InvoiceStatus.Paid)
+                        {
+                            <MudMenuItem Icon="@Icons.Material.Outlined.Cancel" OnClick="@(() => CancelInvoiceAsync(context.Id))">Cancel Invoice</MudMenuItem>
+                        }
+                    </MudMenu>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</div>
+
+<!-- Record Payment Dialog -->
+<MudDialog @bind-Visible="_paymentDialogOpen" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight:700">Record Payment · @_activeInvoice?.InvoiceNumber</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_activeInvoice is not null)
+        {
+            <MudPaper Elevation="0" Class="pa-3 mb-3 d-flex justify-space-between align-center" Style="background:var(--mud-palette-background-grey); border-radius:8px">
+                <div>
+                    <MudText Typo="Typo.caption" Class="ml-muted">Invoice Total:</MudText>
+                    <MudText Typo="Typo.body2" Style="font-weight:600">@_activeInvoice.Currency @_activeInvoice.GrandTotal.ToString("N2")</MudText>
+                </div>
+                <div>
+                    <MudText Typo="Typo.caption" Class="ml-muted">Outstanding Balance:</MudText>
+                    <MudText Typo="Typo.h6" Style="font-weight:700; color:var(--mud-palette-error)">@_activeInvoice.Currency @_activeInvoice.BalanceDue.ToString("N2")</MudText>
+                </div>
+            </MudPaper>
+
+            <MudGrid Spacing="2">
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="_paymentForm.Amount" Label="Payment Amount" Required="true" Min="0.01m" Max="@_activeInvoice.BalanceDue" Format="N2" Margin="Margin.Dense" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="PaymentMethod" @bind-Value="_paymentForm.Method" Label="Payment Method" Margin="Margin.Dense" Variant="Variant.Outlined">
+                        <MudSelectItem Value="@PaymentMethod.BankTransfer">Bank Wire / Transfer</MudSelectItem>
+                        <MudSelectItem Value="@PaymentMethod.CreditCard">Credit / Debit Card</MudSelectItem>
+                        <MudSelectItem Value="@PaymentMethod.Cheque">Cheque</MudSelectItem>
+                        <MudSelectItem Value="@PaymentMethod.Cash">Cash</MudSelectItem>
+                        <MudSelectItem Value="@PaymentMethod.Stripe">Stripe / Online</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_paymentForm.ReferenceNumber" Label="Reference / Transaction ID" Margin="Margin.Dense" Variant="Variant.Outlined" Placeholder="e.g. TXN-998124, Wire Conf #44" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_paymentForm.Notes" Label="Notes" Lines="2" Margin="Margin.Dense" Variant="Variant.Outlined" />
+                </MudItem>
+            </MudGrid>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _paymentDialogOpen = false)">Cancel</MudButton>
+        <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="SubmitPaymentAsync" Disabled="_saving">
+            @if (_saving) { <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" /> }
+            Confirm Payment
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<!-- View Invoice Drawer / Dialog -->
+<MudDialog @bind-Visible="_viewDialogOpen" Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true })">
+    <TitleContent>
+        <div class="d-flex align-center justify-space-between">
+            <MudText Typo="Typo.h6" Style="font-weight:700">Invoice @_activeInvoice?.InvoiceNumber</MudText>
+            <MudChip T="string" Color="@GetStatusColor(_activeInvoice?.Status ?? InvoiceStatus.Draft)" Size="Size.Small" Variant="Variant.Filled">
+                @_activeInvoice?.Status
+            </MudChip>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (_activeInvoice is not null)
+        {
+            <div class="d-flex justify-space-between mb-3">
+                <div>
+                    <MudText Typo="Typo.body1" Style="font-weight:700">Billed To: @(_activeInvoice.AccountName ?? "Direct Customer")</MudText>
+                    <MudText Typo="Typo.body2" Class="ml-muted">Terms: @(_activeInvoice.PaymentTerms ?? "Net 30")</MudText>
+                </div>
+                <div class="text-right">
+                    <MudText Typo="Typo.body2">Issue: @_activeInvoice.IssueDate.ToString("MMM dd, yyyy")</MudText>
+                    <MudText Typo="Typo.body2">Due: @_activeInvoice.DueDate.ToString("MMM dd, yyyy")</MudText>
+                </div>
+            </div>
+
+            <MudTable Items="@_activeInvoice.LineItems" Dense="true" Outlined="true" Class="mb-3">
+                <HeaderContent>
+                    <MudTh>Item</MudTh>
+                    <MudTh Style="text-align:right">Qty</MudTh>
+                    <MudTh Style="text-align:right">Unit Price</MudTh>
+                    <MudTh Style="text-align:right">Tax %</MudTh>
+                    <MudTh Style="text-align:right">Total</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.ProductName</MudTd>
+                    <MudTd Style="text-align:right">@context.Quantity</MudTd>
+                    <MudTd Style="text-align:right">@_activeInvoice.Currency @context.UnitPrice.ToString("N2")</MudTd>
+                    <MudTd Style="text-align:right">@context.TaxRate%</MudTd>
+                    <MudTd Style="text-align:right; font-weight:600">@_activeInvoice.Currency @context.TotalAmount.ToString("N2")</MudTd>
+                </RowTemplate>
+            </MudTable>
+
+            <div class="d-flex justify-end gap-6 pa-3 mb-3" style="background:var(--mud-palette-background-grey); border-radius:8px">
+                <div class="text-right">
+                    <MudText Typo="Typo.caption" Class="ml-muted">SubTotal:</MudText>
+                    <MudText Typo="Typo.body2">@_activeInvoice.Currency @_activeInvoice.SubTotal.ToString("N2")</MudText>
+                </div>
+                <div class="text-right">
+                    <MudText Typo="Typo.caption" Class="ml-muted">Tax:</MudText>
+                    <MudText Typo="Typo.body2">@_activeInvoice.Currency @_activeInvoice.TaxAmount.ToString("N2")</MudText>
+                </div>
+                <div class="text-right">
+                    <MudText Typo="Typo.caption" Class="ml-muted">Grand Total:</MudText>
+                    <MudText Typo="Typo.h6" Style="font-weight:700">@_activeInvoice.Currency @_activeInvoice.GrandTotal.ToString("N2")</MudText>
+                </div>
+            </div>
+
+            <!-- Payments Ledger -->
+            <MudText Typo="Typo.subtitle2" Style="font-weight:700" Class="mb-2">Payment Collections History</MudText>
+            @if (_activeInvoice.Payments.Count == 0)
+            {
+                <MudText Typo="Typo.caption" Class="ml-muted">No payments recorded yet.</MudText>
+            }
+            else
+            {
+                <MudTable Items="@_activeInvoice.Payments" Dense="true" Outlined="true">
+                    <HeaderContent>
+                        <MudTh>Date</MudTh>
+                        <MudTh>Method</MudTh>
+                        <MudTh>Reference</MudTh>
+                        <MudTh Style="text-align:right">Amount</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.PaymentDate.ToString("MMM dd, yyyy HH:mm")</MudTd>
+                        <MudTd>@context.Method</MudTd>
+                        <MudTd>@(context.ReferenceNumber ?? "—")</MudTd>
+                        <MudTd Style="text-align:right; font-weight:700; color:var(--mud-palette-success)">@_activeInvoice.Currency @context.Amount.ToString("N2")</MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _viewDialogOpen = false)">Close</MudButton>
+        @if (_activeInvoice?.BalanceDue > 0 && _activeInvoice.Status != InvoiceStatus.Cancelled)
+        {
+            <MudButton Color="Color.Success" Variant="Variant.Filled" StartIcon="@Icons.Material.Outlined.Payment" OnClick="@(() => { _viewDialogOpen = false; OpenRecordPaymentDialog(_activeInvoice); })">
+                Record Payment
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+<!-- Create Invoice Dialog -->
+<MudDialog @bind-Visible="_createDialogOpen" Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="font-weight:700">Create Direct Invoice</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid Spacing="2">
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_createForm.Currency" Label="Currency" Required="true" Margin="Margin.Dense" Variant="Variant.Outlined" MaxLength="3" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_createForm.PaymentTerms" Label="Payment Terms" Margin="Margin.Dense" Variant="Variant.Outlined" Placeholder="e.g. Net 30, Due on Receipt" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudDatePicker @bind-Date="_createIssueDate" Label="Issue Date" Margin="Margin.Dense" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudDatePicker @bind-Date="_createDueDate" Label="Due Date" Margin="Margin.Dense" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_createForm.Notes" Label="Notes / Remarks" Lines="2" Margin="Margin.Dense" Variant="Variant.Outlined" />
+            </MudItem>
+
+            <!-- Line Items -->
+            <MudItem xs="12">
+                <div class="d-flex align-center justify-space-between mt-3 mb-2">
+                    <MudText Typo="Typo.subtitle2" Style="font-weight:700">Invoice Items</MudText>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Add" OnClick="AddInvoiceLineItem">
+                        Add Item
+                    </MudButton>
+                </div>
+
+                @for (int i = 0; i < _createForm.LineItems.Count; i++)
+                {
+                    var item = _createForm.LineItems[i];
+                    var idx = i;
+                    <MudPaper Elevation="0" Outlined="true" Class="pa-2 mb-2 d-flex flex-wrap align-center gap-2" Style="border-radius:8px">
+                        <MudTextField @bind-Value="item.ProductName" Label="Item Name" Required="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="flex: 2; min-width:180px" />
+                        <MudNumericField @bind-Value="item.Quantity" Label="Qty" Min="1m" Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:80px" />
+                        <MudNumericField @bind-Value="item.UnitPrice" Label="Unit Price" Min="0m" Format="N2" Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:110px" />
+                        <MudNumericField @bind-Value="item.TaxRate" Label="Tax %" Min="0m" Max="100m" Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:80px" />
+                        <MudIconButton Icon="@Icons.Material.Outlined.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => RemoveInvoiceLineItem(idx))" Disabled="@(_createForm.LineItems.Count <= 1)" />
+                    </MudPaper>
+                }
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _createDialogOpen = false)">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveInvoiceAsync" Disabled="_saving">
+            Save Invoice
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private bool _loading = true;
+    private bool _saving = false;
+    private List<InvoiceDto> _invoices = [];
+
+    private string _searchQuery = "";
+    private InvoiceStatus? _statusFilter;
+
+    private bool _paymentDialogOpen = false;
+    private InvoiceDto? _activeInvoice;
+    private RecordPaymentRequest _paymentForm = new();
+
+    private bool _viewDialogOpen = false;
+
+    private bool _createDialogOpen = false;
+    private SaveInvoiceRequest _createForm = new();
+    private DateTime? _createIssueDate = DateTime.UtcNow;
+    private DateTime? _createDueDate = DateTime.UtcNow.AddDays(30);
+
+    private List<InvoiceDto> FilteredInvoices => _invoices.Where(i =>
+        (string.IsNullOrWhiteSpace(_searchQuery) ||
+         i.InvoiceNumber.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase) ||
+         (i.AccountName != null && i.AccountName.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase)) ||
+         (i.ContactName != null && i.ContactName.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase))) &&
+        (!_statusFilter.HasValue || i.Status == _statusFilter.Value)
+    ).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadInvoicesAsync();
+    }
+
+    private async Task LoadInvoicesAsync()
+    {
+        _loading = true;
+        try
+        {
+            _invoices = await Http.GetFromJsonAsync<List<InvoiceDto>>("api/v1/invoices") ?? [];
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load invoices: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private Color GetStatusColor(InvoiceStatus s) => s switch
+    {
+        InvoiceStatus.Paid => Color.Success,
+        InvoiceStatus.PartiallyPaid => Color.Info,
+        InvoiceStatus.Issued => Color.Primary,
+        InvoiceStatus.Draft => Color.Default,
+        InvoiceStatus.Overdue => Color.Error,
+        InvoiceStatus.Cancelled => Color.Warning,
+        _ => Color.Default
+    };
+
+    private void ViewInvoice(InvoiceDto inv)
+    {
+        _activeInvoice = inv;
+        _viewDialogOpen = true;
+    }
+
+    private void OpenRecordPaymentDialog(InvoiceDto inv)
+    {
+        _activeInvoice = inv;
+        _paymentForm = new RecordPaymentRequest
+        {
+            Amount = inv.BalanceDue,
+            Method = PaymentMethod.BankTransfer,
+            PaymentDate = DateTime.UtcNow
+        };
+        _paymentDialogOpen = true;
+    }
+
+    private async Task SubmitPaymentAsync()
+    {
+        if (_activeInvoice is null) return;
+        if (_paymentForm.Amount <= 0)
+        {
+            Snackbar.Add("Payment amount must be greater than zero.", Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var resp = await Http.PostAsJsonAsync($"api/v1/invoices/{_activeInvoice.Id}/payments", _paymentForm);
+            if (resp.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Payment recorded successfully!", Severity.Success);
+                _paymentDialogOpen = false;
+                await LoadInvoicesAsync();
+            }
+            else
+            {
+                var err = await resp.Content.ReadAsStringAsync();
+                Snackbar.Add($"Payment error: {err}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Payment error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task CancelInvoiceAsync(Guid id)
+    {
+        try
+        {
+            var resp = await Http.PostAsync($"api/v1/invoices/{id}/cancel", null);
+            if (resp.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Invoice marked as cancelled.", Severity.Success);
+                await LoadInvoicesAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void OpenNewInvoiceDialog()
+    {
+        _createForm = new SaveInvoiceRequest
+        {
+            Currency = "AED",
+            PaymentTerms = "Net 30",
+            LineItems =
+            [
+                new SaveInvoiceLineItemRequest { ProductName = "Product / Service", Quantity = 1, UnitPrice = 1000m, TaxRate = 5m }
+            ]
+        };
+        _createIssueDate = DateTime.UtcNow;
+        _createDueDate = DateTime.UtcNow.AddDays(30);
+        _createDialogOpen = true;
+    }
+
+    private void AddInvoiceLineItem()
+    {
+        _createForm.LineItems.Add(new SaveInvoiceLineItemRequest
+        {
+            ProductName = "Professional Service",
+            Quantity = 1,
+            UnitPrice = 500m,
+            TaxRate = 5m
+        });
+    }
+
+    private void RemoveInvoiceLineItem(int idx)
+    {
+        if (_createForm.LineItems.Count > 1)
+        {
+            _createForm.LineItems.RemoveAt(idx);
+        }
+    }
+
+    private async Task SaveInvoiceAsync()
+    {
+        if (_createForm.LineItems.Count == 0 || string.IsNullOrWhiteSpace(_createForm.LineItems[0].ProductName))
+        {
+            Snackbar.Add("At least one line item is required.", Severity.Warning);
+            return;
+        }
+
+        _createForm.IssueDate = _createIssueDate ?? DateTime.UtcNow;
+        _createForm.DueDate = _createDueDate ?? DateTime.UtcNow.AddDays(30);
+
+        _saving = true;
+        try
+        {
+            var resp = await Http.PostAsJsonAsync("api/v1/invoices", _createForm);
+            if (resp.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Invoice created successfully!", Severity.Success);
+                _createDialogOpen = false;
+                await LoadInvoicesAsync();
+            }
+            else
+            {
+                var err = await resp.Content.ReadAsStringAsync();
+                Snackbar.Add($"Error: {err}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

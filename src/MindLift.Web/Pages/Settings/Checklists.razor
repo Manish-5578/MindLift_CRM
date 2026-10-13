@@ -1,0 +1,189 @@
+@page "/settings/checklists"
+@inject HttpClient Http
+@inject AppState App
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+
+<PageTitle>Onboarding checklists · MindLift</PageTitle>
+
+<div class="ml-page ml-page--form">
+    <PageHeader Title="Onboarding checklists" Subtitle="Tasks that are created for you when a deal is won, so every new customer gets the same start.">
+        <Actions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => OpenForm(null)" data-testid="primary-action">New checklist</MudButton>
+        </Actions>
+    </PageHeader>
+    <SettingsNav Current="/settings/checklists" />
+
+    @if (_loading)
+    {
+        <SkeletonTable Rows="3" Columns="3" />
+    }
+    else if (_loadFailed)
+    {
+        <ErrorState OnRetry="LoadAsync" />
+    }
+    else if (_templates.Count == 0)
+    {
+        <EmptyState Icon="@Icons.Material.Outlined.Checklist" Title="No checklists yet" Message="Create one and its tasks appear on every deal you win." />
+    }
+    else
+    {
+        @foreach (var template in _templates)
+        {
+            var current = template;
+            <MlCard Title="@current.Name" Subtitle="@Subtitle(current)" Class="mb-4" TestId="@("checklist-" + current.Name)">
+                <div class="ml-stack-sm">
+                    @foreach (var item in current.Items)
+                    {
+                        <div class="ml-row"><MudIcon Icon="@Icons.Material.Outlined.CheckBoxOutlineBlank" Size="Size.Small" /><span class="ml-grow">@item.Subject</span><span class="ml-muted">@(item.OffsetDays == 0 ? "same day" : $"+{item.OffsetDays} days")</span></div>
+                    }
+                    <div class="ml-row" style="justify-content:flex-end">
+                        <MudButton Size="Size.Small" OnClick="() => OpenForm(current)" data-testid="edit-checklist">Edit</MudButton>
+                        <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeleteAsync(current)" data-testid="delete-checklist">Delete</MudButton>
+                    </div>
+                </div>
+            </MlCard>
+        }
+    }
+</div>
+
+<FormDrawer @bind-Open="_drawer" Title="@(_editing is null ? "New checklist" : "Edit checklist")" SubmitText="Save" Busy="_busy" OnSubmit="SaveAsync" IsDirty="true">
+    @if (_error is not null)
+    {
+        <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3" data-testid="checklist-error">@_error</MudAlert>
+    }
+
+    <div class="ml-stack">
+        <MudTextField @bind-Value="_name" Label="Name *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="checklist-name" />
+        <MudSelect T="Guid?" @bind-Value="_pipelineId" Label="Pipeline" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" HelperText="Leave empty to use it for every pipeline.">
+            @foreach (var pipeline in App.Bootstrap?.Pipelines ?? [])
+            {
+                <MudSelectItem T="Guid?" Value="@((Guid?)pipeline.Id)">@pipeline.Name</MudSelectItem>
+            }
+        </MudSelect>
+        <MudSwitch T="bool" @bind-Value="_active" Label="Active" Color="Color.Primary" />
+
+        <MudText Typo="Typo.overline" Class="ml-muted">Tasks</MudText>
+        @for (var i = 0; i < _items.Count; i++)
+        {
+            var index = i;
+            var item = _items[index];
+            <div class="ml-stack-sm" style="padding:12px;border:1px solid var(--ml-border);border-radius:var(--ml-radius)" data-testid="checklist-item">
+                <div class="ml-row">
+                    <MudTextField T="string" Value="item.Subject" ValueChanged="v => item.Subject = v ?? string.Empty" Label="Task *" Variant="Variant.Outlined" Margin="Margin.Dense" Class="ml-grow" data-testid="item-subject" />
+                    <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small" OnClick="() => _items.RemoveAt(index)" aria-label="Remove task" />
+                </div>
+                <MudNumericField T="int" Value="item.OffsetDays" ValueChanged="v => item.OffsetDays = v" Label="Days after winning" Min="0" Max="365" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="item-days" />
+            </div>
+        }
+
+        <div><MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Outlined.Add" OnClick="() => _items.Add(new Row())" data-testid="add-checklist-item">Add task</MudButton></div>
+    </div>
+</FormDrawer>
+
+@code {
+    private sealed class Row
+    {
+        public string Subject { get; set; } = string.Empty;
+        public int OffsetDays { get; set; }
+    }
+
+    private IReadOnlyList<ChecklistTemplateDto> _templates = [];
+    private bool _loading = true;
+    private bool _loadFailed;
+    private bool _drawer;
+    private bool _busy;
+    private string? _error;
+    private ChecklistTemplateDto? _editing;
+    private string _name = string.Empty;
+    private Guid? _pipelineId;
+    private bool _active = true;
+    private List<Row> _items = [new()];
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _loadFailed = false;
+        try
+        {
+            _templates = await Http.GetFromJsonAsync<List<ChecklistTemplateDto>>("api/v1/settings/checklists") ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            _loadFailed = true;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private string Subtitle(ChecklistTemplateDto template)
+        => string.Join(" · ", new[]
+        {
+            template.IsActive ? "Active" : "Switched off",
+            template.PipelineId is { } id ? App.Bootstrap?.Pipelines.FirstOrDefault(p => p.Id == id)?.Name : "Every pipeline",
+            $"{template.Items.Count} tasks",
+        });
+
+    private void OpenForm(ChecklistTemplateDto? template)
+    {
+        _editing = template;
+        _name = template?.Name ?? string.Empty;
+        _pipelineId = template?.PipelineId;
+        _active = template?.IsActive ?? true;
+        _items = template is null ? [new Row()] : template.Items.Select(i => new Row { Subject = i.Subject, OffsetDays = i.OffsetDays }).ToList();
+        _error = null;
+        _drawer = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        _error = null;
+        _busy = true;
+        try
+        {
+            var request = new SaveChecklistTemplateRequest(_name, _pipelineId, _active, _items.Select(i => new ChecklistItemDto(i.Subject, i.OffsetDays, null)).ToList());
+            var response = _editing is null
+                ? await Http.PostAsJsonAsync("api/v1/settings/checklists", request)
+                : await Http.PutAsJsonAsync($"api/v1/settings/checklists/{_editing.Id}", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                var fields = await ProblemText.FieldErrorsAsync(response);
+                _error = fields.Count > 0 ? string.Join(" ", fields.Values) : await ProblemText.FromAsync(response, "We could not save this checklist.");
+                return;
+            }
+
+            _drawer = false;
+            Snackbar.Add("Checklist saved", Severity.Success);
+            await LoadAsync();
+        }
+        catch (HttpRequestException)
+        {
+            _error = "We could not reach MindLift. Check your connection and try again.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DeleteAsync(ChecklistTemplateDto template)
+    {
+        if (!await Dialogs.ConfirmAsync($"Delete {template.Name}?", "Tasks already created from it stay where they are.", "Delete", danger: true))
+        {
+            return;
+        }
+
+        var response = await Http.DeleteAsync($"api/v1/settings/checklists/{template.Id}");
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "We could not delete this checklist."), Severity.Error);
+            return;
+        }
+
+        await LoadAsync();
+    }
+}

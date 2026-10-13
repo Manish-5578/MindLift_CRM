@@ -1,0 +1,87 @@
+{
+  "key": "real_estate",
+  "version": 1,
+  "name": "Real estate",
+  "nameAr": "العقارات",
+  "description": "Agencies and brokers managing property enquiries, viewings and offers.",
+  "modules": {
+    "labels": {
+      "Deals": { "singular": "Property Deal", "plural": "Property Deals", "singularAr": "صفقة عقار", "pluralAr": "صفقات العقارات" }
+    },
+    "enable": ["Dashboard", "Leads", "Contacts", "Accounts", "Deals", "Activities", "Calendar", "Communication", "Reports", "Notifications", "Documents"],
+    "disable": []
+  },
+  "picklists": {
+    "lead_source": {
+      "mode": "merge",
+      "values": [
+        { "value": "property_finder", "label": "Property Finder", "labelAr": "بروبرتي فايندر" },
+        { "value": "bayut", "label": "Bayut", "labelAr": "بيوت" },
+        { "value": "dubizzle", "label": "Dubizzle", "labelAr": "دوبيزل" }
+      ]
+    }
+  },
+  "pipelines": [
+    {
+      "name": "Sales",
+      "nameAr": "المبيعات",
+      "isDefault": true,
+      "stages": [
+        { "name": "Enquiry", "nameAr": "استفسار", "probability": 10, "type": "Open", "rottingDays": 3 },
+        { "name": "Viewing", "nameAr": "معاينة", "probability": 30, "type": "Open", "rottingDays": 7 },
+        { "name": "Offer", "nameAr": "عرض", "probability": 60, "type": "Open", "rottingDays": 7 },
+        { "name": "Agreement", "nameAr": "اتفاقية", "probability": 85, "type": "Open", "rottingDays": 14 },
+        { "name": "Closed Won", "nameAr": "مغلقة - ناجحة", "probability": 100, "type": "Won" },
+        { "name": "Closed Lost", "nameAr": "مغلقة - خاسرة", "probability": 0, "type": "Lost" }
+      ]
+    },
+    {
+      "name": "Leasing",
+      "nameAr": "التأجير",
+      "isDefault": false,
+      "stages": [
+        { "name": "Enquiry", "nameAr": "استفسار", "probability": 10, "type": "Open" },
+        { "name": "Viewing", "nameAr": "معاينة", "probability": 40, "type": "Open" },
+        { "name": "Contract", "nameAr": "عقد", "probability": 80, "type": "Open" },
+        { "name": "Leased", "nameAr": "مؤجر", "probability": 100, "type": "Won" },
+        { "name": "Lost", "nameAr": "خاسرة", "probability": 0, "type": "Lost" }
+      ]
+    }
+  ],
+  "customFields": [
+    { "entity": "leads", "key": "cf_property_type", "label": "Property type", "labelAr": "نوع العقار", "type": "Picklist", "section": "Requirements", "showInList": true,
+      "options": [
+        { "value": "apartment", "label": "Apartment", "labelAr": "شقة" },
+        { "value": "villa", "label": "Villa", "labelAr": "فيلا" },
+        { "value": "townhouse", "label": "Townhouse", "labelAr": "تاون هاوس" },
+        { "value": "office", "label": "Office", "labelAr": "مكتب" },
+        { "value": "land", "label": "Land", "labelAr": "أرض" }
+      ] },
+    { "entity": "leads", "key": "cf_location", "label": "Preferred location", "labelAr": "الموقع المفضل", "type": "Text", "section": "Requirements" },
+    { "entity": "leads", "key": "cf_budget", "label": "Budget", "labelAr": "الميزانية", "type": "Currency", "section": "Requirements", "showInList": true },
+    { "entity": "leads", "key": "cf_bedrooms", "label": "Bedrooms", "labelAr": "غرف النوم", "type": "Number", "section": "Requirements" },
+    { "entity": "deals", "key": "cf_property_type", "label": "Property type", "labelAr": "نوع العقار", "type": "Picklist",
+      "options": [
+        { "value": "apartment", "label": "Apartment", "labelAr": "شقة" },
+        { "value": "villa", "label": "Villa", "labelAr": "فيلا" },
+        { "value": "townhouse", "label": "Townhouse", "labelAr": "تاون هاوس" },
+        { "value": "office", "label": "Office", "labelAr": "مكتب" },
+        { "value": "land", "label": "Land", "labelAr": "أرض" }
+      ] },
+    { "entity": "deals", "key": "cf_location", "label": "Location", "labelAr": "الموقع", "type": "Text" },
+    { "entity": "deals", "key": "cf_budget", "label": "Budget", "labelAr": "الميزانية", "type": "Currency" },
+    { "entity": "deals", "key": "cf_bedrooms", "label": "Bedrooms", "labelAr": "غرف النوم", "type": "Number" }
+  ],
+  "layouts": {
+    "leads": {
+      "Form": [
+        { "section": "Contact info", "sectionAr": "بيانات الاتصال", "columns": 2, "fields": ["first_name", "last_name", "email", "phone"] },
+        { "section": "Requirements", "sectionAr": "المتطلبات", "columns": 2, "fields": ["cf_property_type", "cf_location", "cf_budget", "cf_bedrooms"] },
+        { "section": "Lead details", "sectionAr": "تفاصيل العميل", "columns": 2, "fields": ["source", "status", "rating", "owner_id"] }
+      ]
+    }
+  },
+  "dashboardHighlights": ["deals_in_progress", "upcoming_meetings", "leads_by_source"],
+  "documentTypes": { "enable": ["passport", "emirates_id", "title_deed", "generic"], "portalEnabled": true },
+  "sampleData": { "profile": "real_estate" }
+}

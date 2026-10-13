@@ -1,0 +1,467 @@
+using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using MindLift.Application.Abstractions;
+using MindLift.Application.Common.Exceptions;
+using MindLift.Application.Common.Time;
+using MindLift.Domain.Entities;
+using MindLift.Infrastructure.Identity;
+using MindLift.Infrastructure.Persistence;
+using MindLift.Shared.Contracts;
+using MindLift.Shared.Enums;
+
+namespace MindLift.Infrastructure.Dashboard;
+
+public sealed class DashboardService(
+    AppDbContext db,
+    ITenantContext tenant,
+    IClock clock,
+    IEnumerable<IDashboardWidget> widgets,
+    ILogger<DashboardService> logger
+) : IDashboardService
+{
+    public async Task<DashboardResponse> GetDashboardAsync(
+        DashboardView? requestedView,
+        string? periodPreset,
+        DateTime? fromUtc,
+        DateTime? toUtc,
+        Guid? teamId,
+        Guid? userId,
+        Guid? pipelineId,
+        bool refresh,
+        CancellationToken ct = default
+    )
+    {
+        var currentUserId = tenant.UserId ?? throw new ForbiddenException("Sign in to access dashboard.", "no_user");
+        var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == currentUserId, ct)
+            ?? throw new NotFoundException("User", currentUserId);
+
+        var (allowedMaxView, availableViews) = await ResolveAvailableViewsAsync(user.RoleId, ct);
+        var activeView = ResolveActiveView(requestedView, allowedMaxView);
+
+        var settings = await db.TenantSettings.AsNoTracking().FirstOrDefaultAsync(ct)
+            ?? new TenantSettings { BaseCurrency = "USD", TimeZoneId = "UTC" };
+
+        var tz = TimeZoneInfo.FindSystemTimeZoneById(string.IsNullOrWhiteSpace(settings.TimeZoneId) ? "UTC" : settings.TimeZoneId);
+
+        var (period, previousPeriod) = ResolvePeriods(periodPreset, fromUtc, toUtc, clock.UtcNow, tz);
+        var scopeUserIds = await ResolveScopeUserIdsAsync(activeView, currentUserId, teamId, userId, ct);
+
+        var context = new DashboardContext(
+            currentUserId,
+            tenant.TenantId ?? Guid.Empty,
+            activeView,
+            scopeUserIds,
+            period,
+            previousPeriod,
+            pipelineId,
+            settings.BaseCurrency,
+            tz
+        );
+
+        var layout = await GetEffectiveLayoutAsync(currentUserId, activeView, ct);
+        var widgetMap = widgets.ToDictionary(w => w.Key);
+
+        var computedWidgets = new List<DashboardWidgetDto>();
+        foreach (var item in layout.Widgets.OrderBy(w => w.Order))
+        {
+            if (!widgetMap.TryGetValue(item.Key, out var widget))
+            {
+                continue;
+            }
+
+            if (!widget.Views.Contains(activeView))
+            {
+                continue;
+            }
+
+            if (item.IsHidden)
+            {
+                computedWidgets.Add(new DashboardWidgetDto(
+                    item.Key,
+                    widget.Key,
+                    item.Size,
+                    item.Order,
+                    true,
+                    null,
+                    null,
+                    null
+                ));
+                continue;
+            }
+
+            try
+            {
+                var result = await widget.ComputeAsync(context, ct);
+                var json = result.Data is null ? (JsonElement?)null : JsonSerializer.SerializeToElement(result.Data);
+
+                computedWidgets.Add(new DashboardWidgetDto(
+                    widget.Key,
+                    result.Title,
+                    item.Size,
+                    item.Order,
+                    false,
+                    json,
+                    result.DrillDownUrl,
+                    result.Error
+                ));
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to compute dashboard widget {Key}", widget.Key);
+                computedWidgets.Add(new DashboardWidgetDto(
+                    widget.Key,
+                    widget.Key,
+                    item.Size,
+                    item.Order,
+                    false,
+                    null,
+                    null,
+                    "widget_failed"
+                ));
+            }
+        }
+
+        return new DashboardResponse(activeView, availableViews, clock.UtcNow, computedWidgets);
+    }
+
+    public async Task<DashboardWidgetDto> GetWidgetAsync(
+        string key,
+        DashboardView? requestedView,
+        string? periodPreset,
+        DateTime? fromUtc,
+        DateTime? toUtc,
+        Guid? teamId,
+        Guid? userId,
+        Guid? pipelineId,
+        bool refresh,
+        CancellationToken ct = default
+    )
+    {
+        var widget = widgets.FirstOrDefault(w => w.Key == key)
+            ?? throw new NotFoundException("Dashboard widget", key);
+
+        var currentUserId = tenant.UserId ?? throw new ForbiddenException("Sign in to access dashboard.", "no_user");
+        var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == currentUserId, ct)
+            ?? throw new NotFoundException("User", currentUserId);
+
+        var (allowedMaxView, _) = await ResolveAvailableViewsAsync(user.RoleId, ct);
+        var activeView = ResolveActiveView(requestedView, allowedMaxView);
+
+        if (!widget.Views.Contains(activeView))
+        {
+            throw new NotFoundException("Dashboard widget for view", key);
+        }
+
+        var settings = await db.TenantSettings.AsNoTracking().FirstOrDefaultAsync(ct)
+            ?? new TenantSettings { BaseCurrency = "USD", TimeZoneId = "UTC" };
+        var tz = TimeZoneInfo.FindSystemTimeZoneById(string.IsNullOrWhiteSpace(settings.TimeZoneId) ? "UTC" : settings.TimeZoneId);
+        var (period, previousPeriod) = ResolvePeriods(periodPreset, fromUtc, toUtc, clock.UtcNow, tz);
+        var scopeUserIds = await ResolveScopeUserIdsAsync(activeView, currentUserId, teamId, userId, ct);
+
+        var context = new DashboardContext(
+            currentUserId,
+            tenant.TenantId ?? Guid.Empty,
+            activeView,
+            scopeUserIds,
+            period,
+            previousPeriod,
+            pipelineId,
+            settings.BaseCurrency,
+            tz
+        );
+
+        var result = await widget.ComputeAsync(context, ct);
+        var json = result.Data is null ? (JsonElement?)null : JsonSerializer.SerializeToElement(result.Data);
+
+        return new DashboardWidgetDto(
+            widget.Key,
+            result.Title,
+            widget.DefaultSize,
+            widget.DefaultOrder,
+            false,
+            json,
+            result.DrillDownUrl,
+            result.Error
+        );
+    }
+
+    public async Task<DashboardLayoutDto> GetLayoutAsync(DashboardView view, CancellationToken ct = default)
+    {
+        var currentUserId = tenant.UserId ?? throw new ForbiddenException("Sign in required.", "no_user");
+        return await GetEffectiveLayoutAsync(currentUserId, view, ct);
+    }
+
+    public async Task<DashboardLayoutDto> SaveLayoutAsync(SaveDashboardLayoutRequest request, CancellationToken ct = default)
+    {
+        var currentUserId = tenant.UserId ?? throw new ForbiddenException("Sign in required.", "no_user");
+        var existing = await db.DashboardLayouts.FirstOrDefaultAsync(l => l.UserId == currentUserId && l.View == request.View, ct);
+
+        var doc = JsonSerializer.SerializeToDocument(request.Widgets);
+        if (existing is null)
+        {
+            existing = new DashboardLayout
+            {
+                UserId = currentUserId,
+                View = request.View,
+                Layout = doc
+            };
+            db.DashboardLayouts.Add(existing);
+        }
+        else
+        {
+            existing.Layout = doc;
+        }
+
+        await db.SaveChangesAsync(ct);
+        return new DashboardLayoutDto(request.View, request.Widgets);
+    }
+
+    public async Task<DashboardLayoutDto> ResetLayoutAsync(DashboardView view, CancellationToken ct = default)
+    {
+        var currentUserId = tenant.UserId ?? throw new ForbiddenException("Sign in required.", "no_user");
+        var existing = await db.DashboardLayouts.FirstOrDefaultAsync(l => l.UserId == currentUserId && l.View == view, ct);
+        if (existing is not null)
+        {
+            db.DashboardLayouts.Remove(existing);
+            await db.SaveChangesAsync(ct);
+        }
+
+        return GetDefaultLayout(view);
+    }
+
+    private async Task<(DashboardView MaxView, IReadOnlyList<DashboardView> Available)> ResolveAvailableViewsAsync(Guid? roleId, CancellationToken ct)
+    {
+        if (roleId is null)
+        {
+            return (DashboardView.Staff, [DashboardView.Staff]);
+        }
+
+        var role = await db.Roles.AsNoTracking().FirstOrDefaultAsync(r => r.Id == roleId.Value, ct);
+        var maxView = role?.DashboardView ?? DashboardView.Staff;
+
+        var available = new List<DashboardView>();
+        if (maxView >= DashboardView.Staff) available.Add(DashboardView.Staff);
+        if (maxView >= DashboardView.Manager) available.Add(DashboardView.Manager);
+        if (maxView >= DashboardView.Admin) available.Add(DashboardView.Admin);
+
+        return (maxView, available);
+    }
+
+    private static DashboardView ResolveActiveView(DashboardView? requested, DashboardView maxView)
+    {
+        if (requested is null) return maxView;
+        return requested.Value <= maxView ? requested.Value : maxView;
+    }
+
+    private async Task<IReadOnlyList<Guid>?> ResolveScopeUserIdsAsync(DashboardView view, Guid currentUserId, Guid? teamId, Guid? userId, CancellationToken ct)
+    {
+        if (view == DashboardView.Staff)
+        {
+            return [currentUserId];
+        }
+
+        if (userId is not null)
+        {
+            return [userId.Value];
+        }
+
+        if (teamId is not null)
+        {
+            var members = await db.Users.AsNoTracking()
+                .Where(u => u.IsActive && u.TeamId == teamId)
+                .Select(u => u.Id)
+                .ToListAsync(ct);
+            return members;
+        }
+
+        if (view == DashboardView.Manager)
+        {
+            // Scope to all teams the manager belongs to
+            var currentUser = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == currentUserId, ct);
+            if (currentUser?.TeamId is not null)
+            {
+                var teamMembers = await db.Users.AsNoTracking()
+                    .Where(u => u.IsActive && u.TeamId == currentUser.TeamId)
+                    .Select(u => u.Id)
+                    .ToListAsync(ct);
+                return teamMembers;
+            }
+
+            return [currentUserId];
+        }
+
+        // Admin view with no filter = company wide (null)
+        return null;
+    }
+
+    private static (DateRange Period, DateRange PreviousPeriod) ResolvePeriods(string? preset, DateTime? fromUtc, DateTime? toUtc, DateTime nowUtc, TimeZoneInfo zone)
+    {
+        if (fromUtc is not null && toUtc is not null)
+        {
+            var p = new DateRange(fromUtc.Value, toUtc.Value);
+            var span = toUtc.Value - fromUtc.Value;
+            var pp = new DateRange(fromUtc.Value - span, fromUtc.Value);
+            return (p, pp);
+        }
+
+        var datePreset = preset?.ToLowerInvariant() switch
+        {
+            "last_month" => DatePreset.LastMonth,
+            "this_quarter" => DatePreset.ThisQuarter,
+            "this_year" => DatePreset.ThisYear,
+            _ => DatePreset.ThisMonth
+        };
+
+        var current = DateRangeResolver.Resolve(datePreset, nowUtc, zone);
+
+        // Previous equivalent range
+        var prevPreset = datePreset switch
+        {
+            DatePreset.ThisMonth => DatePreset.LastMonth,
+            DatePreset.LastMonth => DatePreset.LastMonth,
+            DatePreset.ThisQuarter => DatePreset.LastQuarter,
+            DatePreset.ThisYear => DatePreset.LastYear,
+            _ => DatePreset.LastMonth
+        };
+
+        var prev = DateRangeResolver.Resolve(prevPreset, nowUtc, zone);
+        return (current, prev);
+    }
+
+    private async Task<DashboardLayoutDto> GetEffectiveLayoutAsync(Guid userId, DashboardView view, CancellationToken ct)
+    {
+        var saved = await db.DashboardLayouts.AsNoTracking()
+            .FirstOrDefaultAsync(l => l.UserId == userId && l.View == view, ct);
+
+        if (saved is not null)
+        {
+            try
+            {
+                var items = JsonSerializer.Deserialize<List<DashboardWidgetLayoutItem>>(saved.Layout.RootElement.GetRawText());
+                if (items is not null && items.Count > 0)
+                {
+                    return new DashboardLayoutDto(view, items);
+                }
+            }
+            catch
+            {
+                // Fall back to default
+            }
+        }
+
+        return GetDefaultLayout(view);
+    }
+
+    private static DashboardLayoutDto GetDefaultLayout(DashboardView view) => view switch
+    {
+        DashboardView.Staff => new DashboardLayoutDto(view,
+        [
+            new("kpi_strip", 10, WidgetSize.Xl, false),
+            new("my_day", 20, WidgetSize.Lg, false),
+            new("target_progress", 30, WidgetSize.Sm, false),
+            new("new_leads", 40, WidgetSize.Md, false),
+            new("upcoming_meetings", 50, WidgetSize.Md, false),
+            new("deals_in_progress", 60, WidgetSize.Md, false),
+            new("deals_closing_soon", 70, WidgetSize.Md, false),
+            new("activity_summary", 80, WidgetSize.Md, false)
+        ]),
+        DashboardView.Manager => new DashboardLayoutDto(view,
+        [
+            new("kpi_strip", 10, WidgetSize.Xl, false),
+            new("team_leaderboard", 20, WidgetSize.Lg, false),
+            new("target_progress", 30, WidgetSize.Sm, false),
+            new("sales_trend", 40, WidgetSize.Md, false),
+            new("deals_in_progress", 50, WidgetSize.Md, false),
+            new("leads_by_source", 60, WidgetSize.Sm, false),
+            new("pipeline_funnel", 70, WidgetSize.Sm, false),
+            new("team_overdue", 80, WidgetSize.Sm, false),
+            new("deals_closing_soon", 90, WidgetSize.Md, false),
+            new("recent_wins", 100, WidgetSize.Md, false),
+            new("my_day", 110, WidgetSize.Md, false),
+            new("upcoming_meetings", 120, WidgetSize.Md, false)
+        ]),
+        DashboardView.Admin => new DashboardLayoutDto(view,
+        [
+            new("kpi_strip", 10, WidgetSize.Xl, false),
+            new("sales_trend", 20, WidgetSize.Lg, false),
+            new("target_progress", 25, WidgetSize.Sm, false),
+            new("system_overview", 30, WidgetSize.Sm, false),
+            new("team_leaderboard", 40, WidgetSize.Md, false),
+            new("leads_by_source", 50, WidgetSize.Md, false),
+            new("deals_in_progress", 60, WidgetSize.Md, false),
+            new("pipeline_funnel", 70, WidgetSize.Md, false),
+            new("team_overdue", 80, WidgetSize.Sm, false),
+            new("recent_wins", 90, WidgetSize.Md, false)
+        ]),
+        _ => new DashboardLayoutDto(view, [new("kpi_strip", 10, WidgetSize.Xl, false)])
+    };
+}
+
+public sealed class SalesTargetService(AppDbContext db) : ISalesTargetService
+{
+    public async Task<IReadOnlyList<SalesTargetDto>> ListAsync(CancellationToken ct = default)
+    {
+        var targets = await db.SalesTargets.AsNoTracking().ToListAsync(ct);
+        var users = await db.Users.AsNoTracking().ToDictionaryAsync(u => u.Id, u => $"{u.FirstName} {u.LastName}".Trim(), ct);
+        var teams = await db.Teams.AsNoTracking().ToDictionaryAsync(t => t.Id, t => t.Name, ct);
+
+        return targets.Select(t => new SalesTargetDto(
+            t.Id,
+            t.UserId,
+            t.UserId is { } uid ? users.GetValueOrDefault(uid) : null,
+            t.TeamId,
+            t.TeamId is { } tid ? teams.GetValueOrDefault(tid) : null,
+            t.Metric,
+            t.PeriodType,
+            t.StartDate,
+            t.EndDate,
+            t.TargetValue
+        )).ToList();
+    }
+
+    public async Task<SalesTargetDto> GetByIdAsync(Guid id, CancellationToken ct = default)
+    {
+        var t = await db.SalesTargets.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct)
+            ?? throw new NotFoundException("Sales target", id);
+
+        var userName = t.UserId is { } uid ? await db.Users.Where(u => u.Id == uid).Select(u => $"{u.FirstName} {u.LastName}".Trim()).FirstOrDefaultAsync(ct) : null;
+        var teamName = t.TeamId is { } tid ? await db.Teams.Where(team => team.Id == tid).Select(team => team.Name).FirstOrDefaultAsync(ct) : null;
+
+        return new SalesTargetDto(t.Id, t.UserId, userName, t.TeamId, teamName, t.Metric, t.PeriodType, t.StartDate, t.EndDate, t.TargetValue);
+    }
+
+    public async Task<SalesTargetDto> SaveAsync(Guid? id, SaveSalesTargetRequest request, CancellationToken ct = default)
+    {
+        SalesTarget target;
+        if (id is null)
+        {
+            target = new SalesTarget();
+            db.SalesTargets.Add(target);
+        }
+        else
+        {
+            target = await db.SalesTargets.FirstOrDefaultAsync(x => x.Id == id, ct)
+                ?? throw new NotFoundException("Sales target", id);
+        }
+
+        target.UserId = request.UserId;
+        target.TeamId = request.TeamId;
+        target.Metric = request.Metric;
+        target.PeriodType = request.PeriodType;
+        target.StartDate = request.StartDate;
+        target.EndDate = request.EndDate;
+        target.TargetValue = request.TargetValue;
+
+        await db.SaveChangesAsync(ct);
+        return await GetByIdAsync(target.Id, ct);
+    }
+
+    public async Task DeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        var target = await db.SalesTargets.FirstOrDefaultAsync(x => x.Id == id, ct)
+            ?? throw new NotFoundException("Sales target", id);
+        db.SalesTargets.Remove(target);
+        await db.SaveChangesAsync(ct);
+    }
+}

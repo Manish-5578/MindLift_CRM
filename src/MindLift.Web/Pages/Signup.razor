@@ -1,0 +1,96 @@
+@page "/signup"
+@layout AuthLayout
+@inject HttpClient Http
+@inject AuthSession Session
+@inject AppState App
+@inject NavigationManager Nav
+
+<PageTitle>Create your workspace · MindLift</PageTitle>
+
+<div class="ml-wizard" style="max-width:480px;margin-top:48px">
+    <div class="ml-stack">
+        <MudText Typo="Typo.h4" data-testid="page-title">Create your workspace</MudText>
+        <MudText Typo="Typo.body2" Class="ml-muted">14 days free. No card needed.</MudText>
+
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" data-testid="signup-error">@_error</MudAlert>
+        }
+
+        <MudTextField @bind-Value="_company" Label="Company name" Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" Error="@(_errors.ContainsKey("companyName"))" ErrorText="@(Err("companyName"))" data-testid="signup-company" />
+        <MudGrid Spacing="3">
+            <MudItem xs="12" sm="6"><MudTextField @bind-Value="_first" Label="First name" Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" data-testid="signup-first" /></MudItem>
+            <MudItem xs="12" sm="6"><MudTextField @bind-Value="_last" Label="Last name" Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" data-testid="signup-last" /></MudItem>
+        </MudGrid>
+        <MudTextField @bind-Value="_email" Label="Work email" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Email" Required="true" Error="@(_errors.ContainsKey("email"))" ErrorText="@(Err("email"))" data-testid="signup-email" />
+        <MudTextField @bind-Value="_password" Label="Password" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Password" Required="true" HelperText="At least 8 characters, with upper and lower case letters and a digit." Error="@(_errors.ContainsKey("password"))" ErrorText="@(Err("password"))" data-testid="signup-password" />
+        <MudTextField @bind-Value="_phone" Label="Phone (optional)" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="signup-phone" />
+        <MudSelect @bind-Value="_country" Label="Country" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="signup-country">
+            @foreach (var (iso, label) in Countries)
+            {
+                <MudSelectItem Value="@iso">@label</MudSelectItem>
+            }
+        </MudSelect>
+        <MudCheckBox @bind-Value="_terms" Label="I agree to the Terms and Privacy Policy" Color="Color.Primary" data-testid="signup-terms" />
+
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Size="Size.Large" Disabled="_busy" OnClick="CreateAsync" data-testid="primary-action">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }
+            else { <text>Create my workspace</text> }
+        </MudButton>
+
+        <MudText Typo="Typo.body2" Class="ml-muted">Already have an account? <MudLink Href="/login" Class="ml-link">Sign in</MudLink></MudText>
+    </div>
+</div>
+
+@code {
+    private static readonly (string Code, string Name)[] Countries =
+    [
+        ("AE", "United Arab Emirates"), ("SA", "Saudi Arabia"), ("QA", "Qatar"), ("OM", "Oman"),
+        ("BH", "Bahrain"), ("KW", "Kuwait"), ("IN", "India"), ("GB", "United Kingdom"), ("US", "United States"),
+    ];
+
+    private string _company = string.Empty;
+    private string _first = string.Empty;
+    private string _last = string.Empty;
+    private string _email = string.Empty;
+    private string _password = string.Empty;
+    private string? _phone;
+    private string _country = "AE";
+    private bool _terms;
+    private string? _error;
+    private bool _busy;
+    private Dictionary<string, string> _errors = new();
+
+    private string? Err(string field) => _errors.TryGetValue(field, out var message) ? message : null;
+
+    private async Task CreateAsync()
+    {
+        _error = null;
+        _errors = new();
+        _busy = true;
+        try
+        {
+            var request = new SignupRequest(_company, _first, _last, _email, _password, _phone, _country, "en", _terms);
+            var response = await Http.PostAsJsonAsync("api/v1/auth/signup", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                _errors = await ProblemText.FieldErrorsAsync(response);
+                _error = _errors.Count > 0 ? "Please fix the highlighted fields." : await ProblemText.FromAsync(response, "We could not create your workspace. Try again.");
+                return;
+            }
+
+            Session.SetTokens((await response.Content.ReadFromJsonAsync<TokenResponse>())!);
+            await App.LoadAsync();
+            Nav.NavigateTo("/onboarding");
+        }
+        catch (HttpRequestException)
+        {
+            _error = "We could not reach MindLift. Check your connection and try again.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}
+

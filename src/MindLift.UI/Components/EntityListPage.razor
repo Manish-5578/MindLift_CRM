@@ -1,0 +1,444 @@
+@typeparam TItem
+@using MindLift.Shared.Filtering
+@inject NavigationManager Nav
+@implements IDisposable
+
+<PageHeader Title="@Title" Subtitle="@SubtitleText">
+    <Actions>@HeaderActions</Actions>
+</PageHeader>
+
+<MlCard Flush="true" TestId="entity-list">
+    @if (Views.Count > 0)
+    {
+        <div class="ml-row ml-row--wrap" style="padding:12px 20px 0" data-testid="list-views">
+            <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small">
+                @foreach (var view in Views)
+                {
+                    var current = view;
+                    <MudButton Color="@ViewColor(current)" OnClick="() => SelectViewAsync(current)" data-testid="@ViewTestId(current)">@current.Label</MudButton>
+                }
+            </MudButtonGroup>
+        </div>
+    }
+
+    <div class="ml-row ml-row--wrap" style="padding:12px 20px;border-bottom:1px solid var(--ml-border)" data-testid="list-toolbar">
+        <MudTextField T="string" Value="_state.Search" ValueChanged="SearchAsync" Immediate="true" DebounceInterval="300" Placeholder="@SearchPlaceholder"
+                      Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.Search"
+                      Class="ml-grow" Style="max-width:360px" data-testid="search" />
+
+        @if (Fields.Count > 0)
+        {
+            <MudBadge Content="FilterCount" Visible="FilterCount > 0" Color="Color.Primary" Overlap="true">
+                <MudButton Variant="Variant.Outlined" Size="Size.Medium" StartIcon="@Icons.Material.Outlined.FilterList" OnClick="OpenFilters" data-testid="open-filters">Filters</MudButton>
+            </MudBadge>
+        }
+
+        @foreach (var chip in Chips())
+        {
+            var condition = chip.Condition;
+            <MudChip T="string" Size="Size.Small" OnClose="() => RemoveConditionAsync(condition)" data-testid="filter-chip">@chip.Text</MudChip>
+        }
+
+        @if (_state.IsNarrowed)
+        {
+            <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="ClearAsync" data-testid="clear-filters">Clear</MudButton>
+        }
+    </div>
+
+    @if (_loading)
+    {
+        <div class="ml-hide-xs" data-testid="list-loading"><SkeletonTable Rows="8" Columns="@Columns.Count" /></div>
+        <div class="ml-only-xs" style="padding:12px"><SkeletonCards Count="4" /></div>
+    }
+    else if (_error is not null)
+    {
+        <ErrorState Message="@_error" OnRetry="ReloadAsync" />
+    }
+    else if (_result is { Items.Count: 0 })
+    {
+        @if (NeverHadData)
+        {
+            <EmptyState Title="@EmptyTitle" Message="@EmptyMessage" Icon="@EmptyIcon">
+                <Actions>@EmptyActions</Actions>
+            </EmptyState>
+        }
+        else
+        {
+            <EmptyState Icon="@Icons.Material.Outlined.SearchOff" Title="No results" Message="Try different keywords or clear the filters.">
+                <Actions>
+                    <MudButton Variant="Variant.Outlined" OnClick="ClearAsync" data-testid="empty-clear">Clear filters</MudButton>
+                </Actions>
+            </EmptyState>
+        }
+    }
+    else if (_result is not null)
+    {
+        <div class="ml-hide-xs" style="overflow-x:auto" data-testid="list">
+            <table class="ml-table">
+                <thead>
+                    <tr>
+                        @foreach (var column in Columns)
+                        {
+                            var current = column;
+                            <th class="@ColumnClass(current)" aria-sort="@SortAria(current)">
+                                @if (current.SortField is not null)
+                                {
+                                    <button type="button" @onclick="() => SortAsync(current.SortField)" data-testid="@SortTestId(current)">
+                                        @current.Header
+                                        @if (_state.SortField == current.SortField)
+                                        {
+                                            <MudIcon Icon="@SortIcon()" Size="Size.Small" />
+                                        }
+                                    </button>
+                                }
+                                else
+                                {
+                                    @current.Header
+                                }
+                            </th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in _result.Items)
+                    {
+                        var current = item;
+                        <tr class="@RowClass" @onclick="() => OpenAsync(current)" data-testid="row">
+                            @foreach (var column in Columns)
+                            {
+                                <td class="@ColumnClass(column)">@column.Cell(current)</td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="ml-only-xs ml-stack" style="padding:12px" data-testid="list-cards">
+            @foreach (var item in _result.Items)
+            {
+                var current = item;
+                <div class="ml-card" style="padding:12px 16px;cursor:pointer" @onclick="() => OpenAsync(current)" data-testid="card">
+                    @if (CardTemplate is not null)
+                    {
+                        @CardTemplate(current)
+                    }
+                    else
+                    {
+                        @Columns[0].Cell(current)
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="ml-row ml-row--between" style="padding:12px 20px;border-top:1px solid var(--ml-border)" data-testid="list-pager">
+            <MudText Typo="Typo.caption" Class="ml-muted">@PagerText</MudText>
+            <div class="ml-row">
+                <MudIconButton Icon="@Icons.Material.Outlined.ChevronLeft" Disabled="_state.Page <= 1" OnClick="() => GoToPageAsync(_state.Page - 1)" aria-label="Previous page" data-testid="page-prev" />
+                <MudIconButton Icon="@Icons.Material.Outlined.ChevronRight" Disabled="_state.Page >= PageCount" OnClick="() => GoToPageAsync(_state.Page + 1)" aria-label="Next page" data-testid="page-next" />
+            </div>
+        </div>
+    }
+</MlCard>
+
+<MudDrawer Open="_filtersOpen" OpenChanged="v => _filtersOpen = v" Anchor="Anchor.End" Variant="DrawerVariant.Temporary" Elevation="3" Width="420px" Class="ml-form-drawer" data-testid="filters-drawer">
+    <div class="ml-stack" style="height:100%">
+        <div class="ml-row ml-row--between" style="padding:16px 24px;border-bottom:1px solid var(--ml-border);min-height:64px">
+            <MudText Typo="Typo.h5">Filters</MudText>
+            <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small" OnClick="CloseFilters" aria-label="Close filters" />
+        </div>
+        <div style="padding:24px;overflow:auto;flex:1 1 auto">
+            <FilterBuilder Fields="Fields" Picklists="Picklists" Users="Users" Value="_draft" ValueChanged="g => _draft = g" />
+        </div>
+        <div class="ml-row" style="justify-content:flex-end;padding:16px 24px;border-top:1px solid var(--ml-border)">
+            <MudButton Variant="Variant.Text" OnClick="ResetFiltersAsync" data-testid="filters-reset">Reset</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ApplyFiltersAsync" data-testid="filters-apply">Apply</MudButton>
+        </div>
+    </div>
+</MudDrawer>
+
+@code {
+    private ListState _state = new("");
+    private PagedResult<TItem>? _result;
+    private bool _loading = true;
+    private string? _error;
+    private bool _filtersOpen;
+    private FilterGroup? _draft;
+    private bool _selfNavigating;
+    private int _requestId;
+
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+
+    /// <summary>The plural name used in the subtitle, for example "leads" gives "1,284 leads".</summary>
+    [Parameter] public string ItemLabel { get; set; } = "records";
+
+    [Parameter] public RenderFragment? HeaderActions { get; set; }
+
+    /// <summary>Tabs above the list. The first one is the default unless <see cref="DefaultView"/> says otherwise.</summary>
+    [Parameter] public IReadOnlyList<ListView> Views { get; set; } = [];
+
+    [Parameter] public string? DefaultView { get; set; }
+
+    [Parameter, EditorRequired] public IReadOnlyList<ListColumn<TItem>> Columns { get; set; } = [];
+
+    /// <summary>How a row looks as a card on phones. Without it the first column is used.</summary>
+    [Parameter] public RenderFragment<TItem>? CardTemplate { get; set; }
+
+    /// <summary>Fetches one page. Throw HttpRequestException when the server cannot be reached.</summary>
+    [Parameter, EditorRequired] public Func<ListQuery, Task<PagedResult<TItem>>> Loader { get; set; } = _ => Task.FromResult(new PagedResult<TItem>([], 0, 1, 25));
+
+    [Parameter] public Func<TItem, string?>? RowHref { get; set; }
+    [Parameter] public EventCallback<TItem> OnRowClick { get; set; }
+
+    /// <summary>The fields of the record type. The Filters button only shows when there are some.</summary>
+    [Parameter] public IReadOnlyList<MindLift.Shared.Contracts.FieldDto> Fields { get; set; } = [];
+
+    [Parameter] public IReadOnlyList<MindLift.Shared.Contracts.PicklistDto>? Picklists { get; set; }
+    [Parameter] public IReadOnlyList<MindLift.Shared.Contracts.UserListItem>? Users { get; set; }
+
+    [Parameter] public string SearchPlaceholder { get; set; } = "Search";
+    [Parameter] public string EmptyTitle { get; set; } = "Nothing here yet";
+    [Parameter] public string? EmptyMessage { get; set; }
+    [Parameter] public string EmptyIcon { get; set; } = Icons.Material.Outlined.Inbox;
+    [Parameter] public RenderFragment? EmptyActions { get; set; }
+    [Parameter] public string? DefaultSortField { get; set; }
+    [Parameter] public string? DefaultSortDir { get; set; }
+    [Parameter] public int PageSize { get; set; } = 25;
+
+    private string DefaultViewKey => DefaultView ?? Views.FirstOrDefault()?.Key ?? string.Empty;
+
+    private string? SubtitleText => _result is null ? null : $"{_result.Total:N0} {ItemLabel}";
+
+    private int PageCount => _result is null ? 1 : Math.Max(1, (int)Math.Ceiling(_result.Total / (double)PageSize));
+
+    private string PagerText => _result is null ? string.Empty : $"{_result.Total:N0} {ItemLabel} · page {_state.Page} of {PageCount}";
+
+    private int FilterCount => _state.Filter?.Conditions.Count ?? 0;
+
+    /// <summary>True when an empty list means "no records yet", not "nothing matches what you asked for".</summary>
+    private bool NeverHadData => !_state.IsNarrowed && (Views.Count == 0 || _state.View == DefaultViewKey);
+
+    private string RowClass => RowHref is not null || OnRowClick.HasDelegate ? "ml-row-click" : string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _state = ListState.FromQuery(new Uri(Nav.Uri).Query, DefaultViewKey, Views.Select(v => v.Key).ToList());
+        if (_state.SortField is null && DefaultSortField is not null)
+        {
+            _state = _state with { SortField = DefaultSortField, SortDir = DefaultSortDir ?? "asc" };
+        }
+
+        Nav.LocationChanged += OnLocationChanged;
+        await LoadAsync();
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        if (_selfNavigating)
+        {
+            _selfNavigating = false;
+            return;
+        }
+
+        // Back and forward buttons: show whatever the address now says.
+        var parsed = ListState.FromQuery(new Uri(e.Location).Query, DefaultViewKey, Views.Select(v => v.Key).ToList());
+        if (parsed != _state)
+        {
+            _state = parsed;
+            _ = InvokeAsync(LoadAsync);
+        }
+    }
+
+    private async Task SetStateAsync(ListState next)
+    {
+        if (next == _state)
+        {
+            return;
+        }
+
+        _state = next;
+        _selfNavigating = true;
+        var query = _state.ToQuery(DefaultViewKey).ToDictionary(kv => kv.Key, kv => (object?)kv.Value);
+
+        // The default sort is not worth putting in the address. Only a sort the user chose is.
+        if (_state.SortField == DefaultSortField && (_state.SortDir ?? "asc") == (DefaultSortDir ?? "asc"))
+        {
+            query[ListState.SortKey] = null;
+            query[ListState.DirKey] = null;
+        }
+
+        Nav.NavigateTo(Nav.GetUriWithQueryParameters(query), replace: true);
+        await LoadAsync();
+    }
+
+    /// <summary>Loads the current page again, for example after a record was created.</summary>
+    public async Task ReloadAsync() => await LoadAsync();
+
+    private ListQuery? _lastQuery;
+
+    /// <summary>The search, filters and sort the list is showing now, so an export can ask for exactly the same records.</summary>
+    public ListQuery CurrentQuery => _lastQuery ?? new ListQuery(_state.Search, EffectiveFilter(), _state.SortField ?? DefaultSortField, DefaultSortDir, 1, PageSize);
+
+    private async Task LoadAsync()
+    {
+        var request = ++_requestId;
+        _loading = true;
+        _error = null;
+        StateHasChanged();
+
+        try
+        {
+            var query = new ListQuery(
+                _state.Search,
+                EffectiveFilter(),
+                _state.SortField ?? DefaultSortField,
+                _state.SortField is null ? DefaultSortDir : _state.SortDir,
+                _state.Page,
+                PageSize);
+            _lastQuery = query;
+            var result = await Loader(query);
+            if (request != _requestId)
+            {
+                return; // A newer search or page was started while this one was loading. Ignore the old answer.
+            }
+
+            _result = result;
+        }
+        catch (ListLoadException ex)
+        {
+            if (request == _requestId)
+            {
+                _result = null;
+                _error = ex.Message;
+            }
+        }
+        catch (HttpRequestException)
+        {
+            if (request == _requestId)
+            {
+                _result = null;
+                _error = "We could not reach MindLift. Check your connection and try again.";
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            if (request == _requestId)
+            {
+                _result = null;
+                _error = "We could not load this list. Try again.";
+            }
+        }
+        finally
+        {
+            if (request == _requestId)
+            {
+                _loading = false;
+            }
+        }
+    }
+
+    /// <summary>The view's own filter and the user's filters together, so a view tab and extra filters both apply.</summary>
+    private FilterGroup? EffectiveFilter()
+    {
+        var view = Views.FirstOrDefault(v => v.Key == _state.View)?.Filter;
+        var user = _state.HasFilter ? _state.Filter : null;
+        if (view is null || user is null)
+        {
+            return view ?? user;
+        }
+
+        return new FilterGroup { Logic = "and", Groups = [view, user] };
+    }
+
+    private Color ViewColor(ListView view) => _state.View == view.Key ? Color.Primary : Color.Default;
+
+    private static string ViewTestId(ListView view) => "view-" + view.Key;
+
+    private async Task SelectViewAsync(ListView view) => await SetStateAsync(_state.Reset(view: view.Key));
+
+    private async Task SearchAsync(string? text) => await SetStateAsync(_state.Reset(search: text, clearSearch: string.IsNullOrWhiteSpace(text)));
+
+    private async Task ClearAsync() => await SetStateAsync(_state.Reset(clearSearch: true, clearFilter: true));
+
+    private async Task GoToPageAsync(int page) => await SetStateAsync(_state with { Page = Math.Clamp(page, 1, PageCount) });
+
+    private async Task SortAsync(string field)
+    {
+        // First click sorts ascending, second descending, third goes back to the default order.
+        var next = _state.SortField != field ? (field, "asc")
+            : _state.SortDir == "asc" ? (field, "desc")
+            : ((string?)null, (string?)null);
+        await SetStateAsync(_state with { SortField = next.Item1, SortDir = next.Item2, Page = 1 });
+    }
+
+    private static string SortTestId(ListColumn<TItem> column) => "sort-" + column.SortField;
+
+    private string? SortAria(ListColumn<TItem> column)
+        => column.SortField is null || _state.SortField != column.SortField ? null : _state.SortDir == "desc" ? "descending" : "ascending";
+
+    private string SortIcon() => _state.SortDir == "desc" ? Icons.Material.Outlined.ArrowDownward : Icons.Material.Outlined.ArrowUpward;
+
+    private static string ColumnClass(ListColumn<TItem> column)
+        => string.Join(' ', new[] { column.HideOnTablet ? "ml-hide-tablet" : null, column.AlignEnd ? "ml-end" : null }.Where(c => c is not null));
+
+    private async Task OpenAsync(TItem item)
+    {
+        if (OnRowClick.HasDelegate)
+        {
+            await OnRowClick.InvokeAsync(item);
+        }
+        else if (RowHref?.Invoke(item) is { } href)
+        {
+            Nav.NavigateTo(href);
+        }
+    }
+
+    // ---- filters ----
+
+    private void OpenFilters()
+    {
+        _draft = _state.Filter;
+        _filtersOpen = true;
+    }
+
+    private void CloseFilters() => _filtersOpen = false;
+
+    private async Task ApplyFiltersAsync()
+    {
+        _filtersOpen = false;
+        var has = _draft is { Conditions.Count: > 0 } or { Groups.Count: > 0 };
+        await SetStateAsync(_state.Reset(filter: has ? _draft : null, clearFilter: !has));
+    }
+
+    private async Task ResetFiltersAsync()
+    {
+        _draft = null;
+        _filtersOpen = false;
+        await SetStateAsync(_state.Reset(clearFilter: true));
+    }
+
+    private async Task RemoveConditionAsync(FilterCondition condition)
+    {
+        if (_state.Filter is not { } filter)
+        {
+            return;
+        }
+
+        var left = new FilterGroup { Logic = filter.Logic, Conditions = filter.Conditions.Where(c => c != condition).ToList(), Groups = filter.Groups };
+        var has = left.Conditions.Count > 0 || left.Groups.Count > 0;
+        await SetStateAsync(_state.Reset(filter: has ? left : null, clearFilter: !has));
+    }
+
+    private IEnumerable<(FilterCondition Condition, string Text)> Chips()
+    {
+        foreach (var condition in _state.Filter?.Conditions ?? [])
+        {
+            if (Fields.FirstOrDefault(f => f.Key == condition.Field) is { } field)
+            {
+                yield return (condition, FilterDescriber.Describe(condition, field, Picklists, Users));
+            }
+        }
+    }
+
+    public void Dispose() => Nav.LocationChanged -= OnLocationChanged;
+}

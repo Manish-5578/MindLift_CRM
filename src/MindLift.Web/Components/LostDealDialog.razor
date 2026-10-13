@@ -1,0 +1,48 @@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h5">@Title</MudText>
+    </TitleContent>
+    <DialogContent>
+        <div class="ml-stack">
+            <MudText Typo="Typo.body1" Class="ml-muted">A lost deal stays on record. Choose why it was lost.</MudText>
+            <MudSelect T="string" @bind-Value="_reason" Label="Reason *" Variant="Variant.Outlined" Margin="Margin.Dense"
+                       Error="@(_error is not null)" ErrorText="@_error" data-testid="lost-reason">
+                @foreach (var value in Reasons)
+                {
+                    <MudSelectItem T="string" Value="@value.Value">@value.Label</MudSelectItem>
+                }
+            </MudSelect>
+            <MudTextField @bind-Value="_notes" Label="Notes" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" data-testid="lost-notes" />
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Cancel" data-testid="lost-cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="Confirm" data-testid="lost-ok">Mark as lost</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private string? _reason;
+    private string? _notes;
+    private string? _error;
+
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public string Title { get; set; } = "Mark this deal as lost?";
+    [Parameter] public IReadOnlyList<PicklistValueDto> Reasons { get; set; } = [];
+
+    public sealed record Result(string Reason, string? Notes);
+
+    private void Confirm()
+    {
+        if (string.IsNullOrWhiteSpace(_reason))
+        {
+            _error = "Choose a reason.";
+            return;
+        }
+
+        MudDialog.Close(DialogResult.Ok(new Result(_reason, string.IsNullOrWhiteSpace(_notes) ? null : _notes.Trim())));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

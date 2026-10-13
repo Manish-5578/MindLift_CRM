@@ -1,0 +1,149 @@
+@inject HttpClient Http
+@inject AppState App
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+@inject IJSRuntime JS
+
+<MlCard Title="Files" TestId="record-files">
+    <div class="ml-stack">
+        @if (CanEdit)
+        {
+            <FileDropZone @ref="_drop" Accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx,.csv,.txt" MaxSizeMb="25" Multiple="true" FilesChanged="OnFilesChosen" />
+        }
+
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else if (_files.Count == 0)
+        {
+            <MudText Typo="Typo.body2" Class="ml-muted" data-testid="no-files">No files yet.</MudText>
+        }
+
+        @foreach (var file in _files)
+        {
+            var current = file;
+            <div class="ml-row" style="padding:6px 0;border-bottom:1px solid var(--ml-border)" data-testid="record-file">
+                <MudIcon Icon="@Icons.Material.Outlined.InsertDriveFile" Class="ml-muted" />
+                <div class="ml-grow" style="min-width:0">
+                    <MudText Typo="Typo.body2" Class="ml-truncate">@current.FileName</MudText>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@Formatting.FileSize(current.SizeBytes) · <DateText Value="@current.CreatedAtUtc" /></MudText>
+                </div>
+                <MudIconButton Icon="@Icons.Material.Outlined.Download" Size="Size.Small" OnClick="() => DownloadAsync(current)" aria-label="@("Download " + current.FileName)" data-testid="file-download" />
+                @if (CanDelete)
+                {
+                    <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" OnClick="() => DeleteAsync(current)" aria-label="@("Delete " + current.FileName)" data-testid="file-delete" />
+                }
+            </div>
+        }
+    </div>
+</MlCard>
+
+@code {
+    /// <summary>The kind of record: leads, contacts, accounts or deals.</summary>
+    [Parameter, EditorRequired] public string EntityType { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired] public Guid EntityId { get; set; }
+
+    private FileDropZone? _drop;
+    private bool _loading = true;
+    private IReadOnlyList<StoredFileDto> _files = [];
+    private Guid _loadedFor;
+
+    private bool Can(Func<ModulePermissionDto, bool> check)
+        => App.Bootstrap?.Permissions.Any(p => string.Equals(p.Module, EntityType, StringComparison.OrdinalIgnoreCase) && check(p)) == true;
+
+    private bool CanEdit => Can(p => p.CanEdit);
+    private bool CanDelete => Can(p => p.CanDelete);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (EntityId != _loadedFor)
+        {
+            _loadedFor = EntityId;
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _files = await Http.GetFromJsonAsync<List<StoredFileDto>>($"api/v1/files?entityType={EntityType}&entityId={EntityId}") ?? [];
+        }
+        catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException or TaskCanceledException)
+        {
+            _files = [];
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnFilesChosen(IReadOnlyList<Microsoft.AspNetCore.Components.Forms.IBrowserFile> chosen)
+    {
+        foreach (var file in chosen)
+        {
+            try
+            {
+                using var content = new MultipartFormDataContent();
+                var stream = new StreamContent(file.OpenReadStream(25L * 1024 * 1024));
+                content.Add(stream, "file", file.Name);
+                content.Add(new StringContent(EntityType), "entityType");
+                content.Add(new StringContent(EntityId.ToString()), "entityId");
+                var response = await Http.PostAsync("api/v1/files", content);
+                if (response.IsSuccessStatusCode)
+                {
+                    Snackbar.Add($"{file.Name} uploaded", Severity.Success);
+                }
+                else
+                {
+                    Snackbar.Add(await ProblemText.FromAsync(response, $"We could not upload {file.Name}."), Severity.Error);
+                }
+            }
+            catch (IOException)
+            {
+                Snackbar.Add($"We could not read {file.Name}.", Severity.Error);
+            }
+        }
+
+        await LoadAsync();
+        StateHasChanged();
+
+        if (_drop is not null)
+        {
+            await _drop.ClearAsync();
+        }
+    }
+
+    private async Task DownloadAsync(StoredFileDto file)
+    {
+        var response = await Http.GetAsync($"api/v1/files/{file.Id}");
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "We could not download this file."), Severity.Error);
+            return;
+        }
+
+        await JS.InvokeVoidAsync("mindlift.downloadFile", file.FileName, file.ContentType, Convert.ToBase64String(await response.Content.ReadAsByteArrayAsync()));
+    }
+
+    private async Task DeleteAsync(StoredFileDto file)
+    {
+        if (!await Dialogs.ConfirmAsync($"Delete {file.FileName}?", "The file is removed from this record.", "Delete", danger: true))
+        {
+            return;
+        }
+
+        var response = await Http.DeleteAsync($"api/v1/files/{file.Id}");
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "We could not delete this file."), Severity.Error);
+        }
+
+        await LoadAsync();
+    }
+}

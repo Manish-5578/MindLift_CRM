@@ -1,0 +1,372 @@
+@page "/onboarding"
+@layout AuthLayout
+@inject HttpClient Http
+@inject AuthSession Session
+@inject AppState App
+@inject NavigationManager Nav
+
+<PageTitle>Set up your workspace · MindLift</PageTitle>
+
+<div class="ml-wizard">
+    @if (_loading)
+    {
+        <MlCard Loading="true" />
+    }
+    else if (_state is null)
+    {
+        <ErrorState OnRetry="LoadAsync" />
+    }
+    else
+    {
+        <MlCard Flush="true">
+            <div class="ml-card__body" style="padding:24px">
+                <div class="ml-row ml-row--between">
+                    <MudText Typo="Typo.caption" Class="ml-muted" data-testid="step-indicator">Step @_step of 6 · @StepTitle(_step)</MudText>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@(Math.Round(100.0 * (_step - 1) / 6))%</MudText>
+                </div>
+                <MudProgressLinear Value="@(100.0 * (_step - 1) / 6)" Color="Color.Primary" Rounded="true" Class="my-2" />
+
+                @if (_error is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3" data-testid="wizard-error">@_error</MudAlert>
+                }
+
+                @if (_step == 1)
+                {
+                    <MudText Typo="Typo.h5">Tell us about your company</MudText>
+                    <MudText Typo="Typo.body2" Class="ml-muted">This sets your currency, time zone and language.</MudText>
+                    <div class="ml-stack">
+                        <MudTextField @bind-Value="_companyName" Label="Company name" Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" />
+                        <MudGrid Spacing="3">
+                            <MudItem xs="12" sm="6">
+                                <MudSelect T="string" Value="_country" ValueChanged="OnCountryChanged" Label="Country" Variant="Variant.Outlined" Margin="Margin.Dense">
+                                    @foreach (var (iso, label) in Countries)
+                                    {
+                                        <MudSelectItem T="string" Value="@iso">@label</MudSelectItem>
+                                    }
+                                </MudSelect>
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudTextField @bind-Value="_currency" Label="Base currency" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                            </MudItem>
+                        </MudGrid>
+                        <MudSelect T="string" @bind-Value="_language" Label="Language" Variant="Variant.Outlined" Margin="Margin.Dense">
+                            <MudSelectItem T="string" Value="@("en")">English</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("ar")">Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©</MudSelectItem>
+                        </MudSelect>
+                        <MudSwitch @bind-Value="_tax" Label="We charge tax (VAT / GST)" Color="Color.Primary" />
+                        @if (_tax)
+                        {
+                            <MudGrid Spacing="3">
+                                <MudItem xs="12" sm="4"><MudTextField @bind-Value="_taxLabel" Label="Tax label" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+                                <MudItem xs="12" sm="4"><MudNumericField @bind-Value="_taxRate" Label="Rate (%)" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0m" Max="100m" /></MudItem>
+                                <MudItem xs="12" sm="4"><MudTextField @bind-Value="_trn" Label="Tax registration number" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+                            </MudGrid>
+                        }
+                    </div>
+                }
+                else if (_step == 2)
+                {
+                    <MudText Typo="Typo.h5">Choose your industry</MudText>
+                    <MudText Typo="Typo.body2" Class="ml-muted">We set up names, stages and fields for it. You can change anything later.</MudText>
+                    <MudGrid Spacing="3">
+                        @foreach (var industry in _industries)
+                        {
+                            <MudItem xs="12" sm="6" md="4">
+                                <MlCard Class="@(industry.Key == _industry ? "ml-card ml-industry--selected" : "")" OnClick="@(() => SelectIndustry(industry.Key))" TestId="@($"industry-{industry.Key}")">
+                                    <div class="ml-card__body">
+                                        <MudText Typo="Typo.h6">@industry.Name</MudText>
+                                        <MudText Typo="Typo.body2" Class="ml-muted">@industry.Description</MudText>
+                                        <MudText Typo="Typo.caption" Class="ml-muted mt-2">Deals become "@industry.DealLabel"</MudText>
+                                    </div>
+                                </MlCard>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                }
+                else if (_step == 3)
+                {
+                    <MudText Typo="Typo.h5">Your sales pipeline</MudText>
+                    <MudText Typo="Typo.body2" Class="ml-muted">Stages come from your industry. Won and Lost must stay last.</MudText>
+                    <div class="ml-stack-sm">
+                        @foreach (var stage in _stages)
+                        {
+                            <div class="ml-row">
+                                <MudTextField @bind-Value="stage.Name" Label="Stage" Variant="Variant.Outlined" Margin="Margin.Dense" Class="ml-grow" />
+                                <MudNumericField @bind-Value="stage.Probability" Label="%" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" Max="100" Style="max-width:90px" />
+                                <MudChip T="string" Size="Size.Small" Color="@(stage.StageType == "Open" ? Color.Info : stage.StageType == "Won" ? Color.Success : Color.Error)">@stage.StageType</MudChip>
+                            </div>
+                        }
+                    </div>
+                }
+                else if (_step == 4)
+                {
+                    <MudText Typo="Typo.h5">Invite your team</MudText>
+                    <MudText Typo="Typo.body2" Class="ml-muted">Each person uses a seat on your plan. You can invite more later in Settings.</MudText>
+                    <div class="ml-stack-sm">
+                        @foreach (var invite in _invites)
+                        {
+                            <div class="ml-row ml-row--wrap">
+                                <MudTextField @bind-Value="invite.Email" Label="Email" Variant="Variant.Outlined" Margin="Margin.Dense" Class="ml-grow" />
+                                <MudTextField @bind-Value="invite.FirstName" Label="First name" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:160px" />
+                                <MudTextField @bind-Value="invite.LastName" Label="Last name" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:160px" />
+                                <MudSelect T="Guid?" @bind-Value="invite.RoleId" Label="Role" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:150px">
+                                    @foreach (var role in _roles)
+                                    {
+                                        <MudSelectItem T="Guid?" Value="@role.Id">@role.Name</MudSelectItem>
+                                    }
+                                </MudSelect>
+                            </div>
+                        }
+                        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Outlined.Add" OnClick="AddInviteRow">Add another</MudButton>
+                    </div>
+                }
+                else if (_step == 5)
+                {
+                    <MudText Typo="Typo.h5">Start with data</MudText>
+                    <MudText Typo="Typo.body2" Class="ml-muted">Choose how you want to begin.</MudText>
+                    <MudRadioGroup T="string" @bind-Value="_dataMode">
+                        <MudRadio T="string" Value="@("sample")" Color="Color.Primary">Load sample data (recommended). Explore with realistic records. Remove them anytime.</MudRadio>
+                        <MudRadio T="string" Value="@("import")" Color="Color.Primary">Import my data later from Excel or CSV.</MudRadio>
+                        <MudRadio T="string" Value="@("empty")" Color="Color.Primary">Start empty.</MudRadio>
+                    </MudRadioGroup>
+                }
+                else
+                {
+                    <MudText Typo="Typo.h5">Connect your channels</MudText>
+                    <MudText Typo="Typo.body2" Class="ml-muted">Email and WhatsApp connections arrive in a later release. You can skip this step now.</MudText>
+                    <MudAlert Severity="Severity.Info" Dense="true">Nothing to connect yet. Continue to finish setup.</MudAlert>
+                }
+            </div>
+            <div class="ml-card__footer" style="justify-content:space-between">
+                <MudButton Variant="Variant.Text" Disabled="_step == 1 || _busy" OnClick="Back">Back</MudButton>
+                <div class="ml-row">
+                    @if (_step >= 3)
+                    {
+                        <MudButton Variant="Variant.Text" Disabled="_busy" OnClick="SkipAsync" data-testid="skip-action">Skip for now</MudButton>
+                    }
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_busy" OnClick="ContinueAsync" data-testid="primary-action">
+                        @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }
+                        else { @(_step == 6 ? "Go to my dashboard" : "Continue") }
+                    </MudButton>
+                </div>
+            </div>
+        </MlCard>
+    }
+</div>
+
+@code {
+    private static readonly (string Code, string Name)[] Countries =
+    [
+        ("AE", "United Arab Emirates"), ("SA", "Saudi Arabia"), ("QA", "Qatar"), ("OM", "Oman"),
+        ("BH", "Bahrain"), ("KW", "Kuwait"), ("IN", "India"), ("GB", "United Kingdom"), ("US", "United States"),
+    ];
+
+    private static readonly Dictionary<string, (string Currency, string Zone, string TaxLabel, decimal Rate)> Defaults = new()
+    {
+        ["AE"] = ("AED", "Asia/Dubai", "VAT", 5), ["SA"] = ("SAR", "Asia/Riyadh", "VAT", 15), ["QA"] = ("QAR", "Asia/Qatar", "Tax", 0),
+        ["OM"] = ("OMR", "Asia/Muscat", "VAT", 5), ["BH"] = ("BHD", "Asia/Bahrain", "VAT", 10), ["KW"] = ("KWD", "Asia/Kuwait", "Tax", 0),
+        ["IN"] = ("INR", "Asia/Kolkata", "GST", 18), ["GB"] = ("GBP", "Europe/London", "VAT", 20), ["US"] = ("USD", "America/New_York", "Sales tax", 0),
+    };
+
+    private OnboardingDto? _state;
+    private bool _loading = true;
+    private bool _busy;
+    private string? _error;
+    private int _step = 1;
+
+    private string _companyName = string.Empty;
+    private string _country = "AE";
+    private string _currency = "AED";
+    private string _timeZone = "Asia/Dubai";
+    private string _language = "en";
+    private bool _tax = true;
+    private string _taxLabel = "VAT";
+    private decimal _taxRate = 5;
+    private string? _trn;
+
+    private List<IndustrySummaryDto> _industries = [];
+    private string? _industry;
+
+    private List<StageRow> _stages = [];
+
+    private List<InviteRow> _invites = [];
+
+    private sealed class StageRow
+    {
+        public string Name { get; set; } = string.Empty;
+        public int Probability { get; set; }
+        public string StageType { get; set; } = "Open";
+    }
+    private List<RoleDto> _roles = [];
+
+    private string _dataMode = "sample";
+
+    private sealed class InviteRow
+    {
+        public string Email { get; set; } = string.Empty;
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public Guid? RoleId { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.IsSignedIn)
+        {
+            Nav.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        if (!App.IsAdmin)
+        {
+            Nav.NavigateTo("/");
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var response = await Http.GetAsync("api/v1/onboarding");
+            _state = response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<OnboardingDto>() : null;
+            if (_state is null)
+            {
+                return;
+            }
+
+            if (_state.CurrentStep == OnboardingSteps.Completed)
+            {
+                Nav.NavigateTo("/");
+                return;
+            }
+
+            _step = Math.Clamp(_state.CurrentStep, 1, 6);
+            _companyName = _state.Tenant.Name;
+            _industries = await Http.GetFromJsonAsync<List<IndustrySummaryDto>>("api/v1/onboarding/industries") ?? [];
+            _roles = await Http.GetFromJsonAsync<List<RoleDto>>("api/v1/roles") ?? [];
+            _invites = [new InviteRow { RoleId = _roles.FirstOrDefault(r => r.Name == "Staff")?.Id }];
+            _industry = _state.Tenant.IndustryKey ?? _industries.FirstOrDefault()?.Key;
+            if (_step >= 3)
+            {
+                await LoadStagesAsync();
+            }
+        }
+        catch (HttpRequestException)
+        {
+            _state = null;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadStagesAsync()
+    {
+        var pipelines = await Http.GetFromJsonAsync<List<PipelineDto>>("api/v1/settings/pipelines") ?? [];
+        var pipeline = pipelines.FirstOrDefault(p => p.IsDefault) ?? pipelines.FirstOrDefault();
+        _stages = pipeline is null ? [] : pipeline.Stages.Select(s => new StageRow { Name = s.Name, Probability = s.Probability, StageType = s.StageType }).ToList();
+    }
+
+    private void OnCountryChanged(string code)
+    {
+        _country = code;
+        if (Defaults.TryGetValue(code, out var d))
+        {
+            _currency = d.Currency;
+            _timeZone = d.Zone;
+            _taxLabel = d.TaxLabel;
+            _taxRate = d.Rate;
+            _tax = d.Rate > 0;
+        }
+    }
+
+    private void SelectIndustry(string key) => _industry = key;
+
+    private void AddInviteRow() => _invites.Add(new InviteRow { RoleId = _roles.FirstOrDefault(r => r.Name == "Staff")?.Id });
+
+    private async Task ContinueAsync()
+    {
+        _error = null;
+        _busy = true;
+        try
+        {
+            HttpResponseMessage response = _step switch
+            {
+                1 => await Http.PutAsJsonAsync("api/v1/onboarding/company", new OnboardingCompanyRequest(
+                        _companyName, _country, _currency, _timeZone, _language, _tax, _taxLabel, _taxRate, _trn)),
+                2 => await Http.PostAsJsonAsync("api/v1/onboarding/industry", new ApplyIndustryRequest(_industry ?? "general")),
+                3 => await Http.PutAsJsonAsync("api/v1/onboarding/pipeline", new SaveOnboardingPipelineRequest(_stages.Select(s => new OnboardingStageDto(s.Name, s.Probability, s.StageType)).ToList())),
+                4 => await Http.PostAsJsonAsync("api/v1/onboarding/team", new OnboardingTeamRequest(
+                        _invites.Where(i => !string.IsNullOrWhiteSpace(i.Email) && i.RoleId is not null)
+                            .Select(i => new OnboardingInviteDto(i.Email.Trim(), i.FirstName.Trim(), i.LastName.Trim(), i.RoleId!.Value, null)).ToList())),
+                5 => await Http.PostAsJsonAsync("api/v1/onboarding/data", new OnboardingDataRequest(_dataMode)),
+                _ => await Http.PostAsync("api/v1/onboarding/complete", null),
+            };
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await ProblemText.FromAsync(response, "Something went wrong. Please try again.");
+                return;
+            }
+
+            if (_step == 6)
+            {
+                Nav.NavigateTo("/", forceLoad: true);
+                return;
+            }
+
+            _state = await response.Content.ReadFromJsonAsync<OnboardingDto>();
+            _step = Math.Min(_step + 1, 6);
+            if (_step == 3)
+            {
+                await LoadStagesAsync();
+            }
+        }
+        catch (HttpRequestException)
+        {
+            _error = "We could not reach MindLift. Check your connection and try again.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task SkipAsync()
+    {
+        _busy = true;
+        try
+        {
+            var response = await Http.PostAsync($"api/v1/onboarding/skip/{_step}", null);
+            if (response.IsSuccessStatusCode)
+            {
+                _step = Math.Min(_step + 1, 6);
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void Back() => _step = Math.Max(1, _step - 1);
+
+    private static string StepTitle(int step) => step switch
+    {
+        1 => "Company",
+        2 => "Industry",
+        3 => "Pipeline",
+        4 => "Team",
+        5 => "Data",
+        _ => "Channels",
+    };
+}
+
+

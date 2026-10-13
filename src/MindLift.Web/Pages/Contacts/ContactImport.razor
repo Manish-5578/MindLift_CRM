@@ -1,0 +1,5 @@
+@page "/contacts/import"
+@using MindLift.Shared.Imports
+
+<ImportWizard Module="AppModule.Contacts" Endpoint="api/v1/contacts/import" ListHref="/contacts" Fields="ImportFieldSets.Contacts"
+              RequiredField="first_name" RequiredLabel="First name" Singular="contact" />

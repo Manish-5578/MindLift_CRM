@@ -1,0 +1,10 @@
+<span class="ml-chip" style="--chip:@Color" data-testid="status-chip">
+    @if (Dot) { <span class="ml-chip__dot"></span> }
+    @Text
+</span>
+
+@code {
+    [Parameter, EditorRequired] public string Text { get; set; } = "";
+    [Parameter] public string Color { get; set; } = "var(--ml-text-3)";
+    [Parameter] public bool Dot { get; set; } = true;
+}

@@ -1,0 +1,56 @@
+@typeparam TItem where TItem : class
+@using ApexCharts
+
+<MlCard Title="@Title" Subtitle="@Subtitle" Class="@Class" TestId="@TestId" HeaderActions="HeaderActions">
+    @if (Loading)
+    {
+        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Width="100%" Height="@($"{Height}px")" />
+    }
+    else if (IsEmpty)
+    {
+        <EmptyState Compact="true" Icon="@Icons.Material.Outlined.BarChart" Title="No data for this period" />
+    }
+    else
+    {
+        <ApexChart TItem="TItem" Options="_options" Height="@Height" Title="@null">
+            @ChildContent
+        </ApexChart>
+    }
+</MlCard>
+
+@code {
+    private ApexChartOptions<TItem> _options = new();
+
+    /// <summary>Set by MainLayout so charts follow the app's dark mode.</summary>
+    [CascadingParameter(Name = "IsDarkMode")] public bool Dark { get; set; }
+
+    /// <summary>Set by MainLayout so charts mirror their value axis in Arabic.</summary>
+    [CascadingParameter(Name = "IsRtl")] public bool Rtl { get; set; }
+
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public RenderFragment? HeaderActions { get; set; }
+
+    /// <summary>The series, as ApexChart child content.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Options the widget wants on top of the defaults. Called once with the default options to change.</summary>
+    [Parameter] public Action<ApexChartOptions<TItem>>? Configure { get; set; }
+
+    [Parameter] public bool Loading { get; set; }
+
+    /// <summary>True when there is nothing to draw, so the card shows the empty state instead of an empty plot.</summary>
+    [Parameter] public bool IsEmpty { get; set; }
+
+    /// <summary>260 on desktop, 220 on phones (plan 18.9.6).</summary>
+    [Parameter] public int Height { get; set; } = 260;
+
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public string? TestId { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        _options = ChartDefaults.Create<TItem>(Dark, Rtl);
+        Configure?.Invoke(_options);
+    }
+}

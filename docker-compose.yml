@@ -1,0 +1,30 @@
+﻿name: mindlift
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: mindlift-postgres
+    environment:
+      POSTGRES_DB: mindlift
+      POSTGRES_USER: mindlift
+      POSTGRES_PASSWORD: mindlift_dev
+    ports:
+      - "5433:5432"
+    volumes:
+      - mindlift-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mindlift -d mindlift"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: mindlift-mailpit
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI
+
+volumes:
+  mindlift-pgdata:
+

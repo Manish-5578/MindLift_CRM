@@ -1,0 +1,15 @@
+<MudSelect T="Guid?" Value="Value" ValueChanged="ValueChanged" Label="@Label" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="@Clearable" data-testid="@TestId">
+    @foreach (var user in Users)
+    {
+        <MudSelectItem T="Guid?" Value="@((Guid?)user.Id)">@user.FullName</MudSelectItem>
+    }
+</MudSelect>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<UserListItem> Users { get; set; } = [];
+    [Parameter] public string Label { get; set; } = "Owner";
+    [Parameter] public Guid? Value { get; set; }
+    [Parameter] public EventCallback<Guid?> ValueChanged { get; set; }
+    [Parameter] public bool Clearable { get; set; }
+    [Parameter] public string? TestId { get; set; }
+}

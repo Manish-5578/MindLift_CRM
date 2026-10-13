@@ -1,0 +1,287 @@
+@page "/settings/teams"
+@inject HttpClient Http
+@inject AppState App
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageTitle>Teams & branches · MindLift</PageTitle>
+
+<div class="ml-page ml-page--form">
+    <PageHeader Title="Teams & branches" Subtitle="Teams group people for team-scoped access and dashboards. Branches are offices or locations, each with its own time zone." >
+        <Actions>
+            <MudButton Variant="Variant.Outlined" OnClick="() => OpenBranch(null)" data-testid="add-branch">New branch</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => OpenTeam(null)" data-testid="primary-action">New team</MudButton>
+        </Actions>
+    </PageHeader>
+    <SettingsNav Current="/settings/teams" />
+
+    @if (_loading)
+    {
+        <SkeletonTable Rows="5" Columns="3" />
+    }
+    else if (_loadFailed)
+    {
+        <ErrorState OnRetry="LoadAsync" />
+    }
+    else
+    {
+        <MlCard Title="Teams" Subtitle="@($"{_teams.Count} teams")" Flush="true" Class="mb-4" TestId="teams">
+            @foreach (var team in _teams)
+            {
+                <div class="ml-row" style="padding:12px 20px;border-bottom:1px solid var(--ml-border);min-height:56px" data-testid="team-row">
+                    <div class="ml-grow">
+                        <MudText Typo="Typo.subtitle2">@team.Name</MudText>
+                        <MudText Typo="Typo.caption" Class="ml-muted">@BranchName(team.BranchId) · Leader: @LeaderName(team.LeaderId) · @team.MemberCount @(team.MemberCount == 1 ? "member" : "members")</MudText>
+                    </div>
+                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="() => OpenTeam(team)" aria-label="Edit team" />
+                    @if (_confirmTeamId == team.Id)
+                    {
+                        <MudButton Size="Size.Small" OnClick="() => _confirmTeamId = null">Keep</MudButton>
+                        <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeleteTeamAsync(team)">Delete</MudButton>
+                    }
+                    else
+                    {
+                        <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" OnClick="() => _confirmTeamId = team.Id" aria-label="Delete team" />
+                    }
+                </div>
+            }
+            @if (_teams.Count == 0)
+            {
+                <EmptyState Title="No teams yet" Message="Create a team to share records and dashboards with a group." Compact="true" />
+            }
+        </MlCard>
+
+        <MlCard Title="Branches" Subtitle="@($"{_branches.Count} branches")" Flush="true" TestId="branches">
+            @foreach (var branch in _branches)
+            {
+                <div class="ml-row" style="padding:12px 20px;border-bottom:1px solid var(--ml-border);min-height:56px" data-testid="branch-row">
+                    <div class="ml-grow">
+                        <MudText Typo="Typo.subtitle2">@branch.Name</MudText>
+                        <MudText Typo="Typo.caption" Class="ml-muted">@(branch.Address ?? "No address") · @(branch.TimeZoneId ?? App.Bootstrap?.Company.TimeZoneId ?? "UTC")</MudText>
+                    </div>
+                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="() => OpenBranch(branch)" aria-label="Edit branch" />
+                    @if (_confirmBranchId == branch.Id)
+                    {
+                        <MudButton Size="Size.Small" OnClick="() => _confirmBranchId = null">Keep</MudButton>
+                        <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeleteBranchAsync(branch)">Delete</MudButton>
+                    }
+                    else
+                    {
+                        <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" OnClick="() => _confirmBranchId = branch.Id" aria-label="Delete branch" />
+                    }
+                </div>
+            }
+            @if (_branches.Count == 0)
+            {
+                <EmptyState Title="No branches yet" Message="Add a branch if you work from more than one location." Compact="true" />
+            }
+        </MlCard>
+    }
+</div>
+
+<FormDrawer Open="_teamOpen" OpenChanged="v => _teamOpen = v" Title="@_teamTitle" SubmitText="Save team" Busy="_busy" OnSubmit="SaveTeamAsync">
+    <div class="ml-stack">
+        <MudTextField @bind-Value="_teamName" Label="Name *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="team-name" />
+        <MudSelect T="Guid?" @bind-Value="_teamBranchId" Label="Branch" Variant="Variant.Outlined" Margin="Margin.Dense">
+            <MudSelectItem T="Guid?" Value="(Guid?)null">No branch</MudSelectItem>
+            @foreach (var branch in _branches)
+            {
+                <MudSelectItem T="Guid?" Value="@branch.Id">@branch.Name</MudSelectItem>
+            }
+        </MudSelect>
+        <MudSelect T="Guid?" @bind-Value="_teamLeaderId" Label="Team leader" Variant="Variant.Outlined" Margin="Margin.Dense">
+            <MudSelectItem T="Guid?" Value="(Guid?)null">No leader</MudSelectItem>
+            @foreach (var user in _users)
+            {
+                <MudSelectItem T="Guid?" Value="@user.Id">@user.FullName</MudSelectItem>
+            }
+        </MudSelect>
+        @if (_formError is not null) { <MudAlert Severity="Severity.Error" Dense="true">@_formError</MudAlert> }
+    </div>
+</FormDrawer>
+
+<FormDrawer Open="_branchOpen" OpenChanged="v => _branchOpen = v" Title="@_branchTitle" SubmitText="Save branch" Busy="_busy" OnSubmit="SaveBranchAsync">
+    <div class="ml-stack">
+        <MudTextField @bind-Value="_branchName" Label="Name *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="branch-name" />
+        <MudTextField @bind-Value="_branchAddress" Label="Address" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />
+        <MudTextField @bind-Value="_branchTimeZone" Label="Time zone" Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="For example Asia/Dubai. Leave empty to use the company time zone." />
+        @if (_formError is not null) { <MudAlert Severity="Severity.Error" Dense="true">@_formError</MudAlert> }
+    </div>
+</FormDrawer>
+
+@code {
+    private List<TeamDto> _teams = [];
+    private List<BranchDto> _branches = [];
+    private List<UserListItem> _users = [];
+    private bool _loading = true;
+    private bool _loadFailed;
+    private bool _busy;
+    private string? _formError;
+    private Guid? _confirmTeamId;
+    private Guid? _confirmBranchId;
+
+    private bool _teamOpen;
+    private Guid? _teamEditId;
+    private string _teamName = string.Empty;
+    private Guid? _teamBranchId;
+    private Guid? _teamLeaderId;
+    private string _teamTitle = "New team";
+
+    private bool _branchOpen;
+    private Guid? _branchEditId;
+    private string _branchName = string.Empty;
+    private string? _branchAddress;
+    private string? _branchTimeZone;
+    private string _branchTitle = "New branch";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!App.IsAdmin)
+        {
+            Nav.NavigateTo("/");
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _loadFailed = false;
+        try
+        {
+            _teams = await Http.GetFromJsonAsync<List<TeamDto>>("api/v1/teams") ?? [];
+            _branches = await Http.GetFromJsonAsync<List<BranchDto>>("api/v1/branches") ?? [];
+            var users = await Http.GetFromJsonAsync<PagedResult<UserListItem>>("api/v1/users?pageSize=200");
+            _users = users?.Items.Where(u => u.IsActive).ToList() ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            _loadFailed = true;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private string BranchName(Guid? id) => _branches.FirstOrDefault(b => b.Id == id)?.Name ?? "No branch";
+
+    private string LeaderName(Guid? id) => _users.FirstOrDefault(u => u.Id == id)?.FullName ?? "none";
+
+    private void OpenTeam(TeamDto? team)
+    {
+        _formError = null;
+        _teamEditId = team?.Id;
+        _teamName = team?.Name ?? string.Empty;
+        _teamBranchId = team?.BranchId;
+        _teamLeaderId = team?.LeaderId;
+        _teamTitle = team is null ? "New team" : "Edit team";
+        _teamOpen = true;
+    }
+
+    private void OpenBranch(BranchDto? branch)
+    {
+        _formError = null;
+        _branchEditId = branch?.Id;
+        _branchName = branch?.Name ?? string.Empty;
+        _branchAddress = branch?.Address;
+        _branchTimeZone = branch?.TimeZoneId;
+        _branchTitle = branch is null ? "New branch" : "Edit branch";
+        _branchOpen = true;
+    }
+
+    private async Task SaveTeamAsync()
+    {
+        _formError = null;
+        if (string.IsNullOrWhiteSpace(_teamName))
+        {
+            _formError = "Give the team a name.";
+            return;
+        }
+
+        var body = new SaveTeamRequest(_teamName.Trim(), _teamBranchId, _teamLeaderId);
+        _busy = true;
+        try
+        {
+            var response = _teamEditId is null
+                ? await Http.PostAsJsonAsync("api/v1/teams", body)
+                : await Http.PutAsJsonAsync($"api/v1/teams/{_teamEditId}", body);
+            if (!response.IsSuccessStatusCode)
+            {
+                _formError = await ProblemText.FromAsync(response, "We could not save this team.");
+                return;
+            }
+
+            _teamOpen = false;
+            Snackbar.Add("Team saved", Severity.Success);
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task SaveBranchAsync()
+    {
+        _formError = null;
+        if (string.IsNullOrWhiteSpace(_branchName))
+        {
+            _formError = "Give the branch a name.";
+            return;
+        }
+
+        var body = new SaveBranchRequest(_branchName.Trim(), string.IsNullOrWhiteSpace(_branchAddress) ? null : _branchAddress.Trim(),
+            string.IsNullOrWhiteSpace(_branchTimeZone) ? null : _branchTimeZone.Trim());
+        _busy = true;
+        try
+        {
+            var response = _branchEditId is null
+                ? await Http.PostAsJsonAsync("api/v1/branches", body)
+                : await Http.PutAsJsonAsync($"api/v1/branches/{_branchEditId}", body);
+            if (!response.IsSuccessStatusCode)
+            {
+                _formError = await ProblemText.FromAsync(response, "We could not save this branch.");
+                return;
+            }
+
+            _branchOpen = false;
+            Snackbar.Add("Branch saved", Severity.Success);
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DeleteTeamAsync(TeamDto team)
+    {
+        var response = await Http.DeleteAsync($"api/v1/teams/{team.Id}");
+        _confirmTeamId = null;
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "We could not delete this team."), Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Team deleted", Severity.Success);
+        await LoadAsync();
+    }
+
+    private async Task DeleteBranchAsync(BranchDto branch)
+    {
+        var response = await Http.DeleteAsync($"api/v1/branches/{branch.Id}");
+        _confirmBranchId = null;
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "We could not delete this branch."), Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("Branch deleted", Severity.Success);
+        await LoadAsync();
+    }
+}

@@ -1,0 +1,124 @@
+@page "/settings/picklists"
+@inject HttpClient Http
+@inject AppState App
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageTitle>Picklists · MindLift</PageTitle>
+
+<div class="ml-page ml-page--form">
+    <PageHeader Title="Picklists" Subtitle="The choices used in lead status, source, rating and more. Codes never change; labels can." />
+    <SettingsNav Current="/settings/picklists" />
+
+    @if (_loading)
+    {
+        <SkeletonTable Rows="6" Columns="3" />
+    }
+    else if (_lists is null)
+    {
+        <ErrorState OnRetry="LoadAsync" />
+    }
+    else
+    {
+        @foreach (var list in _lists)
+        {
+            <MlCard Title="@list.Key" Subtitle="@($"{list.Values.Count} values")" Class="mb-4" TestId="@($"picklist-{list.Key}")">
+                @foreach (var value in list.Values)
+                {
+                    <div class="ml-row" style="padding:8px 0;border-bottom:1px solid var(--ml-border)">
+                        <div class="ml-grow">
+                            <MudText Typo="Typo.body1">@value.Label</MudText>
+                            <MudText Typo="Typo.caption" Class="ml-muted">@value.Value @(value.LabelAr is null ? "" : "· " + value.LabelAr)</MudText>
+                        </div>
+                        @if (value.IsSystem)
+                        {
+                            <StatusChip Text="Built in" Color="@StatusColors.For("Open")" Dot="false" />
+                        }
+                        <MudSwitch T="bool" Value="value.IsActive" ValueChanged="v => ToggleAsync(list.Key, value, v)" Color="Color.Primary" aria-label="Active" />
+                    </div>
+                }
+                <div class="ml-row ml-row--wrap" style="margin-top:12px">
+                    <MudTextField T="string" @bind-Value="_newValue[list.Key]" Placeholder="code_like_this" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:180px" />
+                    <MudTextField T="string" @bind-Value="_newLabel[list.Key]" Placeholder="Label" Variant="Variant.Outlined" Margin="Margin.Dense" Class="ml-grow" />
+                    <MudButton Variant="Variant.Outlined" OnClick="() => AddAsync(list.Key)">Add value</MudButton>
+                </div>
+            </MlCard>
+        }
+    }
+</div>
+
+@code {
+    private List<PicklistDto>? _lists;
+    private bool _loading = true;
+    private readonly Dictionary<string, string> _newValue = new();
+    private readonly Dictionary<string, string> _newLabel = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!App.IsAdmin)
+        {
+            Nav.NavigateTo("/");
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _lists = await Http.GetFromJsonAsync<List<PicklistDto>>("api/v1/settings/picklists");
+            foreach (var list in _lists ?? [])
+            {
+                _newValue.TryAdd(list.Key, string.Empty);
+                _newLabel.TryAdd(list.Key, string.Empty);
+            }
+        }
+        catch (HttpRequestException)
+        {
+            _lists = null;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task AddAsync(string key)
+    {
+        var code = _newValue.GetValueOrDefault(key)?.Trim().ToLowerInvariant().Replace(' ', '_') ?? string.Empty;
+        var label = _newLabel.GetValueOrDefault(key)?.Trim() ?? string.Empty;
+        if (code.Length == 0 || label.Length == 0)
+        {
+            Snackbar.Add("Enter a code and a label.", Severity.Warning);
+            return;
+        }
+
+        var response = await Http.PostAsJsonAsync($"api/v1/settings/picklists/{key}/values",
+            new SavePicklistValueRequest(code, label, null, null, null, 1000, false, true));
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "We could not add this value."), Severity.Error);
+            return;
+        }
+
+        _newValue[key] = _newLabel[key] = string.Empty;
+        Snackbar.Add("Value added", Severity.Success);
+        await LoadAsync();
+    }
+
+    private async Task ToggleAsync(string key, PicklistValueDto value, bool active)
+    {
+        var response = await Http.PutAsJsonAsync($"api/v1/settings/picklists/{key}/values/{value.Id}",
+            new SavePicklistValueRequest(value.Value, value.Label, value.LabelAr, value.Category, value.Color, value.SortOrder, value.IsDefault, active));
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "We could not change this value."), Severity.Error);
+            return;
+        }
+
+        await LoadAsync();
+    }
+}
