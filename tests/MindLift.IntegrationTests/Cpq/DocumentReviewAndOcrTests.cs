@@ -33,6 +33,29 @@ public sealed class DocumentReviewAndOcrTests(MindLiftApiFactory factory) : ICla
         return form;
     }
 
+
+    [Fact]
+    public async Task A_file_that_cannot_be_read_is_marked_failed_and_no_values_are_invented()
+    {
+        var admin = await Workspaces.SignupAsync(factory);
+        var garbage = new MultipartFormDataContent();
+        var bytes = new ByteArrayContent(new byte[] { 0x00, 0x13, 0x37, 0xFF, 0x01, 0x02, 0x03 });
+        bytes.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+        garbage.Add(bytes, "file", "broken-scan.pdf");
+        var uploadRes = await admin.Client.PostAsync("/api/v1/documents/upload", garbage);
+        uploadRes.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var doc = (await uploadRes.Content.ReadFromJsonAsync<BusinessDocumentDto>())!;
+
+        var ocr = (await (await admin.Client.PostAsync($"/api/v1/documents/{doc.Id}/ocr", null)).Content.ReadFromJsonAsync<OcrResultDto>())!;
+
+        ocr.Status.ShouldBe(DocumentOcrStatus.Failed);
+        ocr.ExtractedFields.ShouldBeEmpty();
+        ocr.DetectedVendor.ShouldBeNull();
+        ocr.DetectedTotal.ShouldBeNull();
+        ocr.DetectedInvoiceNumber.ShouldBeNull();
+        var stored = await admin.Client.GetFromJsonAsync<BusinessDocumentDto>($"/api/v1/documents/{doc.Id}");
+        stored!.Status.ShouldBe("Failed");
+    }
     [Fact]
     public async Task Upload_And_Process_Passport_Mrz_Extracts_Structured_Data()
     {

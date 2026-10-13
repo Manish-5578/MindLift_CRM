@@ -124,6 +124,7 @@
     public async Task ClearAsync()
     {
         _items.Clear();
+        StateHasChanged();
         await NotifyAsync();
     }
 

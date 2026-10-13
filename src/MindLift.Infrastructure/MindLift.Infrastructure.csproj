@@ -14,6 +14,10 @@
     <PackageReference Include="Hangfire.PostgreSql" />
     <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" />
     <PackageReference Include="Dapper" />
+    <PackageReference Include="PDFtoImage" />
+    <PackageReference Include="SkiaSharp" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" />
+    <PackageReference Include="UglyToad.PdfPig" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="MailKit" />

@@ -682,3 +682,21 @@ Test totals: 373 unit, 143 UI component, 231 integration (747 in all), all passi
 
 
 
+
+## Documents: PDF and text support (2026-10-13)
+- Tesseract 5.4 installed (`C:\Program Files\Tesseract-OCR`); Arabic data kept in `tools\tessdata` (configured as `Ocr:TessdataPath`).
+- `DocumentPageReader`: PDF pages with a text layer are read directly (PdfPig, word boxes normalised to the page); scanned pages are rendered at 300 dpi (PDFtoImage) and read by Tesseract; photos are read by Tesseract; `.txt`, `.csv`, `.md` are read as text. Up to 50 pages.
+- `DocumentOcrService` now reads through the page reader. A file that cannot be read is marked **Failed** with no values; the invented-invoice fallback is removed.
+- Fixed: the Tesseract arguments (`tsv` was passed as a file name, so OCR never ran; now `-c tessedit_create_tsv=1`).
+- Packages: UglyToad.PdfPig 1.7.0-custom-5 (the only PdfPig build on nuget.org), PDFtoImage 5.4.0, SkiaSharp 4.153.1.
+- Tests: 4 PDF tests (digital, scanned, photo, unsupported type), 1 failed-file test. Full non-browser suites green.
+- Not yet: configurable document types and field rules (plan 19.3, 19.6); photo clean-up (deskew, contrast).
+
+## Documents: customisable document types (2026-10-13)
+- **Settings > Document types** (`/settings/document-types`): define a kind of document with a key and name, the words that identify it (weighted, one per line), a minimum score, and the values to read.
+- **Values:** each value has a label, a kind (text, number or code, number, amount, date), an anchor (the label written before it, for example `Expiry Date:`) or a regular-expression pattern (first group is the value), required and reporting flags. Non-matching or invalid values (a date that does not parse) are not stored.
+- **Classification:** after the built-in checks, the active type with the highest score that reaches its minimum sets the document category, and its values are saved with the document. Fields keyed `expiry_date` and `issue_date` also set the document's dates.
+- **Test on a sample file:** upload any supported file to see what the type reads, without saving anything.
+- **API:** `/api/v1/settings/document-types` (list, get, create, edit, delete) and `/{id}/test`. Validation covers keys, regular expressions, value kinds and duplicate keys.
+- **Tests:** 10 document-type tests (extraction, Arabic digits, scoring, validation, the sample test, upload-to-save, tenant isolation). Full non-browser suites green: 412 unit, 158 UI, 394 integration.
+- **Not done:** the Settings screen is not yet driven in the browser; and the review screen shows custom fields as plain rows, without page highlights.

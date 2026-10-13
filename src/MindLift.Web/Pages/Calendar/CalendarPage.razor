@@ -4,18 +4,34 @@
 @inject AuthSession Session
 @inject AppState App
 @inject NavigationManager Nav
+@inject ISnackbar Snackbar
 
 <PageTitle>@App.ModuleLabel(AppModule.Calendar) · MindLift</PageTitle>
 
 <div class="ml-page">
     <PageHeader Title="@App.ModuleLabel(AppModule.Calendar)" Subtitle="@RangeTitle">
         <Actions>
+            <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small" data-testid="cal-views">
+                <MudButton Color='@(_view == "day" ? Color.Primary : Color.Default)' OnClick='() => SetViewAsync("day")' data-testid="cal-view-day">Day</MudButton>
+                <MudButton Color='@(_view == "week" ? Color.Primary : Color.Default)' OnClick='() => SetViewAsync("week")' data-testid="cal-view-week">Week</MudButton>
+                <MudButton Color='@(_view == "month" ? Color.Primary : Color.Default)' OnClick='() => SetViewAsync("month")' data-testid="cal-view-month">Month</MudButton>
+            </MudButtonGroup>
             <MudButton Variant="Variant.Outlined" OnClick="Today" data-testid="cal-today">Today</MudButton>
-            <MudIconButton Icon="@Icons.Material.Outlined.ChevronLeft" OnClick="() => Shift(-7)" aria-label="Previous week" data-testid="cal-prev" />
-            <MudIconButton Icon="@Icons.Material.Outlined.ChevronRight" OnClick="() => Shift(7)" aria-label="Next week" data-testid="cal-next" />
-            <MudSwitch T="bool" Value="_mineOnly" ValueChanged="MineAsync" Label="Only mine" Color="Color.Primary" data-testid="cal-mine" />
+            <MudIconButton Icon="@Icons.Material.Outlined.ChevronLeft" OnClick="() => Shift(-1)" aria-label="Previous" data-testid="cal-prev" />
+            <MudIconButton Icon="@Icons.Material.Outlined.ChevronRight" OnClick="() => Shift(1)" aria-label="Next" data-testid="cal-next" />
         </Actions>
     </PageHeader>
+
+    <div class="ml-row ml-row--wrap" style="margin-bottom:16px">
+        <MudSelect T="string" Value="_who" ValueChanged="WhoChangedAsync" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width:220px" Label="Show" data-testid="cal-who">
+            <MudSelectItem T="string" Value="@("me")">My calendar</MudSelectItem>
+            <MudSelectItem T="string" Value="@("everyone")">Everyone</MudSelectItem>
+            @foreach (var user in _users)
+            {
+                <MudSelectItem T="string" Value="@user.Id.ToString()">@user.FullName</MudSelectItem>
+            }
+        </MudSelect>
+    </div>
 
     @if (_error is not null)
     {
@@ -25,13 +41,41 @@
     {
         <SkeletonCards Count="3" />
     }
-    else
+    else if (_view == "month")
     {
-        <div class="ml-week" data-testid="cal-week">
+        <div class="ml-month" data-testid="cal-month">
+            @foreach (var name in new[] { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" })
+            {
+                <div class="ml-month__head">@name</div>
+            }
             @foreach (var day in _days)
             {
                 var current = day;
-                <section class="ml-week__day" data-testid="@("cal-day-" + current.ToString("yyyy-MM-dd"))" aria-label="@current.ToString("dddd d MMMM", CultureInfo.InvariantCulture)">
+                var dayEvents = EventsOn(current).ToList();
+                <div class="@MonthCellClass(current)" data-testid="@("cal-day-" + current.ToString("yyyy-MM-dd"))" @ondragover:preventDefault="true" @ondrop="() => DropAsync(current)">
+                    <div class="ml-month__date">@current.Day</div>
+                    @foreach (var entry in dayEvents.Take(3))
+                    {
+                        <div class="@EventClass(entry)" draggable="true" data-testid="cal-event" data-kind="@entry.Kind" @ondragstart="() => _dragging = entry">
+                            <span class="ml-truncate">@entry.StartUtc.ToString("HH:mm", CultureInfo.InvariantCulture) @entry.Title</span>
+                        </div>
+                    }
+                    @if (dayEvents.Count > 3)
+                    {
+                        <div class="ml-muted">+@(dayEvents.Count - 3) more</div>
+                    }
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class='@(_view == "day" ? "ml-week ml-week--day" : "ml-week")' data-testid="cal-week">
+            @foreach (var day in _days)
+            {
+                var current = day;
+                <section class="ml-week__day" data-testid="@("cal-day-" + current.ToString("yyyy-MM-dd"))" aria-label="@current.ToString("dddd d MMMM", CultureInfo.InvariantCulture)"
+                         @ondragover:preventDefault="true" @ondrop="() => DropAsync(current)">
                     <header class="ml-week__head">
                         <MudText Typo="Typo.subtitle2">@current.ToString("ddd d", CultureInfo.InvariantCulture)</MudText>
                         <MudText Typo="Typo.caption" Class="ml-muted">@current.ToString("MMM", CultureInfo.InvariantCulture)</MudText>
@@ -39,7 +83,8 @@
                     @foreach (var item in EventsOn(current))
                     {
                         var entry = item;
-                        <a class="@EventClass(entry)" href="@(entry.Href ?? "#")" data-testid="cal-event" data-kind="@entry.Kind">
+                        <a class="@EventClass(entry)" href="@(entry.Href ?? "#")" draggable="true" @ondragstart="() => _dragging = entry"
+                           data-testid="cal-event" data-kind="@entry.Kind">
                             <span class="ml-week__time">@entry.StartUtc.ToString("HH:mm", CultureInfo.InvariantCulture)</span>
                             <span class="ml-truncate">@entry.Title</span>
                             @if (entry.LinkedName is not null)
@@ -55,19 +100,25 @@
                 </section>
             }
         </div>
-        <MudText Typo="Typo.caption" Class="ml-muted" Style="margin-top:12px">Times are shown in UTC. Meetings are created from a record (Activities on a contact, lead, account or deal).</MudText>
     }
+    <MudText Typo="Typo.caption" Class="ml-muted" Style="margin-top:12px">Times are UTC. Drag a meeting or task to another day to move it; it keeps its time. Meetings are created from a record.</MudText>
 </div>
 
 @code {
-    private DateOnly _start;
+    private string _view = "week";
+    private DateOnly _anchor;
     private List<DateOnly> _days = [];
     private List<CalendarEventDto> _events = [];
+    private List<UserListItem> _users = [];
+    private string _who = "me";
     private bool _loading = true;
-    private bool _mineOnly = true;
     private string? _error;
+    private CalendarEventDto? _dragging;
 
-    private string RangeTitle => _days.Count == 0 ? string.Empty : $"{_days[0]:d MMM} – {_days[^1]:d MMM yyyy}";
+    private string RangeTitle => _days.Count == 0 ? string.Empty
+        : _view == "month" ? _anchor.ToString("MMMM yyyy", CultureInfo.InvariantCulture)
+        : _view == "day" ? _anchor.ToString("dddd d MMMM yyyy", CultureInfo.InvariantCulture)
+        : $"{_days[0]:d MMM} – {_days[^1]:d MMM yyyy}";
 
     protected override async Task OnInitializedAsync()
     {
@@ -77,27 +128,75 @@
             return;
         }
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        _start = today.AddDays(-(((int)today.DayOfWeek + 6) % 7));
+        _anchor = DateOnly.FromDateTime(DateTime.UtcNow);
+        _users = await RecordLookupsUsers();
+        Rebuild();
+        await LoadAsync();
+    }
+
+    private async Task<List<UserListItem>> RecordLookupsUsers()
+    {
+        try
+        {
+            var page = await Http.GetFromJsonAsync<PagedResult<UserListItem>>("api/v1/users?pageSize=200");
+            return page?.Items.Where(u => u.IsActive).ToList() ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>The days shown for the view: one day, seven days from the week's Monday, or the six weeks around the month.</summary>
+    private void Rebuild()
+    {
+        if (_view == "day")
+        {
+            _days = [_anchor];
+            return;
+        }
+
+        if (_view == "month")
+        {
+            var first = new DateOnly(_anchor.Year, _anchor.Month, 1);
+            var start = first.AddDays(-(((int)first.DayOfWeek + 6) % 7));
+            _days = Enumerable.Range(0, 42).Select(i => start.AddDays(i)).ToList();
+            return;
+        }
+
+        var monday = _anchor.AddDays(-(((int)_anchor.DayOfWeek + 6) % 7));
+        _days = Enumerable.Range(0, 7).Select(i => monday.AddDays(i)).ToList();
+    }
+
+    private async Task SetViewAsync(string view)
+    {
+        _view = view;
+        Rebuild();
         await LoadAsync();
     }
 
     private async Task Today()
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        _start = today.AddDays(-(((int)today.DayOfWeek + 6) % 7));
+        _anchor = DateOnly.FromDateTime(DateTime.UtcNow);
+        Rebuild();
         await LoadAsync();
     }
 
-    private async Task Shift(int days)
+    private async Task Shift(int step)
     {
-        _start = _start.AddDays(days);
+        _anchor = _view switch
+        {
+            "day" => _anchor.AddDays(step),
+            "month" => _anchor.AddMonths(step),
+            _ => _anchor.AddDays(7 * step),
+        };
+        Rebuild();
         await LoadAsync();
     }
 
-    private async Task MineAsync(bool value)
+    private async Task WhoChangedAsync(string value)
     {
-        _mineOnly = value;
+        _who = value;
         await LoadAsync();
     }
 
@@ -105,15 +204,25 @@
     {
         _loading = true;
         _error = null;
-        _days = Enumerable.Range(0, 7).Select(i => _start.AddDays(i)).ToList();
         try
         {
-            var from = _start.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
-            var to = _start.AddDays(7).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
+            var from = _days[0].ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
+            var to = _days[^1].AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
             var url = $"api/v1/calendar/events?from={from}&to={to}";
-            if (_mineOnly && Session.Me is { } me)
+            if (_who == "everyone")
             {
-                url += $"&userIds={me.UserId}";
+                url += string.Concat(_users.Select(u => $"&userIds={u.Id}"));
+            }
+            else if (_who == "me")
+            {
+                if (Session.Me is { } me)
+                {
+                    url += $"&userIds={me.UserId}";
+                }
+            }
+            else
+            {
+                url += $"&userIds={_who}";
             }
 
             _events = await Http.GetFromJsonAsync<List<CalendarEventDto>>(url) ?? [];
@@ -130,6 +239,35 @@
 
     private IEnumerable<CalendarEventDto> EventsOn(DateOnly day)
         => _events.Where(e => DateOnly.FromDateTime(e.StartUtc) == day).OrderBy(e => e.StartUtc);
+
+    /// <summary>Drop a dragged meeting or task on a day: it moves to that day and keeps its time of day.</summary>
+    private async Task DropAsync(DateOnly day)
+    {
+        var entry = _dragging;
+        _dragging = null;
+        if (entry is null || entry.Kind == "booking" || DateOnly.FromDateTime(entry.StartUtc) == day)
+        {
+            if (entry?.Kind == "booking")
+            {
+                Snackbar.Add("A booking moves from its meeting; move the meeting instead.", Severity.Info);
+            }
+
+            return;
+        }
+
+        var newStart = day.ToDateTime(TimeOnly.FromDateTime(entry.StartUtc), DateTimeKind.Utc);
+        var response = await Http.PatchAsJsonAsync($"api/v1/activities/{entry.Id}/schedule", new { StartAt = newStart, EndAt = (DateTime?)null });
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "We could not move this item."), Severity.Error);
+            return;
+        }
+
+        Snackbar.Add($"Moved to {day:d MMM}", Severity.Success);
+        await LoadAsync();
+    }
+
+    private string MonthCellClass(DateOnly day) => "ml-month__cell" + (day.Month != _anchor.Month ? " ml-month__cell--other" : string.Empty);
 
     private static string EventClass(CalendarEventDto e) => e.Kind switch
     {

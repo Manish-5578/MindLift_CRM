@@ -122,7 +122,9 @@ public sealed class TesseractCliOcrEngine : IOcrEngine
             psi.ArgumentList.Add($"tessedit_char_whitelist={req.CharWhitelist}");
         }
 
-        psi.ArgumentList.Add("tsv");
+        // TSV output is a config setting for Tesseract, not a file name, so it is passed with -c.
+        psi.ArgumentList.Add("-c");
+        psi.ArgumentList.Add("tessedit_create_tsv=1");
 
         using var proc = Process.Start(psi) ?? throw new InvalidOperationException("Could not start Tesseract process.");
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);

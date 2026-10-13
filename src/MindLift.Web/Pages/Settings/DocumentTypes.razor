@@ -1,0 +1,250 @@
+@page "/settings/document-types"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+
+<PageTitle>Document types · MindLift</PageTitle>
+
+<div class="ml-page ml-page--form">
+    <PageHeader Title="Document types" Subtitle="Choose the kind of document, the words that identify it, and the values to read from it.">
+        <Actions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => OpenForm(null)" data-testid="primary-action">New document type</MudButton>
+        </Actions>
+    </PageHeader>
+    <SettingsNav Current="/settings/document-types" />
+
+    @if (_loading)
+    {
+        <SkeletonTable Rows="3" Columns="3" />
+    }
+    else if (_types.Count == 0)
+    {
+        <EmptyState Icon="@Icons.Material.Outlined.Description" Title="No document types yet" Message="Add one to choose the values you need from your documents." />
+    }
+    else
+    {
+        @foreach (var type in _types)
+        {
+            var current = type;
+            <MlCard Title="@current.Name" Subtitle="@($"{current.Fields.Count} fields · {(current.IsActive ? "On" : "Off")}")" Class="mb-4" TestId="@("doctype-" + current.Key)">
+                <div class="ml-stack-sm">
+                    @foreach (var field in current.Fields)
+                    {
+                        <div class="ml-row"><span class="ml-grow">@field.Label</span><span class="ml-muted">@field.ValueType@(field.Required ? " · required" : "")</span></div>
+                    }
+                    <div class="ml-row" style="justify-content:flex-end">
+                        <MudButton Size="Size.Small" OnClick="() => OpenForm(current)" data-testid="edit-doctype">Edit</MudButton>
+                        <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeleteAsync(current)" data-testid="delete-doctype">Delete</MudButton>
+                    </div>
+                </div>
+            </MlCard>
+        }
+    }
+</div>
+
+<FormDrawer @bind-Open="_drawer" Title="@(_editing is null ? "New document type" : "Edit document type")" SubmitText="Save" Busy="_busy" OnSubmit="SaveAsync" IsDirty="true">
+    @if (_error is not null)
+    {
+        <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3" data-testid="doctype-error">@_error</MudAlert>
+    }
+
+    <div class="ml-stack">
+        <MudTextField @bind-Value="_key" Label="Key (for example trade_licence) *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="dt-key" />
+        <MudTextField @bind-Value="_name" Label="Name *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="dt-name" />
+        <MudTextField @bind-Value="_description" Label="Description" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudTextField @bind-Value="_keywordsText" Label="Words that identify it, one per line as text|weight" Lines="4" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      HelperText="Example: Trade License|3 — a document scores the weights of the words it contains." data-testid="dt-keywords" />
+        <MudNumericField T="int" @bind-Value="_minScore" Label="Minimum score to match" Min="1" Max="1000" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudCheckBox @bind-Value="_active" Label="Type is on" Color="Color.Primary" />
+
+        <MudText Typo="Typo.subtitle2">Values to read</MudText>
+        @for (var i = 0; i < _fields.Count; i++)
+        {
+            var index = i;
+            var field = _fields[index];
+            <div class="ml-stack-sm" style="padding:12px;border:1px solid var(--ml-border);border-radius:var(--ml-radius)" data-testid="dt-field">
+                <div class="ml-row">
+                    <MudTextField T="string" Value="field.Label" ValueChanged="v => field.Label = v ?? string.Empty" Label="Name shown (for example Licence number) *" Variant="Variant.Outlined" Margin="Margin.Dense" Class="ml-grow" data-testid="dt-field-label" />
+                    <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small" OnClick="() => _fields.RemoveAt(index)" aria-label="Remove field" />
+                </div>
+                <MudTextField T="string" Value="field.Key" ValueChanged="v => field.Key = v ?? string.Empty" Label="Key (for example license_number) *" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                <MudSelect T="string" Value="field.ValueType" ValueChanged="v => field.ValueType = v ?? DocumentValueTypes.Text" Label="Kind of value" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem T="string" Value="@DocumentValueTypes.Text">Text</MudSelectItem>
+                    <MudSelectItem T="string" Value="@DocumentValueTypes.Id">Number or code</MudSelectItem>
+                    <MudSelectItem T="string" Value="@DocumentValueTypes.Number">Number</MudSelectItem>
+                    <MudSelectItem T="string" Value="@DocumentValueTypes.Amount">Amount of money</MudSelectItem>
+                    <MudSelectItem T="string" Value="@DocumentValueTypes.Date">Date</MudSelectItem>
+                </MudSelect>
+                <MudTextField T="string" Value="field.Anchor" ValueChanged="v => field.Anchor = string.IsNullOrWhiteSpace(v) ? null : v" Label="Label written before the value (for example Expiry Date:)" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="dt-field-anchor" />
+                <MudTextField T="string" Value="field.Pattern" ValueChanged="v => field.Pattern = string.IsNullOrWhiteSpace(v) ? null : v" Label="Or a pattern (advanced, regular expression; first group is the value)" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                <div class="ml-row">
+                    <MudCheckBox T="bool" Value="field.Required" ValueChanged="v => field.Required = v" Label="Required" Color="Color.Primary" />
+                    <MudCheckBox T="bool" Value="field.IsMetric" ValueChanged="v => field.IsMetric = v" Label="Number to report on" Color="Color.Primary" />
+                </div>
+            </div>
+        }
+        <div><MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Outlined.Add" OnClick="() => _fields.Add(new FieldRow())" data-testid="add-dt-field">Add a value</MudButton></div>
+
+        @if (_editing is not null)
+        {
+            <MudText Typo="Typo.subtitle2">Test on a sample file</MudText>
+            <MudText Typo="Typo.caption" Class="ml-muted">Upload a file to see what this type reads. Nothing is saved.</MudText>
+            <InputFile OnChange="TestFileAsync" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp,.txt,.csv" data-testid="dt-test-file" />
+            @if (_testResult is not null)
+            {
+                <MudAlert Severity="@(_testResult.Matched ? Severity.Success : Severity.Warning)" Dense="true" data-testid="dt-test-summary">
+                    @(_testResult.Matched ? $"Matched with score {_testResult.Score} (read from {_testResult.TextSource})." : $"Did not match (score {_testResult.Score}). Check the words that identify it.")
+                </MudAlert>
+                @foreach (var found in _testResult.Fields)
+                {
+                    <div class="ml-row" data-testid="dt-test-field">
+                        <span class="ml-grow">@found.Label</span>
+                        <span>@(found.Found ? found.Value : "not found")</span>
+                    </div>
+                }
+            }
+        }
+    </div>
+</FormDrawer>
+
+@code {
+    private sealed class FieldRow
+    {
+        public string Key { get; set; } = string.Empty;
+        public string Label { get; set; } = string.Empty;
+        public string ValueType { get; set; } = DocumentValueTypes.Text;
+        public string? Anchor { get; set; }
+        public string? Pattern { get; set; }
+        public bool Required { get; set; }
+        public bool IsMetric { get; set; }
+    }
+
+    private List<DocumentTypeDto> _types = [];
+    private bool _loading = true;
+    private bool _drawer;
+    private bool _busy;
+    private string? _error;
+    private DocumentTypeDto? _editing;
+    private string _key = string.Empty;
+    private string _name = string.Empty;
+    private string? _description;
+    private string _keywordsText = string.Empty;
+    private int _minScore = 3;
+    private bool _active = true;
+    private List<FieldRow> _fields = [];
+    private DocumentTypeTestResultDto? _testResult;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _types = await Http.GetFromJsonAsync<List<DocumentTypeDto>>("api/v1/settings/document-types") ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            _types = [];
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OpenForm(DocumentTypeDto? type)
+    {
+        _editing = type;
+        _error = null;
+        _testResult = null;
+        _key = type?.Key ?? string.Empty;
+        _name = type?.Name ?? string.Empty;
+        _description = type?.Description;
+        _keywordsText = type is null ? string.Empty : string.Join("\n", type.Keywords.Select(k => $"{k.Text}|{k.Weight}"));
+        _minScore = type?.MinScore ?? 3;
+        _active = type?.IsActive ?? true;
+        _fields = type is null
+            ? [new FieldRow { ValueType = DocumentValueTypes.Text }]
+            : type.Fields.Select(f => new FieldRow { Key = f.Key, Label = f.Label, ValueType = f.ValueType, Anchor = f.Anchor, Pattern = f.Pattern, Required = f.Required, IsMetric = f.IsMetric }).ToList();
+        _drawer = true;
+    }
+
+    private List<DocumentKeywordDto> ParseKeywords()
+        => _keywordsText.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(line =>
+            {
+                var parts = line.Split('|', 2);
+                return new DocumentKeywordDto(parts[0].Trim(), parts.Length > 1 && int.TryParse(parts[1].Trim(), out var w) ? w : 1);
+            })
+            .ToList();
+
+    private async Task SaveAsync()
+    {
+        _error = null;
+        _busy = true;
+        try
+        {
+            var request = new SaveDocumentTypeRequest(_key, _name, _description, _active, _minScore, ParseKeywords(),
+                _fields.Select(f => new DocumentFieldRuleDto(f.Key, f.Label, f.ValueType, f.Anchor, f.Pattern, f.Required, f.IsMetric)).ToList());
+            var response = _editing is null
+                ? await Http.PostAsJsonAsync("api/v1/settings/document-types", request)
+                : await Http.PutAsJsonAsync($"api/v1/settings/document-types/{_editing.Id}", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                var fields = await ProblemText.FieldErrorsAsync(response);
+                _error = fields.Count > 0 ? string.Join(" ", fields.Values) : await ProblemText.FromAsync(response, "We could not save this document type.");
+                return;
+            }
+
+            _drawer = false;
+            Snackbar.Add("Document type saved", Severity.Success);
+            await LoadAsync();
+        }
+        catch (HttpRequestException)
+        {
+            _error = "We could not reach MindLift. Check your connection and try again.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task TestFileAsync(InputFileChangeEventArgs args)
+    {
+        if (_editing is null)
+        {
+            return;
+        }
+
+        using var content = new MultipartFormDataContent();
+        var stream = args.File.OpenReadStream(25L * 1024 * 1024);
+        content.Add(new StreamContent(stream), "file", args.File.Name);
+        var response = await Http.PostAsync($"api/v1/settings/document-types/{_editing.Id}/test", content);
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "We could not test this file."), Severity.Error);
+            return;
+        }
+
+        _testResult = await response.Content.ReadFromJsonAsync<DocumentTypeTestResultDto>();
+    }
+
+    private async Task DeleteAsync(DocumentTypeDto type)
+    {
+        if (!await Dialogs.ConfirmAsync($"Delete {type.Name}?", "Documents already read with it keep their values.", "Delete", danger: true))
+        {
+            return;
+        }
+
+        var response = await Http.DeleteAsync($"api/v1/settings/document-types/{type.Id}");
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, "We could not delete this document type."), Severity.Error);
+            return;
+        }
+
+        await LoadAsync();
+    }
+}

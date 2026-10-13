@@ -195,6 +195,8 @@ public static class DependencyInjection
         services.AddSingleton<MindLift.Infrastructure.Cpq.IOcrEngine, MindLift.Infrastructure.Cpq.TesseractCliOcrEngine>();
         services.AddScoped<ICpqService, MindLift.Infrastructure.Cpq.CpqService>();
         services.AddScoped<IDocumentOcrService, MindLift.Infrastructure.Cpq.DocumentOcrService>();
+        services.AddScoped<MindLift.Infrastructure.Documents.Text.DocumentPageReader>();
+        services.AddScoped<MindLift.Infrastructure.Documents.Extraction.DocumentTypeService>();
         services.AddScoped<MindLift.Infrastructure.Cpq.DocumentExpiryJob>();
         services.AddScoped<MindLift.Infrastructure.Cpq.OcrHealthCheck>();
 

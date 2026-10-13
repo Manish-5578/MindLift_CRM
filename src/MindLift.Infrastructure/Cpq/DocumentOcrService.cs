@@ -9,6 +9,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using MindLift.Infrastructure.Documents.Text;
+using MindLift.Infrastructure.Documents.Extraction;
 using MindLift.Application.Abstractions;
 using MindLift.Application.Common.Exceptions;
 using MindLift.Application.Common.Ocr;
@@ -23,9 +25,26 @@ public sealed class DocumentOcrService(
     IFileStorage fileStorage,
     IOcrEngine ocrEngine,
     INotificationService notifications,
+    DocumentPageReader pageReader,
     ILogger<DocumentOcrService> logger) : IDocumentOcrService
 {
     private Guid CurrentTenantId => tenant.TenantId ?? throw new UnauthorizedAccessException("Tenant context required.");
+
+    /// <summary>Copies the stored file to a temporary path that keeps its real extension, so the reader knows whether it is a PDF or an image.</summary>
+    private async Task<string> SaveTempCopyAsync(BusinessDocument doc, CancellationToken ct)
+    {
+        var extension = Path.GetExtension(doc.FileName ?? string.Empty).ToLowerInvariant();
+        if (string.IsNullOrEmpty(extension))
+        {
+            extension = doc.ContentType switch { "application/pdf" => ".pdf", "image/png" => ".png", "image/jpeg" => ".jpg", _ => ".bin" };
+        }
+
+        var path = Path.Combine(Path.GetTempPath(), $"doc_{Guid.NewGuid():N}{extension}");
+        await using var source = await fileStorage.OpenReadAsync(doc.StorageKey, ct);
+        await using var target = File.Create(path);
+        await source.CopyToAsync(target, ct);
+        return path;
+    }
 
     public async Task<BusinessDocumentDto> UploadDocumentAsync(
         string fileName,
@@ -81,61 +100,38 @@ public sealed class DocumentOcrService(
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
-        // 1. Retrieve file content
-        string rawText = "";
+        // 1. Read every page: PDF text layer where there is one, OCR for scans and photos.
+        IReadOnlyList<PageText> pages = [];
+        string rawText = string.Empty;
         try
         {
-            await using var stream = await fileStorage.OpenReadAsync(doc.StorageKey, ct);
-            using var reader = new StreamReader(stream);
-            rawText = await reader.ReadToEndAsync(ct);
+            pages = await pageReader.ReadAsync(await SaveTempCopyAsync(doc, ct), ct);
+            rawText = string.Join("\n", pages.Select(p => p.Text));
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            logger.LogWarning(ex, "Failed to read raw stream directly for document {DocId}", documentId);
+            logger.LogWarning(ex, "Could not read document {DocId}", documentId);
         }
 
-        // 2. If rawText is binary or empty and OCR engine is available, attempt OCR
-        bool isBinaryOrEmpty = string.IsNullOrWhiteSpace(rawText) ||
-            rawText.Any(c => char.IsControl(c) && c != '\r' && c != '\n' && c != '\t');
+        bool isBinaryOrEmpty = string.IsNullOrWhiteSpace(rawText);
 
-        if (isBinaryOrEmpty && ocrEngine.IsAvailable())
-        {
-            try
-            {
-                var tempFile = Path.Combine(Path.GetTempPath(), $"ocr_{Guid.NewGuid():N}.png");
-                try
-                {
-                    await using (var stream = await fileStorage.OpenReadAsync(doc.StorageKey, ct))
-                    await using (var fileStream = File.Create(tempFile))
-                    {
-                        await stream.CopyToAsync(fileStream, ct);
-                    }
-
-                    var ocrRes = await ocrEngine.RecognizeAsync(tempFile, new OcrRequest("eng+ara"), ct);
-                    if (ocrRes.Words.Count > 0)
-                    {
-                        rawText = string.Join(" ", ocrRes.Words.Select(w => w.Text));
-                        isBinaryOrEmpty = false;
-                    }
-                }
-                finally
-                {
-                    if (File.Exists(tempFile))
-                    {
-                        try { File.Delete(tempFile); } catch { }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "OCR engine recognition failed for document {DocId}", documentId);
-            }
-        }
-
-        // If still binary or empty, use fallback representative template
+        // No readable text: the document is marked Failed. Nothing is invented, so no made-up values can reach a record.
         if (isBinaryOrEmpty)
         {
-            rawText = $"INVOICE\nVendor: MindLift Global Partner\nInvoice #: INV-{new Random().Next(10000, 99999)}\nDate: {DateTime.UtcNow:yyyy-MM-dd}\nTotal Amount: $2,500.00\nSubtotal: $2,500.00";
+            doc.OcrStatus = (int)DocumentOcrStatus.Failed;
+            doc.Status = "Failed";
+            doc.OcrRawText = null;
+            doc.OcrStructuredDataJson = "[]";
+            await db.SaveChangesAsync(ct);
+            return new OcrResultDto
+            {
+                DocumentId = doc.Id,
+                Status = DocumentOcrStatus.Failed,
+                DocumentType = doc.Category,
+                ExtractedText = string.Empty,
+                ExtractedFields = [],
+                ProcessingDuration = sw.Elapsed,
+            };
         }
 
         // 3. Normalized and structured field extraction
@@ -294,6 +290,32 @@ public sealed class DocumentOcrService(
         sw.Stop();
 
         // 4. Update and persist document
+        // B2. The workspace's own document types (Settings > Document types). The best match sets the category and adds its fields.
+        var customTypes = await db.Set<DocumentTypeDefinition>().AsNoTracking().Where(t => t.IsActive).ToListAsync(ct);
+        DocumentTypeDefinition? bestType = null;
+        var bestScore = 0;
+        foreach (var candidate in customTypes)
+        {
+            var score = CustomDocumentExtractor.Score(CustomDocumentExtractor.Keywords(candidate.KeywordsJson), rawText);
+            if (score >= candidate.MinScore && score > bestScore)
+            {
+                bestType = candidate;
+                bestScore = score;
+            }
+        }
+
+        if (bestType is not null)
+        {
+            detectedCategory = bestType.Key;
+            var read = CustomDocumentExtractor.Extract(CustomDocumentExtractor.Fields(bestType.FieldsJson), rawText);
+            foreach (var field in read.Where(f => f.Found && f.Value is not null))
+            {
+                extractedFields.Add(new OcrExtractedFieldDto { FieldName = field.Key, Value = field.Value!, Confidence = field.Confidence / 100.0 });
+                if (field.Key == "expiry_date" && DateOnly.TryParse(field.Value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var expiry)) docExpiry = expiry;
+                if (field.Key == "issue_date" && DateOnly.TryParse(field.Value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var issue)) docIssue = issue;
+            }
+        }
+
         doc.Category = detectedCategory;
         doc.OcrStatus = (int)DocumentOcrStatus.Completed;
         doc.Status = "NeedsReview";
