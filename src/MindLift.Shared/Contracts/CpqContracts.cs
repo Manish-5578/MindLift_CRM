@@ -334,6 +334,9 @@ public sealed class BusinessDocumentDto
     public Guid? AssociatedContactId { get; set; }
     public bool SharedWithPortal { get; set; }
     public string Status { get; set; } = "Ready"; // Queued, Processing, NeedsReview, Ready, Rejected
+    public Guid? ReviewedById { get; set; }
+    public DateTime? ReviewedAt { get; set; }
+    public string? RejectReason { get; set; }
     public DateOnly? ExpiryDate { get; set; }
     public DateOnly? IssueDate { get; set; }
     public double? Confidence { get; set; }
@@ -344,3 +347,9 @@ public sealed class BusinessDocumentDto
     public OcrResultDto? OcrResult { get; set; }
     public DateTime UploadedAt { get; set; }
 }
+
+public sealed record ApplyFieldToRecordItem(string FieldName, string TargetField, string Value);
+
+public sealed record ReviewDocumentRequest(string Action, string? Reason = null, List<ApplyFieldToRecordItem>? ApplyFields = null);
+
+public sealed record UpdateExtractedFieldsRequest(List<OcrExtractedFieldDto> Fields);

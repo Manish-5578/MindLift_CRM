@@ -305,6 +305,32 @@ public sealed class DocumentsController(IDocumentOcrService ocrService) : Contro
         return Ok(result);
     }
 
+    [HttpPost("{id:guid}/review")]
+    [HasPermission(AppModule.Documents, PermissionAction.Edit)]
+    public async Task<ActionResult<BusinessDocumentDto>> Review(Guid id, [FromBody] ReviewDocumentRequest request, CancellationToken ct = default)
+    {
+        var userId = GetUserId();
+        var result = await ocrService.ReviewDocumentAsync(id, request, userId, ct);
+        return Ok(result);
+    }
+
+    [HttpPut("{id:guid}/fields")]
+    [HasPermission(AppModule.Documents, PermissionAction.Edit)]
+    public async Task<IActionResult> UpdateFields(Guid id, [FromBody] UpdateExtractedFieldsRequest request, CancellationToken ct = default)
+    {
+        var success = await ocrService.UpdateExtractedFieldsAsync(id, request, ct);
+        if (!success) return NotFound();
+        return NoContent();
+    }
+
+    [HttpPost("{id:guid}/reprocess")]
+    [HasPermission(AppModule.Documents, PermissionAction.Edit)]
+    public async Task<ActionResult<BusinessDocumentDto>> Reprocess(Guid id, CancellationToken ct = default)
+    {
+        var doc = await ocrService.ReprocessAsync(id, ct);
+        return Ok(doc);
+    }
+
     [HttpDelete("{id:guid}")]
     [HasPermission(AppModule.Documents, PermissionAction.Delete)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct = default)
@@ -312,5 +338,12 @@ public sealed class DocumentsController(IDocumentOcrService ocrService) : Contro
         var deleted = await ocrService.DeleteDocumentAsync(id, ct);
         if (!deleted) return NotFound();
         return NoContent();
+    }
+
+    private Guid GetUserId()
+    {
+        var val = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            ?? User.FindFirst("sub")?.Value;
+        return Guid.TryParse(val, out var id) ? id : Guid.Empty;
     }
 }

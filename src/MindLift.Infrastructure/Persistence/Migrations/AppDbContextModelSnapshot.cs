@@ -1184,6 +1184,10 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnType("date")
                         .HasColumnName("expiry_date");
 
+                    b.Property<string>("ExpiryNotifiedOffsetsJson")
+                        .HasColumnType("text")
+                        .HasColumnName("expiry_notified_offsets_json");
+
                     b.Property<string>("FileName")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -1217,6 +1221,10 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.Property<DateOnly?>("PeriodDate")
                         .HasColumnType("date")
                         .HasColumnName("period_date");
+
+                    b.Property<string>("RejectReason")
+                        .HasColumnType("text")
+                        .HasColumnName("reject_reason");
 
                     b.Property<DateTime?>("ReviewedAt")
                         .HasColumnType("timestamp with time zone")

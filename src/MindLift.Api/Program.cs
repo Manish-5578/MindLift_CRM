@@ -104,7 +104,8 @@ builder.Services.AddSignalR();
 builder.Services.AddSingleton<MindLift.Application.Abstractions.INotificationPusher, MindLift.Api.Hubs.SignalRNotificationPusher>();
 
 builder.Services.AddHealthChecks()
-    .AddNpgSql(connectionString, name: "database");
+    .AddNpgSql(connectionString, name: "database")
+    .AddCheck<MindLift.Infrastructure.Cpq.OcrHealthCheck>("ocr");
 
 // Hangfire: one storage object per application, handed to the job client and the worker explicitly.
 // Hangfire's global storage is shared by every application in the process, so several hosts (the tests run many) would send jobs to one another's database.
@@ -225,6 +226,7 @@ new RecurringJobManager(hangfireStorage).AddOrUpdate<MindLift.Infrastructure.Not
 new RecurringJobManager(hangfireStorage).AddOrUpdate<MindLift.Infrastructure.Notifications.DailyDigestJob>("daily-digest", job => job.RunAsync(CancellationToken.None), Cron.Hourly());
 new RecurringJobManager(hangfireStorage).AddOrUpdate<MindLift.Infrastructure.Bookings.BookingReminderJob>("booking-reminders", job => job.RunAsync(CancellationToken.None), "*/5 * * * *");
 new RecurringJobManager(hangfireStorage).AddOrUpdate<MindLift.Infrastructure.Notifications.NotificationCleanupJob>("notification-cleanup", job => job.RunAsync(CancellationToken.None), Cron.Daily(3, 30));
+new RecurringJobManager(hangfireStorage).AddOrUpdate<MindLift.Infrastructure.Cpq.DocumentExpiryJob>("document-expiry", job => job.RunAsync(CancellationToken.None), Cron.Daily(4));
 
 app.Run();
 

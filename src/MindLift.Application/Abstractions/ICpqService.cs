@@ -56,4 +56,8 @@ public interface IDocumentOcrService
     Task<BusinessDocumentDto?> GetDocumentByIdAsync(Guid id, CancellationToken ct = default);
     Task<(Stream Stream, string ContentType, string FileName)?> GetDocumentStreamAsync(Guid id, CancellationToken ct = default);
     Task<bool> DeleteDocumentAsync(Guid id, CancellationToken ct = default);
+    Task<BusinessDocumentDto> ReviewDocumentAsync(Guid id, ReviewDocumentRequest request, Guid reviewerUserId, CancellationToken ct = default);
+    Task<bool> UpdateExtractedFieldsAsync(Guid id, UpdateExtractedFieldsRequest request, CancellationToken ct = default);
+    Task<BusinessDocumentDto> ReprocessAsync(Guid id, CancellationToken ct = default);
+    Task<int> RunExpiryChecksAsync(CancellationToken ct = default);
 }

@@ -191,8 +191,12 @@ public static class DependencyInjection
         services.AddScoped<MindLift.Infrastructure.Reporting.ReportScheduleJob>();
 
         // CPQ & Documents (M16).
+        services.Configure<MindLift.Infrastructure.Cpq.OcrOptions>(configuration.GetSection("Ocr"));
+        services.AddSingleton<MindLift.Infrastructure.Cpq.IOcrEngine, MindLift.Infrastructure.Cpq.TesseractCliOcrEngine>();
         services.AddScoped<ICpqService, MindLift.Infrastructure.Cpq.CpqService>();
         services.AddScoped<IDocumentOcrService, MindLift.Infrastructure.Cpq.DocumentOcrService>();
+        services.AddScoped<MindLift.Infrastructure.Cpq.DocumentExpiryJob>();
+        services.AddScoped<MindLift.Infrastructure.Cpq.OcrHealthCheck>();
 
         // Customer Portal (M17).
         services.AddScoped<IPortalService, MindLift.Infrastructure.Portal.PortalService>();

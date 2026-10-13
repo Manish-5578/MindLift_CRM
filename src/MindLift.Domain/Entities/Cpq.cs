@@ -177,4 +177,6 @@ public sealed class BusinessDocument : TenantEntity
     public string? DetectedVendor { get; set; }
     public string? DetectedInvoiceNumber { get; set; }
     public DateTime? DetectedDate { get; set; }
+    public string? RejectReason { get; set; }
+    public string? ExpiryNotifiedOffsetsJson { get; set; }
 }

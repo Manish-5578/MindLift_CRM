@@ -3,8 +3,8 @@
 Read this file first at the start of every session. The full plan is in `CRM_BUILD_PLAN.md`.
 
 ## Current status
-- **Last completed milestones:** M17 (Customer Portal WASM App, Refresh Tokens, Security & Isolation). M16 is **partly built** (see M16 section for OCR pipeline and review screen).
-- **Status (2026-10-13):** 941 tests pass (404 unit, 158 UI, 379 integration). The build has 0 errors and 15 compiler warnings in pre-existing code. `tests/MindLift.E2E` was **not run**.
+- **Last completed milestones:** M16 (Real OCR Pipeline, MRZ, Review Screen & Expiry Notifications) and M17 (Customer Portal WASM App, Refresh Tokens, Security & Isolation).
+- **Status (2026-10-13):** 956 tests pass (412 unit, 158 UI, 386 integration). The build has 0 errors and 13 compiler warnings in pre-existing code. `tests/MindLift.E2E` was **not run**.
 
 ## Environment
 - .NET SDK 10.0.401 (pinned in `global.json`, `rollForward: latestFeature`)
@@ -577,6 +577,29 @@ Test totals: 373 unit, 143 UI component, 231 integration (747 in all), all passi
   - **Integration Tests:** 5/5 passed in [CpqFlowTests.cs](file:///d:/MindLift_CRM/tests/MindLift.IntegrationTests/Cpq/CpqFlowTests.cs) (Product catalog lifecycle, Price book overrides, Quote calculations & deal sync, Quote-to-invoice conversion & partial/full payment reconciliation, Document upload & OCR processing).
   - **Full Suite Run:** 356/356 integration tests + 404/404 unit tests + 158/158 UI tests passed (918 total tests, 0 failures, 0 regressions).
   - **Build Status:** 0 compilation errors across all projects.
+
+### M16 completion: Real OCR Pipeline, MRZ, Normalizers, Document Review & Expiry Alerts - 2026-10-13
+- **OCR Engine & Normalization Pipeline:**
+  - `IOcrEngine` with `TesseractCliOcrEngine` configuring process arguments (`stdout -l eng+ara --oem 1 --psm 3 tsv`), parsing TSV word layout (level 5 bboxes, confidence), with graceful fallback for digital/plain text when Tesseract CLI is absent.
+  - `TextNormalizer`: Normalizes Arabic-Indic digits (`٠-٩`) and Persian digits (`۰-۹`) to standard ASCII `0-9`, converts Arabic punctuation (comma `،`, decimal separator `٫`, thousands separator `٬`), strips tatweel `ـ`, and unifies Alef/Ya/Ta-marbuta forms and strips diacritics for robust keyword matching while preserving line structure.
+  - `DateNormalizer`: Culture-invariant parser supporting multiple English and Arabic date patterns (including day-first, month-first, Arabic-Indic numbers, and Arabic month names), rejecting out-of-range years (< 1900 or > 2100).
+  - `AmountNormalizer`: Normalizes currency formats, parses currency symbols and codes (`AED`, `USD`, `SAR`, `EUR`, `GBP`, `د.إ`, `ر.س`), handles negative amounts formatted with minus or parentheses `(1,250.00)`, and prevents false positives on alphanumeric codes.
+  - `MrzParser`: Parses ICAO Doc 9303 TD3 (2 lines × 44 chars) passport MRZ with 7-3-1 repeating weighted check digit validation on document number, date of birth, and expiry date. Extracts document number, nationality, names, sex, DOB, and expiry date with confidence scoring (1.0 for valid check digits, 0.60 for invalid).
+  - Registered `/health` check for `ocr`, reporting `Healthy` when Tesseract is installed or `Degraded` when digital text extraction is active.
+- **Document Review & Verification:**
+  - Implemented Document Review screen (`DocumentReview.razor` at `/documents/review/{id}` and `/documents/{id}/review`) with split-pane layout:
+    - Left pane: File download action, raw extracted text viewer with monospace layout, and full JSON payload inspector.
+    - Right pane: Structured key information fields with confidence chips, in-place field editing with Save action.
+    - Actions: [Reprocess OCR], [Reject] with required reason modal, [Approve & Apply] committing approved status and applying verified field values to associated Account or Contact records.
+  - Direct navigation from Document table row actions to the Review screen.
+- **Automated Expiry Alerts:**
+  - Added Hangfire recurring job `document-expiry` executing `DocumentExpiryJob` daily.
+  - Evaluates approved documents nearing expiration (60, 30, 7 days), dispatches in-app notifications, and records notified offsets in `ExpiryNotifiedOffsetsJson` to prevent duplicate alerts.
+  - Scoped multi-tenant processing with `ITenantContext.Use`.
+- **Test Fixtures & Verification:**
+  - Created synthetic document test fixtures in `tests/fixtures/documents/` (synthetic passport TD3 MRZ, English trade license, Arabic trade license with Arabic-Indic digits, and synthetic invoice).
+  - 8 new unit tests in `OcrNormalizerTests.cs` (100% pass rate).
+  - 7 new integration tests in `DocumentReviewAndOcrTests.cs`: passport MRZ extraction, Arabic trade license digit normalization, review approval with account field application, rejection with reason, Hangfire expiry notification job, `/health` OCR check, and multi-tenant isolation with permission checks (100% pass rate).
 
 ## M14 Enhancements: PDF Export & Scheduled Report Deliveries
 - **Built & Integrated:**

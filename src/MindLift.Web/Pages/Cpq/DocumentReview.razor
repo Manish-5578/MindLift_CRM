@@ -1,0 +1,383 @@
+@page "/documents/review/{Id:guid}"
+@page "/documents/{Id:guid}/review"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager Nav
+
+<div class="pa-4 d-flex flex-column" style="height: calc(100vh - 80px);">
+    @if (_loading)
+    {
+        <div class="d-flex justify-center align-center flex-grow-1">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Large" />
+        </div>
+    }
+    else if (_document == null)
+    {
+        <MudAlert Severity="Severity.Error">Document not found or has been deleted.</MudAlert>
+    }
+    else
+    {
+        <!-- Header Bar -->
+        <MudPaper Class="pa-4 mb-4 d-flex justify-space-between align-center flex-wrap gap-4" Elevation="1">
+            <div class="d-flex align-center gap-3">
+                <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Nav.NavigateTo("/documents"))" aria-label="Back to documents" />
+                <div>
+                    <div class="d-flex align-center gap-2">
+                        <MudText Typo="Typo.h5" Class="font-weight-bold">@_document.FileName</MudText>
+                        <MudChip T="string" Color="Color.Primary" Size="Size.Small" Variant="Variant.Outlined">@_document.Category</MudChip>
+                        <MudChip T="string" Color="@GetStatusColor(_document.Status)" Size="Size.Small">@_document.Status</MudChip>
+                        @if (_document.Confidence.HasValue)
+                        {
+                            <MudChip T="string" Color="@GetConfidenceColor(_document.Confidence.Value)" Size="Size.Small" Variant="Variant.Text">
+                                @($"{(_document.Confidence.Value * 100):F0}% confidence")
+                            </MudChip>
+                        }
+                    </div>
+                    <MudText Typo="Typo.caption" Class="text-secondary">
+                        Uploaded @(_document.UploadedAt.ToString("g")) · @FormatBytes(_document.FileSizeBytes)
+                        @if (!string.IsNullOrEmpty(_document.RejectReason))
+                        {
+                            <span class="ml-2 text-danger">· Rejected: @_document.RejectReason</span>
+                        }
+                    </MudText>
+                </div>
+            </div>
+
+            <div class="d-flex align-center gap-2">
+                <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Refresh"
+                           OnClick="ReprocessAsync" Disabled="_processing">
+                    Reprocess OCR
+                </MudButton>
+                @if (_document.Status != "Rejected")
+                {
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Cancel"
+                               OnClick="OpenRejectDialog" Disabled="_processing">
+                        Reject
+                    </MudButton>
+                }
+                @if (_document.Status != "Approved")
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.CheckCircle"
+                               OnClick="OpenApproveDialog" Disabled="_processing">
+                        Approve & Apply
+                    </MudButton>
+                }
+            </div>
+        </MudPaper>
+
+        <!-- Two-Pane Work Area -->
+        <div class="d-flex flex-grow-1 gap-4" style="min-height: 0;">
+            <!-- Left Pane: Document Text / Viewer -->
+            <MudPaper Class="pa-4 flex-grow-1 d-flex flex-column" Elevation="1" Style="width: 55%; overflow: hidden;">
+                <div class="d-flex justify-space-between align-center mb-2">
+                    <MudText Typo="Typo.subtitle1" Class="font-weight-bold">Document Content</MudText>
+                    <div class="d-flex gap-2">
+                        <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Filled.Download"
+                                   Href="@($"/api/v1/documents/{_document.Id}/file")" Target="_blank">
+                            Download File
+                        </MudButton>
+                    </div>
+                </div>
+
+                <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" Class="flex-grow-1 d-flex flex-column">
+                    <MudTabPanel Text="Extracted Text" Icon="@Icons.Material.Filled.TextFields">
+                        <div class="pa-3 flex-grow-1" style="overflow-y: auto; max-height: calc(100vh - 280px); background-color: var(--mud-palette-background-grey); border-radius: 4px;">
+                            <pre style="white-space: pre-wrap; font-family: monospace; font-size: 0.875rem;">@(_document.OcrResult?.ExtractedText ?? "No text extracted yet.")</pre>
+                        </div>
+                    </MudTabPanel>
+                    <MudTabPanel Text="Raw OCR Payload" Icon="@Icons.Material.Filled.Code">
+                        <div class="pa-3 flex-grow-1" style="overflow-y: auto; max-height: calc(100vh - 280px); background-color: var(--mud-palette-background-grey); border-radius: 4px;">
+                            <pre style="white-space: pre-wrap; font-family: monospace; font-size: 0.8125rem;">@System.Text.Json.JsonSerializer.Serialize(_document.OcrResult, new System.Text.Json.JsonSerializerOptions { WriteIndented = true })</pre>
+                        </div>
+                    </MudTabPanel>
+                </MudTabs>
+            </MudPaper>
+
+            <!-- Right Pane: Extracted Fields Review & Apply -->
+            <MudPaper Class="pa-4 d-flex flex-column" Elevation="1" Style="width: 45%; overflow-y: auto;">
+                <div class="d-flex justify-space-between align-center mb-4">
+                    <div>
+                        <MudText Typo="Typo.subtitle1" Class="font-weight-bold">Intelligence & Key Information</MudText>
+                        <MudText Typo="Typo.caption" Class="text-secondary">Review and adjust extracted values before approval</MudText>
+                    </div>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" OnClick="SaveFieldsAsync">
+                        Save Edits
+                    </MudButton>
+                </div>
+
+                @if (_fields.Count == 0)
+                {
+                    <MudAlert Severity="Severity.Info" Class="my-2">No structured fields extracted from this document.</MudAlert>
+                }
+                else
+                {
+                    <div class="d-flex flex-column gap-3">
+                        @foreach (var field in _fields)
+                        {
+                            <MudPaper Class="pa-3" Outlined="true">
+                                <div class="d-flex justify-space-between align-center mb-1">
+                                    <MudText Typo="Typo.subtitle2" Class="font-weight-bold">@field.FieldName</MudText>
+                                    <MudChip T="string" Size="Size.Small" Color="@GetConfidenceColor(field.Confidence)" Variant="Variant.Text">
+                                        @($"{field.Confidence * 100:F0}%")
+                                    </MudChip>
+                                </div>
+                                <MudTextField @bind-Value="field.Value" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                            </MudPaper>
+                        }
+                    </div>
+                }
+
+                @if (_document.AssociatedAccountId.HasValue || _document.AssociatedContactId.HasValue)
+                {
+                    <MudDivider Class="my-4" />
+                    <MudText Typo="Typo.subtitle2" Class="font-weight-bold mb-2">Apply to Associated Record</MudText>
+                    <MudPaper Class="pa-3" Outlined="true" Style="background-color: var(--mud-palette-background-grey);">
+                        <MudText Typo="Typo.body2">
+                            When approved, verified values can be synchronized to the linked @(_document.AssociatedAccountId.HasValue ? "Account" : "Contact") record.
+                        </MudText>
+                    </MudPaper>
+                }
+            </MudPaper>
+        </div>
+    }
+</div>
+
+<!-- Reject Dialog -->
+<MudDialog @bind-Visible="_rejectDialogOpen">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Reject Document</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mb-3">Please specify the reason for rejecting this document:</MudText>
+        <MudTextField @bind-Value="_rejectReason" Label="Reason for rejection" Lines="3" Variant="Variant.Outlined" Required="true" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _rejectDialogOpen = false)">Cancel</MudButton>
+        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="ConfirmRejectAsync" Disabled="@string.IsNullOrWhiteSpace(_rejectReason)">Reject</MudButton>
+    </DialogActions>
+</MudDialog>
+
+<!-- Approve Dialog -->
+<MudDialog @bind-Visible="_approveDialogOpen">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Approve Document</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mb-3">Are you sure you want to approve this document and commit its extracted data?</MudText>
+        @if (_fields.Count > 0)
+        {
+            <MudText Typo="Typo.subtitle2" Class="font-weight-bold mb-1">Fields to be approved:</MudText>
+            <MudList T="string" Dense="true">
+                @foreach (var f in _fields)
+                {
+                    <MudListItem T="string">
+                        <strong>@f.FieldName:</strong> @f.Value
+                    </MudListItem>
+                }
+            </MudList>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _approveDialogOpen = false)">Cancel</MudButton>
+        <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="ConfirmApproveAsync">Approve & Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private bool _loading = true;
+    private bool _processing;
+    private BusinessDocumentDto? _document;
+    private List<OcrExtractedFieldDto> _fields = [];
+
+    private bool _rejectDialogOpen;
+    private string _rejectReason = string.Empty;
+    private bool _approveDialogOpen;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDocumentAsync();
+    }
+
+    private async Task LoadDocumentAsync()
+    {
+        _loading = true;
+        try
+        {
+            _document = await Http.GetFromJsonAsync<BusinessDocumentDto>($"/api/v1/documents/{Id}");
+            if (_document?.OcrResult?.ExtractedFields != null)
+            {
+                _fields = _document.OcrResult.ExtractedFields.Select(f => new OcrExtractedFieldDto
+                {
+                    FieldName = f.FieldName,
+                    Value = f.Value,
+                    Confidence = f.Confidence
+                }).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load document: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ReprocessAsync()
+    {
+        _processing = true;
+        try
+        {
+            var res = await Http.PostAsync($"/api/v1/documents/{Id}/reprocess", null);
+            if (res.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Document reprocessed successfully.", Severity.Success);
+                await LoadDocumentAsync();
+            }
+            else
+            {
+                Snackbar.Add("Failed to reprocess document.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _processing = false;
+        }
+    }
+
+    private async Task SaveFieldsAsync()
+    {
+        try
+        {
+            var req = new UpdateExtractedFieldsRequest(_fields);
+            var res = await Http.PutAsJsonAsync($"/api/v1/documents/{Id}/fields", req);
+            if (res.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Fields saved successfully.", Severity.Success);
+                await LoadDocumentAsync();
+            }
+            else
+            {
+                Snackbar.Add("Failed to save field edits.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void OpenRejectDialog()
+    {
+        _rejectReason = string.Empty;
+        _rejectDialogOpen = true;
+    }
+
+    private async Task ConfirmRejectAsync()
+    {
+        _rejectDialogOpen = false;
+        _processing = true;
+        try
+        {
+            var req = new ReviewDocumentRequest("Reject", _rejectReason);
+            var res = await Http.PostAsJsonAsync($"/api/v1/documents/{Id}/review", req);
+            if (res.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Document marked as Rejected.", Severity.Info);
+                await LoadDocumentAsync();
+            }
+            else
+            {
+                Snackbar.Add("Failed to reject document.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _processing = false;
+        }
+    }
+
+    private void OpenApproveDialog()
+    {
+        _approveDialogOpen = true;
+    }
+
+    private async Task ConfirmApproveAsync()
+    {
+        _approveDialogOpen = false;
+        _processing = true;
+        try
+        {
+            var applyList = new List<ApplyFieldToRecordItem>();
+            foreach (var f in _fields)
+            {
+                if (_document?.AssociatedAccountId != null)
+                {
+                    applyList.Add(new ApplyFieldToRecordItem(f.FieldName, $"accounts.{f.FieldName.ToLowerInvariant()}", f.Value));
+                }
+                else if (_document?.AssociatedContactId != null)
+                {
+                    applyList.Add(new ApplyFieldToRecordItem(f.FieldName, $"contacts.{f.FieldName.ToLowerInvariant()}", f.Value));
+                }
+            }
+
+            var req = new ReviewDocumentRequest("Approve", null, applyList);
+            var res = await Http.PostAsJsonAsync($"/api/v1/documents/{Id}/review", req);
+            if (res.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Document approved successfully.", Severity.Success);
+                await LoadDocumentAsync();
+            }
+            else
+            {
+                Snackbar.Add("Failed to approve document.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _processing = false;
+        }
+    }
+
+    private static Color GetStatusColor(string status) => status switch
+    {
+        "Approved" => Color.Success,
+        "Ready" => Color.Info,
+        "NeedsReview" => Color.Warning,
+        "Processing" => Color.Primary,
+        "Rejected" => Color.Error,
+        _ => Color.Default
+    };
+
+    private static Color GetConfidenceColor(double conf) => conf switch
+    {
+        >= 0.90 => Color.Success,
+        >= 0.70 => Color.Warning,
+        _ => Color.Error
+    };
+
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024.0):F1} MB";
+    }
+}
