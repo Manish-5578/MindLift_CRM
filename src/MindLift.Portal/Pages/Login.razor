@@ -1,0 +1,123 @@
+@page "/{Slug}/login"
+@inherits PortalPageBase
+
+<PageTitle>@T["login.title"] · @Session.Branding?.TenantName</PageTitle>
+
+@if (!Ready)
+{
+    <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+}
+else if (UnknownCompany)
+{
+    <NoCompany Message='@T["login.unknownCompany"]' />
+}
+else
+{
+    <AuthCard Title='@T["login.title"]' Subtitle='@T["login.subtitle"]'>
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3" id="login-error">@_error</MudAlert>
+        }
+
+        @if (_linkSent)
+        {
+            <MudAlert Severity="Severity.Success" Class="mb-3" id="login-link-sent">@T["login.linkSent"]</MudAlert>
+        }
+
+        <EditForm Model="this" OnSubmit="SubmitAsync" class="pt-form">
+            <MudTextField @bind-Value="_email" Label='@T["login.email"]' InputType="InputType.Email" Variant="Variant.Outlined"
+                          Required="true" autocomplete="email" id="login-email" Immediate="true" />
+            @if (!_magicMode)
+            {
+                <MudTextField @bind-Value="_password" Label='@T["login.password"]' InputType="InputType.Password" Variant="Variant.Outlined"
+                              Required="true" autocomplete="current-password" id="login-password" Immediate="true" />
+            }
+
+            <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" FullWidth="true"
+                       Disabled="@(_busy || !CanSubmit)" Class="pt-cta" id="login-submit">
+                @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="me-2" /> }
+                @(_magicMode ? T["login.sendLink"] : T["login.submit"])
+            </MudButton>
+        </EditForm>
+
+        <MudButton Variant="Variant.Text" Color="Color.Primary" FullWidth="true" Class="mt-2" OnClick="ToggleMode" id="login-toggle-mode"
+                   StartIcon="@(_magicMode ? Icons.Material.Outlined.Password : Icons.Material.Outlined.MarkEmailUnread)">
+            @(_magicMode ? T["login.usePassword"] : T["login.magic"])
+        </MudButton>
+
+        @if (!string.IsNullOrWhiteSpace(Session.Branding?.SupportEmail))
+        {
+            <p class="pt-auth__help">@T["profile.support"] <a href="mailto:@Session.Branding!.SupportEmail">@Session.Branding!.SupportEmail</a></p>
+        }
+    </AuthCard>
+}
+
+@code {
+    protected override bool RequiresSignIn => false;
+
+    private string _email = string.Empty;
+    private string _password = string.Empty;
+    private bool _magicMode;
+    private bool _busy;
+    private bool _linkSent;
+    private string? _error;
+
+    private bool CanSubmit => !string.IsNullOrWhiteSpace(_email) && (_magicMode || !string.IsNullOrEmpty(_password));
+
+    protected override Task LoadAsync()
+    {
+        if (Session.IsSignedIn)
+        {
+            Nav.NavigateTo(Link());
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private void ToggleMode()
+    {
+        _magicMode = !_magicMode;
+        _error = null;
+        _linkSent = false;
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (!CanSubmit) return;
+        _busy = true;
+        _error = null;
+        _linkSent = false;
+        try
+        {
+            if (_magicMode)
+            {
+                var sent = await Session.Anonymous.PostAsJsonAsync(Api($"{Uri.EscapeDataString(Slug)}/auth/magic-link"), new PortalMagicLinkRequest(_email.Trim()));
+                _linkSent = sent.IsSuccessStatusCode;
+                if (!sent.IsSuccessStatusCode) _error = T["common.error"];
+                return;
+            }
+
+            var resp = await Session.Anonymous.PostAsJsonAsync(Api($"{Uri.EscapeDataString(Slug)}/auth/login"), new PortalLoginRequest(_email.Trim(), _password));
+            if (resp.IsSuccessStatusCode)
+            {
+                await CompleteSignInAsync((await resp.Content.ReadFromJsonAsync<PortalLoginResponse>())!);
+                return;
+            }
+
+            _error = await ErrorCodeAsync(resp) switch
+            {
+                "portal_disabled" => T["login.disabled"],
+                "account_locked" or "account_inactive" or "password_not_set" => await DetailAsync(resp, T["login.failed"]),
+                _ => T["login.failed"]
+            };
+        }
+        catch (HttpRequestException)
+        {
+            _error = T["common.error"];
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

@@ -1,0 +1,232 @@
+@page "/{Slug}"
+@inherits PortalPageBase
+
+<PageTitle>@T["nav.home"] · @Session.Branding?.TenantName</PageTitle>
+
+@if (!Ready || _loading)
+{
+    <div class="d-flex justify-center pa-12">
+        <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Large" />
+    </div>
+}
+else if (_home is null)
+{
+    <div class="pa-6 text-center">
+        <MudText Typo="Typo.h6">@T["common.error"]</MudText>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="mt-3" OnClick="LoadAsync">@T["common.retry"]</MudButton>
+    </div>
+}
+else
+{
+    <div class="pt-container pt-fade-in">
+        <!-- Welcome Hero -->
+        <section class="pt-hero">
+            <div class="pt-hero__content">
+                <MudText Typo="Typo.caption" Class="pt-hero__sub">@(_home.AccountName ?? Session.Branding?.TenantName)</MudText>
+                <h1 class="pt-hero__title">@T["home.hello"], @_home.CustomerName</h1>
+                <p class="pt-hero__desc">@(T.IsArabic && !string.IsNullOrWhiteSpace(Session.Branding?.WelcomeMessageAr) ? Session.Branding!.WelcomeMessageAr : _home.WelcomeMessage)</p>
+            </div>
+            @if (_home.OpenRequests.Count > 0)
+            {
+                <div class="pt-hero__badge">
+                    <MudButton Variant="Variant.Filled" Color="Color.Warning" StartIcon="@Icons.Material.Outlined.NotificationImportant" Href='@Link("requests")' Size="Size.Small">
+                        @_home.OpenRequests.Count @T["home.openRequests"]
+                    </MudButton>
+                </div>
+            }
+        </section>
+
+        <!-- Key Information Cards -->
+        @if (_home.KeyInfo.Count > 0)
+        {
+            <section class="pt-section">
+                <div class="pt-section__head">
+                    <h2 class="pt-section__title">@T["home.keyInfo"]</h2>
+                </div>
+                <div class="pt-grid pt-grid--keyinfo">
+                    @foreach (var info in _home.KeyInfo)
+                    {
+                        <div class="pt-card pt-card--keyinfo" id="@($"keyinfo-{info.TypeKey}")">
+                            <div class="d-flex align-center justify-space-between mb-2">
+                                <span class="pt-card__tag">@info.TypeName</span>
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="@ValidityColor(info.Validity)">
+                                    @T.Status(info.Validity)
+                                </MudChip>
+                            </div>
+                            @if (info.ExpiryDate.HasValue)
+                            {
+                                <div class="pt-card__expiry">
+                                    <span class="pt-card__expiry-label">@T["home.expires"]</span>
+                                    <span class="pt-card__expiry-date">@info.ExpiryDate.Value.ToString("yyyy-MM-dd")</span>
+                                    @if (info.DaysLeft.HasValue && info.DaysLeft >= 0)
+                                    {
+                                        <span class="pt-card__expiry-left">(@info.DaysLeft @T["home.daysLeft"])</span>
+                                    }
+                                </div>
+                            }
+                            <div class="pt-card__fields">
+                                @foreach (var field in info.Fields)
+                                {
+                                    <div class="pt-card__field">
+                                        <span class="pt-card__field-name">@field.Label</span>
+                                        <span class="pt-card__field-val">@field.Value</span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </section>
+        }
+
+        <!-- Metrics (if any) -->
+        @if (_home.Metrics.Count > 0)
+        {
+            <section class="pt-section">
+                <div class="pt-section__head">
+                    <h2 class="pt-section__title">@T["home.metrics"]</h2>
+                </div>
+                <div class="pt-grid pt-grid--metrics">
+                    @foreach (var metric in _home.Metrics)
+                    {
+                        <div class="pt-card pt-card--metric" id="@($"metric-{metric.Key}")">
+                            <span class="pt-card__metric-label">@metric.Label</span>
+                            <div class="pt-card__metric-val">
+                                <span class="pt-card__metric-currency">@metric.Currency</span>
+                                <span class="pt-card__metric-num">@metric.Latest.ToString("N2")</span>
+                            </div>
+                            @if (metric.ChangePct.HasValue)
+                            {
+                                <div class="pt-card__metric-change @(metric.ChangePct >= 0 ? "pt-card__metric-change--up" : "pt-card__metric-change--down")">
+                                    <MudIcon Icon="@(metric.ChangePct >= 0 ? Icons.Material.Outlined.TrendingUp : Icons.Material.Outlined.TrendingDown)" Size="Size.Small" />
+                                    <span>@Math.Abs(metric.ChangePct.Value)% @T["home.vsLastYear"]</span>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </section>
+        }
+
+        <!-- Outstanding Requests -->
+        @if (_home.OpenRequests.Count > 0)
+        {
+            <section class="pt-section">
+                <div class="pt-section__head">
+                    <h2 class="pt-section__title">@T["home.openRequests"]</h2>
+                    <a class="pt-section__link" href='@Link("requests")'>@T["home.viewAll"]</a>
+                </div>
+                <div class="pt-requests-list">
+                    @foreach (var req in _home.OpenRequests)
+                    {
+                        <div class="pt-request-row" id="@($"request-{req.Id}")">
+                            <div class="pt-request-row__main">
+                                <span class="pt-request-row__title">@req.Title</span>
+                                @if (!string.IsNullOrWhiteSpace(req.Description))
+                                {
+                                    <span class="pt-request-row__desc">@req.Description</span>
+                                }
+                            </div>
+                            <div class="pt-request-row__meta">
+                                @if (req.DueDate.HasValue)
+                                {
+                                    var overdue = req.DueDate.Value < DateOnly.FromDateTime(DateTime.UtcNow);
+                                    <span class="pt-request-row__due @(overdue ? "pt-request-row__due--overdue" : "")">
+                                        @T["req.due"] @req.DueDate.Value.ToString("MMM dd, yyyy")
+                                    </span>
+                                }
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" Href='@Link("requests")'>
+                                    @T["home.upload"]
+                                </MudButton>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </section>
+        }
+
+        <!-- Recent Documents -->
+        <section class="pt-section">
+            <div class="pt-section__head">
+                <h2 class="pt-section__title">@T["home.recent"]</h2>
+                @if (_home.RecentDocuments.Count > 0)
+                {
+                    <a class="pt-section__link" href='@Link("documents")'>@T["home.viewAll"]</a>
+                }
+            </div>
+
+            @if (_home.RecentDocuments.Count == 0)
+            {
+                <div class="pt-card pt-empty">
+                    <MudIcon Icon="@Icons.Material.Outlined.FolderOff" Size="Size.Large" Class="ml-muted" />
+                    <p class="pt-empty__text">@T["home.noDocuments"]</p>
+                </div>
+            }
+            else
+            {
+                <div class="pt-doc-table">
+                    @foreach (var doc in _home.RecentDocuments)
+                    {
+                        <div class="pt-doc-row" id="@($"doc-{doc.Id}")">
+                            <div class="pt-doc-row__icon">
+                                <MudIcon Icon="@FileIcon(doc.ContentType)" />
+                            </div>
+                            <div class="pt-doc-row__main">
+                                <a class="pt-doc-row__name" href='@Link($"documents/{doc.Id}")'>@doc.FileName</a>
+                                <span class="pt-doc-row__sub">@doc.Category · @FormatBytes(doc.FileSizeBytes) · @doc.UploadedAt.ToString("yyyy-MM-dd")</span>
+                            </div>
+                            <div class="pt-doc-row__action">
+                                <MudIconButton Icon="@Icons.Material.Outlined.Download" Href='@($"api/v1/portal/documents/{doc.Id}/file")'
+                                               Target="_blank" aria-label='@T["docs.download"]' Size="Size.Small" />
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+    </div>
+}
+
+@code {
+    private PortalHomeDto? _home;
+    private bool _loading = true;
+
+    protected override async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _home = await Http.GetFromJsonAsync<PortalHomeDto>(Api("home"));
+        }
+        catch (HttpRequestException)
+        {
+            _home = null;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static Color ValidityColor(string validity) => validity switch
+    {
+        "valid" => Color.Success,
+        "expiring" => Color.Warning,
+        "expired" => Color.Error,
+        _ => Color.Default
+    };
+
+    private static string FileIcon(string ct) => ct switch
+    {
+        var x when x.Contains("pdf") => Icons.Material.Outlined.PictureAsPdf,
+        var x when x.Contains("image") => Icons.Material.Outlined.Image,
+        _ => Icons.Material.Outlined.Description
+    };
+
+    private static string FormatBytes(long b)
+    {
+        if (b < 1024) return $"{b} B";
+        if (b < 1024 * 1024) return $"{b / 1024.0:F1} KB";
+        return $"{b / (1024.0 * 1024.0):F1} MB";
+    }
+}

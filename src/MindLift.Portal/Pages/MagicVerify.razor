@@ -1,0 +1,78 @@
+@page "/{Slug}/magic"
+@inherits PortalPageBase
+
+<PageTitle>@T["magic.checking"] · @Session.Branding?.TenantName</PageTitle>
+
+@if (!Ready)
+{
+    <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+}
+else if (UnknownCompany)
+{
+    <NoCompany Message='@T["login.unknownCompany"]' />
+}
+else if (_verifying)
+{
+    <AuthCard Title='@T["magic.checking"]'>
+        <div class="d-flex justify-center my-6">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Large" />
+        </div>
+    </AuthCard>
+}
+else if (!string.IsNullOrEmpty(_error))
+{
+    <AuthCard Title='@T["app.name"]' Subtitle="@_error">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Href='@Link("login")' Class="mt-4" id="magic-retry">
+            @T["magic.back"]
+        </MudButton>
+    </AuthCard>
+}
+
+@code {
+    protected override bool RequiresSignIn => false;
+
+    [SupplyParameterFromQuery] public string? Token { get; set; }
+
+    private bool _verifying;
+    private string? _error;
+
+    protected override async Task LoadAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Token))
+        {
+            _error = T["magic.failed"];
+            return;
+        }
+
+        _verifying = true;
+        try
+        {
+            var req = new PortalMagicLinkVerifyRequest(Token.Trim());
+            var resp = await Session.Anonymous.PostAsJsonAsync(Api($"{Uri.EscapeDataString(Slug)}/auth/magic-link/verify"), req);
+            if (resp.IsSuccessStatusCode)
+            {
+                var login = await resp.Content.ReadFromJsonAsync<PortalLoginResponse>();
+                if (login is not null)
+                {
+                    await CompleteSignInAsync(login);
+                    return;
+                }
+            }
+
+            _error = await ErrorCodeAsync(resp) switch
+            {
+                "portal_disabled" => T["login.disabled"],
+                "expired_token" or "invalid_token" => T["magic.failed"],
+                _ => await DetailAsync(resp, T["magic.failed"])
+            };
+        }
+        catch (HttpRequestException)
+        {
+            _error = T["common.error"];
+        }
+        finally
+        {
+            _verifying = false;
+        }
+    }
+}

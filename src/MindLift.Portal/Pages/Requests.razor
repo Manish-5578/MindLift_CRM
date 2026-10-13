@@ -1,0 +1,158 @@
+@page "/{Slug}/requests"
+@inherits PortalPageBase
+@inject ISnackbar Snackbar
+
+<PageTitle>@T["req.title"] · @Session.Branding?.TenantName</PageTitle>
+
+<div class="pt-container pt-fade-in">
+    <div class="pt-section__head mb-4">
+        <div>
+            <h1 class="pt-section__title">@T["req.title"]</h1>
+            <p class="pt-hero__desc">@T["req.subtitle"]</p>
+        </div>
+    </div>
+
+    @if (_loading)
+    {
+        <div class="d-flex justify-center pa-12">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        </div>
+    }
+    else if (_requests.Count == 0)
+    {
+        <div class="pt-card pt-empty">
+            <MudIcon Icon="@Icons.Material.Outlined.AssignmentTurnedIn" Size="Size.Large" Class="ml-muted" />
+            <p class="pt-empty__text">@T["req.empty"]</p>
+        </div>
+    }
+    else
+    {
+        <div class="pt-requests-stack">
+            @foreach (var req in _requests)
+            {
+                <div class="pt-card pt-request-card" id="@($"request-{req.Id}")">
+                    <div class="d-flex justify-space-between align-start flex-wrap gap-2 mb-2">
+                        <div class="pt-request-card__head">
+                            <h2 class="pt-request-card__title">@req.Title</h2>
+                            @if (!string.IsNullOrWhiteSpace(req.Description))
+                            {
+                                <p class="pt-request-card__desc">@req.Description</p>
+                            }
+                        </div>
+                        <div class="d-flex align-center gap-2">
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="@ReqStatusColor(req.Status)">
+                                @T.Status(req.Status)
+                            </MudChip>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-space-between align-center flex-wrap gap-2 pt-2 pt-request-card__footer">
+                        <div class="pt-request-card__dates">
+                            @if (req.DueDate.HasValue)
+                            {
+                                var overdue = req.DueDate.Value < DateOnly.FromDateTime(DateTime.UtcNow) && req.Status == "Open";
+                                <span class="pt-request-row__due @(overdue ? "pt-request-row__due--overdue" : "")">
+                                    @T["req.due"] @req.DueDate.Value.ToString("MMM dd, yyyy")
+                                    @(overdue ? $" ({T["req.overdue"]})" : "")
+                                </span>
+                            }
+                            <span class="pt-muted-text">· @req.CreatedAt.ToString("MMM dd, yyyy")</span>
+                        </div>
+
+                        @if (req.Status is "Open" or "Submitted")
+                        {
+                            <MudFileUpload T="IBrowserFile" FilesChanged="@(f => UploadForRequestAsync(req.Id, f))" Accept=".pdf,.png,.jpg,.jpeg">
+                                <CustomContent Context="upload">
+                                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                                               StartIcon="@Icons.Material.Outlined.CloudUpload" Disabled="@(_uploadingId == req.Id)"
+                                               OnClick="@(() => upload.OpenFilePickerAsync())" id="@($"upload-btn-{req.Id}")">
+                                        @if (_uploadingId == req.Id)
+                                        {
+                                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="me-2" />
+                                            <span>@T["req.uploading"]</span>
+                                        }
+                                        else
+                                        {
+                                            <span>@(req.Status == "Submitted" ? "Re-upload file" : T["req.upload"])</span>
+                                        }
+                                    </MudButton>
+                                </CustomContent>
+                            </MudFileUpload>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<PortalDocumentRequestDto> _requests = [];
+    private bool _loading = true;
+    private Guid? _uploadingId;
+
+    protected override async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _requests = await Http.GetFromJsonAsync<List<PortalDocumentRequestDto>>(Api("requests")) ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            _requests = [];
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task UploadForRequestAsync(Guid requestId, IBrowserFile? file)
+    {
+        if (file is null) return;
+        if (file.Size > 10 * 1024 * 1024)
+        {
+            Snackbar.Add(T["req.tooLarge"], Severity.Warning);
+            return;
+        }
+
+        _uploadingId = requestId;
+        try
+        {
+            using var form = new MultipartFormDataContent();
+            var stream = file.OpenReadStream(10 * 1024 * 1024);
+            var streamContent = new StreamContent(stream);
+            streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType ?? "application/octet-stream");
+            form.Add(streamContent, "file", file.Name);
+
+            var resp = await Http.PostAsync(Api($"requests/{requestId}/upload"), form);
+            if (resp.IsSuccessStatusCode)
+            {
+                Snackbar.Add(T["req.uploaded"], Severity.Success);
+                await LoadAsync();
+            }
+            else
+            {
+                var err = await DetailAsync(resp, T["req.failed"]);
+                Snackbar.Add(err, Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _uploadingId = null;
+        }
+    }
+
+    private static Color ReqStatusColor(string status) => status switch
+    {
+        "Completed" => Color.Success,
+        "Submitted" => Color.Info,
+        "Cancelled" => Color.Error,
+        _ => Color.Warning
+    };
+}

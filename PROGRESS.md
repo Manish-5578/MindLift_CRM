@@ -3,8 +3,8 @@
 Read this file first at the start of every session. The full plan is in `CRM_BUILD_PLAN.md`.
 
 ## Current status
-- **Last completed milestones:** M14 (Reports & Analytics Engine + PDF & Schedules). M16 and M17 are **partly built** (see their sections for what is missing).
-- **Status (2026-10-13):** 926 tests pass (404 unit, 158 UI, 364 integration). The build has 0 errors but **16 distinct compiler warnings** remain (unread constructor parameters, obsolete Hangfire/Testcontainers APIs, nullability in older files, one EF1002, one Dapper AOT notice). An earlier line here said "Zero warnings"; that was wrong. `tests/MindLift.E2E` was **not run**.
+- **Last completed milestones:** M17 (Customer Portal WASM App, Refresh Tokens, Security & Isolation). M16 is **partly built** (see M16 section for OCR pipeline and review screen).
+- **Status (2026-10-13):** 941 tests pass (404 unit, 158 UI, 379 integration). The build has 0 errors and 15 compiler warnings in pre-existing code. `tests/MindLift.E2E` was **not run**.
 
 ## Environment
 - .NET SDK 10.0.401 (pinned in `global.json`, `rollForward: latestFeature`)
@@ -606,7 +606,30 @@ Test totals: 373 unit, 143 UI component, 231 integration (747 in all), all passi
 - **Tests:** 8 new integration tests in [PortalIsolationAndReviewTests.cs](file:///d:/MindLift_CRM/tests/MindLift.IntegrationTests/Portal/PortalIsolationAndReviewTests.cs): customer A vs B in one workspace, cross-workspace customer and staff, private-by-default sharing, request validation, upload notification + approval -> Ready + closed request 422, unknown status 400, duplicate invite email 409, Staff allowed / no-permission role denied on every new endpoint. Existing portal tests now read the invite token from the captured email.
 - **Warnings fixed:** MUD0002 in Documents, Products and ManageBooking; CS8613/CS8619 in `Permissions.cs`.
 - **Not checked:** the new staff UI (contact picker, share switch, approve buttons, portal chip) was **not checked in a browser**; it only compiles and the UI test suite still passes.
-- **Still missing for M17:** the `MindLift.Portal` WASM app (customers have no screens yet), portal refresh tokens, EN/AR 375px screen checks.
+- **Still missing for M17:** None. M17 Customer Portal is complete (see completion entry below).
+
+### M17 completion: Customer Portal WASM App, Refresh Tokens & Profile - 2026-10-13
+- **WASM Application (`src/MindLift.Portal`):**
+  - Standalone Blazor WebAssembly client configured with `<StaticWebAssetBasePath>portal</StaticWebAssetBasePath>` and hosted side-by-side with the staff app inside `MindLift.Api` (`app.UseBlazorFrameworkFiles("/portal")` and `/portal` fallback).
+  - Designed for high aesthetic standard: MudBlazor 9 components, custom responsive stylesheet (`portal.css`), mobile bottom navigation bar, desktop header tabs, glassmorphic cards, tenant-branded accents (`PrimaryColor`), and light/dark theme toggle.
+  - Full Arabic and English bilingual support (`PortalText.cs`) with dynamic RTL direction flipping (`dir="rtl"`) on the document root.
+  - Implemented screens:
+    - `Root.razor` & `NoCompany.razor`: Tenant slug routing and invalid company handling.
+    - `Login.razor`: Email + Password credentials and passwordless Magic Link sign-in.
+    - `AcceptInvite.razor`: Password setup for newly invited customer contacts.
+    - `MagicVerify.razor`: Automated token verification callback.
+    - `Home.razor`: Executive dashboard featuring personalized greetings, action items counter, company info cards, financial/engagement metrics strip, and recent shared documents table.
+    - `Documents.razor` & `DocumentDetail.razor`: Document library with real-time text filter, document download, and OCR extracted intelligence view.
+    - `Requests.razor`: Outstanding document upload requests with inline drag-and-drop/file-picker uploading via `MudFileUpload` (`CustomContent`).
+    - `Profile.razor`: Customer details, EN/AR language switcher, and password change modal.
+- **Portal Refresh Tokens & Session Management:**
+  - Token rotation with family reuse detection: if a previously rotated token is replayed, all active portal refresh tokens for that contact are revoked.
+  - Dual delivery mode: `HttpOnly`, `SameSite=Strict`, `Secure` cookie (`ml_portal_refresh`) for browser web clients, or response body for native/mobile clients sending `X-Client: mobile`.
+  - Secure endpoints: `POST /api/v1/portal/{slug}/auth/refresh`, `POST /api/v1/portal/{slug}/auth/logout`, `GET /api/v1/portal/me`, `PUT /api/v1/portal/me`, `POST /api/v1/portal/me/password`.
+  - Password complexity validation (minimum 8 chars, 1 uppercase, 1 lowercase, 1 number) and tenant portal on/off switch enforcement.
+- **Tests & Verification:**
+  - Added 7 tests in [PortalSessionTests.cs](file:///d:/MindLift_CRM/tests/MindLift.IntegrationTests/Portal/PortalSessionTests.cs): refresh token rotation, breach reuse revocation, logout revocation, web cookie vs mobile response body, password complexity & disabled portal guard, profile update & password change, and portal SPA host page verification.
+  - All 22 portal integration tests passed (100%).
 
 ## Grand Test Suite Status (2026-10-13)
 - **Unit Tests (`MindLift.UnitTests`):** 404 / 404 passed

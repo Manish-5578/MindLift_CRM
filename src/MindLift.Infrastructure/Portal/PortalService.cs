@@ -60,6 +60,7 @@ public sealed class PortalService(
             ?? throw new NotFoundException("Tenant", tenantSlug);
 
         using var scope = tenant.Use(t.Id);
+        await EnsurePortalEnabledAsync(t.Id, ct);
 
         var normEmail = req.Email.Trim().ToUpperInvariant();
         var user = await db.PortalUsers
@@ -90,37 +91,7 @@ public sealed class PortalService(
 
         user.FailedLoginCount = 0;
         user.LastLoginAt = DateTime.UtcNow;
-
-        var contact = await db.Contacts
-            .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(c => c.Id == user.ContactId && c.TenantId == t.Id && !c.IsDeleted, ct)
-            ?? throw new NotFoundException("Contact", user.ContactId);
-
-        var account = user.AccountId.HasValue
-            ? await db.Accounts.IgnoreQueryFilters().FirstOrDefaultAsync(a => a.Id == user.AccountId.Value && !a.IsDeleted, ct)
-            : null;
-
-        await db.SaveChangesAsync(ct);
-
-        var customerName = $"{contact.FirstName} {contact.LastName}".Trim();
-        var (accessToken, _) = tokenService.CreatePortalAccessToken(
-            user.Id,
-            t.Id,
-            contact.Id,
-            account?.Id,
-            user.Email,
-            customerName,
-            user.Language);
-
-        return new PortalLoginResponse(
-            AccessToken: accessToken,
-            PortalUserId: user.Id,
-            ContactId: contact.Id,
-            AccountId: account?.Id,
-            CustomerName: customerName,
-            AccountName: account?.Name,
-            Language: user.Language
-        );
+        return await IssueAsync(t.Id, user, ct);
     }
 
     public async Task SendMagicLinkAsync(string tenantSlug, PortalMagicLinkRequest req, CancellationToken ct = default)
@@ -184,6 +155,7 @@ public sealed class PortalService(
             ?? throw new NotFoundException("Tenant", tenantSlug);
 
         using var scope = tenant.Use(t.Id);
+        await EnsurePortalEnabledAsync(t.Id, ct);
 
         var hash = TokenService.Hash(req.Token.Trim());
         var token = await db.PortalTokens
@@ -202,36 +174,13 @@ public sealed class PortalService(
             ?? throw new NotFoundException("User", token.PortalUserId);
 
         user.LastLoginAt = DateTime.UtcNow;
-        await db.SaveChangesAsync(ct);
+        if (!user.IsActive)
+        {
+            await db.SaveChangesAsync(ct);
+            throw new UnauthorizedException("account_inactive", "Your portal account is deactivated.");
+        }
 
-        var contact = await db.Contacts
-            .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(c => c.Id == user.ContactId && !c.IsDeleted, ct)
-            ?? throw new NotFoundException("Contact", user.ContactId);
-
-        var account = user.AccountId.HasValue
-            ? await db.Accounts.IgnoreQueryFilters().FirstOrDefaultAsync(a => a.Id == user.AccountId.Value && !a.IsDeleted, ct)
-            : null;
-
-        var customerName = $"{contact.FirstName} {contact.LastName}".Trim();
-        var (accessToken, _) = tokenService.CreatePortalAccessToken(
-            user.Id,
-            t.Id,
-            contact.Id,
-            account?.Id,
-            user.Email,
-            customerName,
-            user.Language);
-
-        return new PortalLoginResponse(
-            AccessToken: accessToken,
-            PortalUserId: user.Id,
-            ContactId: contact.Id,
-            AccountId: account?.Id,
-            CustomerName: customerName,
-            AccountName: account?.Name,
-            Language: user.Language
-        );
+        return await IssueAsync(t.Id, user, ct);
     }
 
     public async Task<PortalLoginResponse> AcceptInviteAsync(string tenantSlug, AcceptPortalInviteRequest req, CancellationToken ct = default)
@@ -242,6 +191,8 @@ public sealed class PortalService(
             ?? throw new NotFoundException("Tenant", tenantSlug);
 
         using var scope = tenant.Use(t.Id);
+        await EnsurePortalEnabledAsync(t.Id, ct);
+        ValidatePassword(req.Password);
 
         var hash = TokenService.Hash(req.Token.Trim());
         var token = await db.PortalTokens
@@ -264,26 +215,166 @@ public sealed class PortalService(
         user.LastLoginAt = DateTime.UtcNow;
         user.IsActive = true;
 
-        await db.SaveChangesAsync(ct);
+        return await IssueAsync(t.Id, user, ct);
+    }
 
-        var contact = await db.Contacts
-            .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(c => c.Id == user.ContactId && !c.IsDeleted, ct)
+    public async Task<PortalLoginResponse> RefreshAsync(string tenantSlug, string refreshToken, CancellationToken ct = default)
+    {
+        var t = await db.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Slug == tenantSlug, ct)
+            ?? throw new UnauthorizedException("invalid_refresh_token", "Your session has ended. Please sign in again.");
+
+        using var scope = tenant.Use(t.Id);
+        await EnsurePortalEnabledAsync(t.Id, ct);
+
+        var hash = TokenService.Hash(refreshToken.Trim());
+        var token = await db.PortalTokens.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(x => x.TenantId == t.Id && x.TokenHash == hash && x.Purpose == RefreshPurpose && !x.IsDeleted, ct)
+            ?? throw new UnauthorizedException("invalid_refresh_token", "Your session has ended. Please sign in again.");
+
+        if (token.UsedAt.HasValue)
+        {
+            // A rotated token came back: someone else may hold a copy. End every session for this customer.
+            await RevokeRefreshTokensAsync(t.Id, token.PortalUserId, ct);
+            throw new UnauthorizedException("refresh_token_reused", "Your session has ended. Please sign in again.");
+        }
+
+        if (token.ExpiresAt < DateTime.UtcNow)
+        {
+            throw new UnauthorizedException("invalid_refresh_token", "Your session has ended. Please sign in again.");
+        }
+
+        var user = await db.PortalUsers.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Id == token.PortalUserId && u.TenantId == t.Id && !u.IsDeleted, ct);
+        if (user is null || !user.IsActive)
+        {
+            throw new UnauthorizedException("account_inactive", "Your portal account is deactivated.");
+        }
+
+        token.UsedAt = DateTime.UtcNow;
+        return await IssueAsync(t.Id, user, ct);
+    }
+
+    public async Task LogoutAsync(string tenantSlug, string refreshToken, CancellationToken ct = default)
+    {
+        var t = await db.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Slug == tenantSlug, ct);
+        if (t is null) return;
+
+        using var scope = tenant.Use(t.Id);
+        var hash = TokenService.Hash(refreshToken.Trim());
+        var token = await db.PortalTokens.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(x => x.TenantId == t.Id && x.TokenHash == hash && x.Purpose == RefreshPurpose && !x.IsDeleted, ct);
+        if (token is { UsedAt: null })
+        {
+            token.UsedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync(ct);
+        }
+    }
+
+    public async Task<PortalProfileDto> GetProfileAsync(Guid portalUserId, CancellationToken ct = default)
+    {
+        var user = await db.PortalUsers.AsNoTracking().FirstOrDefaultAsync(u => u.Id == portalUserId && !u.IsDeleted, ct)
+            ?? throw new NotFoundException("PortalUser", portalUserId);
+        var contact = await db.Contacts.AsNoTracking().FirstOrDefaultAsync(c => c.Id == user.ContactId && !c.IsDeleted, ct)
             ?? throw new NotFoundException("Contact", user.ContactId);
-
-        var account = user.AccountId.HasValue
-            ? await db.Accounts.IgnoreQueryFilters().FirstOrDefaultAsync(a => a.Id == user.AccountId.Value && !a.IsDeleted, ct)
+        var accountName = user.AccountId.HasValue
+            ? await db.Accounts.AsNoTracking().Where(a => a.Id == user.AccountId.Value).Select(a => a.Name).FirstOrDefaultAsync(ct)
             : null;
 
+        return new PortalProfileDto(contact.FirstName, contact.LastName, user.Email, contact.Phone, accountName, user.Language, user.LastLoginAt);
+    }
+
+    public async Task<PortalProfileDto> UpdateProfileAsync(Guid portalUserId, UpdatePortalProfileRequest req, CancellationToken ct = default)
+    {
+        if (req.Language is not ("en" or "ar"))
+        {
+            throw new ValidationException(new Dictionary<string, string[]> { ["language"] = ["Language must be en or ar."] });
+        }
+
+        var user = await db.PortalUsers.FirstOrDefaultAsync(u => u.Id == portalUserId && !u.IsDeleted, ct)
+            ?? throw new NotFoundException("PortalUser", portalUserId);
+        user.Language = req.Language;
+        await db.SaveChangesAsync(ct);
+        return await GetProfileAsync(portalUserId, ct);
+    }
+
+    public async Task ChangePasswordAsync(Guid portalUserId, ChangePortalPasswordRequest req, CancellationToken ct = default)
+    {
+        ValidatePassword(req.NewPassword);
+        var user = await db.PortalUsers.FirstOrDefaultAsync(u => u.Id == portalUserId && !u.IsDeleted, ct)
+            ?? throw new NotFoundException("PortalUser", portalUserId);
+
+        if (string.IsNullOrEmpty(user.PasswordHash)
+            || Hasher.VerifyHashedPassword(user, user.PasswordHash, req.CurrentPassword) == PasswordVerificationResult.Failed)
+        {
+            throw new ValidationException(new Dictionary<string, string[]> { ["currentPassword"] = ["The current password is not correct."] });
+        }
+
+        user.PasswordHash = Hasher.HashPassword(user, req.NewPassword);
+        await db.SaveChangesAsync(ct);
+    }
+
+    private const string RefreshPurpose = "Refresh";
+    private const int RefreshDays = 30;
+    private const int MinPasswordLength = 8;
+
+    private static void ValidatePassword(string? password)
+    {
+        if (string.IsNullOrEmpty(password) || password.Length < MinPasswordLength)
+        {
+            throw new ValidationException(new Dictionary<string, string[]> { ["password"] = [$"Use at least {MinPasswordLength} characters."] });
+        }
+    }
+
+    /// <summary>Sign-in and refresh are refused while the workspace has switched its portal off.</summary>
+    private async Task EnsurePortalEnabledAsync(Guid tenantId, CancellationToken ct)
+    {
+        var enabled = await db.PortalSettings.IgnoreQueryFilters()
+            .Where(s => s.TenantId == tenantId && !s.IsDeleted)
+            .Select(s => (bool?)s.IsEnabled)
+            .FirstOrDefaultAsync(ct) ?? true;
+        if (!enabled)
+        {
+            throw new ForbiddenException("The customer portal is switched off for this company.", "portal_disabled");
+        }
+    }
+
+    private async Task RevokeRefreshTokensAsync(Guid tenantId, Guid portalUserId, CancellationToken ct)
+    {
+        var live = await db.PortalTokens.IgnoreQueryFilters()
+            .Where(x => x.TenantId == tenantId && x.PortalUserId == portalUserId && x.Purpose == RefreshPurpose && x.UsedAt == null && !x.IsDeleted)
+            .ToListAsync(ct);
+        foreach (var item in live)
+        {
+            item.UsedAt = DateTime.UtcNow;
+        }
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Saves pending changes, then returns a new access token and a new single-use refresh token.</summary>
+    private async Task<PortalLoginResponse> IssueAsync(Guid tenantId, PortalUser user, CancellationToken ct)
+    {
+        var contact = await db.Contacts.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(c => c.Id == user.ContactId && c.TenantId == tenantId && !c.IsDeleted, ct)
+            ?? throw new UnauthorizedException("account_inactive", "Your portal account is no longer linked to a contact.");
+
+        var account = user.AccountId.HasValue
+            ? await db.Accounts.IgnoreQueryFilters().FirstOrDefaultAsync(a => a.Id == user.AccountId.Value && a.TenantId == tenantId && !a.IsDeleted, ct)
+            : null;
+
+        var refreshPlain = TokenService.NewRefreshToken();
+        db.PortalTokens.Add(new PortalToken
+        {
+            TenantId = tenantId,
+            PortalUserId = user.Id,
+            Purpose = RefreshPurpose,
+            TokenHash = TokenService.Hash(refreshPlain),
+            ExpiresAt = DateTime.UtcNow.AddDays(RefreshDays)
+        });
+        await db.SaveChangesAsync(ct);
+
         var customerName = $"{contact.FirstName} {contact.LastName}".Trim();
-        var (accessToken, _) = tokenService.CreatePortalAccessToken(
-            user.Id,
-            t.Id,
-            contact.Id,
-            account?.Id,
-            user.Email,
-            customerName,
-            user.Language);
+        var (accessToken, expiresAt) = tokenService.CreatePortalAccessToken(
+            user.Id, tenantId, contact.Id, account?.Id, user.Email, customerName, user.Language);
 
         return new PortalLoginResponse(
             AccessToken: accessToken,
@@ -292,8 +383,9 @@ public sealed class PortalService(
             AccountId: account?.Id,
             CustomerName: customerName,
             AccountName: account?.Name,
-            Language: user.Language
-        );
+            Language: user.Language,
+            ExpiresAtUtc: expiresAt,
+            RefreshToken: refreshPlain);
     }
 
     public async Task<PortalHomeDto> GetHomeAsync(Guid portalUserId, Guid contactId, Guid? accountId, CancellationToken ct = default)

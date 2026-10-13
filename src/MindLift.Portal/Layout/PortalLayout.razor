@@ -1,0 +1,129 @@
+﻿@inherits LayoutComponentBase
+@inject PortalSession Session
+@inject PortalText T
+@inject NavigationManager Nav
+@implements IDisposable
+
+<MudThemeProvider Theme="_theme" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudRTLProvider RightToLeft="T.IsArabic">
+    @if (Session.IsSignedIn && Session.Slug is not null)
+    {
+        <div class="pt-shell">
+            <header class="pt-topbar">
+                <a class="pt-brand" href="@Session.Slug" aria-label='@T["nav.home"]'>
+                    @if (!string.IsNullOrWhiteSpace(Session.Branding?.LogoUrl))
+                    {
+                        <img src="@Session.Branding!.LogoUrl" alt="" class="pt-brand__logo" />
+                    }
+                    else
+                    {
+                        <span class="pt-brand__mark">@Initial</span>
+                    }
+                    <span class="pt-brand__text">
+                        <span class="pt-brand__name">@Session.Branding?.TenantName</span>
+                        <span class="pt-brand__sub">@T["app.name"]</span>
+                    </span>
+                </a>
+
+                <nav class="pt-tabs" aria-label='@T["app.name"]'>
+                    @foreach (var item in NavItems)
+                    {
+                        <NavLink class="pt-tab" href="@item.Href" Match="@item.Match" ActiveClass="pt-tab--active">
+                            <MudIcon Icon="@item.Icon" Size="Size.Small" />
+                            <span>@T[item.Key]</span>
+                        </NavLink>
+                    }
+                </nav>
+
+                <div class="pt-topbar__actions">
+                    <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="ToggleLanguage" id="portal-lang">@T["lang.toggle"]</MudButton>
+                    <MudMenu Icon="@Icons.Material.Outlined.AccountCircle" AriaLabel='@T["nav.profile"]' Dense="true" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+                        <MudText Typo="Typo.body2" Class="px-4 py-2" Style="font-weight:600">@Session.User?.CustomerName</MudText>
+                        <MudDivider />
+                        <MudMenuItem Href="@ProfileHref" Icon="@Icons.Material.Outlined.Person">@T["nav.profile"]</MudMenuItem>
+                        <MudMenuItem OnClick="SignOutAsync" Icon="@Icons.Material.Outlined.Logout">@T["nav.signout"]</MudMenuItem>
+                    </MudMenu>
+                </div>
+            </header>
+
+            <main class="pt-main">
+                @Body
+            </main>
+
+            <nav class="pt-bottomnav" aria-label='@T["app.name"]'>
+                @foreach (var item in NavItems)
+                {
+                    <NavLink class="pt-bottomnav__item" href="@item.Href" Match="@item.Match" ActiveClass="pt-bottomnav__item--active">
+                        <MudIcon Icon="@item.Icon" />
+                        <span>@T[item.Key]</span>
+                    </NavLink>
+                }
+            </nav>
+        </div>
+    }
+    else
+    {
+        <div class="pt-auth">
+            <div class="pt-auth__glow" aria-hidden="true"></div>
+            <div class="pt-auth__lang">
+                <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="ToggleLanguage" id="portal-lang-auth">@T["lang.toggle"]</MudButton>
+            </div>
+            @Body
+        </div>
+    }
+</MudRTLProvider>
+
+@code {
+    private MudTheme _theme = MindLiftTheme.Create();
+    private string? _appliedColor;
+
+    private sealed record NavItem(string Key, string Href, string Icon, NavLinkMatch Match);
+
+    private string Initial => string.IsNullOrWhiteSpace(Session.Branding?.TenantName) ? "M" : Session.Branding!.TenantName[..1].ToUpperInvariant();
+    private string ProfileHref => $"{Session.Slug}/profile";
+
+    private IEnumerable<NavItem> NavItems =>
+    [
+        new("nav.home", Session.Slug ?? string.Empty, Icons.Material.Outlined.Home, NavLinkMatch.All),
+        new("nav.documents", $"{Session.Slug}/documents", Icons.Material.Outlined.FolderOpen, NavLinkMatch.Prefix),
+        new("nav.requests", $"{Session.Slug}/requests", Icons.Material.Outlined.AssignmentTurnedIn, NavLinkMatch.Prefix),
+        new("nav.profile", $"{Session.Slug}/profile", Icons.Material.Outlined.Person, NavLinkMatch.Prefix),
+    ];
+
+    protected override void OnInitialized()
+    {
+        Session.Changed += OnChanged;
+        T.Changed += OnChanged;
+    }
+
+    private void OnChanged()
+    {
+        var color = Session.Branding?.PrimaryColor;
+        if (color != _appliedColor)
+        {
+            _appliedColor = color;
+            _theme = MindLiftTheme.Create(color);
+        }
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    private Task ToggleLanguage() => T.SetLanguageAsync(T.IsArabic ? "en" : "ar");
+
+    private async Task SignOutAsync()
+    {
+        var slug = Session.Slug;
+        await Session.SignOutAsync();
+        Nav.NavigateTo($"{slug}/login");
+    }
+
+    public void Dispose()
+    {
+        Session.Changed -= OnChanged;
+        T.Changed -= OnChanged;
+    }
+}

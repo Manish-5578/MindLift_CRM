@@ -1,0 +1,155 @@
+@page "/{Slug}/documents/{Id:guid}"
+@inherits PortalPageBase
+
+<PageTitle>@(_doc?.FileName ?? T["nav.documents"]) · @Session.Branding?.TenantName</PageTitle>
+
+<div class="pt-container pt-container--narrow pt-fade-in">
+    <div class="mb-4">
+        <MudButton Variant="Variant.Text" StartIcon="@(T.IsArabic ? Icons.Material.Outlined.ArrowForward : Icons.Material.Outlined.ArrowBack)"
+                   Href='@Link("documents")' Size="Size.Small">
+            @T["docs.back"]
+        </MudButton>
+    </div>
+
+    @if (_loading)
+    {
+        <div class="d-flex justify-center pa-12">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        </div>
+    }
+    else if (_doc is null)
+    {
+        <div class="pt-card pt-empty">
+            <MudIcon Icon="@Icons.Material.Outlined.ErrorOutline" Size="Size.Large" Color="Color.Error" />
+            <p class="pt-empty__text">@T["docs.notFound"]</p>
+        </div>
+    }
+    else
+    {
+        <div class="pt-card pt-doc-detail">
+            <div class="d-flex align-center justify-space-between flex-wrap gap-2 mb-4">
+                <div class="d-flex align-center gap-3">
+                    <MudAvatar Color="Color.Primary" Variant="Variant.Filled" Size="Size.Medium">
+                        <MudIcon Icon="@FileIcon(_doc.ContentType)" />
+                    </MudAvatar>
+                    <div>
+                        <h1 class="pt-doc-detail__title">@_doc.FileName</h1>
+                        <span class="pt-doc-detail__sub">@_doc.Category · @FormatBytes(_doc.FileSizeBytes)</span>
+                    </div>
+                </div>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Download"
+                           Href='@($"api/v1/portal/documents/{_doc.Id}/file")' Target="_blank">
+                    @T["docs.download"]
+                </MudButton>
+            </div>
+
+            <MudDivider Class="my-4" />
+
+            <div class="pt-meta-grid">
+                <div class="pt-meta-item">
+                    <span class="pt-meta-label">@T["docs.status"]</span>
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="@DocStatusColor(_doc.Status)">
+                        @T.Status(_doc.Status)
+                    </MudChip>
+                </div>
+                <div class="pt-meta-item">
+                    <span class="pt-meta-label">@T["docs.category"]</span>
+                    <span class="pt-meta-val">@_doc.Category</span>
+                </div>
+                <div class="pt-meta-item">
+                    <span class="pt-meta-label">@T["docs.uploaded"]</span>
+                    <span class="pt-meta-val">@_doc.UploadedAt.ToString("MMM dd, yyyy HH:mm")</span>
+                </div>
+                @if (_doc.ExpiryDate.HasValue)
+                {
+                    <div class="pt-meta-item">
+                        <span class="pt-meta-label">@T["docs.expiry"]</span>
+                        <span class="pt-meta-val">@_doc.ExpiryDate.Value.ToString("MMM dd, yyyy")</span>
+                    </div>
+                }
+            </div>
+
+            @if (_doc.OcrResult is not null)
+            {
+                <MudDivider Class="my-4" />
+                <h2 class="pt-section__title mb-3">@T["home.keyInfo"]</h2>
+                <div class="pt-grid pt-grid--fields mb-3">
+                    @if (!string.IsNullOrWhiteSpace(_doc.OcrResult.DetectedVendor))
+                    {
+                        <div class="pt-card pt-card--sub">
+                            <span class="pt-meta-label">Vendor</span>
+                            <span class="pt-meta-val">@_doc.OcrResult.DetectedVendor</span>
+                        </div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_doc.OcrResult.DetectedInvoiceNumber))
+                    {
+                        <div class="pt-card pt-card--sub">
+                            <span class="pt-meta-label">Doc / Invoice #</span>
+                            <span class="pt-meta-val">#@_doc.OcrResult.DetectedInvoiceNumber</span>
+                        </div>
+                    }
+                    @if (_doc.OcrResult.DetectedTotal.HasValue)
+                    {
+                        <div class="pt-card pt-card--sub">
+                            <span class="pt-meta-label">Amount</span>
+                            <span class="pt-meta-val" style="color:var(--mud-palette-success)">@_doc.OcrResult.DetectedTotal.Value.ToString("N2")</span>
+                        </div>
+                    }
+                    @if (_doc.OcrResult.DetectedDate.HasValue)
+                    {
+                        <div class="pt-card pt-card--sub">
+                            <span class="pt-meta-label">Document Date</span>
+                            <span class="pt-meta-val">@_doc.OcrResult.DetectedDate.Value.ToString("MMM dd, yyyy")</span>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private BusinessDocumentDto? _doc;
+    private bool _loading = true;
+
+    protected override async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _doc = await Http.GetFromJsonAsync<BusinessDocumentDto>(Api($"documents/{Id}"));
+        }
+        catch (HttpRequestException)
+        {
+            _doc = null;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static Color DocStatusColor(string status) => status switch
+    {
+        "Ready" => Color.Success,
+        "NeedsReview" or "Processing" => Color.Warning,
+        "Rejected" => Color.Error,
+        _ => Color.Default
+    };
+
+    private static string FileIcon(string ct) => ct switch
+    {
+        var x when x.Contains("pdf") => Icons.Material.Outlined.PictureAsPdf,
+        var x when x.Contains("image") => Icons.Material.Outlined.Image,
+        _ => Icons.Material.Outlined.Description
+    };
+
+    private static string FormatBytes(long b)
+    {
+        if (b < 1024) return $"{b} B";
+        if (b < 1024 * 1024) return $"{b / 1024.0:F1} KB";
+        return $"{b / (1024.0 * 1024.0):F1} MB";
+    }
+}

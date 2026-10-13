@@ -12,6 +12,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\MindLift.Infrastructure\MindLift.Infrastructure.csproj" />
+    <ProjectReference Include="..\MindLift.Portal\MindLift.Portal.csproj" />
     <ProjectReference Include="..\MindLift.Web\MindLift.Web.csproj" />
   </ItemGroup>
   <ItemGroup>

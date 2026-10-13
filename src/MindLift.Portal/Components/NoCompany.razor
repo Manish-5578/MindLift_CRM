@@ -1,0 +1,12 @@
+@inject PortalText T
+
+<div class="pt-auth__card pt-fade-in" role="status">
+    <div class="pt-auth__icon"><MudIcon Icon="@Icons.Material.Outlined.MarkEmailRead" Size="Size.Large" /></div>
+    <h1 class="pt-auth__title">@T["app.name"]</h1>
+    <p class="pt-auth__subtitle">@(Message ?? T["common.noSlug"])</p>
+</div>
+
+@code {
+    /// <summary>Optional message; defaults to "open the portal from your email".</summary>
+    [Parameter] public string? Message { get; set; }
+}

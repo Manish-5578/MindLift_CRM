@@ -1,0 +1,136 @@
+@page "/{Slug}/documents"
+@inherits PortalPageBase
+
+<PageTitle>@T["docs.title"] · @Session.Branding?.TenantName</PageTitle>
+
+<div class="pt-container pt-fade-in">
+    <div class="pt-section__head mb-4">
+        <div>
+            <h1 class="pt-section__title">@T["docs.title"]</h1>
+            <p class="pt-hero__desc">@T["docs.subtitle"]</p>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="pt-filters mb-4">
+        <MudTextField @bind-Value="_search" Placeholder='@T["docs.search"]' Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Outlined.Search" Immediate="true" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" Class="pt-filters__search" OnKeyUp="HandleSearchKeyUp" id="doc-search" />
+
+        <MudSelect T="string" @bind-Value="_category" Variant="Variant.Outlined" Margin="Margin.Dense"
+                   Class="pt-filters__cat" SelectedValuesChanged="OnCategoryChanged" id="doc-category">
+            <MudSelectItem Value='@("")'>@T["docs.allCategories"]</MudSelectItem>
+            <MudSelectItem Value='@("Contract")'>Contract</MudSelectItem>
+            <MudSelectItem Value='@("Invoice")'>Invoice</MudSelectItem>
+            <MudSelectItem Value='@("Receipt")'>Receipt</MudSelectItem>
+            <MudSelectItem Value='@("Identity")'>Identity</MudSelectItem>
+            <MudSelectItem Value='@("General")'>General</MudSelectItem>
+        </MudSelect>
+    </div>
+
+    @if (_loading)
+    {
+        <div class="d-flex justify-center pa-12">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        </div>
+    }
+    else if (_docs.Count == 0)
+    {
+        <div class="pt-card pt-empty">
+            <MudIcon Icon="@Icons.Material.Outlined.FolderOff" Size="Size.Large" Class="ml-muted" />
+            <p class="pt-empty__text">@T["docs.empty"]</p>
+        </div>
+    }
+    else
+    {
+        <div class="pt-doc-table">
+            @foreach (var doc in _docs)
+            {
+                <div class="pt-doc-row" id="@($"doc-{doc.Id}")">
+                    <div class="pt-doc-row__icon">
+                        <MudIcon Icon="@FileIcon(doc.ContentType)" />
+                    </div>
+                    <div class="pt-doc-row__main">
+                        <a class="pt-doc-row__name" href='@Link($"documents/{doc.Id}")'>@doc.FileName</a>
+                        <span class="pt-doc-row__sub">
+                            @doc.Category · @FormatBytes(doc.FileSizeBytes) · @doc.UploadedAt.ToString("yyyy-MM-dd")
+                            @if (doc.ExpiryDate.HasValue)
+                            {
+                                <span> · @T["home.expires"] @doc.ExpiryDate.Value.ToString("yyyy-MM-dd")</span>
+                            }
+                        </span>
+                    </div>
+                    <div class="pt-doc-row__meta">
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="@DocStatusColor(doc.Status)">
+                            @T.Status(doc.Status)
+                        </MudChip>
+                    </div>
+                    <div class="pt-doc-row__action">
+                        <MudIconButton Icon="@Icons.Material.Outlined.Download" Href='@($"api/v1/portal/documents/{doc.Id}/file")'
+                                       Target="_blank" aria-label='@T["docs.download"]' Size="Size.Small" />
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<BusinessDocumentDto> _docs = [];
+    private bool _loading = true;
+    private string _search = string.Empty;
+    private string _category = string.Empty;
+
+    protected override async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var q = $"documents?category={Uri.EscapeDataString(_category)}&search={Uri.EscapeDataString(_search)}";
+            _docs = await Http.GetFromJsonAsync<List<BusinessDocumentDto>>(Api(q)) ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            _docs = [];
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void HandleSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            _ = LoadAsync();
+        }
+    }
+
+    private void OnCategoryChanged()
+    {
+        _ = LoadAsync();
+    }
+
+    private static Color DocStatusColor(string status) => status switch
+    {
+        "Ready" => Color.Success,
+        "NeedsReview" or "Processing" => Color.Warning,
+        "Rejected" => Color.Error,
+        _ => Color.Default
+    };
+
+    private static string FileIcon(string ct) => ct switch
+    {
+        var x when x.Contains("pdf") => Icons.Material.Outlined.PictureAsPdf,
+        var x when x.Contains("image") => Icons.Material.Outlined.Image,
+        _ => Icons.Material.Outlined.Description
+    };
+
+    private static string FormatBytes(long b)
+    {
+        if (b < 1024) return $"{b} B";
+        if (b < 1024 * 1024) return $"{b / 1024.0:F1} KB";
+        return $"{b / (1024.0 * 1024.0):F1} MB";
+    }
+}

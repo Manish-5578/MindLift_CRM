@@ -15,6 +15,9 @@ namespace MindLift.Api.Controllers;
 [Route("api/v1/portal")]
 public sealed class PortalAuthController(IPortalService portalService) : ControllerBase
 {
+    private const string RefreshCookieName = "ml_portal_refresh";
+    private const string MobileHeader = "X-Client";
+
     [AllowAnonymous]
     [HttpGet("{slug}/branding")]
     public async Task<ActionResult<PortalBrandingDto>> GetBranding(string slug, CancellationToken ct = default)
@@ -26,10 +29,7 @@ public sealed class PortalAuthController(IPortalService portalService) : Control
     [AllowAnonymous]
     [HttpPost("{slug}/auth/login")]
     public async Task<ActionResult<PortalLoginResponse>> Login(string slug, [FromBody] PortalLoginRequest req, CancellationToken ct = default)
-    {
-        var resp = await portalService.LoginAsync(slug, req, ct);
-        return Ok(resp);
-    }
+        => Issue(slug, await portalService.LoginAsync(slug, req, ct));
 
     [AllowAnonymous]
     [HttpPost("{slug}/auth/magic-link")]
@@ -42,18 +42,57 @@ public sealed class PortalAuthController(IPortalService portalService) : Control
     [AllowAnonymous]
     [HttpPost("{slug}/auth/magic-link/verify")]
     public async Task<ActionResult<PortalLoginResponse>> VerifyMagicLink(string slug, [FromBody] PortalMagicLinkVerifyRequest req, CancellationToken ct = default)
-    {
-        var resp = await portalService.VerifyMagicLinkAsync(slug, req, ct);
-        return Ok(resp);
-    }
+        => Issue(slug, await portalService.VerifyMagicLinkAsync(slug, req, ct));
 
     [AllowAnonymous]
     [HttpPost("{slug}/auth/accept-invite")]
     public async Task<ActionResult<PortalLoginResponse>> AcceptInvite(string slug, [FromBody] AcceptPortalInviteRequest req, CancellationToken ct = default)
+        => Issue(slug, await portalService.AcceptInviteAsync(slug, req, ct));
+
+    [AllowAnonymous]
+    [HttpPost("{slug}/auth/refresh")]
+    public async Task<ActionResult<PortalLoginResponse>> Refresh(string slug, [FromBody] PortalRefreshRequest? body, CancellationToken ct = default)
     {
-        var resp = await portalService.AcceptInviteAsync(slug, req, ct);
-        return Ok(resp);
+        var token = Request.Cookies[RefreshCookieName] ?? body?.RefreshToken
+            ?? throw new UnauthorizedException("invalid_refresh_token", "Your session has ended. Please sign in again.");
+        return Issue(slug, await portalService.RefreshAsync(slug, token, ct));
     }
+
+    [AllowAnonymous]
+    [HttpPost("{slug}/auth/logout")]
+    public async Task<IActionResult> Logout(string slug, [FromBody] PortalRefreshRequest? body, CancellationToken ct = default)
+    {
+        var token = Request.Cookies[RefreshCookieName] ?? body?.RefreshToken;
+        if (!string.IsNullOrEmpty(token))
+        {
+            await portalService.LogoutAsync(slug, token, ct);
+        }
+
+        Response.Cookies.Delete(RefreshCookieName, CookieOptionsFor(slug, DateTimeOffset.UnixEpoch));
+        return NoContent();
+    }
+
+    /// <summary>Browsers get the refresh token as an HttpOnly cookie that scripts cannot read; mobile clients get it in the body.</summary>
+    private PortalLoginResponse Issue(string slug, PortalLoginResponse result)
+    {
+        var isMobile = string.Equals(Request.Headers[MobileHeader], "mobile", StringComparison.OrdinalIgnoreCase);
+        if (isMobile || result.RefreshToken is null)
+        {
+            return result;
+        }
+
+        Response.Cookies.Append(RefreshCookieName, result.RefreshToken, CookieOptionsFor(slug, DateTimeOffset.UtcNow.AddDays(30)));
+        return result with { RefreshToken = null };
+    }
+
+    private static CookieOptions CookieOptionsFor(string slug, DateTimeOffset expires) => new()
+    {
+        HttpOnly = true,
+        Secure = true,
+        SameSite = SameSiteMode.Strict,
+        Path = $"/api/v1/portal/{Uri.EscapeDataString(slug)}/auth",
+        Expires = expires,
+    };
 }
 
 // ================= CUSTOMER PORTAL AUTHENTICATED AREA =================
@@ -81,6 +120,21 @@ public sealed class PortalCustomerController(IPortalService portalService, IDocu
     {
         var home = await portalService.GetHomeAsync(GetPortalUserId(), GetContactId(), GetAccountId(), ct);
         return Ok(home);
+    }
+
+    [HttpGet("me")]
+    public async Task<ActionResult<PortalProfileDto>> GetProfile(CancellationToken ct = default)
+        => Ok(await portalService.GetProfileAsync(GetPortalUserId(), ct));
+
+    [HttpPut("me")]
+    public async Task<ActionResult<PortalProfileDto>> UpdateProfile([FromBody] UpdatePortalProfileRequest req, CancellationToken ct = default)
+        => Ok(await portalService.UpdateProfileAsync(GetPortalUserId(), req, ct));
+
+    [HttpPost("me/password")]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePortalPasswordRequest req, CancellationToken ct = default)
+    {
+        await portalService.ChangePasswordAsync(GetPortalUserId(), req, ct);
+        return NoContent();
     }
 
     [HttpGet("documents")]

@@ -10,6 +10,11 @@ public interface IPortalService
     Task SendMagicLinkAsync(string tenantSlug, PortalMagicLinkRequest req, CancellationToken ct = default);
     Task<PortalLoginResponse> VerifyMagicLinkAsync(string tenantSlug, PortalMagicLinkVerifyRequest req, CancellationToken ct = default);
     Task<PortalLoginResponse> AcceptInviteAsync(string tenantSlug, AcceptPortalInviteRequest req, CancellationToken ct = default);
+    Task<PortalLoginResponse> RefreshAsync(string tenantSlug, string refreshToken, CancellationToken ct = default);
+    Task LogoutAsync(string tenantSlug, string refreshToken, CancellationToken ct = default);
+    Task<PortalProfileDto> GetProfileAsync(Guid portalUserId, CancellationToken ct = default);
+    Task<PortalProfileDto> UpdateProfileAsync(Guid portalUserId, UpdatePortalProfileRequest req, CancellationToken ct = default);
+    Task ChangePasswordAsync(Guid portalUserId, ChangePortalPasswordRequest req, CancellationToken ct = default);
 
     // Customer Portal Authenticated
     Task<PortalHomeDto> GetHomeAsync(Guid portalUserId, Guid contactId, Guid? accountId, CancellationToken ct = default);

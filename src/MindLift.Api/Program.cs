@@ -190,8 +190,9 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-// Staff web app (Blazor WebAssembly) served at "/".
+// Staff web app (Blazor WebAssembly) served at "/", customer portal at "/portal".
 app.UseBlazorFrameworkFiles();
+app.UseBlazorFrameworkFiles("/portal");
 app.UseStaticFiles();
 
 app.UseAuthentication();
@@ -206,6 +207,10 @@ app.MapHealthChecks("/health");
 // Unknown API and hub routes return 404 (never the SPA page).
 app.MapFallback("/api/{**rest}", context => { context.Response.StatusCode = StatusCodes.Status404NotFound; return Task.CompletedTask; });
 app.MapFallback("/hubs/{**rest}", context => { context.Response.StatusCode = StatusCodes.Status404NotFound; return Task.CompletedTask; });
+
+// Customer portal fallback:
+app.MapFallbackToFile("/portal", "portal/index.html");
+app.MapFallbackToFile("/portal/{*path:nonfile}", "portal/index.html");
 
 // SPA fallback: every other path returns index.html so the Blazor router can handle it.
 app.MapFallbackToFile("index.html");

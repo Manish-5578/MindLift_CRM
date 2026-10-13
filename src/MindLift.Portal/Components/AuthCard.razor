@@ -1,0 +1,29 @@
+@inject PortalSession Session
+
+<div class="pt-auth__card pt-fade-in">
+    <div class="pt-auth__brand">
+        @if (!string.IsNullOrWhiteSpace(Session.Branding?.LogoUrl))
+        {
+            <img src="@Session.Branding!.LogoUrl" alt="" class="pt-auth__logo" />
+        }
+        else
+        {
+            <span class="pt-brand__mark pt-brand__mark--lg">@Initial</span>
+        }
+        <span class="pt-auth__company">@Session.Branding?.TenantName</span>
+    </div>
+    <h1 class="pt-auth__title">@Title</h1>
+    @if (!string.IsNullOrWhiteSpace(Subtitle))
+    {
+        <p class="pt-auth__subtitle">@Subtitle</p>
+    }
+    @ChildContent
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private string Initial => string.IsNullOrWhiteSpace(Session.Branding?.TenantName) ? "M" : Session.Branding!.TenantName[..1].ToUpperInvariant();
+}

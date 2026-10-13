@@ -46,8 +46,28 @@ public sealed record PortalLoginResponse(
     Guid? AccountId,
     string CustomerName,
     string? AccountName,
-    string Language
+    string Language,
+    DateTime? ExpiresAtUtc = null,
+    string? RefreshToken = null
 );
+
+/// <summary>Body form of the portal refresh token, used by mobile clients. Browsers send the HttpOnly cookie.</summary>
+public sealed record PortalRefreshRequest(string? RefreshToken);
+
+/// <summary>The signed-in customer's own profile.</summary>
+public sealed record PortalProfileDto(
+    string FirstName,
+    string LastName,
+    string Email,
+    string? Phone,
+    string? AccountName,
+    string Language,
+    DateTime? LastLoginAt
+);
+
+public sealed record UpdatePortalProfileRequest(string Language);
+
+public sealed record ChangePortalPasswordRequest(string CurrentPassword, string NewPassword);
 
 public sealed record PortalMagicLinkRequest(
     string Email

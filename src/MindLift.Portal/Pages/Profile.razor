@@ -1,0 +1,229 @@
+@page "/{Slug}/profile"
+@inherits PortalPageBase
+@inject ISnackbar Snackbar
+
+<PageTitle>@T["profile.title"] · @Session.Branding?.TenantName</PageTitle>
+
+<div class="pt-container pt-container--narrow pt-fade-in">
+    <div class="pt-section__head mb-4">
+        <div>
+            <h1 class="pt-section__title">@T["profile.title"]</h1>
+        </div>
+    </div>
+
+    @if (_loading)
+    {
+        <div class="d-flex justify-center pa-12">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        </div>
+    }
+    else if (_profile is null)
+    {
+        <div class="pt-card pt-empty">
+            <MudIcon Icon="@Icons.Material.Outlined.ErrorOutline" Size="Size.Large" Color="Color.Error" />
+            <p class="pt-empty__text">@T["common.error"]</p>
+        </div>
+    }
+    else
+    {
+        <!-- Customer Info Card -->
+        <div class="pt-card mb-4">
+            <div class="d-flex align-center gap-3 mb-4">
+                <MudAvatar Color="Color.Primary" Variant="Variant.Filled" Size="Size.Large">
+                    <span style="font-weight:700">@(_profile.FirstName.Length > 0 ? _profile.FirstName[..1] : "C")</span>
+                </MudAvatar>
+                <div>
+                    <h2 class="pt-doc-detail__title">@_profile.FirstName @_profile.LastName</h2>
+                    <span class="pt-muted-text">@_profile.Email</span>
+                </div>
+            </div>
+
+            <MudDivider Class="my-3" />
+
+            <div class="pt-meta-grid">
+                @if (!string.IsNullOrWhiteSpace(_profile.AccountName))
+                {
+                    <div class="pt-meta-item">
+                        <span class="pt-meta-label">@T["profile.company"]</span>
+                        <span class="pt-meta-val">@_profile.AccountName</span>
+                    </div>
+                }
+                @if (!string.IsNullOrWhiteSpace(_profile.Phone))
+                {
+                    <div class="pt-meta-item">
+                        <span class="pt-meta-label">@T["profile.phone"]</span>
+                        <span class="pt-meta-val">@_profile.Phone</span>
+                    </div>
+                }
+                @if (_profile.LastLoginAt.HasValue)
+                {
+                    <div class="pt-meta-item">
+                        <span class="pt-meta-label">@T["profile.lastLogin"]</span>
+                        <span class="pt-meta-val">@_profile.LastLoginAt.Value.ToString("MMM dd, yyyy HH:mm")</span>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Language Preference Card -->
+        <div class="pt-card mb-4">
+            <h2 class="pt-section__title mb-3">@T["profile.language"]</h2>
+            <div class="d-flex align-center gap-4 flex-wrap">
+                <MudRadioGroup T="string" @bind-Value="_selectedLang">
+                    <MudRadio Value='@("en")' Color="Color.Primary">English</MudRadio>
+                    <MudRadio Value='@("ar")' Color="Color.Primary">العربية</MudRadio>
+                </MudRadioGroup>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                           OnClick="SaveLanguageAsync" Disabled="@(_savingLang || _selectedLang == _profile.Language)" id="save-lang">
+                    @if (_savingLang) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="me-1" /> }
+                    @T["profile.saveLanguage"]
+                </MudButton>
+            </div>
+        </div>
+
+        <!-- Change Password Card -->
+        <div class="pt-card mb-4">
+            <h2 class="pt-section__title mb-3">@T["profile.password"]</h2>
+            @if (!string.IsNullOrEmpty(_pwdError))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3" id="pwd-error">@_pwdError</MudAlert>
+            }
+
+            <EditForm Model="this" OnSubmit="ChangePasswordAsync" class="pt-form">
+                <MudTextField @bind-Value="_currentPassword" Label='@T["profile.current"]' InputType="InputType.Password"
+                              Variant="Variant.Outlined" Required="true" autocomplete="current-password" id="profile-current-pwd" />
+                <MudTextField @bind-Value="_newPassword" Label='@T["profile.new"]' InputType="InputType.Password"
+                              Variant="Variant.Outlined" Required="true" autocomplete="new-password" id="profile-new-pwd" />
+
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Medium"
+                           Disabled="@(_savingPwd || string.IsNullOrEmpty(_currentPassword) || string.IsNullOrEmpty(_newPassword))"
+                           id="profile-pwd-submit">
+                    @if (_savingPwd) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="me-1" /> }
+                    @T["profile.changePassword"]
+                </MudButton>
+            </EditForm>
+        </div>
+
+        <!-- Support Info Card -->
+        @if (!string.IsNullOrWhiteSpace(Session.Branding?.SupportEmail) || !string.IsNullOrWhiteSpace(Session.Branding?.SupportPhone))
+        {
+            <div class="pt-card">
+                <h2 class="pt-section__title mb-2">@T["profile.support"]</h2>
+                <div class="d-flex flex-column gap-1">
+                    @if (!string.IsNullOrWhiteSpace(Session.Branding?.SupportEmail))
+                    {
+                        <div class="d-flex align-center gap-2">
+                            <MudIcon Icon="@Icons.Material.Outlined.Email" Size="Size.Small" Class="ml-muted" />
+                            <a href="mailto:@Session.Branding!.SupportEmail" class="pt-link">@Session.Branding!.SupportEmail</a>
+                        </div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(Session.Branding?.SupportPhone))
+                    {
+                        <div class="d-flex align-center gap-2">
+                            <MudIcon Icon="@Icons.Material.Outlined.Phone" Size="Size.Small" Class="ml-muted" />
+                            <a href="tel:@Session.Branding!.SupportPhone" class="pt-link">@Session.Branding!.SupportPhone</a>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private PortalProfileDto? _profile;
+    private bool _loading = true;
+    private string _selectedLang = "en";
+    private bool _savingLang;
+
+    private string _currentPassword = string.Empty;
+    private string _newPassword = string.Empty;
+    private bool _savingPwd;
+    private string? _pwdError;
+
+    protected override async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _profile = await Http.GetFromJsonAsync<PortalProfileDto>(Api("me"));
+            if (_profile is not null)
+            {
+                _selectedLang = _profile.Language;
+            }
+        }
+        catch (HttpRequestException)
+        {
+            _profile = null;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SaveLanguageAsync()
+    {
+        if (_profile is null || _selectedLang == _profile.Language) return;
+        _savingLang = true;
+        try
+        {
+            var req = new UpdatePortalProfileRequest(_selectedLang);
+            var resp = await Http.PutAsJsonAsync(Api("me"), req);
+            if (resp.IsSuccessStatusCode)
+            {
+                _profile = await resp.Content.ReadFromJsonAsync<PortalProfileDto>();
+                await T.SetLanguageAsync(_selectedLang);
+                Snackbar.Add(T["profile.saved"], Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add(T["common.error"], Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _savingLang = false;
+        }
+    }
+
+    private async Task ChangePasswordAsync()
+    {
+        if (string.IsNullOrEmpty(_currentPassword) || string.IsNullOrEmpty(_newPassword)) return;
+        if (_newPassword.Length < 8)
+        {
+            _pwdError = T["invite.short"];
+            return;
+        }
+
+        _savingPwd = true;
+        _pwdError = null;
+        try
+        {
+            var req = new ChangePortalPasswordRequest(_currentPassword, _newPassword);
+            var resp = await Http.PostAsJsonAsync(Api("me/password"), req);
+            if (resp.IsSuccessStatusCode)
+            {
+                Snackbar.Add(T["profile.passwordChanged"], Severity.Success);
+                _currentPassword = string.Empty;
+                _newPassword = string.Empty;
+            }
+            else
+            {
+                _pwdError = await DetailAsync(resp, T["profile.passwordWrong"]);
+            }
+        }
+        catch (Exception ex)
+        {
+            _pwdError = ex.Message;
+        }
+        finally
+        {
+            _savingPwd = false;
+        }
+    }
+}

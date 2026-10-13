@@ -1,0 +1,104 @@
+@page "/{Slug}/accept-invite"
+@inherits PortalPageBase
+
+<PageTitle>@T["invite.title"] · @Session.Branding?.TenantName</PageTitle>
+
+@if (!Ready)
+{
+    <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+}
+else if (UnknownCompany)
+{
+    <NoCompany Message='@T["login.unknownCompany"]' />
+}
+else if (string.IsNullOrWhiteSpace(Token))
+{
+    <AuthCard Title='@T["invite.title"]' Subtitle='@T["invite.missing"]'>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Href='@Link("login")' Class="mt-4">
+            @T["magic.back"]
+        </MudButton>
+    </AuthCard>
+}
+else
+{
+    <AuthCard Title='@T["invite.title"]' Subtitle='@T["invite.subtitle"]'>
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3" id="invite-error">@_error</MudAlert>
+        }
+
+        <EditForm Model="this" OnSubmit="SubmitAsync" class="pt-form">
+            <MudTextField @bind-Value="_password" Label='@T["invite.password"]' InputType="InputType.Password" Variant="Variant.Outlined"
+                          Required="true" autocomplete="new-password" id="invite-password" Immediate="true" />
+            <MudTextField @bind-Value="_confirm" Label='@T["invite.confirm"]' InputType="InputType.Password" Variant="Variant.Outlined"
+                          Required="true" autocomplete="new-password" id="invite-confirm" Immediate="true" />
+
+            <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" FullWidth="true"
+                       Disabled="@(_busy || !CanSubmit)" Class="pt-cta" id="invite-submit">
+                @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="me-2" /> }
+                @T["invite.submit"]
+            </MudButton>
+        </EditForm>
+    </AuthCard>
+}
+
+@code {
+    protected override bool RequiresSignIn => false;
+
+    [SupplyParameterFromQuery] public string? Token { get; set; }
+
+    private string _password = string.Empty;
+    private string _confirm = string.Empty;
+    private bool _busy;
+    private string? _error;
+
+    private bool CanSubmit => !string.IsNullOrEmpty(_password) && !string.IsNullOrEmpty(_confirm);
+
+    private async Task SubmitAsync()
+    {
+        if (!CanSubmit) return;
+        if (_password.Length < 8)
+        {
+            _error = T["invite.short"];
+            return;
+        }
+
+        if (_password != _confirm)
+        {
+            _error = T["invite.mismatch"];
+            return;
+        }
+
+        _busy = true;
+        _error = null;
+        try
+        {
+            var req = new AcceptPortalInviteRequest(Token!, _password);
+            var resp = await Session.Anonymous.PostAsJsonAsync(Api($"{Uri.EscapeDataString(Slug)}/auth/accept-invite"), req);
+            if (resp.IsSuccessStatusCode)
+            {
+                var login = await resp.Content.ReadFromJsonAsync<PortalLoginResponse>();
+                if (login is not null)
+                {
+                    await CompleteSignInAsync(login);
+                    return;
+                }
+            }
+
+            _error = await ErrorCodeAsync(resp) switch
+            {
+                "portal_disabled" => T["login.disabled"],
+                "expired_token" or "invalid_token" => T["invite.failed"],
+                _ => await DetailAsync(resp, T["invite.failed"])
+            };
+        }
+        catch (HttpRequestException)
+        {
+            _error = T["common.error"];
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}
