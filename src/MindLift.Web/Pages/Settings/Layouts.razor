@@ -3,8 +3,9 @@
 @inject AppState App
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
+@inject Translator T
 
-<PageTitle>Fields & layouts · MindLift</PageTitle>
+<PageTitle>@T["Fields & layouts"] · MindLift</PageTitle>
 
 <div class="ml-page ml-page--form">
     <PageHeader Title="Fields & layouts" Subtitle="Choose which fields appear on each record form and detail page, in what order, and in which section." />
@@ -12,15 +13,15 @@
 
     <MlCard Class="mb-4" TestId="layout-picker">
         <div class="ml-row ml-row--wrap">
-            <MudSelect T="string" Value="_entity" ValueChanged="OnPickerChangedAsync" Label="Record type" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:200px" data-testid="entity-select">
+            <MudSelect T="string" Value="_entity" ValueChanged="OnPickerChangedAsync" Label="@T["Record type"]" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:200px" data-testid="entity-select">
                 @foreach (var (key, label) in Entities)
                 {
                     <MudSelectItem T="string" Value="@key">@label</MudSelectItem>
                 }
             </MudSelect>
-            <MudSelect T="string" Value="_kind" ValueChanged="OnKindChangedAsync" Label="Layout" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:200px" data-testid="kind-select">
-                <MudSelectItem T="string" Value="KindForm">Create and edit form</MudSelectItem>
-                <MudSelectItem T="string" Value="KindDetail">Record page</MudSelectItem>
+            <MudSelect T="string" Value="_kind" ValueChanged="OnKindChangedAsync" Label="@T["Layout"]" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:200px" data-testid="kind-select">
+                <MudSelectItem T="string" Value="KindForm">@T["Create and edit form"]</MudSelectItem>
+                <MudSelectItem T="string" Value="KindDetail">@T["Record page"]</MudSelectItem>
             </MudSelect>
         </div>
     </MlCard>
@@ -39,19 +40,19 @@
         {
             <MlCard Class="mb-4" TestId="layout-section">
                 <div class="ml-row ml-row--wrap" style="margin-bottom:12px">
-                    <MudTextField @bind-Value="section.Section" Label="Section name" Variant="Variant.Outlined" Margin="Margin.Dense" Class="ml-grow" />
-                    <MudSelect T="int" @bind-Value="section.Columns" Label="Columns" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:120px">
-                        <MudSelectItem T="int" Value="1">1 column</MudSelectItem>
-                        <MudSelectItem T="int" Value="2">2 columns</MudSelectItem>
+                    <MudTextField @bind-Value="section.Section" Label="@T["Section name"]" Variant="Variant.Outlined" Margin="Margin.Dense" Class="ml-grow" />
+                    <MudSelect T="int" @bind-Value="section.Columns" Label="@T["Columns"]" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:120px">
+                        <MudSelectItem T="int" Value="1">@T["1 column"]</MudSelectItem>
+                        <MudSelectItem T="int" Value="2">@T["2 columns"]</MudSelectItem>
                     </MudSelect>
-                    <MudIconButton Icon="@Icons.Material.Outlined.ArrowUpward" Size="Size.Small" Disabled="section.Index == 0" OnClick="() => MoveSection(section, -1)" aria-label="Move section up" />
-                    <MudIconButton Icon="@Icons.Material.Outlined.ArrowDownward" Size="Size.Small" Disabled="section.Index == _sections.Count - 1" OnClick="() => MoveSection(section, 1)" aria-label="Move section down" />
-                    <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Disabled="_sections.Count == 1" OnClick="() => RemoveSection(section)" aria-label="Remove section" />
+                    <MudIconButton Icon="@Icons.Material.Outlined.ArrowUpward" Size="Size.Small" Disabled="section.Index == 0" OnClick="() => MoveSection(section, -1)" aria-label="@T["Move section up"]" />
+                    <MudIconButton Icon="@Icons.Material.Outlined.ArrowDownward" Size="Size.Small" Disabled="section.Index == _sections.Count - 1" OnClick="() => MoveSection(section, 1)" aria-label="@T["Move section down"]" />
+                    <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Disabled="_sections.Count == 1" OnClick="() => RemoveSection(section)" aria-label="@T["Remove section"]" />
                 </div>
 
                 @if (section.Fields.Count == 0)
                 {
-                    <MudText Typo="Typo.body2" Class="ml-muted">No fields in this section yet. Add one from the list below.</MudText>
+                    <MudText Typo="Typo.body2" Class="ml-muted">@T["No fields in this section yet. Add one from the list below."]</MudText>
                 }
                 @foreach (var key in section.Fields)
                 {
@@ -61,9 +62,9 @@
                             <MudText Typo="Typo.body1">@FieldLabel(fieldKey)</MudText>
                             <MudText Typo="Typo.caption" Class="ml-muted">@fieldKey</MudText>
                         </div>
-                        <MudIconButton Icon="@Icons.Material.Outlined.ArrowUpward" Size="Size.Small" OnClick="() => MoveField(section, fieldKey, -1)" aria-label="Move field up" />
-                        <MudIconButton Icon="@Icons.Material.Outlined.ArrowDownward" Size="Size.Small" OnClick="() => MoveField(section, fieldKey, 1)" aria-label="Move field down" />
-                        <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small" OnClick="() => RemoveField(section, fieldKey)" aria-label="Remove field" />
+                        <MudIconButton Icon="@Icons.Material.Outlined.ArrowUpward" Size="Size.Small" OnClick="() => MoveField(section, fieldKey, -1)" aria-label="@T["Move field up"]" />
+                        <MudIconButton Icon="@Icons.Material.Outlined.ArrowDownward" Size="Size.Small" OnClick="() => MoveField(section, fieldKey, 1)" aria-label="@T["Move field down"]" />
+                        <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small" OnClick="() => RemoveField(section, fieldKey)" aria-label="@T["Remove field"]" />
                     </div>
                 }
             </MlCard>
@@ -72,11 +73,11 @@
         <MlCard Title="Add fields" Subtitle="Fields that are not on this layout yet. Pick the section they go into first." Class="mb-4" TestId="available-fields">
             @if (_sections.Count > 0)
             {
-                <MudSelect T="int" @bind-Value="_targetIndex" Label="Add to section" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:280px">
+                <MudSelect T="int" @bind-Value="_targetIndex" Label="@T["Add to section"]" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:280px">
                     @for (var i = 0; i < _sections.Count; i++)
                     {
                         var index = i;
-                        <MudSelectItem T="int" Value="@index">@_sections[index].Section</MudSelectItem>
+                        <MudSelectItem T="int" Value="@index">@T[_sections[index].Section]</MudSelectItem>
                     }
                 </MudSelect>
             }
@@ -88,14 +89,14 @@
                 }
                 @if (!AvailableFields().Any())
                 {
-                    <MudText Typo="Typo.body2" Class="ml-muted">Every field is on this layout.</MudText>
+                    <MudText Typo="Typo.body2" Class="ml-muted">@T["Every field is on this layout."]</MudText>
                 }
             </div>
         </MlCard>
 
         <div class="ml-row ml-row--wrap" style="justify-content:space-between">
-            <MudButton Variant="Variant.Outlined" OnClick="AddSection">Add section</MudButton>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_busy" OnClick="SaveAsync" data-testid="primary-action">Save layout</MudButton>
+            <MudButton Variant="Variant.Outlined" OnClick="AddSection">@T["Add section"]</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_busy" OnClick="SaveAsync" data-testid="primary-action">@T["Save layout"]</MudButton>
         </div>
     }
 </div>
@@ -267,11 +268,11 @@
             var response = await Http.PutAsJsonAsync($"api/v1/settings/layouts/{_entity}/{_kind}", new SaveLayoutRequest(sections));
             if (!response.IsSuccessStatusCode)
             {
-                Snackbar.Add(await ProblemText.FromAsync(response, "We could not save this layout."), Severity.Error);
+                Snackbar.Add(await ProblemText.FromAsync(response, T["We could not save this layout."]), Severity.Error);
                 return;
             }
 
-            Snackbar.Add("Layout saved", Severity.Success);
+            Snackbar.Add(T["Layout saved"], Severity.Success);
             await App.LoadAsync();
             await LoadAsync(_entity, _kind);
         }

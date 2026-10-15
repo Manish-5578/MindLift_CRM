@@ -3,8 +3,9 @@
 @inject AppState App
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
+@inject Translator T
 
-<PageTitle>Picklists · MindLift</PageTitle>
+<PageTitle>@T["Picklists"] · MindLift</PageTitle>
 
 <div class="ml-page ml-page--form">
     <PageHeader Title="Picklists" Subtitle="The choices used in lead status, source, rating and more. Codes never change; labels can." />
@@ -34,13 +35,13 @@
                         {
                             <StatusChip Text="Built in" Color="@StatusColors.For("Open")" Dot="false" />
                         }
-                        <MudSwitch T="bool" Value="value.IsActive" ValueChanged="v => ToggleAsync(list.Key, value, v)" Color="Color.Primary" aria-label="Active" />
+                        <MudSwitch T="bool" Value="value.IsActive" ValueChanged="v => ToggleAsync(list.Key, value, v)" Color="Color.Primary" aria-label="@T["Active"]" />
                     </div>
                 }
                 <div class="ml-row ml-row--wrap" style="margin-top:12px">
                     <MudTextField T="string" @bind-Value="_newValue[list.Key]" Placeholder="code_like_this" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:180px" />
-                    <MudTextField T="string" @bind-Value="_newLabel[list.Key]" Placeholder="Label" Variant="Variant.Outlined" Margin="Margin.Dense" Class="ml-grow" />
-                    <MudButton Variant="Variant.Outlined" OnClick="() => AddAsync(list.Key)">Add value</MudButton>
+                    <MudTextField T="string" @bind-Value="_newLabel[list.Key]" Placeholder="@T["Label"]" Variant="Variant.Outlined" Margin="Margin.Dense" Class="ml-grow" />
+                    <MudButton Variant="Variant.Outlined" OnClick="() => AddAsync(list.Key)">@T["Add value"]</MudButton>
                 </div>
             </MlCard>
         }
@@ -92,7 +93,7 @@
         var label = _newLabel.GetValueOrDefault(key)?.Trim() ?? string.Empty;
         if (code.Length == 0 || label.Length == 0)
         {
-            Snackbar.Add("Enter a code and a label.", Severity.Warning);
+            Snackbar.Add(T["Enter a code and a label."], Severity.Warning);
             return;
         }
 
@@ -100,12 +101,12 @@
             new SavePicklistValueRequest(code, label, null, null, null, 1000, false, true));
         if (!response.IsSuccessStatusCode)
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, "We could not add this value."), Severity.Error);
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not add this value."]), Severity.Error);
             return;
         }
 
         _newValue[key] = _newLabel[key] = string.Empty;
-        Snackbar.Add("Value added", Severity.Success);
+        Snackbar.Add(T["Value added"], Severity.Success);
         await LoadAsync();
     }
 
@@ -115,7 +116,7 @@
             new SavePicklistValueRequest(value.Value, value.Label, value.LabelAr, value.Category, value.Color, value.SortOrder, value.IsDefault, active));
         if (!response.IsSuccessStatusCode)
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, "We could not change this value."), Severity.Error);
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not change this value."]), Severity.Error);
             return;
         }
 

@@ -5,15 +5,16 @@
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
 @inject IDialogService Dialogs
+@inject Translator T
 
-<PageTitle>@App.ModuleLabel(AppModule.Activities) · MindLift</PageTitle>
+<PageTitle>@T[App.ModuleLabel(AppModule.Activities)] · MindLift</PageTitle>
 
 <div class="ml-page ml-page--narrow">
     <PageHeader Title="@App.ModuleLabel(AppModule.Activities)" Subtitle="Your tasks, calls and meetings.">
         <Actions>
             @if (CanCreate)
             {
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" OnClick="OpenNew" data-testid="primary-action">New task</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" OnClick="OpenNew" data-testid="primary-action">@T["New task"]</MudButton>
             }
         </Actions>
     </PageHeader>
@@ -25,7 +26,7 @@
             <MudChip T="string" Variant="@(_tab == current ? Variant.Filled : Variant.Outlined)" Color="@(_tab == current ? Color.Primary : Color.Default)"
                      OnClick="() => SetTabAsync(current)" data-testid="@("tab-" + current)">@label@(Count(current) is { } n ? $" ({n})" : "")</MudChip>
         }
-        <MudSelect T="string" Value="_type" ValueChanged="SetTypeAsync" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" Placeholder="All types" Style="max-width:160px" aria-label="Type" data-testid="type-filter">
+        <MudSelect T="string" Value="_type" ValueChanged="SetTypeAsync" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" Placeholder="@T["All types"]" Style="max-width:160px" aria-label="@T["Type"]" data-testid="type-filter">
             @foreach (var type in new[] { "Task", "Call", "Meeting", "Note" })
             {
                 <MudSelectItem T="string" Value="@type">@type</MudSelectItem>
@@ -67,7 +68,7 @@
                     </div>
                     @if (CanEdit)
                     {
-                        <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="() => Edit(current)" aria-label="Edit" />
+                        <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="() => Edit(current)" aria-label="@T["Edit"]" />
                     }
                 </div>
             }
@@ -93,7 +94,7 @@
     private bool CanCreate => Can(p => p.CanCreate);
     private bool CanEdit => Can(p => p.CanEdit);
 
-    private string EmptyTitle => _tab switch { "today" => "Nothing due today", "overdue" => "Nothing overdue", "upcoming" => "Nothing coming up", _ => "Nothing completed yet" };
+    private string EmptyTitle => _tab switch { "today" => T["Nothing due today"], "overdue" => T["Nothing overdue"], "upcoming" => T["Nothing coming up"], _ => "Nothing completed yet" };
 
     private int? Count(string key) => key switch { "today" => _day?.Today, "overdue" => _day?.Overdue, "upcoming" => _day?.Upcoming, _ => null };
 
@@ -137,7 +138,7 @@
             var response = await Http.PostAsJsonAsync("api/v1/activities/query", new ActivityQuery(_tab, _type, null, true, null, null, null, null, 1, 100));
             if (!response.IsSuccessStatusCode)
             {
-                _error = await ProblemText.FromAsync(response, "We could not load your activities. Try again.");
+                _error = await ProblemText.FromAsync(response, T["We could not load your activities. Try again."]);
                 return;
             }
 
@@ -146,7 +147,7 @@
         }
         catch (HttpRequestException)
         {
-            _error = "We could not reach MindLift. Check your connection and try again.";
+            _error = T["We could not reach MindLift. Check your connection and try again."];
         }
         finally
         {
@@ -168,7 +169,7 @@
 
     private async Task OnSaved()
     {
-        Snackbar.Add("Activity saved", Severity.Success);
+        Snackbar.Add(T["Activity saved"], Severity.Success);
         await LoadAsync();
     }
 
@@ -179,7 +180,7 @@
             : await Http.PostAsync($"api/v1/activities/{item.Id}/reopen", null);
         if (!response.IsSuccessStatusCode)
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, "We could not update this activity."), Severity.Error);
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not update this activity."]), Severity.Error);
         }
 
         await LoadAsync();

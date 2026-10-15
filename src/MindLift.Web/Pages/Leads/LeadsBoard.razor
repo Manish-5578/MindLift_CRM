@@ -7,28 +7,29 @@
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
 @inject IDialogService Dialogs
+@inject Translator T
 
-<PageTitle>@App.ModuleLabel(AppModule.Leads) board · MindLift</PageTitle>
+<PageTitle>@T["{0} board", T[App.ModuleLabel(AppModule.Leads)]] · MindLift</PageTitle>
 
 <div class="ml-page ml-page--narrow">
     <PageHeader Title="@App.ModuleLabel(AppModule.Leads)" Subtitle="@SubtitleText">
         <Actions>
             <MudButtonGroup Variant="Variant.Outlined" Size="Size.Medium" data-testid="layout-toggle">
-                <MudButton Color="Color.Primary" Href="/leads/board">Board</MudButton>
-                <MudButton Href="/leads">List</MudButton>
+                <MudButton Color="Color.Primary" Href="/leads/board">@T["Board"]</MudButton>
+                <MudButton Href="/leads">@T["List"]</MudButton>
             </MudButtonGroup>
             @if (CanCreate)
             {
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" OnClick="OpenNewLead" data-testid="primary-action">New lead</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" OnClick="OpenNewLead" data-testid="primary-action">@T["New lead"]</MudButton>
             }
         </Actions>
     </PageHeader>
 
     <div class="ml-row ml-row--wrap" style="margin-bottom:16px" data-testid="board-toolbar">
-        <MudTextField T="string" Value="_search" ValueChanged="SearchAsync" Immediate="true" DebounceInterval="300" Placeholder="Search name, email, company or phone"
+        <MudTextField T="string" Value="_search" ValueChanged="SearchAsync" Immediate="true" DebounceInterval="300" Placeholder="@T["Search name, email, company or phone"]"
                       Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.Search"
                       Class="ml-grow" Style="max-width:360px" data-testid="search" />
-        <MudSwitch T="bool" Value="_mineOnly" ValueChanged="MineAsync" Label="Only mine" Color="Color.Primary" data-testid="mine-only" />
+        <MudSwitch T="bool" Value="_mineOnly" ValueChanged="MineAsync" Label="@T["Only mine"]" Color="Color.Primary" data-testid="mine-only" />
     </div>
 
     @if (_error is not null)
@@ -45,7 +46,7 @@
             <ColumnFooter Context="column">
                 @if (HasMore(column.Key))
                 {
-                    <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="() => ShowMoreAsync(column.Key)" data-testid="@MoreTestId(column.Key)">Show more (@Remaining(column.Key) left)</MudButton>
+                    <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="() => ShowMoreAsync(column.Key)" data-testid="@MoreTestId(column.Key)">@T["Show more ({0} left)", Remaining(column.Key)]</MudButton>
                 }
             </ColumnFooter>
         </KanbanBoard>
@@ -170,7 +171,7 @@
         }
         catch (HttpRequestException)
         {
-            _error = "We could not reach MindLift. Check your connection and try again.";
+            _error = T["We could not reach MindLift. Check your connection and try again."];
         }
         finally
         {
@@ -194,7 +195,7 @@
         }
         catch (Exception ex) when (ex is ListLoadException or HttpRequestException)
         {
-            Snackbar.Add("We could not load more leads.", Severity.Error);
+            Snackbar.Add(T["We could not load more leads."], Severity.Error);
         }
     }
 
@@ -212,7 +213,7 @@
         var response = await Http.PostAsJsonAsync("api/v1/leads/query", new ListQuery(_search, filter, "created_at", "desc", page, PageSize));
         if (!response.IsSuccessStatusCode)
         {
-            throw new ListLoadException(await ProblemText.FromAsync(response, "We could not load your leads. Try again."));
+            throw new ListLoadException(await ProblemText.FromAsync(response, T["We could not load your leads. Try again."]));
         }
 
         return (await response.Content.ReadFromJsonAsync<PagedResult<LeadListItemDto>>())!;
@@ -231,7 +232,7 @@
         HttpResponseMessage response;
         if (move.ToKey == Disqualified)
         {
-            var reason = await Dialogs.PromptReasonAsync($"Disqualify {lead.FullName}?", "Say why this lead is not a fit. It stays on record.", "Reason *", "Disqualify", danger: true);
+            var reason = await Dialogs.PromptReasonAsync($"Disqualify {lead.FullName}?", T["Say why this lead is not a fit. It stays on record."], T["Reason *"], T["Disqualify"], danger: true);
             if (reason is null)
             {
                 return;
@@ -244,7 +245,7 @@
             var full = await Http.GetFromJsonAsync<LeadDto>($"api/v1/leads/{lead.Id}");
             if (full is null)
             {
-                Snackbar.Add("We could not open this lead.", Severity.Error);
+                Snackbar.Add(T["We could not open this lead."], Severity.Error);
                 return;
             }
 
@@ -255,7 +256,7 @@
 
         if (!response.IsSuccessStatusCode)
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, "We could not move this lead."), Severity.Error);
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not move this lead."]), Severity.Error);
         }
         else
         {
@@ -275,7 +276,7 @@
 
     private async Task OnSaved()
     {
-        Snackbar.Add("Lead saved", Severity.Success);
+        Snackbar.Add(T["Lead saved"], Severity.Success);
         await LoadAllAsync();
     }
 }

@@ -3,6 +3,7 @@
 @inject ISnackbar Snackbar
 @inject IDialogService Dialogs
 @inject IJSRuntime JS
+@inject Translator T
 
 <MlCard Title="Files" TestId="record-files">
     <div class="ml-stack">
@@ -17,7 +18,7 @@
         }
         else if (_files.Count == 0)
         {
-            <MudText Typo="Typo.body2" Class="ml-muted" data-testid="no-files">No files yet.</MudText>
+            <MudText Typo="Typo.body2" Class="ml-muted" data-testid="no-files">@T["No files yet."]</MudText>
         }
 
         @foreach (var file in _files)
@@ -124,7 +125,7 @@
         var response = await Http.GetAsync($"api/v1/files/{file.Id}");
         if (!response.IsSuccessStatusCode)
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, "We could not download this file."), Severity.Error);
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not download this file."]), Severity.Error);
             return;
         }
 
@@ -133,7 +134,7 @@
 
     private async Task DeleteAsync(StoredFileDto file)
     {
-        if (!await Dialogs.ConfirmAsync($"Delete {file.FileName}?", "The file is removed from this record.", "Delete", danger: true))
+        if (!await Dialogs.ConfirmAsync($"Delete {file.FileName}?", T["The file is removed from this record."], T["Delete"], danger: true))
         {
             return;
         }
@@ -141,7 +142,7 @@
         var response = await Http.DeleteAsync($"api/v1/files/{file.Id}");
         if (!response.IsSuccessStatusCode)
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, "We could not delete this file."), Severity.Error);
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not delete this file."]), Severity.Error);
         }
 
         await LoadAsync();

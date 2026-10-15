@@ -3,8 +3,9 @@
 @inject AppState App
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
+@inject Translator T
 
-<PageTitle>Modules · MindLift</PageTitle>
+<PageTitle>@T["Modules"] · MindLift</PageTitle>
 
 <div class="ml-page ml-page--form">
     <PageHeader Title="Modules" Subtitle="Switch modules on or off, and rename them for your business." />
@@ -32,7 +33,7 @@
                         <MudSwitch T="bool" Value="module.IsEnabled" ValueChanged="v => ToggleAsync(module, v)" Color="Color.Primary" Disabled="IsCore(module.Module)" aria-label="@($"Enable {module.PluralLabel}")" />
                         <div class="ml-grow">
                             <MudText Typo="Typo.subtitle2">@module.PluralLabel</MudText>
-                            <MudText Typo="Typo.caption" Class="ml-muted">Singular: @module.SingularLabel · Key: @module.Module@(IsCore(module.Module) ? " · Always on" : "")</MudText>
+                            <MudText Typo="Typo.caption" Class="ml-muted">@T["Singular: {0} · Key: {1}", module.SingularLabel, module.Module]@(IsCore(module.Module) ? " · " + T["Always on"] : "")</MudText>
                         </div>
                         <MudChip T="string" Size="Size.Small" Color="@(module.IsEnabled ? Color.Success : Color.Default)">@(module.IsEnabled ? "On" : "Off")</MudChip>
                     </div>
@@ -83,7 +84,7 @@
             new SaveModuleSettingRequest(enabled, module.SingularLabel, module.PluralLabel, module.SortOrder));
         if (!response.IsSuccessStatusCode)
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, "Could not change this module."), Severity.Error);
+            Snackbar.Add(await ProblemText.FromAsync(response, T["Could not change this module."]), Severity.Error);
             return;
         }
 

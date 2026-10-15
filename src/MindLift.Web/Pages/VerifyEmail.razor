@@ -1,12 +1,13 @@
 @page "/verify-email"
 @layout AuthLayout
 @inject HttpClient Http
+@inject Translator T
 
-<PageTitle>Confirm your email · MindLift</PageTitle>
+<PageTitle>@T["Confirm your email"] · MindLift</PageTitle>
 
 <div class="ml-wizard" style="max-width:420px;margin-top:48px">
     <div class="ml-stack">
-        <MudText Typo="Typo.h4" data-testid="page-title">Confirm your email</MudText>
+        <MudText Typo="Typo.h4" data-testid="page-title">@T["Confirm your email"]</MudText>
 
         @if (_working)
         {
@@ -14,14 +15,14 @@
         }
         else if (_ok)
         {
-            <MudAlert Severity="Severity.Success" data-testid="verify-ok">Thank you. Your email address is confirmed.</MudAlert>
+            <MudAlert Severity="Severity.Success" data-testid="verify-ok">@T["Thank you. Your email address is confirmed."]</MudAlert>
         }
         else
         {
             <MudAlert Severity="Severity.Error" data-testid="verify-error">@_error</MudAlert>
         }
 
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Size="Size.Large" Href="/" data-testid="primary-action">Continue to MindLift</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Size="Size.Large" Href="/" data-testid="primary-action">@T["Continue to MindLift"]</MudButton>
     </div>
 </div>
 
@@ -31,12 +32,13 @@
 
     private bool _working = true;
     private bool _ok;
-    private string _error = "This link is not complete. Open the link from the email again.";
+    private string _error = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
         if (string.IsNullOrWhiteSpace(Email) || string.IsNullOrWhiteSpace(Token))
         {
+            _error = T["This link is not complete. Open the link from the email again."];
             _working = false;
             return;
         }
@@ -47,12 +49,12 @@
             _ok = response.IsSuccessStatusCode;
             if (!_ok)
             {
-                _error = await ProblemText.FromAsync(response, "This link has expired or was already used.");
+                _error = await ProblemText.FromAsync(response, T["This link has expired or was already used."]);
             }
         }
         catch (HttpRequestException)
         {
-            _error = "We could not reach MindLift. Check your connection and try again.";
+            _error = T["We could not reach MindLift. Check your connection and try again."];
         }
         finally
         {

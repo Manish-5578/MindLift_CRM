@@ -1,23 +1,24 @@
+@inject Translator T
 <MudDialog>
     <TitleContent>
         <MudText Typo="Typo.h5">@Title</MudText>
     </TitleContent>
     <DialogContent>
         <div class="ml-stack">
-            <MudText Typo="Typo.body1" Class="ml-muted">A lost deal stays on record. Choose why it was lost.</MudText>
-            <MudSelect T="string" @bind-Value="_reason" Label="Reason *" Variant="Variant.Outlined" Margin="Margin.Dense"
+            <MudText Typo="Typo.body1" Class="ml-muted">@T["A lost deal stays on record. Choose why it was lost."]</MudText>
+            <MudSelect T="string" @bind-Value="_reason" Label="@T["Reason *"]" Variant="Variant.Outlined" Margin="Margin.Dense"
                        Error="@(_error is not null)" ErrorText="@_error" data-testid="lost-reason">
                 @foreach (var value in Reasons)
                 {
                     <MudSelectItem T="string" Value="@value.Value">@value.Label</MudSelectItem>
                 }
             </MudSelect>
-            <MudTextField @bind-Value="_notes" Label="Notes" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" data-testid="lost-notes" />
+            <MudTextField @bind-Value="_notes" Label="@T["Notes"]" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" data-testid="lost-notes" />
         </div>
     </DialogContent>
     <DialogActions>
-        <MudButton Variant="Variant.Text" OnClick="Cancel" data-testid="lost-cancel">Cancel</MudButton>
-        <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="Confirm" data-testid="lost-ok">Mark as lost</MudButton>
+        <MudButton Variant="Variant.Text" OnClick="Cancel" data-testid="lost-cancel">@T["Cancel"]</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="Confirm" data-testid="lost-ok">@T["Mark as lost"]</MudButton>
     </DialogActions>
 </MudDialog>
 
@@ -37,7 +38,7 @@
     {
         if (string.IsNullOrWhiteSpace(_reason))
         {
-            _error = "Choose a reason.";
+            _error = T["Choose a reason."];
             return;
         }
 

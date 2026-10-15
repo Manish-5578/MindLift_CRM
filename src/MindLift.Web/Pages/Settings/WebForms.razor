@@ -4,13 +4,14 @@
 @inject AppState App
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
+@inject Translator T
 
-<PageTitle>Web forms · MindLift</PageTitle>
+<PageTitle>@T["Web forms"] · MindLift</PageTitle>
 
 <div class="ml-page ml-page--form">
     <PageHeader Title="Web forms" Subtitle="Forms on your website that create leads. Choose the fields, where the lead comes from and the message the visitor sees.">
         <Actions>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => OpenForm(null)" data-testid="primary-action">New form</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => OpenForm(null)" data-testid="primary-action">@T["New form"]</MudButton>
         </Actions>
     </PageHeader>
     <SettingsNav Current="/settings/web-forms" />
@@ -32,12 +33,12 @@
                     <StatusChip Text="@(form.IsActive ? "Live" : "Paused")" Color="@StatusColors.For(form.IsActive ? "Won" : "Expired")" />
                     <MudText Typo="Typo.caption" Class="ml-muted">@form.SubmissionCount @(form.SubmissionCount == 1 ? "submission" : "submissions")</MudText>
                 </div>
-                <MudText Typo="Typo.body2" Class="ml-muted" style="margin-bottom:4px">Fields: @string.Join(", ", form.Fields.Select(FieldLabel))</MudText>
-                <MudText Typo="Typo.body2" Class="ml-muted" style="margin-bottom:4px">Endpoint for your website:</MudText>
-                <MudText Typo="Typo.caption" Class="ml-muted" style="margin-bottom:8px">Send a POST request with JSON fields firstName, lastName, email, phone, companyName and message. Leave hp empty; it is a spam trap.</MudText>
+                <MudText Typo="Typo.body2" Class="ml-muted" style="margin-bottom:4px">@T["Fields: {0}", string.Join(", ", form.Fields.Select(FieldLabel))]</MudText>
+                <MudText Typo="Typo.body2" Class="ml-muted" style="margin-bottom:4px">@T["Endpoint for your website:"]</MudText>
+                <MudText Typo="Typo.caption" Class="ml-muted" style="margin-bottom:8px">@T["Send a POST request with JSON fields firstName, lastName, email, phone, companyName and message. Leave hp empty; it is a spam trap."]</MudText>
                 <MudTextField T="string" Value="@EndpointFor(form)" ReadOnly="true" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="1" data-testid="form-endpoint" />
                 <div class="ml-row" style="justify-content:flex-end;margin-top:8px">
-                    <MudButton Size="Size.Small" OnClick="() => OpenForm(form)">Edit form</MudButton>
+                    <MudButton Size="Size.Small" OnClick="() => OpenForm(form)">@T["Edit form"]</MudButton>
                 </div>
             </MlCard>
         }
@@ -51,25 +52,25 @@
 <FormDrawer Open="_open" OpenChanged="v => _open = v" Title="@_title" SubmitText="Save form" Busy="_busy" OnSubmit="SaveAsync">
     <div class="ml-stack">
         @if (_formError is not null) { <MudAlert Severity="Severity.Error" Dense="true">@_formError</MudAlert> }
-        <MudTextField @bind-Value="_name" Label="Name *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="form-name" />
-        <MudSelect T="string" @bind-Value="_source" Label="Lead source *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="form-source">
+        <MudTextField @bind-Value="_name" Label="@T["Name *"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="form-name" />
+        <MudSelect T="string" @bind-Value="_source" Label="@T["Lead source *"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="form-source">
             @foreach (var value in SourceValues())
             {
                 <MudSelectItem T="string" Value="@value.Value">@value.Label</MudSelectItem>
             }
         </MudSelect>
-        <MudTextField @bind-Value="_successMessage" Label="Message after submit" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" HelperText="Shown to the visitor after they send the form." />
+        <MudTextField @bind-Value="_successMessage" Label="@T["Message after submit"]" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" HelperText="@T["Shown to the visitor after they send the form."]" />
 
-        <MudText Typo="Typo.subtitle2" Class="mt-2">Fields the form collects</MudText>
-        <MudText Typo="Typo.caption" Class="ml-muted">First name is always required.</MudText>
-        <MudCheckBox T="bool" Value="true" Disabled="true" Label="First name (required)" Color="Color.Primary" />
+        <MudText Typo="Typo.subtitle2" Class="mt-2">@T["Fields the form collects"]</MudText>
+        <MudText Typo="Typo.caption" Class="ml-muted">@T["First name is always required."]</MudText>
+        <MudCheckBox T="bool" Value="true" Disabled="true" Label="@T["First name (required)"]" Color="Color.Primary" />
         @foreach (var field in OptionalFields)
         {
             var key = field.Key;
-            <MudCheckBox T="bool" Value="_fields.Contains(key)" ValueChanged="v => ToggleField(key, v)" Label="@field.Label" Color="Color.Primary" data-testid="@($"field-{key}")" />
+            <MudCheckBox T="bool" Value="_fields.Contains(key)" ValueChanged="v => ToggleField(key, v)" Label="@T[field.Label]" Color="Color.Primary" data-testid="@($"field-{key}")" />
         }
 
-        <MudCheckBox @bind-Value="_active" Label="Accepting submissions" Color="Color.Primary" />
+        <MudCheckBox @bind-Value="_active" Label="@T["Accepting submissions"]" Color="Color.Primary" />
     </div>
 </FormDrawer>
 
@@ -128,8 +129,8 @@
 
     private string FieldLabel(string key) => key switch
     {
-        "first_name" => "First name",
-        _ => OptionalFields.FirstOrDefault(f => f.Key == key).Label ?? key,
+        "first_name" => T["First name"],
+        _ => OptionalFields.FirstOrDefault(f => f.Key == key).Label is { } label ? T[label] : key,
     };
 
     private static string FormSubtitle(WebFormDto form) => form.IsActive ? "Accepting submissions" : "Paused";
@@ -169,13 +170,13 @@
         _formError = null;
         if (string.IsNullOrWhiteSpace(_name))
         {
-            _formError = "Give the form a name.";
+            _formError = T["Give the form a name."];
             return;
         }
 
         if (string.IsNullOrWhiteSpace(_source))
         {
-            _formError = "Choose where these leads come from.";
+            _formError = T["Choose where these leads come from."];
             return;
         }
 
@@ -191,12 +192,12 @@
                 : await Http.PutAsJsonAsync($"api/v1/settings/web-forms/{_editId}", body);
             if (!response.IsSuccessStatusCode)
             {
-                _formError = await ProblemText.FromAsync(response, "We could not save this form.");
+                _formError = await ProblemText.FromAsync(response, T["We could not save this form."]);
                 return;
             }
 
             _open = false;
-            Snackbar.Add("Form saved", Severity.Success);
+            Snackbar.Add(T["Form saved"], Severity.Success);
             await LoadAsync();
         }
         finally

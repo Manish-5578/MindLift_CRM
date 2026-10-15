@@ -7,25 +7,26 @@
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
 @inject IDialogService Dialogs
+@inject Translator T
 
-<PageTitle>Reports & Analytics · MindLift</PageTitle>
+<PageTitle>@T["Reports & Analytics"] · MindLift</PageTitle>
 
 <div class="ml-page">
     <div class="d-flex flex-wrap align-center justify-space-between gap-3 mb-4">
         <div>
-            <MudText Typo="Typo.h5" Style="font-weight:700">Reports & Analytics</MudText>
-            <MudText Typo="Typo.body2" Class="ml-muted">Pre-built executive reports, custom queries, and cross-module business intelligence.</MudText>
+            <MudText Typo="Typo.h5" Style="font-weight:700">@T["Reports & Analytics"]</MudText>
+            <MudText Typo="Typo.body2" Class="ml-muted">@T["Pre-built executive reports, custom queries, and cross-module business intelligence."]</MudText>
         </div>
 
         <div class="d-flex flex-wrap align-center gap-2">
             <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.TrackChanges" Href="/reports/targets" Size="Size.Small">
-                Sales Targets
+                @T["Sales Targets"]
             </MudButton>
             <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.CreateNewFolder" OnClick="() => _folderDrawerOpen = true" Size="Size.Small">
-                New Folder
+                @T["New Folder"]
             </MudButton>
             <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" Href="/reports/builder" Size="Size.Small">
-                New Report
+                @T["New Report"]
             </MudButton>
         </div>
     </div>
@@ -34,16 +35,16 @@
     <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-4 d-flex flex-wrap align-center justify-space-between gap-3" Style="border-radius:12px">
         <div class="d-flex flex-wrap align-center gap-2">
             <MudChipSet T="string" SelectedValue="_selectedCategory" SelectedValueChanged="OnCategoryChanged" CheckMark="false">
-                <MudChip T="string" Value="@("all")" Variant="@(_selectedCategory == "all" ? Variant.Filled : Variant.Outlined)" Color="Color.Primary" Size="Size.Small">All Reports</MudChip>
-                <MudChip T="string" Value="@("favorites")" Variant="@(_selectedCategory == "favorites" ? Variant.Filled : Variant.Outlined)" Color="Color.Warning" Size="Size.Small" Icon="@Icons.Material.Filled.Star">Favorites</MudChip>
-                <MudChip T="string" Value="@("system")" Variant="@(_selectedCategory == "system" ? Variant.Filled : Variant.Outlined)" Color="Color.Secondary" Size="Size.Small">System Reports</MudChip>
-                <MudChip T="string" Value="@("custom")" Variant="@(_selectedCategory == "custom" ? Variant.Filled : Variant.Outlined)" Color="Color.Info" Size="Size.Small">Custom Reports</MudChip>
+                <MudChip T="string" Value="@("all")" Variant="@(_selectedCategory == "all" ? Variant.Filled : Variant.Outlined)" Color="Color.Primary" Size="Size.Small">@T["All Reports"]</MudChip>
+                <MudChip T="string" Value="@("favorites")" Variant="@(_selectedCategory == "favorites" ? Variant.Filled : Variant.Outlined)" Color="Color.Warning" Size="Size.Small" Icon="@Icons.Material.Filled.Star">@T["Favorites"]</MudChip>
+                <MudChip T="string" Value="@("system")" Variant="@(_selectedCategory == "system" ? Variant.Filled : Variant.Outlined)" Color="Color.Secondary" Size="Size.Small">@T["System Reports"]</MudChip>
+                <MudChip T="string" Value="@("custom")" Variant="@(_selectedCategory == "custom" ? Variant.Filled : Variant.Outlined)" Color="Color.Info" Size="Size.Small">@T["Custom Reports"]</MudChip>
             </MudChipSet>
 
             @if (_folders.Count > 0)
             {
-                <MudSelect T="Guid?" Value="_selectedFolderId" ValueChanged="OnFolderSelected" Placeholder="All Folders" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="min-width:180px">
-                    <MudSelectItem T="Guid?" Value="@((Guid?)null)">All Folders</MudSelectItem>
+                <MudSelect T="Guid?" Value="_selectedFolderId" ValueChanged="OnFolderSelected" Placeholder="@T["All Folders"]" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="min-width:180px">
+                    <MudSelectItem T="Guid?" Value="@((Guid?)null)">@T["All Folders"]</MudSelectItem>
                     @foreach (var f in _folders)
                     {
                         <MudSelectItem T="Guid?" Value="@f.Id">@f.Name (@f.ReportCount)</MudSelectItem>
@@ -52,7 +53,7 @@
             }
         </div>
 
-        <MudTextField @bind-Value="_searchQuery" Placeholder="Search reports..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.Search" Immediate="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="max-width:280px" />
+        <MudTextField @bind-Value="_searchQuery" Placeholder="@T["Search reports..."]" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.Search" Immediate="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="max-width:280px" />
     </MudPaper>
 
     @if (_loading)
@@ -61,7 +62,7 @@
     }
     else if (FilteredReports.Count == 0)
     {
-        <EmptyState Title="No reports found" Subtitle="Try changing your search terms or create a new custom report with the report builder." ActionLabel="Create Report" OnAction="@(() => Nav.NavigateTo("/reports/builder"))" />
+        <EmptyState Title="No reports found" Subtitle="@T["Try changing your search terms or create a new custom report with the report builder."]" ActionLabel="Create Report" OnAction="@(() => Nav.NavigateTo("/reports/builder"))" />
     }
     else
     {
@@ -100,21 +101,21 @@
                                 </MudChip>
                                 @if (r.LastRunAt.HasValue)
                                 {
-                                    <MudText Typo="Typo.caption" Class="ml-muted">Run @r.LastRunAt.Value.ToShortDateString()</MudText>
+                                    <MudText Typo="Typo.caption" Class="ml-muted">@T["Run {0}", r.LastRunAt.Value.ToShortDateString()]</MudText>
                                 }
                             </div>
                         </MudCardContent>
 
                         <MudCardActions Class="justify-space-between pt-0 pb-3 px-3">
                             <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" EndIcon="@Icons.Material.Filled.ArrowForward" OnClick="() => OpenReport(r)">
-                                Run
+                                @T["Run"]
                             </MudButton>
 
                             @if (!r.IsSystem)
                             {
                                 <MudMenu Icon="@Icons.Material.Outlined.MoreVert" Dense="true" Size="Size.Small">
-                                    <MudMenuItem Icon="@Icons.Material.Outlined.Edit" Href="@($"/reports/builder/{r.Id}")">Edit</MudMenuItem>
-                                    <MudMenuItem Icon="@Icons.Material.Outlined.Delete" OnClick="() => DeleteReport(r)">Delete</MudMenuItem>
+                                    <MudMenuItem Icon="@Icons.Material.Outlined.Edit" Href="@($"/reports/builder/{r.Id}")">@T["Edit"]</MudMenuItem>
+                                    <MudMenuItem Icon="@Icons.Material.Outlined.Delete" OnClick="() => DeleteReport(r)">@T["Delete"]</MudMenuItem>
                                 </MudMenu>
                             }
                         </MudCardActions>
@@ -128,8 +129,8 @@
 <!-- Folder Drawer -->
 <FormDrawer Open="_folderDrawerOpen" OpenChanged="v => _folderDrawerOpen = v" Title="New Report Folder" SubmitText="Create Folder" Busy="_savingFolder" OnSubmit="CreateFolderAsync" IsDirty="!string.IsNullOrWhiteSpace(_newFolderName)">
     <div class="ml-stack">
-        <MudTextField @bind-Value="_newFolderName" Label="Folder Name *" Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" Placeholder="e.g. Sales KPIs" />
-        <MudTextField @bind-Value="_newFolderDescription" Label="Description" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" Placeholder="Optional description" />
+        <MudTextField @bind-Value="_newFolderName" Label="@T["Folder Name *"]" Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" Placeholder="@T["e.g. Sales KPIs"]" />
+        <MudTextField @bind-Value="_newFolderDescription" Label="@T["Description"]" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" Placeholder="@T["Optional description"]" />
     </div>
 </FormDrawer>
 
@@ -218,7 +219,7 @@
             if (resp.IsSuccessStatusCode)
             {
                 r.IsFavorite = !r.IsFavorite;
-                Snackbar.Add(r.IsFavorite ? "Added to favorites" : "Removed from favorites", Severity.Info);
+                Snackbar.Add(r.IsFavorite ? T["Added to favorites"] : T["Removed from favorites"], Severity.Info);
             }
         }
         catch { }
@@ -227,9 +228,9 @@
     private async Task DeleteReport(ReportDefinitionDto r)
     {
         bool confirmed = await Dialogs.ConfirmAsync(
-            "Delete Report",
+            T["Delete Report"],
             $"Are you sure you want to delete report '{r.Name}'?",
-            "Delete",
+            T["Delete"],
             danger: true);
 
         if (confirmed)
@@ -238,11 +239,11 @@
             if (resp.IsSuccessStatusCode)
             {
                 _reports.Remove(r);
-                Snackbar.Add("Report deleted.", Severity.Success);
+                Snackbar.Add(T["Report deleted."], Severity.Success);
             }
             else
             {
-                Snackbar.Add("Failed to delete report.", Severity.Error);
+                Snackbar.Add(T["Failed to delete report."], Severity.Error);
             }
         }
     }
@@ -261,7 +262,7 @@
 
             if (resp.IsSuccessStatusCode)
             {
-                Snackbar.Add("Folder created", Severity.Success);
+                Snackbar.Add(T["Folder created"], Severity.Success);
                 _folderDrawerOpen = false;
                 _newFolderName = "";
                 _newFolderDescription = null;
@@ -269,7 +270,7 @@
             }
             else
             {
-                Snackbar.Add("Failed to create folder", Severity.Error);
+                Snackbar.Add(T["Failed to create folder"], Severity.Error);
             }
         }
         finally

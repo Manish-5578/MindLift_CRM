@@ -368,4 +368,3793 @@
   <data name="in {0} days" xml:space="preserve">
     <value>بعد {0} أيام</value>
   </data>
+  <data name="({0}% off)" xml:space="preserve">
+    <value>(خصم {0}%)</value>
+  </data>
+  <data name="+ Add Action" xml:space="preserve">
+    <value>+ إضافة إجراء</value>
+  </data>
+  <data name="+{0} more" xml:space="preserve">
+    <value>+{0} أخرى</value>
+  </data>
+  <data name="1 column" xml:space="preserve">
+    <value>عمود واحد</value>
+  </data>
+  <data name="1 is first. The stages after it move down to make room. Won and Lost stay last." xml:space="preserve">
+    <value>الرقم 1 هو الأول. تنتقل المراحل التي تليه للأسفل لإفساح المجال. تبقى مرحلتا «تم الفوز» و«خسارة» في النهاية.</value>
+  </data>
+  <data name="1. Choose a day" xml:space="preserve">
+    <value>1. اختر يومًا</value>
+  </data>
+  <data name="14 days free. No card needed." xml:space="preserve">
+    <value>14 يومًا مجانًا. لا حاجة إلى بطاقة.</value>
+  </data>
+  <data name="2 columns" xml:space="preserve">
+    <value>عمودان</value>
+  </data>
+  <data name="2. Choose a time" xml:space="preserve">
+    <value>2. اختر وقتًا</value>
+  </data>
+  <data name="3. Your details" xml:space="preserve">
+    <value>3. بياناتك</value>
+  </data>
+  <data name="A booking moves from its meeting; move the meeting instead." xml:space="preserve">
+    <value>يُنقل الحجز من خلال اجتماعه؛ انقل الاجتماع بدلًا من ذلك.</value>
+  </data>
+  <data name="A company with this name already exists. Link it from the company page once it is available." xml:space="preserve">
+    <value>توجد شركة بهذا الاسم بالفعل. اربطها من صفحة الشركة عند توفرها.</value>
+  </data>
+  <data name="A lost deal stays on record. Choose why it was lost." xml:space="preserve">
+    <value>تبقى الصفقة الخاسرة مسجلة. اختر سبب خسارتها.</value>
+  </data>
+  <data name="Accepted" xml:space="preserve">
+    <value>مقبول</value>
+  </data>
+  <data name="Accepted Proposals" xml:space="preserve">
+    <value>العروض المقبولة</value>
+  </data>
+  <data name="Accepting submissions" xml:space="preserve">
+    <value>يقبل الإرسالات</value>
+  </data>
+  <data name="Account" xml:space="preserve">
+    <value>الحساب</value>
+  </data>
+  <data name="Account / Customer" xml:space="preserve">
+    <value>الحساب / العميل</value>
+  </data>
+  <data name="Account deleted" xml:space="preserve">
+    <value>تم حذف الحساب</value>
+  </data>
+  <data name="Account saved" xml:space="preserve">
+    <value>تم حفظ الحساب</value>
+  </data>
+  <data name="Action" xml:space="preserve">
+    <value>الإجراء</value>
+  </data>
+  <data name="Action {0}: {1}" xml:space="preserve">
+    <value>الإجراء {0}: {1}</value>
+  </data>
+  <data name="Actions" xml:space="preserve">
+    <value>الإجراءات</value>
+  </data>
+  <data name="Actions to Execute" xml:space="preserve">
+    <value>الإجراءات المطلوب تنفيذها</value>
+  </data>
+  <data name="Active" xml:space="preserve">
+    <value>نشط</value>
+  </data>
+  <data name="Active Only" xml:space="preserve">
+    <value>النشطة فقط</value>
+  </data>
+  <data name="Active Targets" xml:space="preserve">
+    <value>الأهداف النشطة</value>
+  </data>
+  <data name="Active in Catalog" xml:space="preserve">
+    <value>نشط في الكتالوج</value>
+  </data>
+  <data name="Activities (Count)" xml:space="preserve">
+    <value>الأنشطة (العدد)</value>
+  </data>
+  <data name="Activity" xml:space="preserve">
+    <value>النشاط</value>
+  </data>
+  <data name="Activity saved" xml:space="preserve">
+    <value>تم حفظ النشاط</value>
+  </data>
+  <data name="Add" xml:space="preserve">
+    <value>إضافة</value>
+  </data>
+  <data name="Add Channel Account" xml:space="preserve">
+    <value>إضافة حساب قناة</value>
+  </data>
+  <data name="Add Condition" xml:space="preserve">
+    <value>إضافة شرط</value>
+  </data>
+  <data name="Add Grouping Field" xml:space="preserve">
+    <value>إضافة حقل تجميع</value>
+  </data>
+  <data name="Add Item" xml:space="preserve">
+    <value>إضافة بند</value>
+  </data>
+  <data name="Add New Schedule" xml:space="preserve">
+    <value>إضافة جدول جديد</value>
+  </data>
+  <data name="Add a branch if you work from more than one location." xml:space="preserve">
+    <value>أضف فرعًا إذا كنت تعمل من أكثر من موقع.</value>
+  </data>
+  <data name="Add a user" xml:space="preserve">
+    <value>إضافة مستخدم</value>
+  </data>
+  <data name="Add a value" xml:space="preserve">
+    <value>إضافة قيمة</value>
+  </data>
+  <data name="Add another" xml:space="preserve">
+    <value>إضافة آخر</value>
+  </data>
+  <data name="Add at least one action to run when this trigger fires." xml:space="preserve">
+    <value>أضف إجراءً واحدًا على الأقل ليُنفَّذ عند تفعيل هذا المشغّل.</value>
+  </data>
+  <data name="Add at least one action." xml:space="preserve">
+    <value>أضف إجراءً واحدًا على الأقل.</value>
+  </data>
+  <data name="Add at least one user to this rule." xml:space="preserve">
+    <value>أضف مستخدمًا واحدًا على الأقل إلى هذه القاعدة.</value>
+  </data>
+  <data name="Add contact" xml:space="preserve">
+    <value>إضافة جهة اتصال</value>
+  </data>
+  <data name="Add field" xml:space="preserve">
+    <value>إضافة حقل</value>
+  </data>
+  <data name="Add fields" xml:space="preserve">
+    <value>إضافة حقول</value>
+  </data>
+  <data name="Add fields to any record type. Keys cannot change after they are created." xml:space="preserve">
+    <value>أضف حقولًا إلى أي نوع سجل. لا يمكن تغيير المفاتيح بعد إنشائها.</value>
+  </data>
+  <data name="Add one to choose the values you need from your documents." xml:space="preserve">
+    <value>أضف نوعًا لاختيار القيم التي تحتاجها من مستنداتك.</value>
+  </data>
+  <data name="Add rate" xml:space="preserve">
+    <value>إضافة سعر صرف</value>
+  </data>
+  <data name="Add section" xml:space="preserve">
+    <value>إضافة قسم</value>
+  </data>
+  <data name="Add stage" xml:space="preserve">
+    <value>إضافة مرحلة</value>
+  </data>
+  <data name="Add task" xml:space="preserve">
+    <value>إضافة مهمة</value>
+  </data>
+  <data name="Add the first one below." xml:space="preserve">
+    <value>أضف الأول أدناه.</value>
+  </data>
+  <data name="Add to section" xml:space="preserve">
+    <value>إضافة إلى القسم</value>
+  </data>
+  <data name="Add value" xml:space="preserve">
+    <value>إضافة قيمة</value>
+  </data>
+  <data name="Add your sellable products and services or adjust the search filter." xml:space="preserve">
+    <value>أضف منتجاتك وخدماتك القابلة للبيع أو عدّل عامل تصفية البحث.</value>
+  </data>
+  <data name="Added to favorites" xml:space="preserve">
+    <value>تمت الإضافة إلى المفضلة</value>
+  </data>
+  <data name="Address" xml:space="preserve">
+    <value>العنوان</value>
+  </data>
+  <data name="Address (letters, numbers, hyphens) *" xml:space="preserve">
+    <value>العنوان (حروف وأرقام وشرطات) *</value>
+  </data>
+  <data name="Aggregates &amp; Metrics" xml:space="preserve">
+    <value>التجميعات والمقاييس</value>
+  </data>
+  <data name="All Categories" xml:space="preserve">
+    <value>كل الفئات</value>
+  </data>
+  <data name="All Folders" xml:space="preserve">
+    <value>كل المجلدات</value>
+  </data>
+  <data name="All Reports" xml:space="preserve">
+    <value>كل التقارير</value>
+  </data>
+  <data name="All Reps (Company Wide)" xml:space="preserve">
+    <value>كل مندوبي المبيعات (على مستوى الشركة)</value>
+  </data>
+  <data name="All Statuses" xml:space="preserve">
+    <value>كل الحالات</value>
+  </data>
+  <data name="All Team Members" xml:space="preserve">
+    <value>كل أعضاء الفريق</value>
+  </data>
+  <data name="All Time" xml:space="preserve">
+    <value>كل الأوقات</value>
+  </data>
+  <data name="All Types" xml:space="preserve">
+    <value>كل الأنواع</value>
+  </data>
+  <data name="All accounts" xml:space="preserve">
+    <value>كل الحسابات</value>
+  </data>
+  <data name="All contacts" xml:space="preserve">
+    <value>كل جهات الاتصال</value>
+  </data>
+  <data name="All deals" xml:space="preserve">
+    <value>كل الصفقات</value>
+  </data>
+  <data name="All open" xml:space="preserve">
+    <value>كل المفتوحة</value>
+  </data>
+  <data name="All records" xml:space="preserve">
+    <value>كل السجلات</value>
+  </data>
+  <data name="Already have an account?" xml:space="preserve">
+    <value>هل لديك حساب بالفعل؟</value>
+  </data>
+  <data name="Always on" xml:space="preserve">
+    <value>مفعّل دائمًا</value>
+  </data>
+  <data name="Amount" xml:space="preserve">
+    <value>المبلغ</value>
+  </data>
+  <data name="Amount of money" xml:space="preserve">
+    <value>مبلغ مالي</value>
+  </data>
+  <data name="Annual" xml:space="preserve">
+    <value>سنوي</value>
+  </data>
+  <data name="Any lead" xml:space="preserve">
+    <value>أي عميل محتمل</value>
+  </data>
+  <data name="Applies to *" xml:space="preserve">
+    <value>ينطبق على *</value>
+  </data>
+  <data name="Apply to Associated Record" xml:space="preserve">
+    <value>تطبيق على السجل المرتبط</value>
+  </data>
+  <data name="Approve" xml:space="preserve">
+    <value>اعتماد</value>
+  </data>
+  <data name="Approve &amp; Apply" xml:space="preserve">
+    <value>اعتماد وتطبيق</value>
+  </data>
+  <data name="Approve &amp; Save" xml:space="preserve">
+    <value>اعتماد وحفظ</value>
+  </data>
+  <data name="Approve Document" xml:space="preserve">
+    <value>اعتماد المستند</value>
+  </data>
+  <data name="Archived" xml:space="preserve">
+    <value>مؤرشف</value>
+  </data>
+  <data name="Are you sure you want to approve this document and commit its extracted data?" xml:space="preserve">
+    <value>هل أنت متأكد أنك تريد اعتماد هذا المستند وحفظ البيانات المستخرجة منه؟</value>
+  </data>
+  <data name="Area Chart" xml:space="preserve">
+    <value>مخطط مساحي</value>
+  </data>
+  <data name="Ask again" xml:space="preserve">
+    <value>اسأل مرة أخرى</value>
+  </data>
+  <data name="Ask for a new link" xml:space="preserve">
+    <value>اطلب رابطًا جديدًا</value>
+  </data>
+  <data name="Ask for company (required)" xml:space="preserve">
+    <value>اطلب اسم الشركة (إلزامي)</value>
+  </data>
+  <data name="Assigned to" xml:space="preserve">
+    <value>مسند إلى</value>
+  </data>
+  <data name="Assignee" xml:space="preserve">
+    <value>المسؤول</value>
+  </data>
+  <data name="Assignee (Sales Rep)" xml:space="preserve">
+    <value>المسؤول (مندوب المبيعات)</value>
+  </data>
+  <data name="Assignments, mentions, reminders and results of your imports." xml:space="preserve">
+    <value>التكليفات والإشارات والتذكيرات ونتائج عمليات الاستيراد.</value>
+  </data>
+  <data name="At a glance" xml:space="preserve">
+    <value>نظرة سريعة</value>
+  </data>
+  <data name="At least 8 characters, with upper and lower case letters and a digit." xml:space="preserve">
+    <value>8 أحرف على الأقل، مع أحرف كبيرة وصغيرة ورقم.</value>
+  </data>
+  <data name="At least one line item is required." xml:space="preserve">
+    <value>مطلوب بند واحد على الأقل.</value>
+  </data>
+  <data name="Attn: {0}" xml:space="preserve">
+    <value>عناية: {0}</value>
+  </data>
+  <data name="Automatically generate and email this report to your team or stakeholders on a recurring schedule." xml:space="preserve">
+    <value>أنشئ هذا التقرير وأرسله بالبريد الإلكتروني تلقائيًا إلى فريقك أو أصحاب المصلحة وفق جدول متكرر.</value>
+  </data>
+  <data name="Automation rule saved" xml:space="preserve">
+    <value>تم حفظ قاعدة الأتمتة</value>
+  </data>
+  <data name="Automation rules" xml:space="preserve">
+    <value>قواعد الأتمتة</value>
+  </data>
+  <data name="Available Fields" xml:space="preserve">
+    <value>الحقول المتاحة</value>
+  </data>
+  <data name="Avg" xml:space="preserve">
+    <value>المتوسط</value>
+  </data>
+  <data name="Awaiting client" xml:space="preserve">
+    <value>بانتظار العميل</value>
+  </data>
+  <data name="Back" xml:space="preserve">
+    <value>رجوع</value>
+  </data>
+  <data name="Back to Reports" xml:space="preserve">
+    <value>العودة إلى التقارير</value>
+  </data>
+  <data name="Back to documents" xml:space="preserve">
+    <value>العودة إلى المستندات</value>
+  </data>
+  <data name="Back to sign in" xml:space="preserve">
+    <value>العودة إلى تسجيل الدخول</value>
+  </data>
+  <data name="Bank Wire / Transfer" xml:space="preserve">
+    <value>حوالة / تحويل مصرفي</value>
+  </data>
+  <data name="Base currency" xml:space="preserve">
+    <value>العملة الأساسية</value>
+  </data>
+  <data name="Base currency (ISO code)" xml:space="preserve">
+    <value>العملة الأساسية (رمز ISO)</value>
+  </data>
+  <data name="Billed To: {0}" xml:space="preserve">
+    <value>الفاتورة إلى: {0}</value>
+  </data>
+  <data name="Billing Frequency" xml:space="preserve">
+    <value>دورية الفوترة</value>
+  </data>
+  <data name="Block Recipient" xml:space="preserve">
+    <value>حظر المستلم</value>
+  </data>
+  <data name="Board" xml:space="preserve">
+    <value>اللوحة</value>
+  </data>
+  <data name="Book a time" xml:space="preserve">
+    <value>احجز موعدًا</value>
+  </data>
+  <data name="Book this time" xml:space="preserve">
+    <value>احجز هذا الموعد</value>
+  </data>
+  <data name="Booking page deleted" xml:space="preserve">
+    <value>تم حذف صفحة الحجز</value>
+  </data>
+  <data name="Booking page saved" xml:space="preserve">
+    <value>تم حفظ صفحة الحجز</value>
+  </data>
+  <data name="Booking pages" xml:space="preserve">
+    <value>صفحات الحجز</value>
+  </data>
+  <data name="Branch" xml:space="preserve">
+    <value>الفرع</value>
+  </data>
+  <data name="Branch deleted" xml:space="preserve">
+    <value>تم حذف الفرع</value>
+  </data>
+  <data name="Branch saved" xml:space="preserve">
+    <value>تم حفظ الفرع</value>
+  </data>
+  <data name="Branches" xml:space="preserve">
+    <value>الفروع</value>
+  </data>
+  <data name="Brand colour" xml:space="preserve">
+    <value>لون العلامة التجارية</value>
+  </data>
+  <data name="Bring in a list from a CSV file. Nothing is changed until you press Import." xml:space="preserve">
+    <value>استورد قائمة من ملف CSV. لن يتغير شيء حتى تضغط على «استيراد».</value>
+  </data>
+  <data name="Business details" xml:space="preserve">
+    <value>بيانات الشركة</value>
+  </data>
+  <data name="By email" xml:space="preserve">
+    <value>عبر البريد الإلكتروني</value>
+  </data>
+  <data name="CSV Spreadsheet" xml:space="preserve">
+    <value>جدول بيانات CSV</value>
+  </data>
+  <data name="Call" xml:space="preserve">
+    <value>مكالمة</value>
+  </data>
+  <data name="Call Webhook" xml:space="preserve">
+    <value>استدعاء Webhook</value>
+  </data>
+  <data name="Cancel Invoice" xml:space="preserve">
+    <value>إلغاء الفاتورة</value>
+  </data>
+  <data name="Cancel request" xml:space="preserve">
+    <value>إلغاء الطلب</value>
+  </data>
+  <data name="Cancel this booking" xml:space="preserve">
+    <value>إلغاء هذا الحجز</value>
+  </data>
+  <data name="Cancelled" xml:space="preserve">
+    <value>ملغى</value>
+  </data>
+  <data name="Cash" xml:space="preserve">
+    <value>نقدًا</value>
+  </data>
+  <data name="Category" xml:space="preserve">
+    <value>الفئة</value>
+  </data>
+  <data name="Category / X-Axis" xml:space="preserve">
+    <value>الفئة / المحور السيني</value>
+  </data>
+  <data name="Change password" xml:space="preserve">
+    <value>تغيير كلمة المرور</value>
+  </data>
+  <data name="Channel account removed" xml:space="preserve">
+    <value>تمت إزالة حساب القناة</value>
+  </data>
+  <data name="Channels &amp; Accounts" xml:space="preserve">
+    <value>القنوات والحسابات</value>
+  </data>
+  <data name="Chart Type" xml:space="preserve">
+    <value>نوع المخطط</value>
+  </data>
+  <data name="Checklist saved" xml:space="preserve">
+    <value>تم حفظ قائمة المهام</value>
+  </data>
+  <data name="Cheque" xml:space="preserve">
+    <value>شيك</value>
+  </data>
+  <data name="Choice (many)" xml:space="preserve">
+    <value>اختيار (متعدد)</value>
+  </data>
+  <data name="Choice (one)" xml:space="preserve">
+    <value>اختيار (واحد)</value>
+  </data>
+  <data name="Choose a file" xml:space="preserve">
+    <value>اختر ملفًا</value>
+  </data>
+  <data name="Choose a new password" xml:space="preserve">
+    <value>اختر كلمة مرور جديدة</value>
+  </data>
+  <data name="Choose a password" xml:space="preserve">
+    <value>اختر كلمة مرور</value>
+  </data>
+  <data name="Choose a reason." xml:space="preserve">
+    <value>اختر سببًا.</value>
+  </data>
+  <data name="Choose file" xml:space="preserve">
+    <value>اختر ملفًا</value>
+  </data>
+  <data name="Choose how you want to begin." xml:space="preserve">
+    <value>اختر كيف تريد أن تبدأ.</value>
+  </data>
+  <data name="Choose the kind of document, the words that identify it, and the values to read from it." xml:space="preserve">
+    <value>اختر نوع المستند والكلمات التي تحدده والقيم المطلوب قراءتها منه.</value>
+  </data>
+  <data name="Choose the value the lead field must equal." xml:space="preserve">
+    <value>اختر القيمة التي يجب أن يساويها حقل العميل المحتمل.</value>
+  </data>
+  <data name="Choose what reaches you in MindLift and by email." xml:space="preserve">
+    <value>اختر ما يصلك في MindLift وعبر البريد الإلكتروني.</value>
+  </data>
+  <data name="Choose where these leads come from." xml:space="preserve">
+    <value>اختر مصدر هؤلاء العملاء المحتملين.</value>
+  </data>
+  <data name="Choose which fields appear on each record form and detail page, in what order, and in which section." xml:space="preserve">
+    <value>اختر الحقول التي تظهر في نموذج كل سجل وصفحة تفاصيله، وبأي ترتيب، وفي أي قسم.</value>
+  </data>
+  <data name="Choose your industry" xml:space="preserve">
+    <value>اختر مجال عملك</value>
+  </data>
+  <data name="Click 'Run Preview' above to execute your current report configuration." xml:space="preserve">
+    <value>اضغط على «تشغيل المعاينة» أعلاه لتنفيذ إعدادات التقرير الحالية.</value>
+  </data>
+  <data name="Closed" xml:space="preserve">
+    <value>مغلق</value>
+  </data>
+  <data name="Collected Revenue" xml:space="preserve">
+    <value>الإيرادات المحصّلة</value>
+  </data>
+  <data name="Collection Progress" xml:space="preserve">
+    <value>تقدّم التحصيل</value>
+  </data>
+  <data name="Colour (#RRGGBB)" xml:space="preserve">
+    <value>اللون (#RRGGBB)</value>
+  </data>
+  <data name="Colour preview" xml:space="preserve">
+    <value>معاينة اللون</value>
+  </data>
+  <data name="Columns" xml:space="preserve">
+    <value>الأعمدة</value>
+  </data>
+  <data name="Comma-separated email addresses" xml:space="preserve">
+    <value>عناوين بريد إلكتروني مفصولة بفواصل</value>
+  </data>
+  <data name="Comma-separated, for example USD, EUR." xml:space="preserve">
+    <value>مفصولة بفواصل، مثل USD وEUR.</value>
+  </data>
+  <data name="Communication Opt-Outs" xml:space="preserve">
+    <value>إلغاء الاشتراك في الاتصالات</value>
+  </data>
+  <data name="Companies appear here when you add them, import them, or convert a lead." xml:space="preserve">
+    <value>تظهر الشركات هنا عند إضافتها أو استيرادها أو تحويل عميل محتمل.</value>
+  </data>
+  <data name="Company" xml:space="preserve">
+    <value>الشركة</value>
+  </data>
+  <data name="Company name" xml:space="preserve">
+    <value>اسم الشركة</value>
+  </data>
+  <data name="Company settings" xml:space="preserve">
+    <value>إعدادات الشركة</value>
+  </data>
+  <data name="Configure complex quotes, manage product discounts, and convert accepted proposals into invoices." xml:space="preserve">
+    <value>أعدّ عروض أسعار معقدة، وأدر خصومات المنتجات، وحوّل العروض المقبولة إلى فواتير.</value>
+  </data>
+  <data name="Configure custom data sources, grouping, formulas, and visual analytics." xml:space="preserve">
+    <value>أعدّ مصادر بيانات مخصصة وتجميعات ومعادلات وتحليلات مرئية.</value>
+  </data>
+  <data name="Configured Schedules" xml:space="preserve">
+    <value>الجداول المضبوطة</value>
+  </data>
+  <data name="Confirm Payment" xml:space="preserve">
+    <value>تأكيد الدفعة</value>
+  </data>
+  <data name="Confirm your email" xml:space="preserve">
+    <value>أكّد بريدك الإلكتروني</value>
+  </data>
+  <data name="Connect your channels" xml:space="preserve">
+    <value>اربط قنواتك</value>
+  </data>
+  <data name="Connection failed" xml:space="preserve">
+    <value>فشل الاتصال</value>
+  </data>
+  <data name="Contact" xml:space="preserve">
+    <value>جهة الاتصال</value>
+  </data>
+  <data name="Contact deleted" xml:space="preserve">
+    <value>تم حذف جهة الاتصال</value>
+  </data>
+  <data name="Contact saved" xml:space="preserve">
+    <value>تم حفظ جهة الاتصال</value>
+  </data>
+  <data name="Contacts appear here when you add them, import them, or convert a lead." xml:space="preserve">
+    <value>تظهر جهات الاتصال هنا عند إضافتها أو استيرادها أو تحويل عميل محتمل.</value>
+  </data>
+  <data name="Contacts or leads in this registry will be strictly blocked from receiving outbound messages." xml:space="preserve">
+    <value>سيُمنع تمامًا إرسال الرسائل الصادرة إلى جهات الاتصال أو العملاء المحتملين المدرجين في هذا السجل.</value>
+  </data>
+  <data name="Contacts with the same email or phone." xml:space="preserve">
+    <value>جهات الاتصال التي لها البريد الإلكتروني أو الهاتف نفسه.</value>
+  </data>
+  <data name="Continue setup" xml:space="preserve">
+    <value>متابعة الإعداد</value>
+  </data>
+  <data name="Continue to MindLift" xml:space="preserve">
+    <value>المتابعة إلى MindLift</value>
+  </data>
+  <data name="Contract" xml:space="preserve">
+    <value>عقد</value>
+  </data>
+  <data name="Conversion Funnel" xml:space="preserve">
+    <value>قمع التحويل</value>
+  </data>
+  <data name="Convert" xml:space="preserve">
+    <value>تحويل</value>
+  </data>
+  <data name="Convert lead" xml:space="preserve">
+    <value>تحويل العميل المحتمل</value>
+  </data>
+  <data name="Convert to Invoice" xml:space="preserve">
+    <value>تحويل إلى فاتورة</value>
+  </data>
+  <data name="Convert to a customer" xml:space="preserve">
+    <value>تحويل إلى عميل</value>
+  </data>
+  <data name="Could not change portal sharing." xml:space="preserve">
+    <value>تعذّر تغيير مشاركة البوابة.</value>
+  </data>
+  <data name="Could not change this module." xml:space="preserve">
+    <value>تعذّر تغيير هذه الوحدة.</value>
+  </data>
+  <data name="Could not complete task" xml:space="preserve">
+    <value>تعذّر إكمال المهمة</value>
+  </data>
+  <data name="Could not convert this lead." xml:space="preserve">
+    <value>تعذّر تحويل هذا العميل المحتمل.</value>
+  </data>
+  <data name="Could not deactivate this user." xml:space="preserve">
+    <value>تعذّر إلغاء تفعيل هذا المستخدم.</value>
+  </data>
+  <data name="Could not delete rule" xml:space="preserve">
+    <value>تعذّر حذف القاعدة</value>
+  </data>
+  <data name="Could not disqualify this lead." xml:space="preserve">
+    <value>تعذّر استبعاد هذا العميل المحتمل.</value>
+  </data>
+  <data name="Could not export report." xml:space="preserve">
+    <value>تعذّر تصدير التقرير.</value>
+  </data>
+  <data name="Could not save. Try again." xml:space="preserve">
+    <value>تعذّر الحفظ. حاول مرة أخرى.</value>
+  </data>
+  <data name="Could not send portal invitation." xml:space="preserve">
+    <value>تعذّر إرسال دعوة البوابة.</value>
+  </data>
+  <data name="Could not toggle rule" xml:space="preserve">
+    <value>تعذّر تبديل حالة القاعدة</value>
+  </data>
+  <data name="Add a {0} column before importing." xml:space="preserve">
+    <value>أضف عمود {0} قبل الاستيراد.</value>
+  </data>
+  <data name="Could not update the request." xml:space="preserve">
+    <value>تعذّر تحديث الطلب.</value>
+  </data>
+  <data name="Count" xml:space="preserve">
+    <value>العدد</value>
+  </data>
+  <data name="Country" xml:space="preserve">
+    <value>الدولة</value>
+  </data>
+  <data name="Create" xml:space="preserve">
+    <value>إنشاء</value>
+  </data>
+  <data name="Create Direct Invoice" xml:space="preserve">
+    <value>إنشاء فاتورة مباشرة</value>
+  </data>
+  <data name="Create Folder" xml:space="preserve">
+    <value>إنشاء مجلد</value>
+  </data>
+  <data name="Create Invoice" xml:space="preserve">
+    <value>إنشاء فاتورة</value>
+  </data>
+  <data name="Create New Proposal / Quote" xml:space="preserve">
+    <value>إنشاء عرض / عرض سعر جديد</value>
+  </data>
+  <data name="Create Price Book" xml:space="preserve">
+    <value>إنشاء قائمة أسعار</value>
+  </data>
+  <data name="Create Proposal" xml:space="preserve">
+    <value>إنشاء عرض</value>
+  </data>
+  <data name="Create Task" xml:space="preserve">
+    <value>إنشاء مهمة</value>
+  </data>
+  <data name="Create a deal" xml:space="preserve">
+    <value>إنشاء صفقة</value>
+  </data>
+  <data name="Create a form, then paste its endpoint into your website." xml:space="preserve">
+    <value>أنشئ نموذجًا، ثم الصق عنوانه في موقعك الإلكتروني.</value>
+  </data>
+  <data name="Create a pipeline to start tracking deals." xml:space="preserve">
+    <value>أنشئ مسار مبيعات لبدء تتبع الصفقات.</value>
+  </data>
+  <data name="Create a team to share records and dashboards with a group." xml:space="preserve">
+    <value>أنشئ فريقًا لمشاركة السجلات ولوحات التحكم مع مجموعة.</value>
+  </data>
+  <data name="Create an account" xml:space="preserve">
+    <value>إنشاء حساب</value>
+  </data>
+  <data name="Create an invoice or convert accepted proposals into billing records." xml:space="preserve">
+    <value>أنشئ فاتورة أو حوّل العروض المقبولة إلى سجلات فوترة.</value>
+  </data>
+  <data name="Create and edit form" xml:space="preserve">
+    <value>إنشاء النموذج وتعديله</value>
+  </data>
+  <data name="Create my workspace" xml:space="preserve">
+    <value>إنشاء مساحة العمل</value>
+  </data>
+  <data name="Create one and its tasks appear on every deal you win." xml:space="preserve">
+    <value>أنشئ واحدة وستظهر مهامها في كل صفقة تفوز بها.</value>
+  </data>
+  <data name="Create one and share its link. Customers see only the free times." xml:space="preserve">
+    <value>أنشئ واحدة وشارك رابطها. يرى العملاء الأوقات الفارغة فقط.</value>
+  </data>
+  <data name="Create role" xml:space="preserve">
+    <value>إنشاء دور</value>
+  </data>
+  <data name="Create your first rule to automate tasks, field updates, emails, and notifications on record events." xml:space="preserve">
+    <value>أنشئ أول قاعدة لأتمتة المهام وتحديثات الحقول والرسائل والإشعارات عند أحداث السجلات.</value>
+  </data>
+  <data name="Create your workspace" xml:space="preserve">
+    <value>أنشئ مساحة عملك</value>
+  </data>
+  <data name="Created" xml:space="preserve">
+    <value>تاريخ الإنشاء</value>
+  </data>
+  <data name="Creates the contact, the company and a deal. Activities move with them." xml:space="preserve">
+    <value>ينشئ جهة الاتصال والشركة وصفقة. وتنتقل الأنشطة معها.</value>
+  </data>
+  <data name="Credit / Debit Card" xml:space="preserve">
+    <value>بطاقة ائتمان / خصم</value>
+  </data>
+  <data name="Cron Expression" xml:space="preserve">
+    <value>تعبير Cron</value>
+  </data>
+  <data name="Currencies" xml:space="preserve">
+    <value>العملات</value>
+  </data>
+  <data name="Currencies saved" xml:space="preserve">
+    <value>تم حفظ العملات</value>
+  </data>
+  <data name="Currency" xml:space="preserve">
+    <value>العملة</value>
+  </data>
+  <data name="Currency Code" xml:space="preserve">
+    <value>رمز العملة</value>
+  </data>
+  <data name="Custom Cron Expression" xml:space="preserve">
+    <value>تعبير Cron مخصص</value>
+  </data>
+  <data name="Custom Rate" xml:space="preserve">
+    <value>سعر مخصص</value>
+  </data>
+  <data name="Custom Reports" xml:space="preserve">
+    <value>التقارير المخصصة</value>
+  </data>
+  <data name="Custom fields" xml:space="preserve">
+    <value>الحقول المخصصة</value>
+  </data>
+  <data name="Customer contact" xml:space="preserve">
+    <value>جهة اتصال العميل</value>
+  </data>
+  <data name="Customize" xml:space="preserve">
+    <value>تخصيص</value>
+  </data>
+  <data name="Customize Dashboard" xml:space="preserve">
+    <value>تخصيص لوحة التحكم</value>
+  </data>
+  <data name="Daily (8:00 AM UTC)" xml:space="preserve">
+    <value>يوميًا (8:00 صباحًا بالتوقيت العالمي)</value>
+  </data>
+  <data name="Daily at 8:00 AM UTC" xml:space="preserve">
+    <value>يوميًا عند 8:00 صباحًا بالتوقيت العالمي</value>
+  </data>
+  <data name="Daily summary" xml:space="preserve">
+    <value>ملخص يومي</value>
+  </data>
+  <data name="Data Visualization" xml:space="preserve">
+    <value>تصوير البيانات</value>
+  </data>
+  <data name="Date Column" xml:space="preserve">
+    <value>عمود التاريخ</value>
+  </data>
+  <data name="Date Range" xml:space="preserve">
+    <value>نطاق التاريخ</value>
+  </data>
+  <data name="Date Range Filter" xml:space="preserve">
+    <value>تصفية نطاق التاريخ</value>
+  </data>
+  <data name="Date and time" xml:space="preserve">
+    <value>التاريخ والوقت</value>
+  </data>
+  <data name="Day" xml:space="preserve">
+    <value>يوم</value>
+  </data>
+  <data name="Days after winning" xml:space="preserve">
+    <value>أيام بعد الفوز</value>
+  </data>
+  <data name="Days ahead" xml:space="preserve">
+    <value>أيام قادمة</value>
+  </data>
+  <data name="Deactivate" xml:space="preserve">
+    <value>إلغاء التفعيل</value>
+  </data>
+  <data name="Deactivate {0}? They lose access straight away. Their records stay in the workspace." xml:space="preserve">
+    <value>إلغاء تفعيل {0}؟ سيفقد وصوله فورًا. تبقى سجلاته في مساحة العمل.</value>
+  </data>
+  <data name="Deal" xml:space="preserve">
+    <value>الصفقة</value>
+  </data>
+  <data name="Deal Stage Changes" xml:space="preserve">
+    <value>تغييرات مراحل الصفقات</value>
+  </data>
+  <data name="Deal deleted" xml:space="preserve">
+    <value>تم حذف الصفقة</value>
+  </data>
+  <data name="Deal name" xml:space="preserve">
+    <value>اسم الصفقة</value>
+  </data>
+  <data name="Deal saved" xml:space="preserve">
+    <value>تم حفظ الصفقة</value>
+  </data>
+  <data name="Deals Won" xml:space="preserve">
+    <value>الصفقات الرابحة</value>
+  </data>
+  <data name="Deals Won (Count)" xml:space="preserve">
+    <value>الصفقات الرابحة (العدد)</value>
+  </data>
+  <data name="Deals Won Quota" xml:space="preserve">
+    <value>حصة الصفقات الرابحة</value>
+  </data>
+  <data name="Deals appear here when you add them, import them, or convert a lead." xml:space="preserve">
+    <value>تظهر الصفقات هنا عند إضافتها أو استيرادها أو تحويل عميل محتمل.</value>
+  </data>
+  <data name="Deals become &quot;{0}&quot;" xml:space="preserve">
+    <value>تصبح الصفقات «{0}»</value>
+  </data>
+  <data name="Decides who owns a new lead. Rules run from the lowest priority number. The first rule that matches and has an active user wins." xml:space="preserve">
+    <value>تحدد من يملك العميل المحتمل الجديد. تعمل القواعد بدءًا من أقل رقم أولوية. تُطبَّق أول قاعدة تتطابق ولها مستخدم نشط.</value>
+  </data>
+  <data name="Default" xml:space="preserve">
+    <value>افتراضي</value>
+  </data>
+  <data name="Default Tax Rate %" xml:space="preserve">
+    <value>نسبة الضريبة الافتراضية %</value>
+  </data>
+  <data name="Default language" xml:space="preserve">
+    <value>اللغة الافتراضية</value>
+  </data>
+  <data name="Default pipeline for new deals" xml:space="preserve">
+    <value>المسار الافتراضي للصفقات الجديدة</value>
+  </data>
+  <data name="Define team and rep performance quotas and track revenue progress in real time." xml:space="preserve">
+    <value>حدّد حصص أداء الفرق والمندوبين وتابع تقدم الإيرادات في الوقت الفعلي.</value>
+  </data>
+  <data name="Delete" xml:space="preserve">
+    <value>حذف</value>
+  </data>
+  <data name="Delete Report" xml:space="preserve">
+    <value>حذف التقرير</value>
+  </data>
+  <data name="Delete branch" xml:space="preserve">
+    <value>حذف الفرع</value>
+  </data>
+  <data name="Delete pipeline" xml:space="preserve">
+    <value>حذف المسار</value>
+  </data>
+  <data name="Delete rate" xml:space="preserve">
+    <value>حذف سعر الصرف</value>
+  </data>
+  <data name="Delete role" xml:space="preserve">
+    <value>حذف الدور</value>
+  </data>
+  <data name="Delete rule" xml:space="preserve">
+    <value>حذف القاعدة</value>
+  </data>
+  <data name="Delete schedule" xml:space="preserve">
+    <value>حذف الجدول</value>
+  </data>
+  <data name="Delete stage" xml:space="preserve">
+    <value>حذف المرحلة</value>
+  </data>
+  <data name="Delete team" xml:space="preserve">
+    <value>حذف الفريق</value>
+  </data>
+  <data name="Delete this role? Its users need another role first." xml:space="preserve">
+    <value>حذف هذا الدور؟ يحتاج مستخدموه إلى دور آخر أولًا.</value>
+  </data>
+  <data name="Delivery Frequency" xml:space="preserve">
+    <value>دورية التسليم</value>
+  </data>
+  <data name="Description" xml:space="preserve">
+    <value>الوصف</value>
+  </data>
+  <data name="Detected Intelligence" xml:space="preserve">
+    <value>المعلومات المكتشفة</value>
+  </data>
+  <data name="Direct Customer" xml:space="preserve">
+    <value>عميل مباشر</value>
+  </data>
+  <data name="Disc %" xml:space="preserve">
+    <value>الخصم %</value>
+  </data>
+  <data name="Discount:" xml:space="preserve">
+    <value>الخصم:</value>
+  </data>
+  <data name="Disqualified because" xml:space="preserve">
+    <value>تم الاستبعاد لأن</value>
+  </data>
+  <data name="Disqualify" xml:space="preserve">
+    <value>استبعاد</value>
+  </data>
+  <data name="Disqualify this lead" xml:space="preserve">
+    <value>استبعاد هذا العميل المحتمل</value>
+  </data>
+  <data name="Document Content" xml:space="preserve">
+    <value>محتوى المستند</value>
+  </data>
+  <data name="Document Name / Title" xml:space="preserve">
+    <value>اسم المستند / عنوانه</value>
+  </data>
+  <data name="Document approved successfully." xml:space="preserve">
+    <value>تم اعتماد المستند بنجاح.</value>
+  </data>
+  <data name="Document marked as Rejected." xml:space="preserve">
+    <value>تم تحديد المستند كمرفوض.</value>
+  </data>
+  <data name="Document not found or has been deleted." xml:space="preserve">
+    <value>المستند غير موجود أو تم حذفه.</value>
+  </data>
+  <data name="Document reprocessed successfully." xml:space="preserve">
+    <value>تمت إعادة معالجة المستند بنجاح.</value>
+  </data>
+  <data name="Document request published to customer portal!" xml:space="preserve">
+    <value>تم نشر طلب المستند في بوابة العملاء!</value>
+  </data>
+  <data name="Document type saved" xml:space="preserve">
+    <value>تم حفظ نوع المستند</value>
+  </data>
+  <data name="Document types" xml:space="preserve">
+    <value>أنواع المستندات</value>
+  </data>
+  <data name="Documents &amp; Smart OCR" xml:space="preserve">
+    <value>المستندات والتعرف الذكي على النصوص</value>
+  </data>
+  <data name="Documents already read with it keep their values." xml:space="preserve">
+    <value>المستندات التي قُرئت به تحتفظ بقيمها.</value>
+  </data>
+  <data name="Done" xml:space="preserve">
+    <value>تم</value>
+  </data>
+  <data name="Donut / Pie" xml:space="preserve">
+    <value>مخطط دائري / حلقي</value>
+  </data>
+  <data name="Download File" xml:space="preserve">
+    <value>تنزيل الملف</value>
+  </data>
+  <data name="Download a template" xml:space="preserve">
+    <value>تنزيل قالب</value>
+  </data>
+  <data name="Draft" xml:space="preserve">
+    <value>مسودة</value>
+  </data>
+  <data name="Due Date" xml:space="preserve">
+    <value>تاريخ الاستحقاق</value>
+  </data>
+  <data name="Due In Days" xml:space="preserve">
+    <value>الاستحقاق خلال (أيام)</value>
+  </data>
+  <data name="Due: {0}" xml:space="preserve">
+    <value>الاستحقاق: {0}</value>
+  </data>
+  <data name="Each person uses a seat on your plan. You can invite more later in Settings." xml:space="preserve">
+    <value>يستخدم كل شخص مقعدًا في خطتك. يمكنك دعوة المزيد لاحقًا من الإعدادات.</value>
+  </data>
+  <data name="Edit" xml:space="preserve">
+    <value>تعديل</value>
+  </data>
+  <data name="Edit Builder" xml:space="preserve">
+    <value>تعديل المنشئ</value>
+  </data>
+  <data name="Edit Product" xml:space="preserve">
+    <value>تعديل المنتج</value>
+  </data>
+  <data name="Edit automation rule" xml:space="preserve">
+    <value>تعديل قاعدة الأتمتة</value>
+  </data>
+  <data name="Edit branch" xml:space="preserve">
+    <value>تعديل الفرع</value>
+  </data>
+  <data name="Edit form" xml:space="preserve">
+    <value>تعديل النموذج</value>
+  </data>
+  <data name="Edit pipeline" xml:space="preserve">
+    <value>تعديل المسار</value>
+  </data>
+  <data name="Edit rule" xml:space="preserve">
+    <value>تعديل القاعدة</value>
+  </data>
+  <data name="Edit stage" xml:space="preserve">
+    <value>تعديل المرحلة</value>
+  </data>
+  <data name="Edit team" xml:space="preserve">
+    <value>تعديل الفريق</value>
+  </data>
+  <data name="Effective" xml:space="preserve">
+    <value>ساري المفعول</value>
+  </data>
+  <data name="Email" xml:space="preserve">
+    <value>البريد الإلكتروني</value>
+  </data>
+  <data name="Email *" xml:space="preserve">
+    <value>البريد الإلكتروني *</value>
+  </data>
+  <data name="Email Body *" xml:space="preserve">
+    <value>نص الرسالة *</value>
+  </data>
+  <data name="Email Subject *" xml:space="preserve">
+    <value>موضوع الرسالة *</value>
+  </data>
+  <data name="Email and WhatsApp connections arrive in a later release. You can skip this step now." xml:space="preserve">
+    <value>ستتوفر وصلات البريد الإلكتروني وواتساب في إصدار لاحق. يمكنك تخطي هذه الخطوة الآن.</value>
+  </data>
+  <data name="Email calendar invitations to the guests" xml:space="preserve">
+    <value>إرسال دعوات التقويم إلى الضيوف بالبريد الإلكتروني</value>
+  </data>
+  <data name="Email me my day at 8:00 each morning" xml:space="preserve">
+    <value>أرسل لي ملخص يومي بالبريد الإلكتروني عند الثامنة صباحًا</value>
+  </data>
+  <data name="Email or password is incorrect." xml:space="preserve">
+    <value>البريد الإلكتروني أو كلمة المرور غير صحيحة.</value>
+  </data>
+  <data name="Email: {0}" xml:space="preserve">
+    <value>بريد إلكتروني: {0}</value>
+  </data>
+  <data name="End Date" xml:space="preserve">
+    <value>تاريخ الانتهاء</value>
+  </data>
+  <data name="End date cannot be earlier than start date." xml:space="preserve">
+    <value>لا يمكن أن يكون تاريخ الانتهاء قبل تاريخ البدء.</value>
+  </data>
+  <data name="Endpoint for your website:" xml:space="preserve">
+    <value>عنوان الإرسال لموقعك الإلكتروني:</value>
+  </data>
+  <data name="Enter a code and a label." xml:space="preserve">
+    <value>أدخل رمزًا واسمًا.</value>
+  </data>
+  <data name="Enter a currency, a rate and a date." xml:space="preserve">
+    <value>أدخل عملة وسعر صرف وتاريخًا.</value>
+  </data>
+  <data name="Enter the email you signed up with." xml:space="preserve">
+    <value>أدخل البريد الإلكتروني الذي سجّلت به.</value>
+  </data>
+  <data name="Enter your email and we will send you a link to choose a new one." xml:space="preserve">
+    <value>أدخل بريدك الإلكتروني وسنرسل إليك رابطًا لاختيار كلمة مرور جديدة.</value>
+  </data>
+  <data name="Entries configured:" xml:space="preserve">
+    <value>الإدخالات المضبوطة:</value>
+  </data>
+  <data name="Equals" xml:space="preserve">
+    <value>يساوي</value>
+  </data>
+  <data name="Establish performance quotas for your sales reps or teams to start tracking goal attainment." xml:space="preserve">
+    <value>حدّد حصص الأداء لمندوبي المبيعات أو الفرق لبدء تتبع تحقيق الأهداف.</value>
+  </data>
+  <data name="Every Monday at 8:00 AM UTC" xml:space="preserve">
+    <value>كل يوم اثنين عند 8:00 صباحًا بالتوقيت العالمي</value>
+  </data>
+  <data name="Every field is on this layout." xml:space="preserve">
+    <value>كل الحقول موجودة في هذا التخطيط.</value>
+  </data>
+  <data name="Everyone" xml:space="preserve">
+    <value>الجميع</value>
+  </data>
+  <data name="Everyone (All Users)" xml:space="preserve">
+    <value>الجميع (كل المستخدمين)</value>
+  </data>
+  <data name="Everyone who is active (round robin)" xml:space="preserve">
+    <value>كل النشطين (بالتناوب)</value>
+  </data>
+  <data name="Example: Trade License|3 — a document scores the weights of the words it contains." xml:space="preserve">
+    <value>مثال: Trade License|3 — يحصل المستند على مجموع أوزان الكلمات التي يحتويها.</value>
+  </data>
+  <data name="Example: villa|Villa" xml:space="preserve">
+    <value>مثال: villa|Villa</value>
+  </data>
+  <data name="Excel Spreadsheet (XML)" xml:space="preserve">
+    <value>جدول Excel (XML)</value>
+  </data>
+  <data name="CSV · up to 5,000 rows" xml:space="preserve">
+    <value>CSV · حتى 5,000 صف</value>
+  </data>
+  <data name="Exchange rates" xml:space="preserve">
+    <value>أسعار الصرف</value>
+  </data>
+  <data name="Executing query against tenant schema..." xml:space="preserve">
+    <value>جارٍ تنفيذ الاستعلام على مخطط الشركة...</value>
+  </data>
+  <data name="Execution Delay (Minutes, 0 = Instant)" xml:space="preserve">
+    <value>تأخير التنفيذ (بالدقائق، 0 = فوري)</value>
+  </data>
+  <data name="Execution Time" xml:space="preserve">
+    <value>وقت التنفيذ</value>
+  </data>
+  <data name="Execution logs will appear here when automation rules fire." xml:space="preserve">
+    <value>ستظهر سجلات التنفيذ هنا عند تفعيل قواعد الأتمتة.</value>
+  </data>
+  <data name="Expected close" xml:space="preserve">
+    <value>الإغلاق المتوقع</value>
+  </data>
+  <data name="Expiration Date" xml:space="preserve">
+    <value>تاريخ انتهاء الصلاحية</value>
+  </data>
+  <data name="Expired" xml:space="preserve">
+    <value>منتهي الصلاحية</value>
+  </data>
+  <data name="Expiry Date" xml:space="preserve">
+    <value>تاريخ الانتهاء</value>
+  </data>
+  <data name="Export" xml:space="preserve">
+    <value>تصدير</value>
+  </data>
+  <data name="Export Format" xml:space="preserve">
+    <value>صيغة التصدير</value>
+  </data>
+  <data name="Export as CSV" xml:space="preserve">
+    <value>تصدير بصيغة CSV</value>
+  </data>
+  <data name="Export as Excel (XML)" xml:space="preserve">
+    <value>تصدير بصيغة Excel (XML)</value>
+  </data>
+  <data name="Export as PDF" xml:space="preserve">
+    <value>تصدير بصيغة PDF</value>
+  </data>
+  <data name="Export downloaded" xml:space="preserve">
+    <value>تم تنزيل الملف المُصدَّر</value>
+  </data>
+  <data name="Export failed." xml:space="preserve">
+    <value>فشل التصدير.</value>
+  </data>
+  <data name="Export ready" xml:space="preserve">
+    <value>التصدير جاهز</value>
+  </data>
+  <data name="Extracted Text Content" xml:space="preserve">
+    <value>النص المستخرج</value>
+  </data>
+  <data name="Extracted Total" xml:space="preserve">
+    <value>الإجمالي المستخرج</value>
+  </data>
+  <data name="Failed to approve document." xml:space="preserve">
+    <value>فشل اعتماد المستند.</value>
+  </data>
+  <data name="Failed to create document request." xml:space="preserve">
+    <value>فشل إنشاء طلب المستند.</value>
+  </data>
+  <data name="Failed to create folder" xml:space="preserve">
+    <value>فشل إنشاء المجلد</value>
+  </data>
+  <data name="Failed to delete report." xml:space="preserve">
+    <value>فشل حذف التقرير.</value>
+  </data>
+  <data name="Failed to delete schedule." xml:space="preserve">
+    <value>فشل حذف الجدول.</value>
+  </data>
+  <data name="Failed to delete target." xml:space="preserve">
+    <value>فشل حذف الهدف.</value>
+  </data>
+  <data name="Failed to execute report query." xml:space="preserve">
+    <value>فشل تنفيذ استعلام التقرير.</value>
+  </data>
+  <data name="Failed to reject document." xml:space="preserve">
+    <value>فشل رفض المستند.</value>
+  </data>
+  <data name="Failed to reprocess document." xml:space="preserve">
+    <value>فشلت إعادة معالجة المستند.</value>
+  </data>
+  <data name="Failed to save field edits." xml:space="preserve">
+    <value>فشل حفظ تعديلات الحقول.</value>
+  </data>
+  <data name="Failed to save report." xml:space="preserve">
+    <value>فشل حفظ التقرير.</value>
+  </data>
+  <data name="Failed to save rule. Verify all fields." xml:space="preserve">
+    <value>فشل حفظ القاعدة. تحقق من كل الحقول.</value>
+  </data>
+  <data name="Failed to save sales target." xml:space="preserve">
+    <value>فشل حفظ هدف المبيعات.</value>
+  </data>
+  <data name="Failed to save schedule." xml:space="preserve">
+    <value>فشل حفظ الجدول.</value>
+  </data>
+  <data name="Favorites" xml:space="preserve">
+    <value>المفضلة</value>
+  </data>
+  <data name="Fewest open leads" xml:space="preserve">
+    <value>أقل عدد من العملاء المحتملين المفتوحين</value>
+  </data>
+  <data name="Field Changed" xml:space="preserve">
+    <value>تغيير حقل</value>
+  </data>
+  <data name="Field Key (e.g. Rating, Status, cf_budget)" xml:space="preserve">
+    <value>مفتاح الحقل (مثل Rating أو Status أو cf_budget)</value>
+  </data>
+  <data name="Field Key (e.g. status, rating, cf_budget)" xml:space="preserve">
+    <value>مفتاح الحقل (مثل status أو rating أو cf_budget)</value>
+  </data>
+  <data name="Field added" xml:space="preserve">
+    <value>تمت إضافة الحقل</value>
+  </data>
+  <data name="Field key (e.g. rating, status)" xml:space="preserve">
+    <value>مفتاح الحقل (مثل rating أو status)</value>
+  </data>
+  <data name="Fields" xml:space="preserve">
+    <value>الحقول</value>
+  </data>
+  <data name="Fields &amp; layouts" xml:space="preserve">
+    <value>الحقول والتخطيطات</value>
+  </data>
+  <data name="Fields Extracted: {0}" xml:space="preserve">
+    <value>الحقول المستخرجة: {0}</value>
+  </data>
+  <data name="Fields saved successfully." xml:space="preserve">
+    <value>تم حفظ الحقول بنجاح.</value>
+  </data>
+  <data name="Fields that are not on this layout yet. Pick the section they go into first." xml:space="preserve">
+    <value>حقول ليست في هذا التخطيط بعد. اختر القسم الذي ستنتقل إليه أولًا.</value>
+  </data>
+  <data name="Fields the form collects" xml:space="preserve">
+    <value>الحقول التي يجمعها النموذج</value>
+  </data>
+  <data name="Fields to be approved:" xml:space="preserve">
+    <value>الحقول المطلوب اعتمادها:</value>
+  </data>
+  <data name="Fields: {0}" xml:space="preserve">
+    <value>الحقول: {0}</value>
+  </data>
+  <data name="File" xml:space="preserve">
+    <value>الملف</value>
+  </data>
+  <data name="Files" xml:space="preserve">
+    <value>الملفات</value>
+  </data>
+  <data name="Fill in every field marked with *." xml:space="preserve">
+    <value>املأ كل حقل مُعلَّم بعلامة *.</value>
+  </data>
+  <data name="Filter Criteria (Optional)" xml:space="preserve">
+    <value>معايير التصفية (اختياري)</value>
+  </data>
+  <data name="Find duplicates" xml:space="preserve">
+    <value>البحث عن المكررات</value>
+  </data>
+  <data name="Finish setting up your workspace" xml:space="preserve">
+    <value>أكمل إعداد مساحة عملك</value>
+  </data>
+  <data name="First name" xml:space="preserve">
+    <value>الاسم الأول</value>
+  </data>
+  <data name="First name (required)" xml:space="preserve">
+    <value>الاسم الأول (إلزامي)</value>
+  </data>
+  <data name="First name *" xml:space="preserve">
+    <value>الاسم الأول *</value>
+  </data>
+  <data name="First name is always required." xml:space="preserve">
+    <value>الاسم الأول مطلوب دائمًا.</value>
+  </data>
+  <data name="Fiscal year starts (month 1–12)" xml:space="preserve">
+    <value>بداية السنة المالية (الشهر 1–12)</value>
+  </data>
+  <data name="Folder" xml:space="preserve">
+    <value>المجلد</value>
+  </data>
+  <data name="Folder Name *" xml:space="preserve">
+    <value>اسم المجلد *</value>
+  </data>
+  <data name="Folder created" xml:space="preserve">
+    <value>تم إنشاء المجلد</value>
+  </data>
+  <data name="Follow up" xml:space="preserve">
+    <value>متابعة</value>
+  </data>
+  <data name="Follow up with customer" xml:space="preserve">
+    <value>متابعة العميل</value>
+  </data>
+  <data name="For example Asia/Dubai. Leave empty to use the company time zone." xml:space="preserve">
+    <value>مثل Asia/Dubai. اتركه فارغًا لاستخدام المنطقة الزمنية للشركة.</value>
+  </data>
+  <data name="For round robin, the order below is the turn order. For a specific person, the first user gets every matching lead." xml:space="preserve">
+    <value>في التوزيع بالتناوب، الترتيب أدناه هو ترتيب الأدوار. أما لشخص محدد، فيحصل المستخدم الأول على كل عميل محتمل مطابق.</value>
+  </data>
+  <data name="Forgot password" xml:space="preserve">
+    <value>نسيت كلمة المرور</value>
+  </data>
+  <data name="Forgot your password?" xml:space="preserve">
+    <value>هل نسيت كلمة المرور؟</value>
+  </data>
+  <data name="Form saved" xml:space="preserve">
+    <value>تم حفظ النموذج</value>
+  </data>
+  <data name="Forms on your website that create leads. Choose the fields, where the lead comes from and the message the visitor sees." xml:space="preserve">
+    <value>نماذج في موقعك الإلكتروني تنشئ عملاء محتملين. اختر الحقول ومصدر العميل المحتمل والرسالة التي يراها الزائر.</value>
+  </data>
+  <data name="From (09:00)" xml:space="preserve">
+    <value>من (09:00)</value>
+  </data>
+  <data name="Function" xml:space="preserve">
+    <value>الدالة</value>
+  </data>
+  <data name="General" xml:space="preserve">
+    <value>عام</value>
+  </data>
+  <data name="General (No Folder)" xml:space="preserve">
+    <value>عام (بدون مجلد)</value>
+  </data>
+  <data name="Give the branch a name." xml:space="preserve">
+    <value>أعطِ الفرع اسمًا.</value>
+  </data>
+  <data name="Give the form a name." xml:space="preserve">
+    <value>أعطِ النموذج اسمًا.</value>
+  </data>
+  <data name="Give the pipeline a name." xml:space="preserve">
+    <value>أعطِ المسار اسمًا.</value>
+  </data>
+  <data name="Give the role a name." xml:space="preserve">
+    <value>أعطِ الدور اسمًا.</value>
+  </data>
+  <data name="Give the rule a name." xml:space="preserve">
+    <value>أعطِ القاعدة اسمًا.</value>
+  </data>
+  <data name="Give the stage a name." xml:space="preserve">
+    <value>أعطِ المرحلة اسمًا.</value>
+  </data>
+  <data name="Give the team a name." xml:space="preserve">
+    <value>أعطِ الفريق اسمًا.</value>
+  </data>
+  <data name="Go to sign in" xml:space="preserve">
+    <value>الانتقال إلى تسجيل الدخول</value>
+  </data>
+  <data name="Grand Total:" xml:space="preserve">
+    <value>الإجمالي الكلي:</value>
+  </data>
+  <data name="Greater Than" xml:space="preserve">
+    <value>أكبر من</value>
+  </data>
+  <data name="Group: {0}" xml:space="preserve">
+    <value>المجموعة: {0}</value>
+  </data>
+  <data name="Grouping Fields" xml:space="preserve">
+    <value>حقول التجميع</value>
+  </data>
+  <data name="Guests (email addresses)" xml:space="preserve">
+    <value>الضيوف (عناوين البريد الإلكتروني)</value>
+  </data>
+  <data name="Guests: {0}" xml:space="preserve">
+    <value>الضيوف: {0}</value>
+  </data>
+  <data name="Hello {0}," xml:space="preserve">
+    <value>مرحبًا {0}،</value>
+  </data>
+  <data name="High" xml:space="preserve">
+    <value>عالية</value>
+  </data>
+  <data name="Home dashboard" xml:space="preserve">
+    <value>لوحة التحكم الرئيسية</value>
+  </data>
+  <data name="Horizontal Bar" xml:space="preserve">
+    <value>أعمدة أفقية</value>
+  </data>
+  <data name="How to pick the owner *" xml:space="preserve">
+    <value>كيفية اختيار المالك *</value>
+  </data>
+  <data name="How we read your columns" xml:space="preserve">
+    <value>كيف نقرأ أعمدتك</value>
+  </data>
+  <data name="I agree to the Terms and Privacy Policy" xml:space="preserve">
+    <value>أوافق على الشروط وسياسة الخصوصية</value>
+  </data>
+  <data name="Identity" xml:space="preserve">
+    <value>الهوية</value>
+  </data>
+  <data name="If that email belongs to an account, a link is on its way. It works for one hour." xml:space="preserve">
+    <value>إذا كان هذا البريد الإلكتروني مرتبطًا بحساب، فسيصلك رابط خلال لحظات. يعمل لمدة ساعة واحدة.</value>
+  </data>
+  <data name="Import" xml:space="preserve">
+    <value>استيراد</value>
+  </data>
+  <data name="Import another file" xml:space="preserve">
+    <value>استيراد ملف آخر</value>
+  </data>
+  <data name="Import finished" xml:space="preserve">
+    <value>اكتمل الاستيراد</value>
+  </data>
+  <data name="Import my data later from Excel or CSV." xml:space="preserve">
+    <value>سأستورد بياناتي لاحقًا من Excel أو CSV.</value>
+  </data>
+  <data name="Import {0}" xml:space="preserve">
+    <value>استيراد {0}</value>
+  </data>
+  <data name="In MindLift" xml:space="preserve">
+    <value>داخل MindLift</value>
+  </data>
+  <data name="In person" xml:space="preserve">
+    <value>حضوريًا</value>
+  </data>
+  <data name="In this stage for {0} days" xml:space="preserve">
+    <value>في هذه المرحلة منذ {0} يومًا</value>
+  </data>
+  <data name="Industry" xml:space="preserve">
+    <value>المجال</value>
+  </data>
+  <data name="Insert Template" xml:space="preserve">
+    <value>إدراج قالب</value>
+  </data>
+  <data name="Instructions for Customer" xml:space="preserve">
+    <value>تعليمات للعميل</value>
+  </data>
+  <data name="Intelligence &amp; Key Information" xml:space="preserve">
+    <value>المعلومات الذكية والبيانات الرئيسية</value>
+  </data>
+  <data name="Interactive Query Preview" xml:space="preserve">
+    <value>معاينة الاستعلام التفاعلية</value>
+  </data>
+  <data name="Invitation sent" xml:space="preserve">
+    <value>تم إرسال الدعوة</value>
+  </data>
+  <data name="Invite people, change roles and deactivate accounts." xml:space="preserve">
+    <value>ادعُ أشخاصًا وغيّر الأدوار وألغِ تفعيل الحسابات.</value>
+  </data>
+  <data name="Invite to Portal" xml:space="preserve">
+    <value>دعوة إلى البوابة</value>
+  </data>
+  <data name="Invite user" xml:space="preserve">
+    <value>دعوة مستخدم</value>
+  </data>
+  <data name="Invite your team" xml:space="preserve">
+    <value>ادعُ فريقك</value>
+  </data>
+  <data name="Invite your team to get started." xml:space="preserve">
+    <value>ادعُ فريقك للبدء.</value>
+  </data>
+  <data name="Invoice" xml:space="preserve">
+    <value>الفاتورة</value>
+  </data>
+  <data name="Invoice #" xml:space="preserve">
+    <value>رقم الفاتورة</value>
+  </data>
+  <data name="Invoice / Doc #" xml:space="preserve">
+    <value>رقم الفاتورة / المستند</value>
+  </data>
+  <data name="Invoice Items" xml:space="preserve">
+    <value>بنود الفاتورة</value>
+  </data>
+  <data name="Invoice Total:" xml:space="preserve">
+    <value>إجمالي الفاتورة:</value>
+  </data>
+  <data name="Invoice created successfully!" xml:space="preserve">
+    <value>تم إنشاء الفاتورة بنجاح!</value>
+  </data>
+  <data name="Invoice generated successfully from proposal!" xml:space="preserve">
+    <value>تم إنشاء الفاتورة من العرض بنجاح!</value>
+  </data>
+  <data name="Invoice marked as cancelled." xml:space="preserve">
+    <value>تم تحديد الفاتورة كملغاة.</value>
+  </data>
+  <data name="Invoice {0}" xml:space="preserve">
+    <value>الفاتورة {0}</value>
+  </data>
+  <data name="Invoices &amp; Collections" xml:space="preserve">
+    <value>الفواتير والتحصيل</value>
+  </data>
+  <data name="Is Standard Catalog" xml:space="preserve">
+    <value>كتالوج قياسي</value>
+  </data>
+  <data name="Issue Date" xml:space="preserve">
+    <value>تاريخ الإصدار</value>
+  </data>
+  <data name="Issue: {0}" xml:space="preserve">
+    <value>الإصدار: {0}</value>
+  </data>
+  <data name="Issued" xml:space="preserve">
+    <value>صادرة</value>
+  </data>
+  <data name="It is removed from every record it is linked to." xml:space="preserve">
+    <value>تتم إزالته من كل سجل مرتبط به.</value>
+  </data>
+  <data name="It may have been deleted, or you may not have access to it." xml:space="preserve">
+    <value>ربما تم حذفه، أو ليس لديك صلاحية الوصول إليه.</value>
+  </data>
+  <data name="Item" xml:space="preserve">
+    <value>البند</value>
+  </data>
+  <data name="Item Name" xml:space="preserve">
+    <value>اسم البند</value>
+  </data>
+  <data name="Its contacts stay, but they will no longer belong to a company." xml:space="preserve">
+    <value>تبقى جهات الاتصال التابعة لها، لكنها لن تنتمي بعد الآن إلى شركة.</value>
+  </data>
+  <data name="Job title" xml:space="preserve">
+    <value>المسمى الوظيفي</value>
+  </data>
+  <data name="Join your team" xml:space="preserve">
+    <value>انضم إلى فريقك</value>
+  </data>
+  <data name="Join {0}" xml:space="preserve">
+    <value>الانضمام إلى {0}</value>
+  </data>
+  <data name="Keep" xml:space="preserve">
+    <value>إبقاء</value>
+  </data>
+  <data name="Key (cf_…) *" xml:space="preserve">
+    <value>المفتاح (cf_…) *</value>
+  </data>
+  <data name="Key (for example license_number) *" xml:space="preserve">
+    <value>المفتاح (مثل license_number) *</value>
+  </data>
+  <data name="Key (for example trade_licence) *" xml:space="preserve">
+    <value>المفتاح (مثل trade_licence) *</value>
+  </data>
+  <data name="Kind of value" xml:space="preserve">
+    <value>نوع القيمة</value>
+  </data>
+  <data name="Label" xml:space="preserve">
+    <value>الاسم الظاهر</value>
+  </data>
+  <data name="Label *" xml:space="preserve">
+    <value>الاسم الظاهر *</value>
+  </data>
+  <data name="Label written before the value (for example Expiry Date:)" xml:space="preserve">
+    <value>النص المكتوب قبل القيمة (مثل: تاريخ الانتهاء:)</value>
+  </data>
+  <data name="Language" xml:space="preserve">
+    <value>اللغة</value>
+  </data>
+  <data name="Last name" xml:space="preserve">
+    <value>اسم العائلة</value>
+  </data>
+  <data name="Last name *" xml:space="preserve">
+    <value>اسم العائلة *</value>
+  </data>
+  <data name="Last sent {0}" xml:space="preserve">
+    <value>آخر إرسال {0}</value>
+  </data>
+  <data name="Layout" xml:space="preserve">
+    <value>التخطيط</value>
+  </data>
+  <data name="Layout reset to default" xml:space="preserve">
+    <value>تمت إعادة التخطيط إلى الوضع الافتراضي</value>
+  </data>
+  <data name="Layout saved" xml:space="preserve">
+    <value>تم حفظ التخطيط</value>
+  </data>
+  <data name="Lead" xml:space="preserve">
+    <value>العميل المحتمل</value>
+  </data>
+  <data name="Lead assignment" xml:space="preserve">
+    <value>إسناد العملاء المحتملين</value>
+  </data>
+  <data name="Lead converted. Contact, company and deal are created." xml:space="preserve">
+    <value>تم تحويل العميل المحتمل. تم إنشاء جهة الاتصال والشركة والصفقة.</value>
+  </data>
+  <data name="Lead disqualified" xml:space="preserve">
+    <value>تم استبعاد العميل المحتمل</value>
+  </data>
+  <data name="Lead field" xml:space="preserve">
+    <value>حقل العميل المحتمل</value>
+  </data>
+  <data name="Lead saved" xml:space="preserve">
+    <value>تم حفظ العميل المحتمل</value>
+  </data>
+  <data name="Lead source *" xml:space="preserve">
+    <value>مصدر العميل المحتمل *</value>
+  </data>
+  <data name="Leader: {0}" xml:space="preserve">
+    <value>القائد: {0}</value>
+  </data>
+  <data name="Leads Target" xml:space="preserve">
+    <value>هدف العملاء المحتملين</value>
+  </data>
+  <data name="Leads and contacts with the same email, phone or name." xml:space="preserve">
+    <value>عملاء محتملون وجهات اتصال لهم البريد الإلكتروني أو الهاتف أو الاسم نفسه.</value>
+  </data>
+  <data name="Leads from web forms, WhatsApp, email or imports appear here." xml:space="preserve">
+    <value>يظهر هنا العملاء المحتملون القادمون من نماذج الويب أو واتساب أو البريد الإلكتروني أو الاستيراد.</value>
+  </data>
+  <data name="Leave empty for the MindLift colour." xml:space="preserve">
+    <value>اتركه فارغًا لاستخدام لون MindLift.</value>
+  </data>
+  <data name="Leave empty to ask no extra question." xml:space="preserve">
+    <value>اتركه فارغًا لعدم طرح سؤال إضافي.</value>
+  </data>
+  <data name="Leave empty to never mark it stale." xml:space="preserve">
+    <value>اتركه فارغًا لعدم اعتباره راكدًا أبدًا.</value>
+  </data>
+  <data name="Leave empty to use it for every pipeline." xml:space="preserve">
+    <value>اتركه فارغًا لاستخدامه مع كل المسارات.</value>
+  </data>
+  <data name="Less Than" xml:space="preserve">
+    <value>أقل من</value>
+  </data>
+  <data name="Line Chart" xml:space="preserve">
+    <value>مخطط خطي</value>
+  </data>
+  <data name="Line Items &amp; Rate Breakdown" xml:space="preserve">
+    <value>البنود وتفصيل الأسعار</value>
+  </data>
+  <data name="Link or address" xml:space="preserve">
+    <value>رابط أو عنوان</value>
+  </data>
+  <data name="Link this document to a contact or account before sharing" xml:space="preserve">
+    <value>اربط هذا المستند بجهة اتصال أو حساب قبل مشاركته</value>
+  </data>
+  <data name="Link: {0}" xml:space="preserve">
+    <value>الرابط: {0}</value>
+  </data>
+  <data name="Linked Deal / Account" xml:space="preserve">
+    <value>الصفقة / الحساب المرتبط</value>
+  </data>
+  <data name="List" xml:space="preserve">
+    <value>قائمة</value>
+  </data>
+  <data name="Load sample data (recommended). Explore with realistic records. Remove them anytime." xml:space="preserve">
+    <value>تحميل بيانات تجريبية (موصى به). استكشف بسجلات واقعية. يمكنك إزالتها في أي وقت.</value>
+  </data>
+  <data name="Location or link" xml:space="preserve">
+    <value>الموقع أو الرابط</value>
+  </data>
+  <data name="Log a call" xml:space="preserve">
+    <value>تسجيل مكالمة</value>
+  </data>
+  <data name="Long text" xml:space="preserve">
+    <value>نص طويل</value>
+  </data>
+  <data name="Lost" xml:space="preserve">
+    <value>خسارة</value>
+  </data>
+  <data name="Lost because" xml:space="preserve">
+    <value>الخسارة بسبب</value>
+  </data>
+  <data name="Low" xml:space="preserve">
+    <value>منخفضة</value>
+  </data>
+  <data name="Lower numbers run first." xml:space="preserve">
+    <value>الأرقام الأقل تعمل أولًا.</value>
+  </data>
+  <data name="Lowercase letters, digits and underscores. Starts with cf_." xml:space="preserve">
+    <value>حروف صغيرة وأرقام وشرطات سفلية. يبدأ بـ cf_.</value>
+  </data>
+  <data name="Main contact" xml:space="preserve">
+    <value>جهة الاتصال الرئيسية</value>
+  </data>
+  <data name="Manage sellable items, subscription plans, standard rate cards, and partner price books." xml:space="preserve">
+    <value>أدر العناصر القابلة للبيع وخطط الاشتراك وقوائم الأسعار القياسية وقوائم أسعار الشركاء.</value>
+  </data>
+  <data name="Manage this booking" xml:space="preserve">
+    <value>إدارة هذا الحجز</value>
+  </data>
+  <data name="Mark Accepted" xml:space="preserve">
+    <value>تحديد كمقبول</value>
+  </data>
+  <data name="Mark Sent" xml:space="preserve">
+    <value>تحديد كمرسل</value>
+  </data>
+  <data name="Mark all as read" xml:space="preserve">
+    <value>تحديد الكل كمقروء</value>
+  </data>
+  <data name="Mark as lost" xml:space="preserve">
+    <value>تحديد كخاسرة</value>
+  </data>
+  <data name="Mark as won" xml:space="preserve">
+    <value>تحديد كرابحة</value>
+  </data>
+  <data name="Mark stale after (days)" xml:space="preserve">
+    <value>اعتباره راكدًا بعد (أيام)</value>
+  </data>
+  <data name="Match ALL conditions (AND)" xml:space="preserve">
+    <value>مطابقة جميع الشروط (و)</value>
+  </data>
+  <data name="Match ANY condition (OR)" xml:space="preserve">
+    <value>مطابقة أي شرط (أو)</value>
+  </data>
+  <data name="Match Logic" xml:space="preserve">
+    <value>منطق المطابقة</value>
+  </data>
+  <data name="Matrix (2-dimensional breakdown)" xml:space="preserve">
+    <value>مصفوفة (تفصيل ثنائي الأبعاد)</value>
+  </data>
+  <data name="Max" xml:space="preserve">
+    <value>الأقصى</value>
+  </data>
+  <data name="Meeting" xml:space="preserve">
+    <value>اجتماع</value>
+  </data>
+  <data name="Meeting type" xml:space="preserve">
+    <value>نوع الاجتماع</value>
+  </data>
+  <data name="Mention people" xml:space="preserve">
+    <value>الإشارة إلى أشخاص</value>
+  </data>
+  <data name="Merge" xml:space="preserve">
+    <value>دمج</value>
+  </data>
+  <data name="Merge selected" xml:space="preserve">
+    <value>دمج المحدد</value>
+  </data>
+  <data name="Message" xml:space="preserve">
+    <value>الرسالة</value>
+  </data>
+  <data name="Message after submit" xml:space="preserve">
+    <value>الرسالة بعد الإرسال</value>
+  </data>
+  <data name="Message dispatched" xml:space="preserve">
+    <value>تم إرسال الرسالة</value>
+  </data>
+  <data name="Messages &amp; Omnichannel" xml:space="preserve">
+    <value>الرسائل والقنوات المتعددة</value>
+  </data>
+  <data name="Method" xml:space="preserve">
+    <value>الطريقة</value>
+  </data>
+  <data name="Metric" xml:space="preserve">
+    <value>المقياس</value>
+  </data>
+  <data name="Metric / Value Column" xml:space="preserve">
+    <value>عمود المقياس / القيمة</value>
+  </data>
+  <data name="Min" xml:space="preserve">
+    <value>الأدنى</value>
+  </data>
+  <data name="Minimum score to match" xml:space="preserve">
+    <value>الحد الأدنى من الدرجات للمطابقة</value>
+  </data>
+  <data name="Minutes" xml:space="preserve">
+    <value>دقائق</value>
+  </data>
+  <data name="Module" xml:space="preserve">
+    <value>الوحدة</value>
+  </data>
+  <data name="Modules" xml:space="preserve">
+    <value>الوحدات</value>
+  </data>
+  <data name="Modules appear here once your workspace is set up." xml:space="preserve">
+    <value>تظهر الوحدات هنا بعد إعداد مساحة عملك.</value>
+  </data>
+  <data name="Monday" xml:space="preserve">
+    <value>الاثنين</value>
+  </data>
+  <data name="Month" xml:space="preserve">
+    <value>شهر</value>
+  </data>
+  <data name="Monthly" xml:space="preserve">
+    <value>شهري</value>
+  </data>
+  <data name="Monthly (1st of month 8:00 AM UTC)" xml:space="preserve">
+    <value>شهريًا (أول الشهر 8:00 صباحًا بالتوقيت العالمي)</value>
+  </data>
+  <data name="More" xml:space="preserve">
+    <value>المزيد</value>
+  </data>
+  <data name="Move field down" xml:space="preserve">
+    <value>نقل الحقل للأسفل</value>
+  </data>
+  <data name="Move field up" xml:space="preserve">
+    <value>نقل الحقل للأعلى</value>
+  </data>
+  <data name="Move section down" xml:space="preserve">
+    <value>نقل القسم للأسفل</value>
+  </data>
+  <data name="Move section up" xml:space="preserve">
+    <value>نقل القسم للأعلى</value>
+  </data>
+  <data name="Move user down" xml:space="preserve">
+    <value>نقل المستخدم للأسفل</value>
+  </data>
+  <data name="Move user up" xml:space="preserve">
+    <value>نقل المستخدم للأعلى</value>
+  </data>
+  <data name="My accounts" xml:space="preserve">
+    <value>حساباتي</value>
+  </data>
+  <data name="My calendar" xml:space="preserve">
+    <value>تقويمي</value>
+  </data>
+  <data name="My contacts" xml:space="preserve">
+    <value>جهات اتصالي</value>
+  </data>
+  <data name="My open deals" xml:space="preserve">
+    <value>صفقاتي المفتوحة</value>
+  </data>
+  <data name="My open leads" xml:space="preserve">
+    <value>عملائي المحتملون المفتوحون</value>
+  </data>
+  <data name="Name (Arabic)" xml:space="preserve">
+    <value>الاسم (بالعربية)</value>
+  </data>
+  <data name="Name *" xml:space="preserve">
+    <value>الاسم *</value>
+  </data>
+  <data name="Name and SKU are required." xml:space="preserve">
+    <value>الاسم ورمز المنتج (SKU) مطلوبان.</value>
+  </data>
+  <data name="Name is required." xml:space="preserve">
+    <value>الاسم مطلوب.</value>
+  </data>
+  <data name="Name shown (for example Licence number) *" xml:space="preserve">
+    <value>الاسم الظاهر (مثل رقم الرخصة) *</value>
+  </data>
+  <data name="Net 30" xml:space="preserve">
+    <value>صافي 30 يومًا</value>
+  </data>
+  <data name="New Custom Report" xml:space="preserve">
+    <value>تقرير مخصص جديد</value>
+  </data>
+  <data name="New Folder" xml:space="preserve">
+    <value>مجلد جديد</value>
+  </data>
+  <data name="New Leads" xml:space="preserve">
+    <value>عملاء محتملون جدد</value>
+  </data>
+  <data name="New Leads (Count)" xml:space="preserve">
+    <value>العملاء المحتملون الجدد (العدد)</value>
+  </data>
+  <data name="New Price Book" xml:space="preserve">
+    <value>قائمة أسعار جديدة</value>
+  </data>
+  <data name="New Product" xml:space="preserve">
+    <value>منتج جديد</value>
+  </data>
+  <data name="New Report" xml:space="preserve">
+    <value>تقرير جديد</value>
+  </data>
+  <data name="New Report Folder" xml:space="preserve">
+    <value>مجلد تقارير جديد</value>
+  </data>
+  <data name="New Target" xml:space="preserve">
+    <value>هدف جديد</value>
+  </data>
+  <data name="New Value" xml:space="preserve">
+    <value>قيمة جديدة</value>
+  </data>
+  <data name="New account" xml:space="preserve">
+    <value>حساب جديد</value>
+  </data>
+  <data name="New automation rule" xml:space="preserve">
+    <value>قاعدة أتمتة جديدة</value>
+  </data>
+  <data name="New booking page" xml:space="preserve">
+    <value>صفحة حجز جديدة</value>
+  </data>
+  <data name="New branch" xml:space="preserve">
+    <value>فرع جديد</value>
+  </data>
+  <data name="New checklist" xml:space="preserve">
+    <value>قائمة مهام جديدة</value>
+  </data>
+  <data name="New contact" xml:space="preserve">
+    <value>جهة اتصال جديدة</value>
+  </data>
+  <data name="New custom field" xml:space="preserve">
+    <value>حقل مخصص جديد</value>
+  </data>
+  <data name="New deal" xml:space="preserve">
+    <value>صفقة جديدة</value>
+  </data>
+  <data name="New document type" xml:space="preserve">
+    <value>نوع مستند جديد</value>
+  </data>
+  <data name="New form" xml:space="preserve">
+    <value>نموذج جديد</value>
+  </data>
+  <data name="New lead" xml:space="preserve">
+    <value>عميل محتمل جديد</value>
+  </data>
+  <data name="New leads go to the workspace owner until you add a rule." xml:space="preserve">
+    <value>يذهب العملاء المحتملون الجدد إلى مالك مساحة العمل إلى أن تضيف قاعدة.</value>
+  </data>
+  <data name="New meeting" xml:space="preserve">
+    <value>اجتماع جديد</value>
+  </data>
+  <data name="New note" xml:space="preserve">
+    <value>ملاحظة جديدة</value>
+  </data>
+  <data name="New password" xml:space="preserve">
+    <value>كلمة مرور جديدة</value>
+  </data>
+  <data name="New pipeline" xml:space="preserve">
+    <value>مسار جديد</value>
+  </data>
+  <data name="New role" xml:space="preserve">
+    <value>دور جديد</value>
+  </data>
+  <data name="New rule" xml:space="preserve">
+    <value>قاعدة جديدة</value>
+  </data>
+  <data name="New stage" xml:space="preserve">
+    <value>مرحلة جديدة</value>
+  </data>
+  <data name="New task" xml:space="preserve">
+    <value>مهمة جديدة</value>
+  </data>
+  <data name="New team" xml:space="preserve">
+    <value>فريق جديد</value>
+  </data>
+  <data name="New to MindLift?" xml:space="preserve">
+    <value>جديد في MindLift؟</value>
+  </data>
+  <data name="Next" xml:space="preserve">
+    <value>التالي</value>
+  </data>
+  <data name="No Preview Loaded" xml:space="preserve">
+    <value>لم يتم تحميل معاينة</value>
+  </data>
+  <data name="No accounts yet" xml:space="preserve">
+    <value>لا توجد حسابات بعد</value>
+  </data>
+  <data name="No assignment rules" xml:space="preserve">
+    <value>لا توجد قواعد إسناد</value>
+  </data>
+  <data name="No automation rules" xml:space="preserve">
+    <value>لا توجد قواعد أتمتة</value>
+  </data>
+  <data name="No booking pages yet" xml:space="preserve">
+    <value>لا توجد صفحات حجز بعد</value>
+  </data>
+  <data name="No branch" xml:space="preserve">
+    <value>بدون فرع</value>
+  </data>
+  <data name="No branches yet" xml:space="preserve">
+    <value>لا توجد فروع بعد</value>
+  </data>
+  <data name="No checklists yet" xml:space="preserve">
+    <value>لا توجد قوائم مهام بعد</value>
+  </data>
+  <data name="No child accounts." xml:space="preserve">
+    <value>لا توجد حسابات فرعية.</value>
+  </data>
+  <data name="No company" xml:space="preserve">
+    <value>بدون شركة</value>
+  </data>
+  <data name="No contacts at this company yet." xml:space="preserve">
+    <value>لا توجد جهات اتصال في هذه الشركة بعد.</value>
+  </data>
+  <data name="No contacts on this deal." xml:space="preserve">
+    <value>لا توجد جهات اتصال في هذه الصفقة.</value>
+  </data>
+  <data name="No contacts yet" xml:space="preserve">
+    <value>لا توجد جهات اتصال بعد</value>
+  </data>
+  <data name="No conversations found" xml:space="preserve">
+    <value>لم يتم العثور على محادثات</value>
+  </data>
+  <data name="No custom accounts configured. Using system default SMTP." xml:space="preserve">
+    <value>لم يتم ضبط حسابات مخصصة. يُستخدم SMTP الافتراضي للنظام.</value>
+  </data>
+  <data name="No custom fields yet" xml:space="preserve">
+    <value>لا توجد حقول مخصصة بعد</value>
+  </data>
+  <data name="No custom price overrides configured yet for this price book." xml:space="preserve">
+    <value>لم يتم ضبط أسعار مخصصة بديلة لقائمة الأسعار هذه بعد.</value>
+  </data>
+  <data name="No deadline" xml:space="preserve">
+    <value>بدون موعد نهائي</value>
+  </data>
+  <data name="No deals yet" xml:space="preserve">
+    <value>لا توجد صفقات بعد</value>
+  </data>
+  <data name="No deals yet." xml:space="preserve">
+    <value>لا توجد صفقات بعد.</value>
+  </data>
+  <data name="No document requests" xml:space="preserve">
+    <value>لا توجد طلبات مستندات</value>
+  </data>
+  <data name="No document types yet" xml:space="preserve">
+    <value>لا توجد أنواع مستندات بعد</value>
+  </data>
+  <data name="No documents found" xml:space="preserve">
+    <value>لم يتم العثور على مستندات</value>
+  </data>
+  <data name="No extra details yet. Add custom fields in Settings." xml:space="preserve">
+    <value>لا توجد تفاصيل إضافية بعد. أضف حقولًا مخصصة من الإعدادات.</value>
+  </data>
+  <data name="No fields in this section yet. Add one from the list below." xml:space="preserve">
+    <value>لا توجد حقول في هذا القسم بعد. أضف حقلًا من القائمة أدناه.</value>
+  </data>
+  <data name="No files yet." xml:space="preserve">
+    <value>لا توجد ملفات بعد.</value>
+  </data>
+  <data name="No free times on this day. Try another day." xml:space="preserve">
+    <value>لا توجد أوقات متاحة في هذا اليوم. جرّب يومًا آخر.</value>
+  </data>
+  <data name="No invoices found" xml:space="preserve">
+    <value>لم يتم العثور على فواتير</value>
+  </data>
+  <data name="No leader" xml:space="preserve">
+    <value>بدون قائد</value>
+  </data>
+  <data name="No leads yet" xml:space="preserve">
+    <value>لا يوجد عملاء محتملون بعد</value>
+  </data>
+  <data name="No logs yet" xml:space="preserve">
+    <value>لا توجد سجلات بعد</value>
+  </data>
+  <data name="No matches" xml:space="preserve">
+    <value>لا توجد مطابقات</value>
+  </data>
+  <data name="No messages sent or received yet." xml:space="preserve">
+    <value>لم يتم إرسال أو استلام رسائل بعد.</value>
+  </data>
+  <data name="No modules yet" xml:space="preserve">
+    <value>لا توجد وحدات بعد</value>
+  </data>
+  <data name="No onboarding checklist applies to this deal. Add one in Settings, Onboarding checklists." xml:space="preserve">
+    <value>لا توجد قائمة مهام تهيئة تنطبق على هذه الصفقة. أضف واحدة من الإعدادات، قوائم مهام التهيئة.</value>
+  </data>
+  <data name="No payments recorded yet." xml:space="preserve">
+    <value>لم تُسجَّل مدفوعات بعد.</value>
+  </data>
+  <data name="No pipelines yet" xml:space="preserve">
+    <value>لا توجد مسارات بعد</value>
+  </data>
+  <data name="No products found" xml:space="preserve">
+    <value>لم يتم العثور على منتجات</value>
+  </data>
+  <data name="No proposals found" xml:space="preserve">
+    <value>لم يتم العثور على عروض</value>
+  </data>
+  <data name="No rates yet. Enable a currency above, then add its rate." xml:space="preserve">
+    <value>لا توجد أسعار صرف بعد. فعّل عملة أعلاه ثم أضف سعرها.</value>
+  </data>
+  <data name="No records match this reporting period and filter criteria." xml:space="preserve">
+    <value>لا توجد سجلات تطابق فترة التقرير ومعايير التصفية هذه.</value>
+  </data>
+  <data name="No reports found" xml:space="preserve">
+    <value>لم يتم العثور على تقارير</value>
+  </data>
+  <data name="No roles yet" xml:space="preserve">
+    <value>لا توجد أدوار بعد</value>
+  </data>
+  <data name="No sales targets defined" xml:space="preserve">
+    <value>لم يتم تحديد أهداف مبيعات</value>
+  </data>
+  <data name="No schedules configured for this report yet. Configure your first scheduled delivery below." xml:space="preserve">
+    <value>لم يتم ضبط جداول لهذا التقرير بعد. اضبط أول تسليم مجدول أدناه.</value>
+  </data>
+  <data name="No show" xml:space="preserve">
+    <value>لم يحضر</value>
+  </data>
+  <data name="No source" xml:space="preserve">
+    <value>بدون مصدر</value>
+  </data>
+  <data name="No structured fields extracted" xml:space="preserve">
+    <value>لم يتم استخراج حقول منظمة</value>
+  </data>
+  <data name="No structured fields extracted from this document." xml:space="preserve">
+    <value>لم يتم استخراج حقول منظمة من هذا المستند.</value>
+  </data>
+  <data name="No teams yet" xml:space="preserve">
+    <value>لا توجد فرق بعد</value>
+  </data>
+  <data name="No text extracted." xml:space="preserve">
+    <value>لم يتم استخراج نص.</value>
+  </data>
+  <data name="No users yet" xml:space="preserve">
+    <value>لا يوجد مستخدمون بعد</value>
+  </data>
+  <data name="No visual representation available for {0}." xml:space="preserve">
+    <value>لا يتوفر تمثيل مرئي لـ {0}.</value>
+  </data>
+  <data name="No web forms yet" xml:space="preserve">
+    <value>لا توجد نماذج ويب بعد</value>
+  </data>
+  <data name="Normal" xml:space="preserve">
+    <value>عادية</value>
+  </data>
+  <data name="Not Equals" xml:space="preserve">
+    <value>لا يساوي</value>
+  </data>
+  <data name="Not Found" xml:space="preserve">
+    <value>غير موجود</value>
+  </data>
+  <data name="Not linked to a company." xml:space="preserve">
+    <value>غير مرتبط بشركة.</value>
+  </data>
+  <data name="Note" xml:space="preserve">
+    <value>ملاحظة</value>
+  </data>
+  <data name="Notes" xml:space="preserve">
+    <value>ملاحظات</value>
+  </data>
+  <data name="Notes / Remarks" xml:space="preserve">
+    <value>ملاحظات / تعليقات</value>
+  </data>
+  <data name="Nothing" xml:space="preserve">
+    <value>لا شيء</value>
+  </data>
+  <data name="Nothing coming up" xml:space="preserve">
+    <value>لا شيء قادم</value>
+  </data>
+  <data name="Nothing due today" xml:space="preserve">
+    <value>لا شيء مستحق اليوم</value>
+  </data>
+  <data name="Nothing else shares this contact's email or phone." xml:space="preserve">
+    <value>لا يشارك أي سجل آخر البريد الإلكتروني أو الهاتف مع جهة الاتصال هذه.</value>
+  </data>
+  <data name="Nothing else shares this lead's email, phone or name." xml:space="preserve">
+    <value>لا يشارك أي سجل آخر البريد الإلكتروني أو الهاتف أو الاسم مع هذا العميل المحتمل.</value>
+  </data>
+  <data name="Nothing logged yet." xml:space="preserve">
+    <value>لم يُسجَّل شيء بعد.</value>
+  </data>
+  <data name="Nothing new. Assignments, mentions and reminders will show up here." xml:space="preserve">
+    <value>لا جديد. ستظهر هنا التكليفات والإشارات والتذكيرات.</value>
+  </data>
+  <data name="Nothing overdue" xml:space="preserve">
+    <value>لا شيء متأخر</value>
+  </data>
+  <data name="Nothing to connect yet. Continue to finish setup." xml:space="preserve">
+    <value>لا شيء لربطه بعد. تابع لإنهاء الإعداد.</value>
+  </data>
+  <data name="Notice (hours)" xml:space="preserve">
+    <value>الإشعار المسبق (ساعات)</value>
+  </data>
+  <data name="Notification" xml:space="preserve">
+    <value>إشعار</value>
+  </data>
+  <data name="Notification Toast Message *" xml:space="preserve">
+    <value>نص رسالة الإشعار المنبثقة *</value>
+  </data>
+  <data name="Notifications" xml:space="preserve">
+    <value>الإشعارات</value>
+  </data>
+  <data name="Number" xml:space="preserve">
+    <value>رقم</value>
+  </data>
+  <data name="Number or code" xml:space="preserve">
+    <value>رقم أو رمز</value>
+  </data>
+  <data name="Number to report on" xml:space="preserve">
+    <value>رقم لإعداد التقارير عنه</value>
+  </data>
+  <data name="OCR Details" xml:space="preserve">
+    <value>تفاصيل التعرف على النصوص</value>
+  </data>
+  <data name="OCR Intelligence" xml:space="preserve">
+    <value>ذكاء التعرف على النصوص</value>
+  </data>
+  <data name="OCR Processed" xml:space="preserve">
+    <value>تمت معالجة التعرف على النصوص</value>
+  </data>
+  <data name="OCR Status" xml:space="preserve">
+    <value>حالة التعرف على النصوص</value>
+  </data>
+  <data name="OCR re-processed successfully!" xml:space="preserve">
+    <value>تمت إعادة معالجة التعرف على النصوص بنجاح!</value>
+  </data>
+  <data name="On Created" xml:space="preserve">
+    <value>عند الإنشاء</value>
+  </data>
+  <data name="On Updated" xml:space="preserve">
+    <value>عند التحديث</value>
+  </data>
+  <data name="Onboarding" xml:space="preserve">
+    <value>التهيئة</value>
+  </data>
+  <data name="Onboarding checklists" xml:space="preserve">
+    <value>قوائم مهام التهيئة</value>
+  </data>
+  <data name="One specific person" xml:space="preserve">
+    <value>شخص محدد</value>
+  </data>
+  <data name="One-Time" xml:space="preserve">
+    <value>مرة واحدة</value>
+  </data>
+  <data name="Only me" xml:space="preserve">
+    <value>أنا فقط</value>
+  </data>
+  <data name="Only mine" xml:space="preserve">
+    <value>الخاصة بي فقط</value>
+  </data>
+  <data name="Only run actions if record meets these conditions" xml:space="preserve">
+    <value>نفّذ الإجراءات فقط إذا استوفى السجل هذه الشروط</value>
+  </data>
+  <data name="Only when" xml:space="preserve">
+    <value>فقط عندما</value>
+  </data>
+  <data name="Open" xml:space="preserve">
+    <value>مفتوح</value>
+  </data>
+  <data name="Open Contact" xml:space="preserve">
+    <value>فتح جهة الاتصال</value>
+  </data>
+  <data name="Open Lead" xml:space="preserve">
+    <value>فتح العميل المحتمل</value>
+  </data>
+  <data name="Open Portal Requests" xml:space="preserve">
+    <value>طلبات البوابة المفتوحة</value>
+  </data>
+  <data name="Open deals" xml:space="preserve">
+    <value>الصفقات المفتوحة</value>
+  </data>
+  <data name="Open hours" xml:space="preserve">
+    <value>ساعات العمل</value>
+  </data>
+  <data name="Open-ended" xml:space="preserve">
+    <value>مفتوح المدة</value>
+  </data>
+  <data name="Opt-Outs" xml:space="preserve">
+    <value>إلغاء الاشتراكات</value>
+  </data>
+  <data name="Opt-out registered successfully" xml:space="preserve">
+    <value>تم تسجيل إلغاء الاشتراك بنجاح</value>
+  </data>
+  <data name="Opt-out removed" xml:space="preserve">
+    <value>تمت إزالة إلغاء الاشتراك</value>
+  </data>
+  <data name="Optional description" xml:space="preserve">
+    <value>وصف اختياري</value>
+  </data>
+  <data name="Options, one per line as value|Label" xml:space="preserve">
+    <value>الخيارات، واحد في كل سطر بصيغة القيمة|الاسم</value>
+  </data>
+  <data name="Or a pattern (advanced, regular expression; first group is the value)" xml:space="preserve">
+    <value>أو نمط (متقدم، تعبير نمطي؛ المجموعة الأولى هي القيمة)</value>
+  </data>
+  <data name="Other currencies you use" xml:space="preserve">
+    <value>عملات أخرى تستخدمها</value>
+  </data>
+  <data name="Outstanding Balance" xml:space="preserve">
+    <value>الرصيد المستحق</value>
+  </data>
+  <data name="Outstanding Balance:" xml:space="preserve">
+    <value>الرصيد المستحق:</value>
+  </data>
+  <data name="Overall Discount %" xml:space="preserve">
+    <value>الخصم الإجمالي %</value>
+  </data>
+  <data name="Overdue" xml:space="preserve">
+    <value>متأخر</value>
+  </data>
+  <data name="Overdue Invoices" xml:space="preserve">
+    <value>الفواتير المتأخرة</value>
+  </data>
+  <data name="Override Product Price" xml:space="preserve">
+    <value>تجاوز سعر المنتج</value>
+  </data>
+  <data name="Own records" xml:space="preserve">
+    <value>السجلات الخاصة</value>
+  </data>
+  <data name="PDF Document" xml:space="preserve">
+    <value>مستند PDF</value>
+  </data>
+  <data name="Page is on" xml:space="preserve">
+    <value>الصفحة مفعّلة</value>
+  </data>
+  <data name="Paid" xml:space="preserve">
+    <value>مدفوع</value>
+  </data>
+  <data name="Paid: {0}" xml:space="preserve">
+    <value>المدفوع: {0}</value>
+  </data>
+  <data name="Parent company" xml:space="preserve">
+    <value>الشركة الأم</value>
+  </data>
+  <data name="Part of {0}" xml:space="preserve">
+    <value>تابعة لـ {0}</value>
+  </data>
+  <data name="Partially Paid" xml:space="preserve">
+    <value>مدفوع جزئيًا</value>
+  </data>
+  <data name="Password" xml:space="preserve">
+    <value>كلمة المرور</value>
+  </data>
+  <data name="Payment Amount" xml:space="preserve">
+    <value>مبلغ الدفعة</value>
+  </data>
+  <data name="Payment Collections History" xml:space="preserve">
+    <value>سجل تحصيل الدفعات</value>
+  </data>
+  <data name="Payment Method" xml:space="preserve">
+    <value>طريقة الدفع</value>
+  </data>
+  <data name="Payment Terms" xml:space="preserve">
+    <value>شروط الدفع</value>
+  </data>
+  <data name="Payment amount must be greater than zero." xml:space="preserve">
+    <value>يجب أن يكون مبلغ الدفعة أكبر من صفر.</value>
+  </data>
+  <data name="Payment recorded successfully!" xml:space="preserve">
+    <value>تم تسجيل الدفعة بنجاح!</value>
+  </data>
+  <data name="Period Type" xml:space="preserve">
+    <value>نوع الفترة</value>
+  </data>
+  <data name="Permissions saved. They apply on the user's next page load." xml:space="preserve">
+    <value>تم حفظ الصلاحيات. تُطبَّق عند تحميل المستخدم الصفحة في المرة القادمة.</value>
+  </data>
+  <data name="Personal" xml:space="preserve">
+    <value>شخصي</value>
+  </data>
+  <data name="Phone" xml:space="preserve">
+    <value>الهاتف</value>
+  </data>
+  <data name="Phone (optional)" xml:space="preserve">
+    <value>الهاتف (اختياري)</value>
+  </data>
+  <data name="Phone or Email" xml:space="preserve">
+    <value>الهاتف أو البريد الإلكتروني</value>
+  </data>
+  <data name="Physical Goods" xml:space="preserve">
+    <value>سلع مادية</value>
+  </data>
+  <data name="Picklists" xml:space="preserve">
+    <value>قوائم الاختيار</value>
+  </data>
+  <data name="Pipeline" xml:space="preserve">
+    <value>المسار</value>
+  </data>
+  <data name="Pipeline deleted" xml:space="preserve">
+    <value>تم حذف المسار</value>
+  </data>
+  <data name="Pipeline saved" xml:space="preserve">
+    <value>تم حفظ المسار</value>
+  </data>
+  <data name="Pipelines" xml:space="preserve">
+    <value>المسارات</value>
+  </data>
+  <data name="Please ensure the trade license is valid for at least 6 months and stamped." xml:space="preserve">
+    <value>يرجى التأكد من أن الرخصة التجارية سارية لمدة 6 أشهر على الأقل وأنها مختومة.</value>
+  </data>
+  <data name="Please enter at least one valid recipient email address." xml:space="preserve">
+    <value>يرجى إدخال عنوان بريد إلكتروني صالح واحد على الأقل للمستلم.</value>
+  </data>
+  <data name="Please fix the highlighted fields." xml:space="preserve">
+    <value>يرجى تصحيح الحقول المميزة.</value>
+  </data>
+  <data name="Please select a product." xml:space="preserve">
+    <value>يرجى اختيار منتج.</value>
+  </data>
+  <data name="Please specify the reason for rejecting this document:" xml:space="preserve">
+    <value>يرجى ذكر سبب رفض هذا المستند:</value>
+  </data>
+  <data name="Portal" xml:space="preserve">
+    <value>البوابة</value>
+  </data>
+  <data name="Portal active" xml:space="preserve">
+    <value>البوابة مفعّلة</value>
+  </data>
+  <data name="Portal disabled" xml:space="preserve">
+    <value>البوابة معطّلة</value>
+  </data>
+  <data name="Portal invite sent" xml:space="preserve">
+    <value>تم إرسال دعوة البوابة</value>
+  </data>
+  <data name="Position" xml:space="preserve">
+    <value>الترتيب</value>
+  </data>
+  <data name="Possible duplicates" xml:space="preserve">
+    <value>مكررات محتملة</value>
+  </data>
+  <data name="Pre-built executive reports, custom queries, and cross-module business intelligence." xml:space="preserve">
+    <value>تقارير تنفيذية جاهزة واستعلامات مخصصة وذكاء أعمال عبر الوحدات.</value>
+  </data>
+  <data name="Preferences" xml:space="preserve">
+    <value>التفضيلات</value>
+  </data>
+  <data name="Preferences saved" xml:space="preserve">
+    <value>تم حفظ التفضيلات</value>
+  </data>
+  <data name="Press the button again to create the contact anyway." xml:space="preserve">
+    <value>اضغط على الزر مرة أخرى لإنشاء جهة الاتصال على أي حال.</value>
+  </data>
+  <data name="Press the button again to create the lead anyway." xml:space="preserve">
+    <value>اضغط على الزر مرة أخرى لإنشاء العميل المحتمل على أي حال.</value>
+  </data>
+  <data name="Preview" xml:space="preserve">
+    <value>معاينة</value>
+  </data>
+  <data name="Preview failed: Unable to execute report query." xml:space="preserve">
+    <value>فشلت المعاينة: تعذّر تنفيذ استعلام التقرير.</value>
+  </data>
+  <data name="Previous" xml:space="preserve">
+    <value>السابق</value>
+  </data>
+  <data name="Price" xml:space="preserve">
+    <value>السعر</value>
+  </data>
+  <data name="Price Book Name" xml:space="preserve">
+    <value>اسم قائمة الأسعار</value>
+  </data>
+  <data name="Price Book Rate" xml:space="preserve">
+    <value>سعر قائمة الأسعار</value>
+  </data>
+  <data name="Price Books" xml:space="preserve">
+    <value>قوائم الأسعار</value>
+  </data>
+  <data name="Price book created successfully!" xml:space="preserve">
+    <value>تم إنشاء قائمة الأسعار بنجاح!</value>
+  </data>
+  <data name="Price book name is required." xml:space="preserve">
+    <value>اسم قائمة الأسعار مطلوب.</value>
+  </data>
+  <data name="Pricing Mode" xml:space="preserve">
+    <value>نمط التسعير</value>
+  </data>
+  <data name="Primary Data Source *" xml:space="preserve">
+    <value>مصدر البيانات الرئيسي *</value>
+  </data>
+  <data name="Priority" xml:space="preserve">
+    <value>الأولوية</value>
+  </data>
+  <data name="Priority {0}" xml:space="preserve">
+    <value>الأولوية {0}</value>
+  </data>
+  <data name="Priority {0} · {1} action(s): {2}" xml:space="preserve">
+    <value>الأولوية {0} · {1} إجراء: {2}</value>
+  </data>
+  <data name="Private (Only Me)" xml:space="preserve">
+    <value>خاص (أنا فقط)</value>
+  </data>
+  <data name="Probability" xml:space="preserve">
+    <value>الاحتمالية</value>
+  </data>
+  <data name="Product" xml:space="preserve">
+    <value>المنتج</value>
+  </data>
+  <data name="Product / Service" xml:space="preserve">
+    <value>منتج / خدمة</value>
+  </data>
+  <data name="Product Catalog &amp; CPQ" xml:space="preserve">
+    <value>كتالوج المنتجات وCPQ</value>
+  </data>
+  <data name="Product Catalog &amp; Price Books" xml:space="preserve">
+    <value>كتالوج المنتجات وقوائم الأسعار</value>
+  </data>
+  <data name="Product Name" xml:space="preserve">
+    <value>اسم المنتج</value>
+  </data>
+  <data name="Product saved successfully!" xml:space="preserve">
+    <value>تم حفظ المنتج بنجاح!</value>
+  </data>
+  <data name="Professional Service" xml:space="preserve">
+    <value>خدمة مهنية</value>
+  </data>
+  <data name="Proposal Title" xml:space="preserve">
+    <value>عنوان العرض</value>
+  </data>
+  <data name="Proposal created successfully!" xml:space="preserve">
+    <value>تم إنشاء العرض بنجاح!</value>
+  </data>
+  <data name="Proposal title is required." xml:space="preserve">
+    <value>عنوان العرض مطلوب.</value>
+  </data>
+  <data name="Proposal {0}" xml:space="preserve">
+    <value>العرض {0}</value>
+  </data>
+  <data name="Public pages where customers book a time with you or your team, without signing in." xml:space="preserve">
+    <value>صفحات عامة يحجز فيها العملاء موعدًا معك أو مع فريقك دون تسجيل الدخول.</value>
+  </data>
+  <data name="Qty" xml:space="preserve">
+    <value>الكمية</value>
+  </data>
+  <data name="Quarterly" xml:space="preserve">
+    <value>ربع سنوي</value>
+  </data>
+  <data name="Quick add" xml:space="preserve">
+    <value>إضافة سريعة</value>
+  </data>
+  <data name="Quotations &amp; Proposals" xml:space="preserve">
+    <value>عروض الأسعار والعروض</value>
+  </data>
+  <data name="Quote #" xml:space="preserve">
+    <value>رقم عرض السعر</value>
+  </data>
+  <data name="Rate" xml:space="preserve">
+    <value>السعر</value>
+  </data>
+  <data name="Rate (%)" xml:space="preserve">
+    <value>النسبة (%)</value>
+  </data>
+  <data name="Rate added" xml:space="preserve">
+    <value>تمت إضافة سعر الصرف</value>
+  </data>
+  <data name="Rate to the base currency, from the date it applies." xml:space="preserve">
+    <value>السعر مقابل العملة الأساسية، اعتبارًا من تاريخ سريانه.</value>
+  </data>
+  <data name="Rate updated successfully!" xml:space="preserve">
+    <value>تم تحديث السعر بنجاح!</value>
+  </data>
+  <data name="Rates" xml:space="preserve">
+    <value>الأسعار</value>
+  </data>
+  <data name="Rating" xml:space="preserve">
+    <value>التقييم</value>
+  </data>
+  <data name="Re-process OCR" xml:space="preserve">
+    <value>إعادة معالجة التعرف على النصوص</value>
+  </data>
+  <data name="Reason (optional)" xml:space="preserve">
+    <value>السبب (اختياري)</value>
+  </data>
+  <data name="Reason for rejection" xml:space="preserve">
+    <value>سبب الرفض</value>
+  </data>
+  <data name="Receipt" xml:space="preserve">
+    <value>إيصال</value>
+  </data>
+  <data name="Recipient" xml:space="preserve">
+    <value>المستلم</value>
+  </data>
+  <data name="Recipient Email (optional - defaults to record email)" xml:space="preserve">
+    <value>بريد المستلم (اختياري - الافتراضي بريد السجل)</value>
+  </data>
+  <data name="Recipient Email Addresses" xml:space="preserve">
+    <value>عناوين بريد المستلمين</value>
+  </data>
+  <data name="Recipients: {0}" xml:space="preserve">
+    <value>المستلمون: {0}</value>
+  </data>
+  <data name="Record Payment" xml:space="preserve">
+    <value>تسجيل دفعة</value>
+  </data>
+  <data name="Record is Created" xml:space="preserve">
+    <value>عند إنشاء سجل</value>
+  </data>
+  <data name="Record is Updated (Any field)" xml:space="preserve">
+    <value>عند تحديث سجل (أي حقل)</value>
+  </data>
+  <data name="Record page" xml:space="preserve">
+    <value>صفحة السجل</value>
+  </data>
+  <data name="Record type" xml:space="preserve">
+    <value>نوع السجل</value>
+  </data>
+  <data name="Reference" xml:space="preserve">
+    <value>المرجع</value>
+  </data>
+  <data name="Reference / Transaction ID" xml:space="preserve">
+    <value>المرجع / رقم المعاملة</value>
+  </data>
+  <data name="Refresh" xml:space="preserve">
+    <value>تحديث</value>
+  </data>
+  <data name="Refresh dashboard" xml:space="preserve">
+    <value>تحديث لوحة التحكم</value>
+  </data>
+  <data name="Refresh logs" xml:space="preserve">
+    <value>تحديث السجلات</value>
+  </data>
+  <data name="Reject" xml:space="preserve">
+    <value>رفض</value>
+  </data>
+  <data name="Reject Document" xml:space="preserve">
+    <value>رفض المستند</value>
+  </data>
+  <data name="Rejected" xml:space="preserve">
+    <value>مرفوض</value>
+  </data>
+  <data name="Rejected: {0}" xml:space="preserve">
+    <value>مرفوض: {0}</value>
+  </data>
+  <data name="Remind me (minutes before)" xml:space="preserve">
+    <value>ذكّرني (دقائق قبل الموعد)</value>
+  </data>
+  <data name="Reminders before, in minutes (for example 1440, 60)" xml:space="preserve">
+    <value>تذكيرات قبل الموعد بالدقائق (مثل 1440، 60)</value>
+  </data>
+  <data name="Remove field" xml:space="preserve">
+    <value>إزالة الحقل</value>
+  </data>
+  <data name="Remove section" xml:space="preserve">
+    <value>إزالة القسم</value>
+  </data>
+  <data name="Remove task" xml:space="preserve">
+    <value>إزالة المهمة</value>
+  </data>
+  <data name="Remove user" xml:space="preserve">
+    <value>إزالة المستخدم</value>
+  </data>
+  <data name="Removed from favorites" xml:space="preserve">
+    <value>تمت الإزالة من المفضلة</value>
+  </data>
+  <data name="Removed from the customer portal." xml:space="preserve">
+    <value>تمت الإزالة من بوابة العملاء.</value>
+  </data>
+  <data name="Reopen" xml:space="preserve">
+    <value>إعادة فتح</value>
+  </data>
+  <data name="Repeat the password" xml:space="preserve">
+    <value>أعد كتابة كلمة المرور</value>
+  </data>
+  <data name="Replaces the main colour of buttons and links for everyone in your workspace." xml:space="preserve">
+    <value>يستبدل اللون الرئيسي للأزرار والروابط لدى جميع من في مساحة عملك.</value>
+  </data>
+  <data name="Report Details" xml:space="preserve">
+    <value>تفاصيل التقرير</value>
+  </data>
+  <data name="Report Name *" xml:space="preserve">
+    <value>اسم التقرير *</value>
+  </data>
+  <data name="Report Records" xml:space="preserve">
+    <value>سجلات التقرير</value>
+  </data>
+  <data name="Report Structure" xml:space="preserve">
+    <value>هيكل التقرير</value>
+  </data>
+  <data name="Report deleted." xml:space="preserve">
+    <value>تم حذف التقرير.</value>
+  </data>
+  <data name="Report name is required." xml:space="preserve">
+    <value>اسم التقرير مطلوب.</value>
+  </data>
+  <data name="Report not found." xml:space="preserve">
+    <value>التقرير غير موجود.</value>
+  </data>
+  <data name="Report saved successfully!" xml:space="preserve">
+    <value>تم حفظ التقرير بنجاح!</value>
+  </data>
+  <data name="Reports &amp; Analytics" xml:space="preserve">
+    <value>التقارير والتحليلات</value>
+  </data>
+  <data name="Reprocess OCR" xml:space="preserve">
+    <value>إعادة معالجة التعرف على النصوص</value>
+  </data>
+  <data name="Request Customer File" xml:space="preserve">
+    <value>طلب ملف من العميل</value>
+  </data>
+  <data name="Request Document from Customer" xml:space="preserve">
+    <value>طلب مستند من العميل</value>
+  </data>
+  <data name="Request approved. The customer's files are marked as reviewed." xml:space="preserve">
+    <value>تم اعتماد الطلب. تم تحديد ملفات العميل كمراجَعة.</value>
+  </data>
+  <data name="Request cancelled." xml:space="preserve">
+    <value>تم إلغاء الطلب.</value>
+  </data>
+  <data name="Request compliance, tax, or contract files from your clients to receive them directly into MindLift." xml:space="preserve">
+    <value>اطلب ملفات الامتثال أو الضرائب أو العقود من عملائك لاستلامها مباشرة في MindLift.</value>
+  </data>
+  <data name="Requested Date" xml:space="preserve">
+    <value>تاريخ الطلب</value>
+  </data>
+  <data name="Required" xml:space="preserve">
+    <value>إلزامي</value>
+  </data>
+  <data name="Resend portal invite" xml:space="preserve">
+    <value>إعادة إرسال دعوة البوابة</value>
+  </data>
+  <data name="Reset to Default Layout" xml:space="preserve">
+    <value>إعادة إلى التخطيط الافتراضي</value>
+  </data>
+  <data name="Revenue Target Goal" xml:space="preserve">
+    <value>هدف الإيرادات</value>
+  </data>
+  <data name="Revenue Won" xml:space="preserve">
+    <value>الإيرادات المحققة</value>
+  </data>
+  <data name="Revenue Won ($)" xml:space="preserve">
+    <value>الإيرادات المحققة ($)</value>
+  </data>
+  <data name="Review" xml:space="preserve">
+    <value>مراجعة</value>
+  </data>
+  <data name="Review and adjust extracted values before approval" xml:space="preserve">
+    <value>راجع القيم المستخرجة وعدّلها قبل الاعتماد</value>
+  </data>
+  <data name="Role" xml:space="preserve">
+    <value>الدور</value>
+  </data>
+  <data name="Role *" xml:space="preserve">
+    <value>الدور *</value>
+  </data>
+  <data name="Role created. Set its permissions below." xml:space="preserve">
+    <value>تم إنشاء الدور. اضبط صلاحياته أدناه.</value>
+  </data>
+  <data name="Role deleted" xml:space="preserve">
+    <value>تم حذف الدور</value>
+  </data>
+  <data name="Roles" xml:space="preserve">
+    <value>الأدوار</value>
+  </data>
+  <data name="Roles &amp; permissions" xml:space="preserve">
+    <value>الأدوار والصلاحيات</value>
+  </data>
+  <data name="Roles appear here once your workspace is set up." xml:space="preserve">
+    <value>تظهر الأدوار هنا بعد إعداد مساحة عملك.</value>
+  </data>
+  <data name="Round robin" xml:space="preserve">
+    <value>بالتناوب</value>
+  </data>
+  <data name="Rows with an email or phone that already exists are skipped. Rows without a first name are reported." xml:space="preserve">
+    <value>يتم تخطي الصفوف التي لها بريد إلكتروني أو هاتف موجود بالفعل. يتم الإبلاغ عن الصفوف التي بلا اسم أول.</value>
+  </data>
+  <data name="Rule Name *" xml:space="preserve">
+    <value>اسم القاعدة *</value>
+  </data>
+  <data name="Rule deleted" xml:space="preserve">
+    <value>تم حذف القاعدة</value>
+  </data>
+  <data name="Rule saved" xml:space="preserve">
+    <value>تم حفظ القاعدة</value>
+  </data>
+  <data name="Run" xml:space="preserve">
+    <value>تشغيل</value>
+  </data>
+  <data name="Run Preview" xml:space="preserve">
+    <value>تشغيل المعاينة</value>
+  </data>
+  <data name="Run {0}" xml:space="preserve">
+    <value>آخر تشغيل {0}</value>
+  </data>
+  <data name="SKU" xml:space="preserve">
+    <value>رمز المنتج (SKU)</value>
+  </data>
+  <data name="SKU / Item Code" xml:space="preserve">
+    <value>رمز المنتج / رمز البند</value>
+  </data>
+  <data name="SMS" xml:space="preserve">
+    <value>رسائل SMS</value>
+  </data>
+  <data name="SaaS / Subscription" xml:space="preserve">
+    <value>برمجيات كخدمة / اشتراك</value>
+  </data>
+  <data name="Sales Targets" xml:space="preserve">
+    <value>أهداف المبيعات</value>
+  </data>
+  <data name="Sales Targets &amp; Quotas" xml:space="preserve">
+    <value>أهداف المبيعات والحصص</value>
+  </data>
+  <data name="Sales target created!" xml:space="preserve">
+    <value>تم إنشاء هدف المبيعات!</value>
+  </data>
+  <data name="Sales target deleted." xml:space="preserve">
+    <value>تم حذف هدف المبيعات.</value>
+  </data>
+  <data name="Sales target updated!" xml:space="preserve">
+    <value>تم تحديث هدف المبيعات!</value>
+  </data>
+  <data name="Sales tax" xml:space="preserve">
+    <value>ضريبة المبيعات</value>
+  </data>
+  <data name="Saudi Arabia" xml:space="preserve">
+    <value>المملكة العربية السعودية</value>
+  </data>
+  <data name="Save Edits" xml:space="preserve">
+    <value>حفظ التعديلات</value>
+  </data>
+  <data name="Save Invoice" xml:space="preserve">
+    <value>حفظ الفاتورة</value>
+  </data>
+  <data name="Save Product" xml:space="preserve">
+    <value>حفظ المنتج</value>
+  </data>
+  <data name="Save Proposal" xml:space="preserve">
+    <value>حفظ العرض</value>
+  </data>
+  <data name="Save Rate" xml:space="preserve">
+    <value>حفظ السعر</value>
+  </data>
+  <data name="Save Report" xml:space="preserve">
+    <value>حفظ التقرير</value>
+  </data>
+  <data name="Save Schedule" xml:space="preserve">
+    <value>حفظ الجدول</value>
+  </data>
+  <data name="Save branch" xml:space="preserve">
+    <value>حفظ الفرع</value>
+  </data>
+  <data name="Save changes" xml:space="preserve">
+    <value>حفظ التغييرات</value>
+  </data>
+  <data name="Save currencies" xml:space="preserve">
+    <value>حفظ العملات</value>
+  </data>
+  <data name="Save form" xml:space="preserve">
+    <value>حفظ النموذج</value>
+  </data>
+  <data name="Save layout" xml:space="preserve">
+    <value>حفظ التخطيط</value>
+  </data>
+  <data name="Save permissions" xml:space="preserve">
+    <value>حفظ الصلاحيات</value>
+  </data>
+  <data name="Save pipeline" xml:space="preserve">
+    <value>حفظ المسار</value>
+  </data>
+  <data name="Save preferences" xml:space="preserve">
+    <value>حفظ التفضيلات</value>
+  </data>
+  <data name="Save rule" xml:space="preserve">
+    <value>حفظ القاعدة</value>
+  </data>
+  <data name="Save stage" xml:space="preserve">
+    <value>حفظ المرحلة</value>
+  </data>
+  <data name="Save team" xml:space="preserve">
+    <value>حفظ الفريق</value>
+  </data>
+  <data name="Saved" xml:space="preserve">
+    <value>تم الحفظ</value>
+  </data>
+  <data name="Say why this lead is not a fit." xml:space="preserve">
+    <value>اذكر سبب عدم ملاءمة هذا العميل المحتمل.</value>
+  </data>
+  <data name="Say why this lead is not a fit. It stays on record." xml:space="preserve">
+    <value>اذكر سبب عدم ملاءمة هذا العميل المحتمل. يبقى هذا في السجل.</value>
+  </data>
+  <data name="Schedule" xml:space="preserve">
+    <value>الجدول</value>
+  </data>
+  <data name="Schedule deleted." xml:space="preserve">
+    <value>تم حذف الجدول.</value>
+  </data>
+  <data name="Schedule saved successfully!" xml:space="preserve">
+    <value>تم حفظ الجدول بنجاح!</value>
+  </data>
+  <data name="Scheduled Deliveries" xml:space="preserve">
+    <value>التسليمات المجدولة</value>
+  </data>
+  <data name="Search by file name, vendor, invoice #..." xml:space="preserve">
+    <value>ابحث باسم الملف أو المورّد أو رقم الفاتورة...</value>
+  </data>
+  <data name="Search by invoice #, customer..." xml:space="preserve">
+    <value>ابحث برقم الفاتورة أو العميل...</value>
+  </data>
+  <data name="Search by name, SKU, or category..." xml:space="preserve">
+    <value>ابحث بالاسم أو رمز المنتج أو الفئة...</value>
+  </data>
+  <data name="Search deal or company" xml:space="preserve">
+    <value>ابحث عن صفقة أو شركة</value>
+  </data>
+  <data name="Search messages or contacts..." xml:space="preserve">
+    <value>ابحث في الرسائل أو جهات الاتصال...</value>
+  </data>
+  <data name="Search name, email, company or phone" xml:space="preserve">
+    <value>ابحث بالاسم أو البريد الإلكتروني أو الشركة أو الهاتف</value>
+  </data>
+  <data name="Search name, email, phone or job title" xml:space="preserve">
+    <value>ابحث بالاسم أو البريد الإلكتروني أو الهاتف أو المسمى الوظيفي</value>
+  </data>
+  <data name="Search name, website, industry or phone" xml:space="preserve">
+    <value>ابحث بالاسم أو الموقع الإلكتروني أو المجال أو الهاتف</value>
+  </data>
+  <data name="Search proposals..." xml:space="preserve">
+    <value>ابحث في العروض...</value>
+  </data>
+  <data name="Search records" xml:space="preserve">
+    <value>البحث في السجلات</value>
+  </data>
+  <data name="Search reports..." xml:space="preserve">
+    <value>ابحث في التقارير...</value>
+  </data>
+  <data name="Section name" xml:space="preserve">
+    <value>اسم القسم</value>
+  </data>
+  <data name="See all" xml:space="preserve">
+    <value>عرض الكل</value>
+  </data>
+  <data name="Select Product" xml:space="preserve">
+    <value>اختر المنتج</value>
+  </data>
+  <data name="Select a conversation to start chatting" xml:space="preserve">
+    <value>اختر محادثة لبدء الدردشة</value>
+  </data>
+  <data name="Send" xml:space="preserve">
+    <value>إرسال</value>
+  </data>
+  <data name="Send Email" xml:space="preserve">
+    <value>إرسال بريد إلكتروني</value>
+  </data>
+  <data name="Send In-App Toast" xml:space="preserve">
+    <value>إرسال إشعار منبثق داخل التطبيق</value>
+  </data>
+  <data name="Send Request" xml:space="preserve">
+    <value>إرسال الطلب</value>
+  </data>
+  <data name="Send a POST request with JSON fields firstName, lastName, email, phone, companyName and message. Leave hp empty; it is a spam trap." xml:space="preserve">
+    <value>أرسل طلب POST بحقول JSON التالية: firstName وlastName وemail وphone وcompanyName وmessage. اترك الحقل hp فارغًا؛ فهو فخ للرسائل المزعجة.</value>
+  </data>
+  <data name="Send invitation" xml:space="preserve">
+    <value>إرسال الدعوة</value>
+  </data>
+  <data name="Send the link" xml:space="preserve">
+    <value>إرسال الرابط</value>
+  </data>
+  <data name="Send {0}" xml:space="preserve">
+    <value>إرسال {0}</value>
+  </data>
+  <data name="Sent" xml:space="preserve">
+    <value>مرسل</value>
+  </data>
+  <data name="Sent / Pending" xml:space="preserve">
+    <value>مرسل / قيد الانتظار</value>
+  </data>
+  <data name="Service" xml:space="preserve">
+    <value>خدمة</value>
+  </data>
+  <data name="Set" xml:space="preserve">
+    <value>تعيين</value>
+  </data>
+  <data name="Set up your workspace" xml:space="preserve">
+    <value>أعدّ مساحة عملك</value>
+  </data>
+  <data name="Shared with the customer portal." xml:space="preserve">
+    <value>تمت المشاركة مع بوابة العملاء.</value>
+  </data>
+  <data name="Show" xml:space="preserve">
+    <value>عرض</value>
+  </data>
+  <data name="Show more" xml:space="preserve">
+    <value>عرض المزيد</value>
+  </data>
+  <data name="Show more ({0} left)" xml:space="preserve">
+    <value>عرض المزيد (متبقٍ {0})</value>
+  </data>
+  <data name="Shown to the visitor after they send the form." xml:space="preserve">
+    <value>تظهر للزائر بعد إرسال النموذج.</value>
+  </data>
+  <data name="Sign in" xml:space="preserve">
+    <value>تسجيل الدخول</value>
+  </data>
+  <data name="Sign in to your MindLift workspace." xml:space="preserve">
+    <value>سجّل الدخول إلى مساحة عملك في MindLift.</value>
+  </data>
+  <data name="Singular: {0} · Key: {1}" xml:space="preserve">
+    <value>المفرد: {0} · المفتاح: {1}</value>
+  </data>
+  <data name="Skip for now" xml:space="preserve">
+    <value>تخطي الآن</value>
+  </data>
+  <data name="Software License" xml:space="preserve">
+    <value>ترخيص برمجيات</value>
+  </data>
+  <data name="Something went wrong. Please try again." xml:space="preserve">
+    <value>حدث خطأ ما. يرجى المحاولة مرة أخرى.</value>
+  </data>
+  <data name="Sorry, the content you are looking for does not exist." xml:space="preserve">
+    <value>عذرًا، المحتوى الذي تبحث عنه غير موجود.</value>
+  </data>
+  <data name="Source" xml:space="preserve">
+    <value>المصدر</value>
+  </data>
+  <data name="Specific Field Changes" xml:space="preserve">
+    <value>تغييرات حقول محددة</value>
+  </data>
+  <data name="Specific person" xml:space="preserve">
+    <value>شخص محدد</value>
+  </data>
+  <data name="Split the file into smaller files of up to 5,000 rows." xml:space="preserve">
+    <value>قسّم الملف إلى ملفات أصغر لا تتجاوز 5,000 صف.</value>
+  </data>
+  <data name="Stage" xml:space="preserve">
+    <value>المرحلة</value>
+  </data>
+  <data name="Stage Changed" xml:space="preserve">
+    <value>تغيير المرحلة</value>
+  </data>
+  <data name="Stage deleted" xml:space="preserve">
+    <value>تم حذف المرحلة</value>
+  </data>
+  <data name="Stage history" xml:space="preserve">
+    <value>سجل المراحل</value>
+  </data>
+  <data name="Stage saved" xml:space="preserve">
+    <value>تم حفظ المرحلة</value>
+  </data>
+  <data name="Stage type *" xml:space="preserve">
+    <value>نوع المرحلة *</value>
+  </data>
+  <data name="Stages come from your industry. Won and Lost must stay last." xml:space="preserve">
+    <value>المراحل مأخوذة من مجال عملك. يجب أن تبقى «تم الفوز» و«خسارة» في النهاية.</value>
+  </data>
+  <data name="Standard" xml:space="preserve">
+    <value>قياسي</value>
+  </data>
+  <data name="Standard 5-part cron: min hour dom month dow" xml:space="preserve">
+    <value>تعبير cron القياسي من 5 أجزاء: الدقيقة الساعة اليوم الشهر يوم الأسبوع</value>
+  </data>
+  <data name="Start Date" xml:space="preserve">
+    <value>تاريخ البدء</value>
+  </data>
+  <data name="Start by creating a proposal for your deals or prospective accounts." xml:space="preserve">
+    <value>ابدأ بإنشاء عرض لصفقاتك أو حساباتك المحتملة.</value>
+  </data>
+  <data name="Start empty." xml:space="preserve">
+    <value>ابدأ فارغًا.</value>
+  </data>
+  <data name="Start times every (min)" xml:space="preserve">
+    <value>أوقات البدء كل (دقيقة)</value>
+  </data>
+  <data name="Start with data" xml:space="preserve">
+    <value>ابدأ ببيانات</value>
+  </data>
+  <data name="Status" xml:space="preserve">
+    <value>الحالة</value>
+  </data>
+  <data name="Step {0} of 6" xml:space="preserve">
+    <value>الخطوة {0} من 6</value>
+  </data>
+  <data name="Stripe / Online" xml:space="preserve">
+    <value>Stripe / عبر الإنترنت</value>
+  </data>
+  <data name="SubTotal:" xml:space="preserve">
+    <value>المجموع الفرعي:</value>
+  </data>
+  <data name="Subject" xml:space="preserve">
+    <value>الموضوع</value>
+  </data>
+  <data name="Subject..." xml:space="preserve">
+    <value>الموضوع...</value>
+  </data>
+  <data name="Subscription" xml:space="preserve">
+    <value>اشتراك</value>
+  </data>
+  <data name="Subscriptions" xml:space="preserve">
+    <value>الاشتراكات</value>
+  </data>
+  <data name="Sum" xml:space="preserve">
+    <value>المجموع</value>
+  </data>
+  <data name="Summary (Grouped rows with totals)" xml:space="preserve">
+    <value>ملخص (صفوف مجمّعة مع الإجماليات)</value>
+  </data>
+  <data name="Sunday" xml:space="preserve">
+    <value>الأحد</value>
+  </data>
+  <data name="Switch modules on or off, and rename them for your business." xml:space="preserve">
+    <value>فعّل الوحدات أو عطّلها، وأعد تسميتها بما يناسب عملك.</value>
+  </data>
+  <data name="Switched off" xml:space="preserve">
+    <value>معطّل</value>
+  </data>
+  <data name="System" xml:space="preserve">
+    <value>النظام</value>
+  </data>
+  <data name="System Reports" xml:space="preserve">
+    <value>تقارير النظام</value>
+  </data>
+  <data name="Table Only (No Chart)" xml:space="preserve">
+    <value>جدول فقط (بدون مخطط)</value>
+  </data>
+  <data name="Tabular (Detailed row list)" xml:space="preserve">
+    <value>جدولي (قائمة صفوف تفصيلية)</value>
+  </data>
+  <data name="Take turns (round robin)" xml:space="preserve">
+    <value>بالتناوب (دورة)</value>
+  </data>
+  <data name="Target Goal" xml:space="preserve">
+    <value>الهدف المنشود</value>
+  </data>
+  <data name="Target Metric" xml:space="preserve">
+    <value>مقياس الهدف</value>
+  </data>
+  <data name="Target Quota Value" xml:space="preserve">
+    <value>قيمة حصة الهدف</value>
+  </data>
+  <data name="Target Quotas &amp; Performance" xml:space="preserve">
+    <value>حصص الأهداف والأداء</value>
+  </data>
+  <data name="Target Value (optional - triggers on change to this value)" xml:space="preserve">
+    <value>القيمة المستهدفة (اختياري - يُفعَّل عند التغيير إلى هذه القيمة)</value>
+  </data>
+  <data name="Target quota must be greater than zero." xml:space="preserve">
+    <value>يجب أن تكون حصة الهدف أكبر من صفر.</value>
+  </data>
+  <data name="Task" xml:space="preserve">
+    <value>مهمة</value>
+  </data>
+  <data name="Task *" xml:space="preserve">
+    <value>المهمة *</value>
+  </data>
+  <data name="Task Subject *" xml:space="preserve">
+    <value>موضوع المهمة *</value>
+  </data>
+  <data name="Task completed" xml:space="preserve">
+    <value>تم إكمال المهمة</value>
+  </data>
+  <data name="Task: {0}" xml:space="preserve">
+    <value>مهمة: {0}</value>
+  </data>
+  <data name="Tasks" xml:space="preserve">
+    <value>المهام</value>
+  </data>
+  <data name="Tasks already created from it stay where they are." xml:space="preserve">
+    <value>تبقى المهام التي أُنشئت منها بالفعل كما هي.</value>
+  </data>
+  <data name="Tasks that are created for you when a deal is won, so every new customer gets the same start." xml:space="preserve">
+    <value>مهام تُنشأ لك عند الفوز بصفقة، ليحصل كل عميل جديد على البداية نفسها.</value>
+  </data>
+  <data name="Tasks you add, and tasks assigned to you, show up here." xml:space="preserve">
+    <value>تظهر هنا المهام التي تضيفها والمهام المسندة إليك.</value>
+  </data>
+  <data name="Tax" xml:space="preserve">
+    <value>الضريبة</value>
+  </data>
+  <data name="Tax %" xml:space="preserve">
+    <value>الضريبة %</value>
+  </data>
+  <data name="Tax Rate" xml:space="preserve">
+    <value>نسبة الضريبة</value>
+  </data>
+  <data name="Tax label" xml:space="preserve">
+    <value>اسم الضريبة</value>
+  </data>
+  <data name="Tax registration number" xml:space="preserve">
+    <value>رقم التسجيل الضريبي</value>
+  </data>
+  <data name="Tax:" xml:space="preserve">
+    <value>الضريبة:</value>
+  </data>
+  <data name="Team" xml:space="preserve">
+    <value>الفريق</value>
+  </data>
+  <data name="Team (My Team)" xml:space="preserve">
+    <value>الفريق (فريقي)</value>
+  </data>
+  <data name="Team deleted" xml:space="preserve">
+    <value>تم حذف الفريق</value>
+  </data>
+  <data name="Team leader" xml:space="preserve">
+    <value>قائد الفريق</value>
+  </data>
+  <data name="Team saved" xml:space="preserve">
+    <value>تم حفظ الفريق</value>
+  </data>
+  <data name="Team's records" xml:space="preserve">
+    <value>سجلات الفريق</value>
+  </data>
+  <data name="Teams" xml:space="preserve">
+    <value>الفرق</value>
+  </data>
+  <data name="Teams &amp; branches" xml:space="preserve">
+    <value>الفرق والفروع</value>
+  </data>
+  <data name="Teams group people for team-scoped access and dashboards. Branches are offices or locations, each with its own time zone." xml:space="preserve">
+    <value>تجمع الفرق الأشخاص للوصول ولوحات التحكم على مستوى الفريق. الفروع هي المكاتب أو المواقع، ولكل منها منطقتها الزمنية.</value>
+  </data>
+  <data name="Tell me when" xml:space="preserve">
+    <value>أخبرني متى</value>
+  </data>
+  <data name="Tell us about your company" xml:space="preserve">
+    <value>أخبرنا عن شركتك</value>
+  </data>
+  <data name="Terms &amp; Conditions" xml:space="preserve">
+    <value>الشروط والأحكام</value>
+  </data>
+  <data name="Terms: {0}" xml:space="preserve">
+    <value>الشروط: {0}</value>
+  </data>
+  <data name="Test Connection" xml:space="preserve">
+    <value>اختبار الاتصال</value>
+  </data>
+  <data name="Test on a sample file" xml:space="preserve">
+    <value>اختبار على ملف نموذجي</value>
+  </data>
+  <data name="Text" xml:space="preserve">
+    <value>نص</value>
+  </data>
+  <data name="Thank you. Your email address is confirmed." xml:space="preserve">
+    <value>شكرًا لك. تم تأكيد بريدك الإلكتروني.</value>
+  </data>
+  <data name="The base currency reports use, the currencies you can record deals in, and their rates." xml:space="preserve">
+    <value>العملة الأساسية التي تستخدمها التقارير، والعملات التي يمكنك تسجيل الصفقات بها، وأسعارها.</value>
+  </data>
+  <data name="The choices used in lead status, source, rating and more. Codes never change; labels can." xml:space="preserve">
+    <value>الخيارات المستخدمة في حالة العميل المحتمل ومصدره وتقييمه وغيرها. الرموز لا تتغير؛ أما الأسماء فيمكن تغييرها.</value>
+  </data>
+  <data name="The close date is set to today and any onboarding checklist is created." xml:space="preserve">
+    <value>يُضبط تاريخ الإغلاق على اليوم ويتم إنشاء أي قائمة مهام تهيئة.</value>
+  </data>
+  <data name="The close date is set to today." xml:space="preserve">
+    <value>يُضبط تاريخ الإغلاق على اليوم.</value>
+  </data>
+  <data name="The contact is removed from your lists. This cannot be undone from here." xml:space="preserve">
+    <value>تتم إزالة جهة الاتصال من قوائمك. لا يمكن التراجع عن ذلك من هنا.</value>
+  </data>
+  <data name="The deal is removed from your lists. This cannot be undone from here." xml:space="preserve">
+    <value>تتم إزالة الصفقة من قوائمك. لا يمكن التراجع عن ذلك من هنا.</value>
+  </data>
+  <data name="The file is removed from this record." xml:space="preserve">
+    <value>تتم إزالة الملف من هذا السجل.</value>
+  </data>
+  <data name="The first rows of your file." xml:space="preserve">
+    <value>الصفوف الأولى من ملفك.</value>
+  </data>
+  <data name="The stages a deal moves through. Every pipeline needs open stages, then exactly one Won and one Lost stage at the end." xml:space="preserve">
+    <value>المراحل التي تمر بها الصفقة. يحتاج كل مسار إلى مراحل مفتوحة، ثم مرحلة «تم الفوز» واحدة بالضبط ومرحلة «خسارة» واحدة في النهاية.</value>
+  </data>
+  <data name="The two passwords are not the same." xml:space="preserve">
+    <value>كلمتا المرور غير متطابقتين.</value>
+  </data>
+  <data name="There is no {0} column, so nothing can be imported. Rename a column or choose another file." xml:space="preserve">
+    <value>لا يوجد عمود {0}، لذا لا يمكن استيراد شيء. أعد تسمية عمود أو اختر ملفًا آخر.</value>
+  </data>
+  <data name="This booking page is not available." xml:space="preserve">
+    <value>صفحة الحجز هذه غير متاحة.</value>
+  </data>
+  <data name="This file has more than 5,000 rows. Split it into smaller files." xml:space="preserve">
+    <value>يحتوي هذا الملف على أكثر من 5,000 صف. قسّمه إلى ملفات أصغر.</value>
+  </data>
+  <data name="This lead was converted" xml:space="preserve">
+    <value>تم تحويل هذا العميل المحتمل</value>
+  </data>
+  <data name="This link has expired or was already used." xml:space="preserve">
+    <value>انتهت صلاحية هذا الرابط أو سبق استخدامه.</value>
+  </data>
+  <data name="This link has expired or was already used. Ask for a new one." xml:space="preserve">
+    <value>انتهت صلاحية هذا الرابط أو سبق استخدامه. اطلب رابطًا جديدًا.</value>
+  </data>
+  <data name="This link is not complete. Open the link from the email again, or ask for a new one." xml:space="preserve">
+    <value>هذا الرابط غير مكتمل. افتح الرابط من البريد الإلكتروني مرة أخرى، أو اطلب رابطًا جديدًا.</value>
+  </data>
+  <data name="This link is not complete. Open the link from the email again." xml:space="preserve">
+    <value>هذا الرابط غير مكتمل. افتح الرابط من البريد الإلكتروني مرة أخرى.</value>
+  </data>
+  <data name="This link is not valid. Use the link from your confirmation email." xml:space="preserve">
+    <value>هذا الرابط غير صالح. استخدم الرابط الوارد في رسالة التأكيد.</value>
+  </data>
+  <data name="This sets your currency, time zone and language." xml:space="preserve">
+    <value>يحدد هذا عملتك ومنطقتك الزمنية ولغتك.</value>
+  </data>
+  <data name="Three letters, for example AED." xml:space="preserve">
+    <value>ثلاثة أحرف، مثل AED.</value>
+  </data>
+  <data name="Tick at least one contact to merge." xml:space="preserve">
+    <value>حدّد جهة اتصال واحدة على الأقل للدمج.</value>
+  </data>
+  <data name="Tick at least one lead to merge." xml:space="preserve">
+    <value>حدّد عميلًا محتملًا واحدًا على الأقل للدمج.</value>
+  </data>
+  <data name="Tick the leads to fold into this one. Contacts are shown for information and cannot be merged here." xml:space="preserve">
+    <value>حدّد العملاء المحتملين المراد دمجهم في هذا السجل. تظهر جهات الاتصال للاطلاع فقط ولا يمكن دمجها هنا.</value>
+  </data>
+  <data name="Tick what this role can do. Scope limits which records it reaches." xml:space="preserve">
+    <value>حدّد ما يمكن لهذا الدور فعله. يحدد النطاق السجلات التي يصل إليها.</value>
+  </data>
+  <data name="Time Horizon" xml:space="preserve">
+    <value>الأفق الزمني</value>
+  </data>
+  <data name="Time zone" xml:space="preserve">
+    <value>المنطقة الزمنية</value>
+  </data>
+  <data name="Time zone (IANA)" xml:space="preserve">
+    <value>المنطقة الزمنية (IANA)</value>
+  </data>
+  <data name="Time zone (for example Asia/Dubai)" xml:space="preserve">
+    <value>المنطقة الزمنية (مثل Asia/Dubai)</value>
+  </data>
+  <data name="Timeline" xml:space="preserve">
+    <value>الخط الزمني</value>
+  </data>
+  <data name="Times are UTC. Drag a meeting or task to another day to move it; it keeps its time. Meetings are created from a record." xml:space="preserve">
+    <value>الأوقات بالتوقيت العالمي. اسحب اجتماعًا أو مهمة إلى يوم آخر لنقلها؛ يبقى وقتها كما هو. تُنشأ الاجتماعات من سجل.</value>
+  </data>
+  <data name="Title" xml:space="preserve">
+    <value>العنوان</value>
+  </data>
+  <data name="To (17:00)" xml:space="preserve">
+    <value>إلى (17:00)</value>
+  </data>
+  <data name="To choose another time, cancel this one and book again from the page." xml:space="preserve">
+    <value>لاختيار وقت آخر، ألغِ هذا الموعد واحجز مرة أخرى من الصفحة.</value>
+  </data>
+  <data name="Toast Notification" xml:space="preserve">
+    <value>إشعار منبثق</value>
+  </data>
+  <data name="Toggle visibility of widgets for this view." xml:space="preserve">
+    <value>تبديل ظهور عناصر الواجهة في هذا العرض.</value>
+  </data>
+  <data name="Total" xml:space="preserve">
+    <value>الإجمالي</value>
+  </data>
+  <data name="Total Documents" xml:space="preserve">
+    <value>إجمالي المستندات</value>
+  </data>
+  <data name="Total Invoiced" xml:space="preserve">
+    <value>إجمالي المفوتر</value>
+  </data>
+  <data name="Total Products" xml:space="preserve">
+    <value>إجمالي المنتجات</value>
+  </data>
+  <data name="Total Proposals" xml:space="preserve">
+    <value>إجمالي العروض</value>
+  </data>
+  <data name="Total Quoted Value" xml:space="preserve">
+    <value>إجمالي القيمة المعروضة</value>
+  </data>
+  <data name="Total Rows" xml:space="preserve">
+    <value>إجمالي الصفوف</value>
+  </data>
+  <data name="Total Storage" xml:space="preserve">
+    <value>إجمالي التخزين</value>
+  </data>
+  <data name="Total Value" xml:space="preserve">
+    <value>القيمة الإجمالية</value>
+  </data>
+  <data name="Track billing records, manage payment collections, and reconcile outstanding balances." xml:space="preserve">
+    <value>تتبع سجلات الفوترة، وأدر تحصيل الدفعات، وسوِّ الأرصدة المستحقة.</value>
+  </data>
+  <data name="Trigger-Condition-Action workflows (Zoho Automation Engine). Run instant or scheduled actions when records are created, updated, or moved between stages." xml:space="preserve">
+    <value>سير عمل المشغّل-الشرط-الإجراء. نفّذ إجراءات فورية أو مجدولة عند إنشاء السجلات أو تحديثها أو نقلها بين المراحل.</value>
+  </data>
+  <data name="Trigger: {0} · Entity ID: {1}…" xml:space="preserve">
+    <value>المشغّل: {0} · معرّف الكيان: {1}…</value>
+  </data>
+  <data name="Try changing your search terms or create a new custom report with the report builder." xml:space="preserve">
+    <value>جرّب تغيير كلمات البحث أو أنشئ تقريرًا مخصصًا جديدًا باستخدام منشئ التقارير.</value>
+  </data>
+  <data name="Type" xml:space="preserve">
+    <value>النوع</value>
+  </data>
+  <data name="Type *" xml:space="preserve">
+    <value>النوع *</value>
+  </data>
+  <data name="Type is on" xml:space="preserve">
+    <value>النوع مفعّل</value>
+  </data>
+  <data name="Type your message..." xml:space="preserve">
+    <value>اكتب رسالتك...</value>
+  </data>
+  <data name="Unified Inbox | MindLift CRM" xml:space="preserve">
+    <value>صندوق الوارد الموحّد | MindLift CRM</value>
+  </data>
+  <data name="Unit Price" xml:space="preserve">
+    <value>سعر الوحدة</value>
+  </data>
+  <data name="United Arab Emirates" xml:space="preserve">
+    <value>الإمارات العربية المتحدة</value>
+  </data>
+  <data name="United Kingdom" xml:space="preserve">
+    <value>المملكة المتحدة</value>
+  </data>
+  <data name="United States" xml:space="preserve">
+    <value>الولايات المتحدة</value>
+  </data>
+  <data name="Unread" xml:space="preserve">
+    <value>غير مقروء</value>
+  </data>
+  <data name="Update Field" xml:space="preserve">
+    <value>تحديث حقل</value>
+  </data>
+  <data name="Upload Date" xml:space="preserve">
+    <value>تاريخ الرفع</value>
+  </data>
+  <data name="Upload Document" xml:space="preserve">
+    <value>رفع مستند</value>
+  </data>
+  <data name="Upload a file to see what this type reads. Nothing is saved." xml:space="preserve">
+    <value>ارفع ملفًا لترى ما يقرؤه هذا النوع. لن يُحفظ شيء.</value>
+  </data>
+  <data name="Upload contracts, customer proposals, vendor invoices, and track secure customer portal document requests." xml:space="preserve">
+    <value>ارفع العقود وعروض العملاء وفواتير الموردين، وتتبع طلبات المستندات الآمنة في بوابة العملاء.</value>
+  </data>
+  <data name="Upload your first business document to extract vendor names, totals, and invoice numbers." xml:space="preserve">
+    <value>ارفع أول مستند تجاري لاستخراج أسماء الموردين والإجماليات وأرقام الفواتير.</value>
+  </data>
+  <data name="Uploaded {0}" xml:space="preserve">
+    <value>تم الرفع {0}</value>
+  </data>
+  <data name="Uploaded: {0}" xml:space="preserve">
+    <value>تم الرفع: {0}</value>
+  </data>
+  <data name="User deactivated" xml:space="preserve">
+    <value>تم إلغاء تفعيل المستخدم</value>
+  </data>
+  <data name="Users" xml:space="preserve">
+    <value>المستخدمون</value>
+  </data>
+  <data name="Users in this rule" xml:space="preserve">
+    <value>المستخدمون في هذه القاعدة</value>
+  </data>
+  <data name="Valid until: {0} · Terms: {1}" xml:space="preserve">
+    <value>صالح حتى: {0} · الشروط: {1}</value>
+  </data>
+  <data name="Value added" xml:space="preserve">
+    <value>تمت إضافة القيمة</value>
+  </data>
+  <data name="Values to read" xml:space="preserve">
+    <value>القيم المطلوب قراءتها</value>
+  </data>
+  <data name="Vendor Detected" xml:space="preserve">
+    <value>المورّد المكتشف</value>
+  </data>
+  <data name="Vertical Column" xml:space="preserve">
+    <value>أعمدة رأسية</value>
+  </data>
+  <data name="Video" xml:space="preserve">
+    <value>فيديو</value>
+  </data>
+  <data name="View" xml:space="preserve">
+    <value>عرض</value>
+  </data>
+  <data name="View Invoice" xml:space="preserve">
+    <value>عرض الفاتورة</value>
+  </data>
+  <data name="View Proposal" xml:space="preserve">
+    <value>فتح العرض</value>
+  </data>
+  <data name="View Rates" xml:space="preserve">
+    <value>عرض الأسعار</value>
+  </data>
+  <data name="View Report" xml:space="preserve">
+    <value>عرض التقرير</value>
+  </data>
+  <data name="View messages across WhatsApp, Email and SMS in real-time" xml:space="preserve">
+    <value>اعرض الرسائل عبر واتساب والبريد الإلكتروني وSMS في الوقت الفعلي</value>
+  </data>
+  <data name="View {0}" xml:space="preserve">
+    <value>عرض {0}</value>
+  </data>
+  <data name="Visibility" xml:space="preserve">
+    <value>الظهور</value>
+  </data>
+  <data name="Visible to the linked customer in their portal when on" xml:space="preserve">
+    <value>ظاهر للعميل المرتبط في بوابته عند التفعيل</value>
+  </data>
+  <data name="We charge tax" xml:space="preserve">
+    <value>نحن نحتسب ضريبة</value>
+  </data>
+  <data name="We charge tax (VAT / GST)" xml:space="preserve">
+    <value>نحتسب ضريبة (ضريبة القيمة المضافة / ضريبة السلع والخدمات)</value>
+  </data>
+  <data name="We could not accept this invitation." xml:space="preserve">
+    <value>تعذّر قبول هذه الدعوة.</value>
+  </data>
+  <data name="We could not add this field." xml:space="preserve">
+    <value>تعذّرت إضافة هذا الحقل.</value>
+  </data>
+  <data name="We could not add this rate." xml:space="preserve">
+    <value>تعذّرت إضافة سعر الصرف هذا.</value>
+  </data>
+  <data name="We could not add this value." xml:space="preserve">
+    <value>تعذّرت إضافة هذه القيمة.</value>
+  </data>
+  <data name="We could not book this time. Please choose another." xml:space="preserve">
+    <value>تعذّر حجز هذا الموعد. يرجى اختيار موعد آخر.</value>
+  </data>
+  <data name="We could not cancel this booking." xml:space="preserve">
+    <value>تعذّر إلغاء هذا الحجز.</value>
+  </data>
+  <data name="We could not change this value." xml:space="preserve">
+    <value>تعذّر تغيير هذه القيمة.</value>
+  </data>
+  <data name="We could not create this role." xml:space="preserve">
+    <value>تعذّر إنشاء هذا الدور.</value>
+  </data>
+  <data name="We could not create your workspace. Try again." xml:space="preserve">
+    <value>تعذّر إنشاء مساحة عملك. حاول مرة أخرى.</value>
+  </data>
+  <data name="We could not delete this account." xml:space="preserve">
+    <value>تعذّر حذف هذا الحساب.</value>
+  </data>
+  <data name="We could not delete this activity." xml:space="preserve">
+    <value>تعذّر حذف هذا النشاط.</value>
+  </data>
+  <data name="We could not delete this booking page." xml:space="preserve">
+    <value>تعذّر حذف صفحة الحجز هذه.</value>
+  </data>
+  <data name="We could not delete this branch." xml:space="preserve">
+    <value>تعذّر حذف هذا الفرع.</value>
+  </data>
+  <data name="We could not delete this checklist." xml:space="preserve">
+    <value>تعذّر حذف قائمة المهام هذه.</value>
+  </data>
+  <data name="We could not delete this contact." xml:space="preserve">
+    <value>تعذّر حذف جهة الاتصال هذه.</value>
+  </data>
+  <data name="We could not delete this deal." xml:space="preserve">
+    <value>تعذّر حذف هذه الصفقة.</value>
+  </data>
+  <data name="We could not delete this document type." xml:space="preserve">
+    <value>تعذّر حذف نوع المستند هذا.</value>
+  </data>
+  <data name="We could not delete this file." xml:space="preserve">
+    <value>تعذّر حذف هذا الملف.</value>
+  </data>
+  <data name="We could not delete this pipeline." xml:space="preserve">
+    <value>تعذّر حذف هذا المسار.</value>
+  </data>
+  <data name="We could not delete this role." xml:space="preserve">
+    <value>تعذّر حذف هذا الدور.</value>
+  </data>
+  <data name="We could not delete this rule." xml:space="preserve">
+    <value>تعذّر حذف هذه القاعدة.</value>
+  </data>
+  <data name="We could not delete this stage." xml:space="preserve">
+    <value>تعذّر حذف هذه المرحلة.</value>
+  </data>
+  <data name="We could not delete this team." xml:space="preserve">
+    <value>تعذّر حذف هذا الفريق.</value>
+  </data>
+  <data name="We could not download this file." xml:space="preserve">
+    <value>تعذّر تنزيل هذا الملف.</value>
+  </data>
+  <data name="We could not export your accounts." xml:space="preserve">
+    <value>تعذّر تصدير حساباتك.</value>
+  </data>
+  <data name="We could not export your contacts." xml:space="preserve">
+    <value>تعذّر تصدير جهات اتصالك.</value>
+  </data>
+  <data name="We could not export your deals." xml:space="preserve">
+    <value>تعذّر تصدير صفقاتك.</value>
+  </data>
+  <data name="We could not export your leads." xml:space="preserve">
+    <value>تعذّر تصدير عملائك المحتملين.</value>
+  </data>
+  <data name="We could not import this file." xml:space="preserve">
+    <value>تعذّر استيراد هذا الملف.</value>
+  </data>
+  <data name="We could not load more leads." xml:space="preserve">
+    <value>تعذّر تحميل المزيد من العملاء المحتملين.</value>
+  </data>
+  <data name="We could not load the calendar. Try again." xml:space="preserve">
+    <value>تعذّر تحميل التقويم. حاول مرة أخرى.</value>
+  </data>
+  <data name="We could not load the free times. Try again." xml:space="preserve">
+    <value>تعذّر تحميل الأوقات المتاحة. حاول مرة أخرى.</value>
+  </data>
+  <data name="We could not load the timeline." xml:space="preserve">
+    <value>تعذّر تحميل الخط الزمني.</value>
+  </data>
+  <data name="We could not load your accounts. Try again." xml:space="preserve">
+    <value>تعذّر تحميل حساباتك. حاول مرة أخرى.</value>
+  </data>
+  <data name="We could not load your activities. Try again." xml:space="preserve">
+    <value>تعذّر تحميل أنشطتك. حاول مرة أخرى.</value>
+  </data>
+  <data name="We could not load your contacts. Try again." xml:space="preserve">
+    <value>تعذّر تحميل جهات اتصالك. حاول مرة أخرى.</value>
+  </data>
+  <data name="We could not load your deals. Try again." xml:space="preserve">
+    <value>تعذّر تحميل صفقاتك. حاول مرة أخرى.</value>
+  </data>
+  <data name="We could not load your leads. Try again." xml:space="preserve">
+    <value>تعذّر تحميل عملائك المحتملين. حاول مرة أخرى.</value>
+  </data>
+  <data name="We could not load your notifications. Check your connection and try again." xml:space="preserve">
+    <value>تعذّر تحميل إشعاراتك. تحقّق من اتصالك وحاول مرة أخرى.</value>
+  </data>
+  <data name="We could not look for duplicates." xml:space="preserve">
+    <value>تعذّر البحث عن المكررات.</value>
+  </data>
+  <data name="We could not merge these contacts." xml:space="preserve">
+    <value>تعذّر دمج جهات الاتصال هذه.</value>
+  </data>
+  <data name="We could not merge these leads." xml:space="preserve">
+    <value>تعذّر دمج هؤلاء العملاء المحتملين.</value>
+  </data>
+  <data name="We could not move this deal." xml:space="preserve">
+    <value>تعذّر نقل هذه الصفقة.</value>
+  </data>
+  <data name="We could not move this item." xml:space="preserve">
+    <value>تعذّر نقل هذا العنصر.</value>
+  </data>
+  <data name="We could not move this lead." xml:space="preserve">
+    <value>تعذّر نقل هذا العميل المحتمل.</value>
+  </data>
+  <data name="We could not open this account" xml:space="preserve">
+    <value>تعذّر فتح هذا الحساب</value>
+  </data>
+  <data name="We could not open this account." xml:space="preserve">
+    <value>تعذّر فتح هذا الحساب.</value>
+  </data>
+  <data name="We could not open this contact" xml:space="preserve">
+    <value>تعذّر فتح جهة الاتصال هذه</value>
+  </data>
+  <data name="We could not open this contact." xml:space="preserve">
+    <value>تعذّر فتح جهة الاتصال هذه.</value>
+  </data>
+  <data name="We could not open this deal" xml:space="preserve">
+    <value>تعذّر فتح هذه الصفقة</value>
+  </data>
+  <data name="We could not open this deal." xml:space="preserve">
+    <value>تعذّر فتح هذه الصفقة.</value>
+  </data>
+  <data name="We could not open this lead" xml:space="preserve">
+    <value>تعذّر فتح هذا العميل المحتمل</value>
+  </data>
+  <data name="We could not open this lead." xml:space="preserve">
+    <value>تعذّر فتح هذا العميل المحتمل.</value>
+  </data>
+  <data name="We could not read this file. Try saving it as CSV again." xml:space="preserve">
+    <value>تعذّرت قراءة هذا الملف. جرّب حفظه بصيغة CSV مرة أخرى.</value>
+  </data>
+  <data name="We could not save the currencies." xml:space="preserve">
+    <value>تعذّر حفظ العملات.</value>
+  </data>
+  <data name="We could not save these permissions." xml:space="preserve">
+    <value>تعذّر حفظ هذه الصلاحيات.</value>
+  </data>
+  <data name="We could not save this account." xml:space="preserve">
+    <value>تعذّر حفظ هذا الحساب.</value>
+  </data>
+  <data name="We could not save this activity." xml:space="preserve">
+    <value>تعذّر حفظ هذا النشاط.</value>
+  </data>
+  <data name="We could not save this booking page." xml:space="preserve">
+    <value>تعذّر حفظ صفحة الحجز هذه.</value>
+  </data>
+  <data name="We could not save this branch." xml:space="preserve">
+    <value>تعذّر حفظ هذا الفرع.</value>
+  </data>
+  <data name="We could not save this checklist." xml:space="preserve">
+    <value>تعذّر حفظ قائمة المهام هذه.</value>
+  </data>
+  <data name="We could not save this contact." xml:space="preserve">
+    <value>تعذّر حفظ جهة الاتصال هذه.</value>
+  </data>
+  <data name="We could not save this deal." xml:space="preserve">
+    <value>تعذّر حفظ هذه الصفقة.</value>
+  </data>
+  <data name="We could not save this document type." xml:space="preserve">
+    <value>تعذّر حفظ نوع المستند هذا.</value>
+  </data>
+  <data name="We could not save this form." xml:space="preserve">
+    <value>تعذّر حفظ هذا النموذج.</value>
+  </data>
+  <data name="We could not save this layout." xml:space="preserve">
+    <value>تعذّر حفظ هذا التخطيط.</value>
+  </data>
+  <data name="We could not save this lead." xml:space="preserve">
+    <value>تعذّر حفظ هذا العميل المحتمل.</value>
+  </data>
+  <data name="We could not save this pipeline." xml:space="preserve">
+    <value>تعذّر حفظ هذا المسار.</value>
+  </data>
+  <data name="We could not save this rule." xml:space="preserve">
+    <value>تعذّر حفظ هذه القاعدة.</value>
+  </data>
+  <data name="We could not save this stage." xml:space="preserve">
+    <value>تعذّر حفظ هذه المرحلة.</value>
+  </data>
+  <data name="We could not save this team." xml:space="preserve">
+    <value>تعذّر حفظ هذا الفريق.</value>
+  </data>
+  <data name="We could not save your preferences." xml:space="preserve">
+    <value>تعذّر حفظ تفضيلاتك.</value>
+  </data>
+  <data name="We could not send the invitation." xml:space="preserve">
+    <value>تعذّر إرسال الدعوة.</value>
+  </data>
+  <data name="We could not send the link. Try again." xml:space="preserve">
+    <value>تعذّر إرسال الرابط. حاول مرة أخرى.</value>
+  </data>
+  <data name="We could not test this file." xml:space="preserve">
+    <value>تعذّر اختبار هذا الملف.</value>
+  </data>
+  <data name="We could not update this activity." xml:space="preserve">
+    <value>تعذّر تحديث هذا النشاط.</value>
+  </data>
+  <data name="We emailed you a calendar invitation. To cancel or move it, use the link in that email." xml:space="preserve">
+    <value>أرسلنا إليك دعوة تقويم بالبريد الإلكتروني. لإلغائها أو نقلها، استخدم الرابط الوارد في ذلك البريد.</value>
+  </data>
+  <data name="We read these columns: {0}. Anything else is ignored. {1} is required." xml:space="preserve">
+    <value>نقرأ هذه الأعمدة: {0}. يتم تجاهل أي شيء آخر. العمود {1} إلزامي.</value>
+  </data>
+  <data name="We set up names, stages and fields for it. You can change anything later." xml:space="preserve">
+    <value>أعددنا له الأسماء والمراحل والحقول. يمكنك تغيير أي شيء لاحقًا.</value>
+  </data>
+  <data name="Web forms" xml:space="preserve">
+    <value>نماذج الويب</value>
+  </data>
+  <data name="Webhook" xml:space="preserve">
+    <value>Webhook</value>
+  </data>
+  <data name="Webhook URL (POST) *" xml:space="preserve">
+    <value>عنوان Webhook (POST) *</value>
+  </data>
+  <data name="Website" xml:space="preserve">
+    <value>الموقع الإلكتروني</value>
+  </data>
+  <data name="Week" xml:space="preserve">
+    <value>أسبوع</value>
+  </data>
+  <data name="Week starts on" xml:space="preserve">
+    <value>يبدأ الأسبوع يوم</value>
+  </data>
+  <data name="Weekly (Monday 8:00 AM UTC)" xml:space="preserve">
+    <value>أسبوعيًا (الاثنين 8:00 صباحًا بالتوقيت العالمي)</value>
+  </data>
+  <data name="Welcome back" xml:space="preserve">
+    <value>مرحبًا بعودتك</value>
+  </data>
+  <data name="What each role can see and do in every module, and which records it reaches." xml:space="preserve">
+    <value>ما يمكن لكل دور رؤيته وفعله في كل وحدة، وما السجلات التي يصل إليها.</value>
+  </data>
+  <data name="What question does this report answer?" xml:space="preserve">
+    <value>ما السؤال الذي يجيب عنه هذا التقرير؟</value>
+  </data>
+  <data name="What went wrong" xml:space="preserve">
+    <value>ما الذي حدث</value>
+  </data>
+  <data name="WhatsApp" xml:space="preserve">
+    <value>واتساب</value>
+  </data>
+  <data name="WhatsApp, Email and SMS communication with this record" xml:space="preserve">
+    <value>التواصل عبر واتساب والبريد الإلكتروني وSMS مع هذا السجل</value>
+  </data>
+  <data name="WhatsApp, Email and SMS in a single collaborative interface" xml:space="preserve">
+    <value>واتساب والبريد الإلكتروني وSMS في واجهة تعاونية واحدة</value>
+  </data>
+  <data name="When *" xml:space="preserve">
+    <value>متى *</value>
+  </data>
+  <data name="When approved, verified values can be synchronized to the linked {0} record." xml:space="preserve">
+    <value>عند الاعتماد، يمكن مزامنة القيم المتحقق منها مع سجل {0} المرتبط.</value>
+  </data>
+  <data name="Who takes the bookings" xml:space="preserve">
+    <value>من يستلم الحجوزات</value>
+  </data>
+  <data name="Win probability %" xml:space="preserve">
+    <value>احتمالية الفوز %</value>
+  </data>
+  <data name="Won" xml:space="preserve">
+    <value>تم الفوز</value>
+  </data>
+  <data name="Won and Lost close the deal. Open stages come before them." xml:space="preserve">
+    <value>«تم الفوز» و«خسارة» تغلقان الصفقة. تأتي المراحل المفتوحة قبلهما.</value>
+  </data>
+  <data name="Won deals" xml:space="preserve">
+    <value>الصفقات الرابحة</value>
+  </data>
+  <data name="Words that identify it, one per line as text|weight" xml:space="preserve">
+    <value>الكلمات التي تحدده، واحدة في كل سطر بصيغة النص|الوزن</value>
+  </data>
+  <data name="Work email" xml:space="preserve">
+    <value>بريد العمل الإلكتروني</value>
+  </data>
+  <data name="Yes / no" xml:space="preserve">
+    <value>نعم / لا</value>
+  </data>
+  <data name="You are booked" xml:space="preserve">
+    <value>تم حجز موعدك</value>
+  </data>
+  <data name="Your booking" xml:space="preserve">
+    <value>حجزك</value>
+  </data>
+  <data name="Your booking is cancelled. We have emailed you a confirmation." xml:space="preserve">
+    <value>تم إلغاء حجزك. أرسلنا إليك تأكيدًا بالبريد الإلكتروني.</value>
+  </data>
+  <data name="Your business details, time zone and tax settings." xml:space="preserve">
+    <value>بيانات شركتك ومنطقتك الزمنية وإعدادات الضريبة.</value>
+  </data>
+  <data name="Your data, pipeline and team are configured in a few short steps." xml:space="preserve">
+    <value>يتم إعداد بياناتك ومسار مبيعاتك وفريقك في بضع خطوات قصيرة.</value>
+  </data>
+  <data name="Your name *" xml:space="preserve">
+    <value>اسمك *</value>
+  </data>
+  <data name="Your password is changed. You can sign in with it now." xml:space="preserve">
+    <value>تم تغيير كلمة المرور. يمكنك تسجيل الدخول بها الآن.</value>
+  </data>
+  <data name="Your sales pipeline" xml:space="preserve">
+    <value>مسار مبيعاتك</value>
+  </data>
+  <data name="Your tasks and meetings for the day and anything overdue. Nothing is sent on a day with nothing in it." xml:space="preserve">
+    <value>مهامك واجتماعاتك لليوم وأي شيء متأخر. لا يُرسل شيء في يوم لا يحتوي على أي منها.</value>
+  </data>
+  <data name="Your tasks, calls and meetings." xml:space="preserve">
+    <value>مهامك ومكالماتك واجتماعاتك.</value>
+  </data>
+  <data name="e.g. Enterprise Tier 2026" xml:space="preserve">
+    <value>مثل: Enterprise Tier 2026</value>
+  </data>
+  <data name="e.g. Net 30, 50% upfront" xml:space="preserve">
+    <value>مثل: صافي 30 يومًا، 50% مقدمًا</value>
+  </data>
+  <data name="e.g. Net 30, Due on Receipt" xml:space="preserve">
+    <value>مثل: صافي 30 يومًا، مستحق عند الاستلام</value>
+  </data>
+  <data name="e.g. Q4 Regional Sales Performance" xml:space="preserve">
+    <value>مثل: أداء المبيعات الإقليمي للربع الرابع</value>
+  </data>
+  <data name="e.g. Sales KPIs" xml:space="preserve">
+    <value>مثل: مؤشرات أداء المبيعات</value>
+  </data>
+  <data name="e.g. Software License &amp; Implementation 2026" xml:space="preserve">
+    <value>مثل: ترخيص البرمجيات والتنفيذ 2026</value>
+  </data>
+  <data name="e.g. Software, Hardware, Consulting" xml:space="preserve">
+    <value>مثل: برمجيات، أجهزة، استشارات</value>
+  </data>
+  <data name="e.g. TXN-998124, Wire Conf #44" xml:space="preserve">
+    <value>مثل: TXN-998124، تأكيد حوالة رقم 44</value>
+  </data>
+  <data name="e.g. Valid Trade License 2026" xml:space="preserve">
+    <value>مثل: رخصة تجارية سارية 2026</value>
+  </data>
+  <data name="invitations sent" xml:space="preserve">
+    <value>تم إرسال الدعوات</value>
+  </data>
+  <data name="invited you to MindLift as {0}." xml:space="preserve">
+    <value>دعاك إلى MindLift بصفة {0}.</value>
+  </data>
+  <data name="no users" xml:space="preserve">
+    <value>لا يوجد مستخدمون</value>
+  </data>
+  <data name="{0} ({1}) - Standard: {2} {3}" xml:space="preserve">
+    <value>{0} ({1}) - القياسي: {2} {3}</value>
+  </data>
+  <data name="{0} Items" xml:space="preserve">
+    <value>{0} عناصر</value>
+  </data>
+  <data name="{0} board" xml:space="preserve">
+    <value>لوحة {0}</value>
+  </data>
+  <data name="{0} condition(s)" xml:space="preserve">
+    <value>{0} شرط</value>
+  </data>
+  <data name="{0} item(s)" xml:space="preserve">
+    <value>{0} بند</value>
+  </data>
+  <data name="{0} minutes" xml:space="preserve">
+    <value>{0} دقيقة</value>
+  </data>
+  <data name="{0} ms" xml:space="preserve">
+    <value>{0} مللي ثانية</value>
+  </data>
+  <data name="{0} of {1} done" xml:space="preserve">
+    <value>تم إنجاز {0} من {1}</value>
+  </data>
 </root>

@@ -3,19 +3,20 @@
 @inject NotificationClient Notifications
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
+@inject Translator T
 
 <div style="position:relative;display:inline-flex" data-testid="notification-bell" data-connected="@ConnectedText">
     <MudBadge Content="@Notifications.Unread" Visible="@(Notifications.Unread > 0)" Max="99" Color="Color.Error" Overlap="true" data-testid="notification-badge">
-        <MudIconButton Icon="@Icons.Material.Outlined.Notifications" Color="Color.Inherit" OnClick="ToggleAsync" aria-label="Notifications" data-testid="notification-bell-button" />
+        <MudIconButton Icon="@Icons.Material.Outlined.Notifications" Color="Color.Inherit" OnClick="ToggleAsync" aria-label="@T["Notifications"]" data-testid="notification-bell-button" />
     </MudBadge>
 
     <MudPopover Open="_open" Fixed="true" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" Class="ml-notifications" Style="min-width:320px;max-width:min(380px, 96vw)">
         <div data-testid="notification-panel">
             <div class="ml-row ml-row--between" style="padding:12px 16px">
-                <MudText Typo="Typo.subtitle2">Notifications</MudText>
+                <MudText Typo="Typo.subtitle2">@T["Notifications"]</MudText>
                 @if (Notifications.Unread > 0)
                 {
-                    <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="MarkAllAsync" data-testid="mark-all-read">Mark all as read</MudButton>
+                    <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="MarkAllAsync" data-testid="mark-all-read">@T["Mark all as read"]</MudButton>
                 }
             </div>
             <MudDivider />
@@ -27,7 +28,7 @@
             else if (_items.Count == 0)
             {
                 <div style="padding:16px 20px" data-testid="notifications-empty">
-                    <MudText Typo="Typo.body2" Class="ml-muted">Nothing new. Assignments, mentions and reminders will show up here.</MudText>
+                    <MudText Typo="Typo.body2" Class="ml-muted">@T["Nothing new. Assignments, mentions and reminders will show up here."]</MudText>
                 </div>
             }
 
@@ -46,7 +47,7 @@
 
             <MudDivider />
             <div style="padding:8px 16px">
-                <MudButton Href="/notifications" Size="Size.Small" Variant="Variant.Text" OnClick="Close" data-testid="see-all-notifications">See all</MudButton>
+                <MudButton Href="/notifications" Size="Size.Small" Variant="Variant.Text" OnClick="Close" data-testid="see-all-notifications">@T["See all"]</MudButton>
             </div>
         </div>
     </MudPopover>

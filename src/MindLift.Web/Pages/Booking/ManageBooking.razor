@@ -2,8 +2,9 @@
 @using System.Globalization
 @layout AuthLayout
 @inject HttpClient Http
+@inject Translator T
 
-<PageTitle>Your booking · MindLift</PageTitle>
+<PageTitle>@T["Your booking"] · MindLift</PageTitle>
 
 <div class="ml-wizard" style="max-width:520px;margin-top:32px">
     @if (_loading)
@@ -12,14 +13,14 @@
     }
     else if (_booking is null)
     {
-        <MudAlert Severity="Severity.Error" data-testid="manage-missing">This link is not valid. Use the link from your confirmation email.</MudAlert>
+        <MudAlert Severity="Severity.Error" data-testid="manage-missing">@T["This link is not valid. Use the link from your confirmation email."]</MudAlert>
     }
     else
     {
         <div class="ml-stack" data-testid="manage-card">
             <MudText Typo="Typo.h4">@_booking.PageName</MudText>
             <MudText Typo="Typo.body1" data-testid="manage-when">@_booking.CompanyName · @_booking.StartUtc.ToString("dddd d MMMM yyyy, HH:mm", CultureInfo.InvariantCulture) UTC</MudText>
-            <MudText Typo="Typo.body2" Class="ml-muted">@_booking.DurationMinutes minutes · @_booking.LocationType@(string.IsNullOrWhiteSpace(_booking.LocationValue) ? "" : ": " + _booking.LocationValue)</MudText>
+            <MudText Typo="Typo.body2" Class="ml-muted">@T["{0} minutes", _booking.DurationMinutes] · @T[_booking.LocationType]@(string.IsNullOrWhiteSpace(_booking.LocationValue) ? "" : ": " + _booking.LocationValue)</MudText>
             <MudChip T="string" Size="Size.Small">@StatusLabel</MudChip>
 
             @if (_done is not null)
@@ -33,9 +34,9 @@
 
             @if (_booking.CanChange)
             {
-                <MudTextField @bind-Value="_reason" Label="Reason (optional)" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="manage-reason" />
-                <MudButton Variant="Variant.Outlined" Color="Color.Error" FullWidth="true" Disabled="_busy" OnClick="CancelAsync" data-testid="manage-cancel">Cancel this booking</MudButton>
-                <MudText Typo="Typo.caption" Class="ml-muted">To choose another time, cancel this one and book again from the page.</MudText>
+                <MudTextField @bind-Value="_reason" Label="@T["Reason (optional)"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="manage-reason" />
+                <MudButton Variant="Variant.Outlined" Color="Color.Error" FullWidth="true" Disabled="_busy" OnClick="CancelAsync" data-testid="manage-cancel">@T["Cancel this booking"]</MudButton>
+                <MudText Typo="Typo.caption" Class="ml-muted">@T["To choose another time, cancel this one and book again from the page."]</MudText>
             }
         </div>
     }
@@ -54,7 +55,7 @@
     private string StatusLabel => _booking?.Status switch
     {
         BookingStatus.Cancelled => "Cancelled",
-        BookingStatus.NoShow => "No show",
+        BookingStatus.NoShow => T["No show"],
         _ => "Confirmed",
     };
 
@@ -84,16 +85,16 @@
             var response = await Http.PostAsJsonAsync($"api/v1/public/booking/manage/{Uri.EscapeDataString(Token)}/cancel", new CancelBookingRequest(string.IsNullOrWhiteSpace(_reason) ? null : _reason));
             if (!response.IsSuccessStatusCode)
             {
-                _error = await ProblemText.FromAsync(response, "We could not cancel this booking.");
+                _error = await ProblemText.FromAsync(response, T["We could not cancel this booking."]);
                 return;
             }
 
-            _done = "Your booking is cancelled. We have emailed you a confirmation.";
+            _done = T["Your booking is cancelled. We have emailed you a confirmation."];
             await OnParametersSetAsync();
         }
         catch (HttpRequestException)
         {
-            _error = "We could not reach MindLift. Check your connection and try again.";
+            _error = T["We could not reach MindLift. Check your connection and try again."];
         }
         finally
         {

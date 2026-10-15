@@ -7,8 +7,9 @@
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
 @inject IJSRuntime JS
+@inject Translator T
 
-<PageTitle>@App.ModuleLabel(AppModule.Accounts) · MindLift</PageTitle>
+<PageTitle>@T[App.ModuleLabel(AppModule.Accounts)] · MindLift</PageTitle>
 
 <div class="ml-page ml-page--narrow">
     @if (App.Bootstrap is not null)
@@ -22,21 +23,21 @@
             <HeaderActions>
                 @if (Can(p => p.CanImport))
                 {
-                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Upload" Href="/accounts/import" data-testid="import-accounts">Import</MudButton>
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Upload" Href="/accounts/import" data-testid="import-accounts">@T["Import"]</MudButton>
                 }
                 @if (Can(p => p.CanExport))
                 {
-                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Download" OnClick="ExportAsync" data-testid="export-accounts">Export</MudButton>
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Download" OnClick="ExportAsync" data-testid="export-accounts">@T["Export"]</MudButton>
                 }
                 @if (Can(p => p.CanCreate))
                 {
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" OnClick="OpenNew" data-testid="primary-action">New account</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" OnClick="OpenNew" data-testid="primary-action">@T["New account"]</MudButton>
                 }
             </HeaderActions>
             <EmptyActions>
                 @if (Can(p => p.CanCreate))
                 {
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenNew">New account</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenNew">@T["New account"]</MudButton>
                 }
             </EmptyActions>
         </EntityListPage>
@@ -120,7 +121,7 @@
 
     private async Task OnSaved()
     {
-        Snackbar.Add("Account saved", Severity.Success);
+        Snackbar.Add(T["Account saved"], Severity.Success);
         if (_list is not null)
         {
             await _list.ReloadAsync();
@@ -132,7 +133,7 @@
         var response = await Http.PostAsJsonAsync("api/v1/accounts/query", query);
         if (!response.IsSuccessStatusCode)
         {
-            throw new ListLoadException(await ProblemText.FromAsync(response, "We could not load your accounts. Try again."));
+            throw new ListLoadException(await ProblemText.FromAsync(response, T["We could not load your accounts. Try again."]));
         }
 
         return (await response.Content.ReadFromJsonAsync<PagedResult<AccountListItemDto>>())!;
@@ -148,11 +149,11 @@
         var response = await Http.PostAsJsonAsync("api/v1/accounts/export", _list.CurrentQuery with { Page = 1, PageSize = 200 });
         if (!response.IsSuccessStatusCode)
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, "We could not export your accounts."), Severity.Error);
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not export your accounts."]), Severity.Error);
             return;
         }
 
         await JS.InvokeVoidAsync("mindlift.downloadFile", "accounts.csv", "text/csv", Convert.ToBase64String(await response.Content.ReadAsByteArrayAsync()));
-        Snackbar.Add("Export ready", Severity.Success);
+        Snackbar.Add(T["Export ready"], Severity.Success);
     }
 }

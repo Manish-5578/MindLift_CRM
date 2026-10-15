@@ -8,8 +8,9 @@
 @inject HttpClient Http
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
+@inject Translator T
 
-<PageTitle>Dashboard · MindLift</PageTitle>
+<PageTitle>@T["Dashboard"] · MindLift</PageTitle>
 
 <div class="ml-page">
     <div class="d-flex flex-wrap align-center justify-space-between gap-3 mb-4">
@@ -38,15 +39,15 @@
             }
 
             <MudSelect T="string" Value="_periodPreset" ValueChanged="OnPeriodChanged" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Style="min-width:140px">
-                <MudSelectItem T="string" Value="@("this_month")">This month</MudSelectItem>
-                <MudSelectItem T="string" Value="@("last_month")">Last month</MudSelectItem>
-                <MudSelectItem T="string" Value="@("this_quarter")">This quarter</MudSelectItem>
-                <MudSelectItem T="string" Value="@("this_year")">This year</MudSelectItem>
+                <MudSelectItem T="string" Value="@("this_month")">@T["This month"]</MudSelectItem>
+                <MudSelectItem T="string" Value="@("last_month")">@T["Last month"]</MudSelectItem>
+                <MudSelectItem T="string" Value="@("this_quarter")">@T["This quarter"]</MudSelectItem>
+                <MudSelectItem T="string" Value="@("this_year")">@T["This year"]</MudSelectItem>
             </MudSelect>
 
-            <MudIconButton Icon="@Icons.Material.Outlined.Refresh" Size="Size.Small" OnClick="() => LoadDashboardAsync(true)" aria-label="Refresh dashboard" />
+            <MudIconButton Icon="@Icons.Material.Outlined.Refresh" Size="Size.Small" OnClick="() => LoadDashboardAsync(true)" aria-label="@T["Refresh dashboard"]" />
             <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Outlined.DashboardCustomize" OnClick="() => _customizeOpen = true">
-                Customize
+                @T["Customize"]
             </MudButton>
         </div>
     </div>
@@ -56,8 +57,8 @@
         <MlCard Title="Finish setting up your workspace" Subtitle="@($"Step {_onboarding.CurrentStep} of 6")" Class="mb-4" TestId="setup-card">
             <div class="ml-stack">
                 <MudProgressLinear Value="@(100.0 * (_onboarding.CurrentStep - 1) / 6)" Color="Color.Primary" Rounded="true" />
-                <MudText Typo="Typo.body2" Class="ml-muted">Your data, pipeline and team are configured in a few short steps.</MudText>
-                <div><MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/onboarding" data-testid="primary-action">Continue setup</MudButton></div>
+                <MudText Typo="Typo.body2" Class="ml-muted">@T["Your data, pipeline and team are configured in a few short steps."]</MudText>
+                <div><MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/onboarding" data-testid="primary-action">@T["Continue setup"]</MudButton></div>
             </div>
         </MlCard>
     }
@@ -148,7 +149,7 @@
                             break;
                         default:
                             <MlCard Title="@widget.Title">
-                                <MudText Typo="Typo.body2" Class="ml-muted">No visual representation available for @widget.Key.</MudText>
+                                <MudText Typo="Typo.body2" Class="ml-muted">@T["No visual representation available for {0}.", widget.Key]</MudText>
                             </MlCard>
                             break;
                     }
@@ -161,7 +162,7 @@
 <!-- Layout Customizer Drawer -->
 <FormDrawer Open="_customizeOpen" OpenChanged="v => _customizeOpen = v" Title="Customize Dashboard" SubmitText="Done" Busy="false" OnSubmit="() => _customizeOpen = false">
     <div class="ml-stack">
-        <MudText Typo="Typo.caption" Class="ml-muted">Toggle visibility of widgets for this view.</MudText>
+        <MudText Typo="Typo.caption" Class="ml-muted">@T["Toggle visibility of widgets for this view."]</MudText>
         @if (_dashboard is not null)
         {
             @foreach (var w in _dashboard.Widgets)
@@ -173,7 +174,7 @@
             }
 
             <MudButton Variant="Variant.Text" Color="Color.Error" StartIcon="@Icons.Material.Outlined.RestartAlt" OnClick="ResetLayoutAsync" Class="mt-2">
-                Reset to Default Layout
+                @T["Reset to Default Layout"]
             </MudButton>
         }
     </div>
@@ -278,7 +279,7 @@
     {
         await Http.DeleteAsync($"api/v1/dashboard/layout?view={_currentView}");
         _customizeOpen = false;
-        Snackbar.Add("Layout reset to default", Severity.Info);
+        Snackbar.Add(T["Layout reset to default"], Severity.Info);
         await LoadDashboardAsync();
     }
 
@@ -287,12 +288,12 @@
         try
         {
             await Http.PostAsJsonAsync($"api/v1/activities/{taskId}/complete", new { });
-            Snackbar.Add("Task completed", Severity.Success);
+            Snackbar.Add(T["Task completed"], Severity.Success);
             await LoadDashboardAsync(true);
         }
         catch
         {
-            Snackbar.Add("Could not complete task", Severity.Error);
+            Snackbar.Add(T["Could not complete task"], Severity.Error);
         }
     }
 

@@ -7,20 +7,21 @@
 @inject ISnackbar Snackbar
 @inject IDialogService Dialogs
 @inject NavigationManager Nav
+@inject Translator T
 
-<PageTitle>Quotations & Proposals · MindLift</PageTitle>
+<PageTitle>@T["Quotations & Proposals"] · MindLift</PageTitle>
 
 <div class="ml-page">
     <!-- Header -->
     <div class="d-flex flex-wrap align-center justify-space-between gap-3 mb-4">
         <div>
-            <MudText Typo="Typo.h5" Style="font-weight:700">Quotations & Proposals</MudText>
-            <MudText Typo="Typo.body2" Class="ml-muted">Configure complex quotes, manage product discounts, and convert accepted proposals into invoices.</MudText>
+            <MudText Typo="Typo.h5" Style="font-weight:700">@T["Quotations & Proposals"]</MudText>
+            <MudText Typo="Typo.body2" Class="ml-muted">@T["Configure complex quotes, manage product discounts, and convert accepted proposals into invoices."]</MudText>
         </div>
 
         <div class="d-flex flex-wrap align-center gap-2">
             <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" OnClick="OpenNewQuoteDialog" Size="Size.Small">
-                Create Proposal
+                @T["Create Proposal"]
             </MudButton>
         </div>
     </div>
@@ -33,7 +34,7 @@
                     <MudIcon Icon="@Icons.Material.Outlined.RequestQuote" />
                 </MudAvatar>
                 <div>
-                    <MudText Typo="Typo.caption" Class="ml-muted">Total Proposals</MudText>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@T["Total Proposals"]</MudText>
                     <MudText Typo="Typo.h6" Style="font-weight:700">@_quotes.Count</MudText>
                 </div>
             </MudPaper>
@@ -44,7 +45,7 @@
                     <MudIcon Icon="@Icons.Material.Outlined.Send" />
                 </MudAvatar>
                 <div>
-                    <MudText Typo="Typo.caption" Class="ml-muted">Sent / Pending</MudText>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@T["Sent / Pending"]</MudText>
                     <MudText Typo="Typo.h6" Style="font-weight:700">@_quotes.Count(q => q.Status == QuoteStatus.Sent || q.Status == QuoteStatus.Draft)</MudText>
                 </div>
             </MudPaper>
@@ -55,7 +56,7 @@
                     <MudIcon Icon="@Icons.Material.Outlined.CheckCircle" />
                 </MudAvatar>
                 <div>
-                    <MudText Typo="Typo.caption" Class="ml-muted">Accepted Proposals</MudText>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@T["Accepted Proposals"]</MudText>
                     <MudText Typo="Typo.h6" Style="font-weight:700">@_quotes.Count(q => q.Status == QuoteStatus.Accepted)</MudText>
                 </div>
             </MudPaper>
@@ -66,7 +67,7 @@
                     <MudIcon Icon="@Icons.Material.Outlined.AttachMoney" />
                 </MudAvatar>
                 <div>
-                    <MudText Typo="Typo.caption" Class="ml-muted">Total Quoted Value</MudText>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@T["Total Quoted Value"]</MudText>
                     <MudText Typo="Typo.h6" Style="font-weight:700">@_quotes.Sum(q => q.GrandTotal).ToString("N0")</MudText>
                 </div>
             </MudPaper>
@@ -76,14 +77,14 @@
     <!-- Filters & Search -->
     <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-4 d-flex flex-wrap align-center justify-space-between gap-3" Style="border-radius:12px">
         <div class="d-flex flex-wrap align-center gap-2">
-            <MudTextField @bind-Value="_searchQuery" Placeholder="Search proposals..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.Search" Immediate="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="min-width:260px" />
-            <MudSelect T="QuoteStatus?" @bind-Value="_statusFilter" Placeholder="All Statuses" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="min-width:160px">
-                <MudSelectItem T="QuoteStatus?" Value="@((QuoteStatus?)null)">All Statuses</MudSelectItem>
-                <MudSelectItem T="QuoteStatus?" Value="@QuoteStatus.Draft">Draft</MudSelectItem>
-                <MudSelectItem T="QuoteStatus?" Value="@QuoteStatus.Sent">Sent</MudSelectItem>
-                <MudSelectItem T="QuoteStatus?" Value="@QuoteStatus.Accepted">Accepted</MudSelectItem>
-                <MudSelectItem T="QuoteStatus?" Value="@QuoteStatus.Rejected">Rejected</MudSelectItem>
-                <MudSelectItem T="QuoteStatus?" Value="@QuoteStatus.Expired">Expired</MudSelectItem>
+            <MudTextField @bind-Value="_searchQuery" Placeholder="@T["Search proposals..."]" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.Search" Immediate="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="min-width:260px" />
+            <MudSelect T="QuoteStatus?" @bind-Value="_statusFilter" Placeholder="@T["All Statuses"]" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="min-width:160px">
+                <MudSelectItem T="QuoteStatus?" Value="@((QuoteStatus?)null)">@T["All Statuses"]</MudSelectItem>
+                <MudSelectItem T="QuoteStatus?" Value="@QuoteStatus.Draft">@T["Draft"]</MudSelectItem>
+                <MudSelectItem T="QuoteStatus?" Value="@QuoteStatus.Sent">@T["Sent"]</MudSelectItem>
+                <MudSelectItem T="QuoteStatus?" Value="@QuoteStatus.Accepted">@T["Accepted"]</MudSelectItem>
+                <MudSelectItem T="QuoteStatus?" Value="@QuoteStatus.Rejected">@T["Rejected"]</MudSelectItem>
+                <MudSelectItem T="QuoteStatus?" Value="@QuoteStatus.Expired">@T["Expired"]</MudSelectItem>
             </MudSelect>
         </div>
     </MudPaper>
@@ -94,19 +95,19 @@
     }
     else if (FilteredQuotes.Count == 0)
     {
-        <EmptyState Title="No proposals found" Subtitle="Start by creating a proposal for your deals or prospective accounts." ActionLabel="New Proposal" OnAction="OpenNewQuoteDialog" />
+        <EmptyState Title="No proposals found" Subtitle="@T["Start by creating a proposal for your deals or prospective accounts."]" ActionLabel="New Proposal" OnAction="OpenNewQuoteDialog" />
     }
     else
     {
         <MudTable Items="@FilteredQuotes" Dense="true" Hover="true" Outlined="true" Style="border-radius:12px; overflow:hidden">
             <HeaderContent>
-                <MudTh>Quote #</MudTh>
-                <MudTh>Title</MudTh>
-                <MudTh>Linked Deal / Account</MudTh>
-                <MudTh>Expiry Date</MudTh>
-                <MudTh Style="text-align:right">Total Value</MudTh>
-                <MudTh>Status</MudTh>
-                <MudTh Style="text-align:right">Actions</MudTh>
+                <MudTh>@T["Quote #"]</MudTh>
+                <MudTh>@T["Title"]</MudTh>
+                <MudTh>@T["Linked Deal / Account"]</MudTh>
+                <MudTh>@T["Expiry Date"]</MudTh>
+                <MudTh Style="text-align:right">@T["Total Value"]</MudTh>
+                <MudTh>@T["Status"]</MudTh>
+                <MudTh Style="text-align:right">@T["Actions"]</MudTh>
             </HeaderContent>
             <RowTemplate>
                 <MudTd DataLabel="Quote #">
@@ -116,7 +117,7 @@
                 </MudTd>
                 <MudTd DataLabel="Title">
                     <MudText Typo="Typo.body2" Style="font-weight:600">@context.Title</MudText>
-                    <MudText Typo="Typo.caption" Class="ml-muted">@context.LineItems.Count item(s)</MudText>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@T["{0} item(s)", context.LineItems.Count]</MudText>
                 </MudTd>
                 <MudTd DataLabel="Linked">
                     <div class="d-flex flex-column">
@@ -133,7 +134,7 @@
                     </MudText>
                     @if (context.DiscountPercent > 0)
                     {
-                        <MudText Typo="Typo.caption" Color="Color.Success">(@context.DiscountPercent% off)</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Success">@T["({0}% off)", context.DiscountPercent]</MudText>
                     }
                 </MudTd>
                 <MudTd DataLabel="Status">
@@ -143,13 +144,13 @@
                 </MudTd>
                 <MudTd DataLabel="Actions" Style="text-align:right">
                     <MudMenu Icon="@Icons.Material.Outlined.MoreVert" Size="Size.Small" Dense="true">
-                        <MudMenuItem Icon="@Icons.Material.Outlined.Visibility" OnClick="@(() => ViewQuoteDetails(context))">View Proposal</MudMenuItem>
+                        <MudMenuItem Icon="@Icons.Material.Outlined.Visibility" OnClick="@(() => ViewQuoteDetails(context))">@T["View Proposal"]</MudMenuItem>
                         @if (context.Status != QuoteStatus.Accepted)
                         {
-                            <MudMenuItem Icon="@Icons.Material.Outlined.CheckCircleOutline" OnClick="@(() => ChangeStatusAsync(context.Id, QuoteStatus.Accepted))">Mark Accepted</MudMenuItem>
-                            <MudMenuItem Icon="@Icons.Material.Outlined.Send" OnClick="@(() => ChangeStatusAsync(context.Id, QuoteStatus.Sent))">Mark Sent</MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Outlined.CheckCircleOutline" OnClick="@(() => ChangeStatusAsync(context.Id, QuoteStatus.Accepted))">@T["Mark Accepted"]</MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Outlined.Send" OnClick="@(() => ChangeStatusAsync(context.Id, QuoteStatus.Sent))">@T["Mark Sent"]</MudMenuItem>
                         }
-                        <MudMenuItem Icon="@Icons.Material.Outlined.ReceiptLong" OnClick="@(() => ConvertToInvoiceAsync(context.Id))">Convert to Invoice</MudMenuItem>
+                        <MudMenuItem Icon="@Icons.Material.Outlined.ReceiptLong" OnClick="@(() => ConvertToInvoiceAsync(context.Id))">@T["Convert to Invoice"]</MudMenuItem>
                     </MudMenu>
                 </MudTd>
             </RowTemplate>
@@ -160,32 +161,32 @@
 <!-- Create Quote Dialog -->
 <MudDialog @bind-Visible="_createDialogOpen" Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true })">
     <TitleContent>
-        <MudText Typo="Typo.h6" Style="font-weight:700">Create New Proposal / Quote</MudText>
+        <MudText Typo="Typo.h6" Style="font-weight:700">@T["Create New Proposal / Quote"]</MudText>
     </TitleContent>
     <DialogContent>
         <MudGrid Spacing="2">
             <MudItem xs="12" sm="8">
-                <MudTextField @bind-Value="_createForm.Title" Label="Proposal Title" Required="true" Margin="Margin.Dense" Variant="Variant.Outlined" Placeholder="e.g. Software License & Implementation 2026" />
+                <MudTextField @bind-Value="_createForm.Title" Label="@T["Proposal Title"]" Required="true" Margin="Margin.Dense" Variant="Variant.Outlined" Placeholder="@T["e.g. Software License & Implementation 2026"]" />
             </MudItem>
             <MudItem xs="12" sm="4">
-                <MudTextField @bind-Value="_createForm.Currency" Label="Currency" Required="true" Margin="Margin.Dense" Variant="Variant.Outlined" MaxLength="3" />
+                <MudTextField @bind-Value="_createForm.Currency" Label="@T["Currency"]" Required="true" Margin="Margin.Dense" Variant="Variant.Outlined" MaxLength="3" />
             </MudItem>
             <MudItem xs="12" sm="6">
-                <MudDatePicker @bind-Date="_validUntilDate" Label="Expiration Date" Margin="Margin.Dense" Variant="Variant.Outlined" />
+                <MudDatePicker @bind-Date="_validUntilDate" Label="@T["Expiration Date"]" Margin="Margin.Dense" Variant="Variant.Outlined" />
             </MudItem>
             <MudItem xs="12" sm="6">
-                <MudNumericField @bind-Value="_createForm.DiscountPercent" Label="Overall Discount %" Margin="Margin.Dense" Variant="Variant.Outlined" Min="0m" Max="100m" OnBlur="RecalculateTotals" />
+                <MudNumericField @bind-Value="_createForm.DiscountPercent" Label="@T["Overall Discount %"]" Margin="Margin.Dense" Variant="Variant.Outlined" Min="0m" Max="100m" OnBlur="RecalculateTotals" />
             </MudItem>
             <MudItem xs="12">
-                <MudTextField @bind-Value="_createForm.TermsAndConditions" Label="Terms & Conditions" Margin="Margin.Dense" Variant="Variant.Outlined" Placeholder="e.g. Net 30, 50% upfront" />
+                <MudTextField @bind-Value="_createForm.TermsAndConditions" Label="@T["Terms & Conditions"]" Margin="Margin.Dense" Variant="Variant.Outlined" Placeholder="@T["e.g. Net 30, 50% upfront"]" />
             </MudItem>
 
             <!-- Line Items Builder -->
             <MudItem xs="12">
                 <div class="d-flex align-center justify-space-between mt-3 mb-2">
-                    <MudText Typo="Typo.subtitle2" Style="font-weight:700">Line Items & Rate Breakdown</MudText>
+                    <MudText Typo="Typo.subtitle2" Style="font-weight:700">@T["Line Items & Rate Breakdown"]</MudText>
                     <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Add" OnClick="AddLineItem">
-                        Add Item
+                        @T["Add Item"]
                     </MudButton>
                 </div>
 
@@ -194,11 +195,11 @@
                     var item = _createForm.LineItems[i];
                     var idx = i;
                     <MudPaper Elevation="0" Outlined="true" Class="pa-2 mb-2 d-flex flex-wrap align-center gap-2" Style="border-radius:8px">
-                        <MudTextField @bind-Value="item.ProductName" Label="Item Name" Required="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="flex: 2; min-width:180px" />
-                        <MudNumericField @bind-Value="item.Quantity" Label="Qty" Min="1m" Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:80px" OnBlur="RecalculateTotals" />
-                        <MudNumericField @bind-Value="item.UnitPrice" Label="Unit Price" Min="0m" Format="N2" Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:110px" OnBlur="RecalculateTotals" />
-                        <MudNumericField @bind-Value="item.TaxRate" Label="Tax %" Min="0m" Max="100m" Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:80px" OnBlur="RecalculateTotals" />
-                        <MudNumericField @bind-Value="item.DiscountPercent" Label="Disc %" Min="0m" Max="100m" Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:80px" OnBlur="RecalculateTotals" />
+                        <MudTextField @bind-Value="item.ProductName" Label="@T["Item Name"]" Required="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="flex: 2; min-width:180px" />
+                        <MudNumericField @bind-Value="item.Quantity" Label="@T["Qty"]" Min="1m" Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:80px" OnBlur="RecalculateTotals" />
+                        <MudNumericField @bind-Value="item.UnitPrice" Label="@T["Unit Price"]" Min="0m" Format="N2" Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:110px" OnBlur="RecalculateTotals" />
+                        <MudNumericField @bind-Value="item.TaxRate" Label="@T["Tax %"]" Min="0m" Max="100m" Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:80px" OnBlur="RecalculateTotals" />
+                        <MudNumericField @bind-Value="item.DiscountPercent" Label="@T["Disc %"]" Min="0m" Max="100m" Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:80px" OnBlur="RecalculateTotals" />
                         <MudIconButton Icon="@Icons.Material.Outlined.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => RemoveLineItem(idx))" Disabled="@(_createForm.LineItems.Count <= 1)" />
                     </MudPaper>
                 }
@@ -208,15 +209,15 @@
             <MudItem xs="12">
                 <MudPaper Elevation="0" Class="pa-3 mt-2 d-flex justify-end gap-6" Style="background:var(--mud-palette-background-grey); border-radius:8px">
                     <div class="text-right">
-                        <MudText Typo="Typo.caption" Class="ml-muted">SubTotal:</MudText>
+                        <MudText Typo="Typo.caption" Class="ml-muted">@T["SubTotal:"]</MudText>
                         <MudText Typo="Typo.body2" Style="font-weight:600">@_createForm.Currency @_previewSubTotal.ToString("N2")</MudText>
                     </div>
                     <div class="text-right">
-                        <MudText Typo="Typo.caption" Class="ml-muted">Tax:</MudText>
+                        <MudText Typo="Typo.caption" Class="ml-muted">@T["Tax:"]</MudText>
                         <MudText Typo="Typo.body2" Style="font-weight:600">@_createForm.Currency @_previewTax.ToString("N2")</MudText>
                     </div>
                     <div class="text-right">
-                        <MudText Typo="Typo.caption" Class="ml-muted">Grand Total:</MudText>
+                        <MudText Typo="Typo.caption" Class="ml-muted">@T["Grand Total:"]</MudText>
                         <MudText Typo="Typo.h6" Style="font-weight:700; color:var(--mud-palette-primary)">@_createForm.Currency @_previewGrandTotal.ToString("N2")</MudText>
                     </div>
                 </MudPaper>
@@ -224,10 +225,10 @@
         </MudGrid>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="@(() => _createDialogOpen = false)">Cancel</MudButton>
+        <MudButton OnClick="@(() => _createDialogOpen = false)">@T["Cancel"]</MudButton>
         <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveQuoteAsync" Disabled="_saving">
             @if (_saving) { <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" /> }
-            Save Proposal
+            @T["Save Proposal"]
         </MudButton>
     </DialogActions>
 </MudDialog>
@@ -236,9 +237,9 @@
 <MudDialog @bind-Visible="_detailsDialogOpen" Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true })">
     <TitleContent>
         <div class="d-flex align-center justify-space-between">
-            <MudText Typo="Typo.h6" Style="font-weight:700">Proposal @_activeQuote?.QuoteNumber</MudText>
+            <MudText Typo="Typo.h6" Style="font-weight:700">@T["Proposal {0}", _activeQuote?.QuoteNumber]</MudText>
             <MudChip T="string" Color="@GetStatusColor(_activeQuote?.Status ?? QuoteStatus.Draft)" Size="Size.Small" Variant="Variant.Filled">
-                @_activeQuote?.Status
+                @T[_activeQuote?.Status.ToString() ?? string.Empty]
             </MudChip>
         </div>
     </TitleContent>
@@ -247,17 +248,17 @@
         {
             <div class="mb-3">
                 <MudText Typo="Typo.h6">@_activeQuote.Title</MudText>
-                <MudText Typo="Typo.body2" Class="ml-muted">Valid until: @(_activeQuote.ExpirationDate?.ToString("MMM dd, yyyy") ?? "Open-ended") · Terms: @(_activeQuote.TermsAndConditions ?? "Standard")</MudText>
+                <MudText Typo="Typo.body2" Class="ml-muted">@T["Valid until: {0} · Terms: {1}", _activeQuote.ExpirationDate?.ToString("MMM dd, yyyy") ?? T["Open-ended"], _activeQuote.TermsAndConditions ?? T["Standard"]]</MudText>
             </div>
 
             <MudTable Items="@_activeQuote.LineItems" Dense="true" Outlined="true" Class="mb-3">
                 <HeaderContent>
-                    <MudTh>Item</MudTh>
-                    <MudTh Style="text-align:right">Qty</MudTh>
-                    <MudTh Style="text-align:right">Price</MudTh>
-                    <MudTh Style="text-align:right">Tax %</MudTh>
-                    <MudTh Style="text-align:right">Disc %</MudTh>
-                    <MudTh Style="text-align:right">Total</MudTh>
+                    <MudTh>@T["Item"]</MudTh>
+                    <MudTh Style="text-align:right">@T["Qty"]</MudTh>
+                    <MudTh Style="text-align:right">@T["Price"]</MudTh>
+                    <MudTh Style="text-align:right">@T["Tax %"]</MudTh>
+                    <MudTh Style="text-align:right">@T["Disc %"]</MudTh>
+                    <MudTh Style="text-align:right">@T["Total"]</MudTh>
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd>@context.ProductName</MudTd>
@@ -271,30 +272,30 @@
 
             <div class="d-flex justify-end gap-6 pa-3" style="background:var(--mud-palette-background-grey); border-radius:8px">
                 <div class="text-right">
-                    <MudText Typo="Typo.caption" Class="ml-muted">SubTotal:</MudText>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@T["SubTotal:"]</MudText>
                     <MudText Typo="Typo.body2">@_activeQuote.Currency @_activeQuote.SubTotal.ToString("N2")</MudText>
                 </div>
                 <div class="text-right">
-                    <MudText Typo="Typo.caption" Class="ml-muted">Discount:</MudText>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@T["Discount:"]</MudText>
                     <MudText Typo="Typo.body2" Color="Color.Success">-@_activeQuote.Currency @_activeQuote.DiscountAmount.ToString("N2")</MudText>
                 </div>
                 <div class="text-right">
-                    <MudText Typo="Typo.caption" Class="ml-muted">Tax:</MudText>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@T["Tax:"]</MudText>
                     <MudText Typo="Typo.body2">@_activeQuote.Currency @_activeQuote.TaxAmount.ToString("N2")</MudText>
                 </div>
                 <div class="text-right">
-                    <MudText Typo="Typo.caption" Class="ml-muted">Grand Total:</MudText>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@T["Grand Total:"]</MudText>
                     <MudText Typo="Typo.h6" Style="font-weight:700">@_activeQuote.Currency @_activeQuote.GrandTotal.ToString("N2")</MudText>
                 </div>
             </div>
         }
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="@(() => _detailsDialogOpen = false)">Close</MudButton>
+        <MudButton OnClick="@(() => _detailsDialogOpen = false)">@T["Close"]</MudButton>
         @if (_activeQuote is not null)
         {
             <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Outlined.ReceiptLong" OnClick="@(() => ConvertToInvoiceAsync(_activeQuote.Id))">
-                Convert to Invoice
+                @T["Convert to Invoice"]
             </MudButton>
         }
     </DialogActions>
@@ -420,7 +421,7 @@
     {
         if (string.IsNullOrWhiteSpace(_createForm.Title))
         {
-            Snackbar.Add("Proposal title is required.", Severity.Warning);
+            Snackbar.Add(T["Proposal title is required."], Severity.Warning);
             return;
         }
 
@@ -431,7 +432,7 @@
             var resp = await Http.PostAsJsonAsync("api/v1/quotes", _createForm);
             if (resp.IsSuccessStatusCode)
             {
-                Snackbar.Add("Proposal created successfully!", Severity.Success);
+                Snackbar.Add(T["Proposal created successfully!"], Severity.Success);
                 _createDialogOpen = false;
                 await LoadQuotesAsync();
             }
@@ -486,7 +487,7 @@
             var resp = await Http.PostAsync($"api/v1/quotes/{quoteId}/convert-to-invoice", null);
             if (resp.IsSuccessStatusCode)
             {
-                Snackbar.Add("Invoice generated successfully from proposal!", Severity.Success);
+                Snackbar.Add(T["Invoice generated successfully from proposal!"], Severity.Success);
                 _detailsDialogOpen = false;
                 Nav.NavigateTo("/invoices");
             }

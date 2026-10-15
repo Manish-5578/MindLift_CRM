@@ -1,3 +1,4 @@
+@inject Translator T
 <FormDrawer Open="Open" OpenChanged="OnOpenChanged" Title="@(_accountId is null ? "New account" : "Edit account")" SubmitText="@(_accountId is null ? "Create account" : "Save changes")" Busy="_busy" OnSubmit="SaveAsync" IsDirty="IsDirty">
     @if (_error is not null)
     {
@@ -110,7 +111,7 @@
                 }
                 else
                 {
-                    _error = await ProblemText.FromAsync(response, "We could not save this account.");
+                    _error = await ProblemText.FromAsync(response, T["We could not save this account."]);
                 }
 
                 return;
@@ -121,7 +122,7 @@
         }
         catch (HttpRequestException)
         {
-            _error = "We could not reach MindLift. Check your connection and try again.";
+            _error = T["We could not reach MindLift. Check your connection and try again."];
         }
         finally
         {

@@ -3,13 +3,14 @@
 @inject AppState App
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
+@inject Translator T
 
-<PageTitle>Pipelines · MindLift</PageTitle>
+<PageTitle>@T["Pipelines"] · MindLift</PageTitle>
 
 <div class="ml-page ml-page--form">
     <PageHeader Title="Pipelines" Subtitle="The stages a deal moves through. Every pipeline needs open stages, then exactly one Won and one Lost stage at the end.">
         <Actions>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => OpenPipeline(null)" data-testid="primary-action">New pipeline</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => OpenPipeline(null)" data-testid="primary-action">@T["New pipeline"]</MudButton>
         </Actions>
     </PageHeader>
     <SettingsNav Current="/settings/pipelines" />
@@ -46,32 +47,32 @@
                                 <MudText Typo="Typo.body1">@stage.Name</MudText>
                                 <MudText Typo="Typo.caption" Class="ml-muted">@stage.StageType · @stage.Probability% @(stage.RottingDays is { } days ? "· stale after " + days + " days" : "")</MudText>
                             </div>
-                            <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="() => OpenStage(pipeline, stage)" aria-label="Edit stage" />
+                            <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="() => OpenStage(pipeline, stage)" aria-label="@T["Edit stage"]" />
                             @if (_confirmStageId == stage.Id)
                             {
-                                <MudButton Size="Size.Small" OnClick="() => _confirmStageId = null">Keep</MudButton>
-                                <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeleteStageAsync(pipeline, stage)">Delete</MudButton>
+                                <MudButton Size="Size.Small" OnClick="() => _confirmStageId = null">@T["Keep"]</MudButton>
+                                <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeleteStageAsync(pipeline, stage)">@T["Delete"]</MudButton>
                             }
                             else
                             {
-                                <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" OnClick="() => _confirmStageId = stage.Id" aria-label="Delete stage" />
+                                <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" OnClick="() => _confirmStageId = stage.Id" aria-label="@T["Delete stage"]" />
                             }
                         </div>
                     }
                 </div>
 
                 <div class="ml-row ml-row--wrap" style="justify-content:space-between;margin-top:12px">
-                    <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="() => OpenStage(pipeline, null)">Add stage</MudButton>
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="() => OpenStage(pipeline, null)">@T["Add stage"]</MudButton>
                     <div class="ml-row">
-                        <MudButton Size="Size.Small" OnClick="() => OpenPipeline(pipeline)">Edit pipeline</MudButton>
+                        <MudButton Size="Size.Small" OnClick="() => OpenPipeline(pipeline)">@T["Edit pipeline"]</MudButton>
                         @if (_confirmPipelineId == pipeline.Id)
                         {
-                            <MudButton Size="Size.Small" OnClick="() => _confirmPipelineId = null">Keep</MudButton>
-                            <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeletePipelineAsync(pipeline)">Delete pipeline</MudButton>
+                            <MudButton Size="Size.Small" OnClick="() => _confirmPipelineId = null">@T["Keep"]</MudButton>
+                            <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeletePipelineAsync(pipeline)">@T["Delete pipeline"]</MudButton>
                         }
                         else
                         {
-                            <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => _confirmPipelineId = pipeline.Id">Delete</MudButton>
+                            <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => _confirmPipelineId = pipeline.Id">@T["Delete"]</MudButton>
                         }
                     </div>
                 </div>
@@ -82,26 +83,26 @@
 
 <FormDrawer Open="_pipelineOpen" OpenChanged="v => _pipelineOpen = v" Title="@_pipelineTitle" SubmitText="Save pipeline" Busy="_busy" OnSubmit="SavePipelineAsync">
     <div class="ml-stack">
-        <MudTextField @bind-Value="_pipelineName" Label="Name *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="pipeline-name" />
-        <MudTextField @bind-Value="_pipelineNameAr" Label="Name (Arabic)" Variant="Variant.Outlined" Margin="Margin.Dense" />
-        <MudCheckBox @bind-Value="_pipelineDefault" Label="Default pipeline for new deals" Color="Color.Primary" />
-        <MudCheckBox @bind-Value="_pipelineActive" Label="Active" Color="Color.Primary" />
+        <MudTextField @bind-Value="_pipelineName" Label="@T["Name *"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="pipeline-name" />
+        <MudTextField @bind-Value="_pipelineNameAr" Label="@T["Name (Arabic)"]" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudCheckBox @bind-Value="_pipelineDefault" Label="@T["Default pipeline for new deals"]" Color="Color.Primary" />
+        <MudCheckBox @bind-Value="_pipelineActive" Label="@T["Active"]" Color="Color.Primary" />
         @if (_formError is not null) { <MudAlert Severity="Severity.Error" Dense="true">@_formError</MudAlert> }
     </div>
 </FormDrawer>
 
 <FormDrawer Open="_stageOpen" OpenChanged="v => _stageOpen = v" Title="@_stageTitle" SubmitText="Save stage" Busy="_busy" OnSubmit="SaveStageAsync">
     <div class="ml-stack">
-        <MudTextField @bind-Value="_stageName" Label="Name *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="stage-name" />
-        <MudTextField @bind-Value="_stageNameAr" Label="Name (Arabic)" Variant="Variant.Outlined" Margin="Margin.Dense" />
-        <MudSelect T="string" @bind-Value="_stageType" Label="Stage type *" Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="Won and Lost close the deal. Open stages come before them.">
-            <MudSelectItem T="string" Value="StageOpen">Open</MudSelectItem>
-            <MudSelectItem T="string" Value="StageWon">Won</MudSelectItem>
-            <MudSelectItem T="string" Value="StageLost">Lost</MudSelectItem>
+        <MudTextField @bind-Value="_stageName" Label="@T["Name *"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="stage-name" />
+        <MudTextField @bind-Value="_stageNameAr" Label="@T["Name (Arabic)"]" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudSelect T="string" @bind-Value="_stageType" Label="@T["Stage type *"]" Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="@T["Won and Lost close the deal. Open stages come before them."]">
+            <MudSelectItem T="string" Value="StageOpen">@T["Open"]</MudSelectItem>
+            <MudSelectItem T="string" Value="StageWon">@T["Won"]</MudSelectItem>
+            <MudSelectItem T="string" Value="StageLost">@T["Lost"]</MudSelectItem>
         </MudSelect>
-        <MudNumericField @bind-Value="_stageProbability" Label="Win probability %" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" Max="100" />
-        <MudNumericField @bind-Value="_stageRotting" Label="Mark stale after (days)" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" HelperText="Leave empty to never mark it stale." />
-        <MudNumericField @bind-Value="_stageSortOrder" Label="Position" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" HelperText="1 is first. The stages after it move down to make room. Won and Lost stay last." />
+        <MudNumericField @bind-Value="_stageProbability" Label="@T["Win probability %"]" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" Max="100" />
+        <MudNumericField @bind-Value="_stageRotting" Label="@T["Mark stale after (days)"]" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" HelperText="@T["Leave empty to never mark it stale."]" />
+        <MudNumericField @bind-Value="_stageSortOrder" Label="@T["Position"]" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" HelperText="@T["1 is first. The stages after it move down to make room. Won and Lost stay last."]" />
         @if (_formError is not null) { <MudAlert Severity="Severity.Error" Dense="true">@_formError</MudAlert> }
     </div>
 </FormDrawer>
@@ -225,7 +226,7 @@
         _formError = null;
         if (string.IsNullOrWhiteSpace(_pipelineName))
         {
-            _formError = "Give the pipeline a name.";
+            _formError = T["Give the pipeline a name."];
             return;
         }
 
@@ -239,12 +240,12 @@
                 : await Http.PutAsJsonAsync($"api/v1/settings/pipelines/{_pipelineEditId}", body);
             if (!response.IsSuccessStatusCode)
             {
-                _formError = await ProblemText.FromAsync(response, "We could not save this pipeline.");
+                _formError = await ProblemText.FromAsync(response, T["We could not save this pipeline."]);
                 return;
             }
 
             _pipelineOpen = false;
-            Snackbar.Add("Pipeline saved", Severity.Success);
+            Snackbar.Add(T["Pipeline saved"], Severity.Success);
             await LoadAsync();
         }
         finally
@@ -258,7 +259,7 @@
         _formError = null;
         if (string.IsNullOrWhiteSpace(_stageName))
         {
-            _formError = "Give the stage a name.";
+            _formError = T["Give the stage a name."];
             return;
         }
 
@@ -272,12 +273,12 @@
                 : await Http.PutAsJsonAsync($"api/v1/settings/pipelines/{_stagePipelineId}/stages/{_stageEditId}", body);
             if (!response.IsSuccessStatusCode)
             {
-                _formError = await ProblemText.FromAsync(response, "We could not save this stage.");
+                _formError = await ProblemText.FromAsync(response, T["We could not save this stage."]);
                 return;
             }
 
             _stageOpen = false;
-            Snackbar.Add("Stage saved", Severity.Success);
+            Snackbar.Add(T["Stage saved"], Severity.Success);
             await LoadAsync();
         }
         finally
@@ -292,11 +293,11 @@
         _confirmPipelineId = null;
         if (!response.IsSuccessStatusCode)
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, "We could not delete this pipeline."), Severity.Error);
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not delete this pipeline."]), Severity.Error);
             return;
         }
 
-        Snackbar.Add("Pipeline deleted", Severity.Success);
+        Snackbar.Add(T["Pipeline deleted"], Severity.Success);
         await LoadAsync();
     }
 
@@ -306,11 +307,11 @@
         _confirmStageId = null;
         if (!response.IsSuccessStatusCode)
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, "We could not delete this stage."), Severity.Error);
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not delete this stage."]), Severity.Error);
             return;
         }
 
-        Snackbar.Add("Stage deleted", Severity.Success);
+        Snackbar.Add(T["Stage deleted"], Severity.Success);
         await LoadAsync();
     }
 }

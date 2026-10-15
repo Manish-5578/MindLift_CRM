@@ -6,28 +6,29 @@
 @inject HttpClient Http
 @inject ISnackbar Snackbar
 @inject IDialogService Dialogs
+@inject Translator T
 
-<PageTitle>Product Catalog & Price Books · MindLift</PageTitle>
+<PageTitle>@T["Product Catalog & Price Books"] · MindLift</PageTitle>
 
 <div class="ml-page">
     <!-- Header -->
     <div class="d-flex flex-wrap align-center justify-space-between gap-3 mb-4">
         <div>
-            <MudText Typo="Typo.h5" Style="font-weight:700">Product Catalog & CPQ</MudText>
-            <MudText Typo="Typo.body2" Class="ml-muted">Manage sellable items, subscription plans, standard rate cards, and partner price books.</MudText>
+            <MudText Typo="Typo.h5" Style="font-weight:700">@T["Product Catalog & CPQ"]</MudText>
+            <MudText Typo="Typo.body2" Class="ml-muted">@T["Manage sellable items, subscription plans, standard rate cards, and partner price books."]</MudText>
         </div>
 
         <div class="d-flex flex-wrap align-center gap-2">
             @if (_activeTab == 0)
             {
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" OnClick="OpenNewProductDialog" Size="Size.Small">
-                    New Product
+                    @T["New Product"]
                 </MudButton>
             }
             else
             {
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" OnClick="OpenNewPriceBookDialog" Size="Size.Small">
-                    New Price Book
+                    @T["New Price Book"]
                 </MudButton>
             }
         </div>
@@ -41,7 +42,7 @@
                     <MudIcon Icon="@Icons.Material.Outlined.Inventory2" />
                 </MudAvatar>
                 <div>
-                    <MudText Typo="Typo.caption" Class="ml-muted">Total Products</MudText>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@T["Total Products"]</MudText>
                     <MudText Typo="Typo.h6" Style="font-weight:700">@_products.Count</MudText>
                 </div>
             </MudPaper>
@@ -52,7 +53,7 @@
                     <MudIcon Icon="@Icons.Material.Outlined.CheckCircleOutline" />
                 </MudAvatar>
                 <div>
-                    <MudText Typo="Typo.caption" Class="ml-muted">Active in Catalog</MudText>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@T["Active in Catalog"]</MudText>
                     <MudText Typo="Typo.h6" Style="font-weight:700">@_products.Count(p => p.IsActive)</MudText>
                 </div>
             </MudPaper>
@@ -63,7 +64,7 @@
                     <MudIcon Icon="@Icons.Material.Outlined.Repeat" />
                 </MudAvatar>
                 <div>
-                    <MudText Typo="Typo.caption" Class="ml-muted">Subscriptions</MudText>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@T["Subscriptions"]</MudText>
                     <MudText Typo="Typo.h6" Style="font-weight:700">@_products.Count(p => p.Type == ProductType.Subscription)</MudText>
                 </div>
             </MudPaper>
@@ -74,7 +75,7 @@
                     <MudIcon Icon="@Icons.Material.Outlined.MenuBook" />
                 </MudAvatar>
                 <div>
-                    <MudText Typo="Typo.caption" Class="ml-muted">Price Books</MudText>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@T["Price Books"]</MudText>
                     <MudText Typo="Typo.h6" Style="font-weight:700">@_priceBooks.Count</MudText>
                 </div>
             </MudPaper>
@@ -87,14 +88,14 @@
             <!-- Filter Bar -->
             <MudPaper Elevation="0" Outlined="true" Class="pa-3 my-3 d-flex flex-wrap align-center justify-space-between gap-3" Style="border-radius:12px">
                 <div class="d-flex flex-wrap align-center gap-2">
-                    <MudTextField @bind-Value="_searchQuery" Placeholder="Search by name, SKU, or category..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.Search" Immediate="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="min-width:280px" />
-                    <MudSelect T="ProductType?" @bind-Value="_typeFilter" Placeholder="All Types" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="min-width:160px">
-                        <MudSelectItem T="ProductType?" Value="@((ProductType?)null)">All Types</MudSelectItem>
-                        <MudSelectItem T="ProductType?" Value="@ProductType.Product">Product</MudSelectItem>
-                        <MudSelectItem T="ProductType?" Value="@ProductType.Service">Service</MudSelectItem>
-                        <MudSelectItem T="ProductType?" Value="@ProductType.Subscription">Subscription</MudSelectItem>
+                    <MudTextField @bind-Value="_searchQuery" Placeholder="@T["Search by name, SKU, or category..."]" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.Search" Immediate="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="min-width:280px" />
+                    <MudSelect T="ProductType?" @bind-Value="_typeFilter" Placeholder="@T["All Types"]" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="min-width:160px">
+                        <MudSelectItem T="ProductType?" Value="@((ProductType?)null)">@T["All Types"]</MudSelectItem>
+                        <MudSelectItem T="ProductType?" Value="@ProductType.Product">@T["Product"]</MudSelectItem>
+                        <MudSelectItem T="ProductType?" Value="@ProductType.Service">@T["Service"]</MudSelectItem>
+                        <MudSelectItem T="ProductType?" Value="@ProductType.Subscription">@T["Subscription"]</MudSelectItem>
                     </MudSelect>
-                    <MudCheckBox @bind-Value="_onlyActive" Label="Active Only" Dense="true" Color="Color.Primary" />
+                    <MudCheckBox @bind-Value="_onlyActive" Label="@T["Active Only"]" Dense="true" Color="Color.Primary" />
                 </div>
             </MudPaper>
 
@@ -104,20 +105,20 @@
             }
             else if (FilteredProducts.Count == 0)
             {
-                <EmptyState Title="No products found" Subtitle="Add your sellable products and services or adjust the search filter." ActionLabel="Create Product" OnAction="OpenNewProductDialog" />
+                <EmptyState Title="No products found" Subtitle="@T["Add your sellable products and services or adjust the search filter."]" ActionLabel="Create Product" OnAction="OpenNewProductDialog" />
             }
             else
             {
                 <MudTable Items="@FilteredProducts" Dense="true" Hover="true" Outlined="true" Style="border-radius:12px; overflow:hidden">
                     <HeaderContent>
-                        <MudTh>SKU</MudTh>
-                        <MudTh>Product / Service</MudTh>
-                        <MudTh>Type</MudTh>
-                        <MudTh>Category</MudTh>
-                        <MudTh Style="text-align:right">Unit Price</MudTh>
-                        <MudTh Style="text-align:right">Tax Rate</MudTh>
-                        <MudTh>Status</MudTh>
-                        <MudTh Style="text-align:right">Actions</MudTh>
+                        <MudTh>@T["SKU"]</MudTh>
+                        <MudTh>@T["Product / Service"]</MudTh>
+                        <MudTh>@T["Type"]</MudTh>
+                        <MudTh>@T["Category"]</MudTh>
+                        <MudTh Style="text-align:right">@T["Unit Price"]</MudTh>
+                        <MudTh Style="text-align:right">@T["Tax Rate"]</MudTh>
+                        <MudTh>@T["Status"]</MudTh>
+                        <MudTh Style="text-align:right">@T["Actions"]</MudTh>
                     </HeaderContent>
                     <RowTemplate>
                         <MudTd DataLabel="SKU">
@@ -157,15 +158,15 @@
                         <MudTd DataLabel="Status">
                             @if (context.IsActive)
                             {
-                                <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">Active</MudChip>
+                                <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">@T["Active"]</MudChip>
                             }
                             else
                             {
-                                <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">Archived</MudChip>
+                                <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">@T["Archived"]</MudChip>
                             }
                         </MudTd>
                         <MudTd DataLabel="Actions" Style="text-align:right">
-                            <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="@(() => OpenEditProductDialog(context))" aria-label="Edit Product" />
+                            <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="@(() => OpenEditProductDialog(context))" aria-label="@T["Edit Product"]" />
                         </MudTd>
                     </RowTemplate>
                 </MudTable>
@@ -193,13 +194,13 @@
                                 <MudCardContent>
                                     <MudText Typo="Typo.body2" Class="ml-muted mb-2">@(pb.Description ?? "No description configured.")</MudText>
                                     <div class="d-flex align-center justify-space-between">
-                                        <MudText Typo="Typo.caption">Entries configured:</MudText>
-                                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">@pb.Entries.Count Items</MudChip>
+                                        <MudText Typo="Typo.caption">@T["Entries configured:"]</MudText>
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">@T["{0} Items", pb.Entries.Count]</MudChip>
                                     </div>
                                 </MudCardContent>
                                 <MudCardActions>
                                     <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Outlined.ListAlt" OnClick="@(() => OpenPriceBookEntries(pb))">
-                                        View Rates
+                                        @T["View Rates"]
                                     </MudButton>
                                 </MudCardActions>
                             </MudCard>
@@ -219,51 +220,51 @@
     <DialogContent>
         <MudGrid Spacing="2">
             <MudItem xs="12">
-                <MudTextField @bind-Value="_productForm.Name" Label="Product Name" Required="true" Margin="Margin.Dense" Variant="Variant.Outlined" />
+                <MudTextField @bind-Value="_productForm.Name" Label="@T["Product Name"]" Required="true" Margin="Margin.Dense" Variant="Variant.Outlined" />
             </MudItem>
             <MudItem xs="12" sm="6">
-                <MudTextField @bind-Value="_productForm.Sku" Label="SKU / Item Code" Required="true" Margin="Margin.Dense" Variant="Variant.Outlined" />
+                <MudTextField @bind-Value="_productForm.Sku" Label="@T["SKU / Item Code"]" Required="true" Margin="Margin.Dense" Variant="Variant.Outlined" />
             </MudItem>
             <MudItem xs="12" sm="6">
-                <MudTextField @bind-Value="_productForm.Category" Label="Category" Margin="Margin.Dense" Variant="Variant.Outlined" Placeholder="e.g. Software, Hardware, Consulting" />
+                <MudTextField @bind-Value="_productForm.Category" Label="@T["Category"]" Margin="Margin.Dense" Variant="Variant.Outlined" Placeholder="@T["e.g. Software, Hardware, Consulting"]" />
             </MudItem>
             <MudItem xs="12" sm="6">
-                <MudSelect T="ProductType" @bind-Value="_productForm.Type" Label="Type" Margin="Margin.Dense" Variant="Variant.Outlined">
-                    <MudSelectItem Value="@ProductType.Product">Physical Goods</MudSelectItem>
-                    <MudSelectItem Value="@ProductType.Service">Professional Service</MudSelectItem>
-                    <MudSelectItem Value="@ProductType.Subscription">SaaS / Subscription</MudSelectItem>
+                <MudSelect T="ProductType" @bind-Value="_productForm.Type" Label="@T["Type"]" Margin="Margin.Dense" Variant="Variant.Outlined">
+                    <MudSelectItem Value="@ProductType.Product">@T["Physical Goods"]</MudSelectItem>
+                    <MudSelectItem Value="@ProductType.Service">@T["Professional Service"]</MudSelectItem>
+                    <MudSelectItem Value="@ProductType.Subscription">@T["SaaS / Subscription"]</MudSelectItem>
                 </MudSelect>
             </MudItem>
             <MudItem xs="12" sm="6">
-                <MudSelect T="BillingFrequency" @bind-Value="_productForm.BillingFrequency" Label="Billing Frequency" Margin="Margin.Dense" Variant="Variant.Outlined" Disabled="@(_productForm.Type != ProductType.Subscription)">
-                    <MudSelectItem Value="@BillingFrequency.OneTime">One-Time</MudSelectItem>
-                    <MudSelectItem Value="@BillingFrequency.Monthly">Monthly</MudSelectItem>
-                    <MudSelectItem Value="@BillingFrequency.Quarterly">Quarterly</MudSelectItem>
-                    <MudSelectItem Value="@BillingFrequency.Annual">Annual</MudSelectItem>
+                <MudSelect T="BillingFrequency" @bind-Value="_productForm.BillingFrequency" Label="@T["Billing Frequency"]" Margin="Margin.Dense" Variant="Variant.Outlined" Disabled="@(_productForm.Type != ProductType.Subscription)">
+                    <MudSelectItem Value="@BillingFrequency.OneTime">@T["One-Time"]</MudSelectItem>
+                    <MudSelectItem Value="@BillingFrequency.Monthly">@T["Monthly"]</MudSelectItem>
+                    <MudSelectItem Value="@BillingFrequency.Quarterly">@T["Quarterly"]</MudSelectItem>
+                    <MudSelectItem Value="@BillingFrequency.Annual">@T["Annual"]</MudSelectItem>
                 </MudSelect>
             </MudItem>
             <MudItem xs="12" sm="6">
-                <MudNumericField @bind-Value="_productForm.UnitPrice" Label="Unit Price" Margin="Margin.Dense" Variant="Variant.Outlined" Min="0m" Format="N2" />
+                <MudNumericField @bind-Value="_productForm.UnitPrice" Label="@T["Unit Price"]" Margin="Margin.Dense" Variant="Variant.Outlined" Min="0m" Format="N2" />
             </MudItem>
             <MudItem xs="12" sm="6">
-                <MudTextField @bind-Value="_productForm.Currency" Label="Currency Code" Margin="Margin.Dense" Variant="Variant.Outlined" MaxLength="3" />
+                <MudTextField @bind-Value="_productForm.Currency" Label="@T["Currency Code"]" Margin="Margin.Dense" Variant="Variant.Outlined" MaxLength="3" />
             </MudItem>
             <MudItem xs="12" sm="6">
-                <MudNumericField @bind-Value="_productForm.TaxRate" Label="Default Tax Rate %" Margin="Margin.Dense" Variant="Variant.Outlined" Min="0m" Max="100m" />
+                <MudNumericField @bind-Value="_productForm.TaxRate" Label="@T["Default Tax Rate %"]" Margin="Margin.Dense" Variant="Variant.Outlined" Min="0m" Max="100m" />
             </MudItem>
             <MudItem xs="12" sm="6" Class="d-flex align-center">
-                <MudCheckBox @bind-Value="_productForm.IsActive" Label="Active in Catalog" Color="Color.Primary" />
+                <MudCheckBox @bind-Value="_productForm.IsActive" Label="@T["Active in Catalog"]" Color="Color.Primary" />
             </MudItem>
             <MudItem xs="12">
-                <MudTextField @bind-Value="_productForm.Description" Label="Description" Lines="2" Margin="Margin.Dense" Variant="Variant.Outlined" />
+                <MudTextField @bind-Value="_productForm.Description" Label="@T["Description"]" Lines="2" Margin="Margin.Dense" Variant="Variant.Outlined" />
             </MudItem>
         </MudGrid>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="@(() => _productDialogOpen = false)">Cancel</MudButton>
+        <MudButton OnClick="@(() => _productDialogOpen = false)">@T["Cancel"]</MudButton>
         <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveProductAsync" Disabled="_saving">
             @if (_saving) { <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" /> }
-            Save Product
+            @T["Save Product"]
         </MudButton>
     </DialogActions>
 </MudDialog>
@@ -271,28 +272,28 @@
 <!-- Price Book Dialog -->
 <MudDialog @bind-Visible="_priceBookDialogOpen" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true })">
     <TitleContent>
-        <MudText Typo="Typo.h6" Style="font-weight:700">New Price Book</MudText>
+        <MudText Typo="Typo.h6" Style="font-weight:700">@T["New Price Book"]</MudText>
     </TitleContent>
     <DialogContent>
         <MudGrid Spacing="2">
             <MudItem xs="12">
-                <MudTextField @bind-Value="_priceBookForm.Name" Label="Price Book Name" Required="true" Margin="Margin.Dense" Variant="Variant.Outlined" Placeholder="e.g. Enterprise Tier 2026" />
+                <MudTextField @bind-Value="_priceBookForm.Name" Label="@T["Price Book Name"]" Required="true" Margin="Margin.Dense" Variant="Variant.Outlined" Placeholder="@T["e.g. Enterprise Tier 2026"]" />
             </MudItem>
             <MudItem xs="12" sm="6">
-                <MudTextField @bind-Value="_priceBookForm.Currency" Label="Currency" Required="true" Margin="Margin.Dense" Variant="Variant.Outlined" MaxLength="3" />
+                <MudTextField @bind-Value="_priceBookForm.Currency" Label="@T["Currency"]" Required="true" Margin="Margin.Dense" Variant="Variant.Outlined" MaxLength="3" />
             </MudItem>
             <MudItem xs="12" sm="6" Class="d-flex align-center">
-                <MudCheckBox @bind-Value="_priceBookForm.IsStandard" Label="Is Standard Catalog" Color="Color.Primary" />
+                <MudCheckBox @bind-Value="_priceBookForm.IsStandard" Label="@T["Is Standard Catalog"]" Color="Color.Primary" />
             </MudItem>
             <MudItem xs="12">
-                <MudTextField @bind-Value="_priceBookForm.Description" Label="Description" Lines="2" Margin="Margin.Dense" Variant="Variant.Outlined" />
+                <MudTextField @bind-Value="_priceBookForm.Description" Label="@T["Description"]" Lines="2" Margin="Margin.Dense" Variant="Variant.Outlined" />
             </MudItem>
         </MudGrid>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="@(() => _priceBookDialogOpen = false)">Cancel</MudButton>
+        <MudButton OnClick="@(() => _priceBookDialogOpen = false)">@T["Cancel"]</MudButton>
         <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SavePriceBookAsync" Disabled="_saving">
-            Create Price Book
+            @T["Create Price Book"]
         </MudButton>
     </DialogActions>
 </MudDialog>
@@ -301,7 +302,7 @@
 <MudDialog @bind-Visible="_entriesDialogOpen" Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true })">
     <TitleContent>
         <div class="d-flex align-center justify-space-between">
-            <MudText Typo="Typo.h6" Style="font-weight:700">Rates · @_selectedPriceBook?.Name</MudText>
+            <MudText Typo="Typo.h6" Style="font-weight:700">@T["Rates"] · @_selectedPriceBook?.Name</MudText>
             <MudChip T="string" Color="Color.Primary" Size="Size.Small" Variant="Variant.Outlined">@_selectedPriceBook?.Currency</MudChip>
         </div>
     </TitleContent>
@@ -310,17 +311,17 @@
         {
             <!-- Add / Update Rate Override -->
             <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-3" Style="border-radius:8px">
-                <MudText Typo="Typo.subtitle2" Style="font-weight:700" Class="mb-2">Override Product Price</MudText>
+                <MudText Typo="Typo.subtitle2" Style="font-weight:700" Class="mb-2">@T["Override Product Price"]</MudText>
                 <div class="d-flex flex-wrap align-center gap-2">
-                    <MudSelect T="Guid?" @bind-Value="_overrideProductId" Placeholder="Select Product" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="flex:2; min-width:200px">
+                    <MudSelect T="Guid?" @bind-Value="_overrideProductId" Placeholder="@T["Select Product"]" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="flex:2; min-width:200px">
                         @foreach (var prod in _products.Where(p => p.IsActive))
                         {
-                            <MudSelectItem T="Guid?" Value="@((Guid?)prod.Id)">@prod.Name (@prod.Sku) - Standard: @prod.Currency @prod.UnitPrice.ToString("N2")</MudSelectItem>
+                            <MudSelectItem T="Guid?" Value="@((Guid?)prod.Id)">@T["{0} ({1}) - Standard: {2} {3}", prod.Name, prod.Sku, prod.Currency, prod.UnitPrice.ToString("N2")]</MudSelectItem>
                         }
                     </MudSelect>
-                    <MudNumericField @bind-Value="_overridePrice" Label="Custom Rate" Min="0m" Format="N2" Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:140px" />
+                    <MudNumericField @bind-Value="_overridePrice" Label="@T["Custom Rate"]" Min="0m" Format="N2" Margin="Margin.Dense" Variant="Variant.Outlined" Style="width:140px" />
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" OnClick="SaveEntryOverrideAsync" Disabled="_savingEntry">
-                        Save Rate
+                        @T["Save Rate"]
                     </MudButton>
                 </div>
             </MudPaper>
@@ -328,16 +329,16 @@
             <!-- Configured Rates Table -->
             @if (_selectedPriceBook.Entries.Count == 0)
             {
-                <MudText Typo="Typo.body2" Class="ml-muted pa-4 text-center">No custom price overrides configured yet for this price book.</MudText>
+                <MudText Typo="Typo.body2" Class="ml-muted pa-4 text-center">@T["No custom price overrides configured yet for this price book."]</MudText>
             }
             else
             {
                 <MudTable Items="@_selectedPriceBook.Entries" Dense="true" Outlined="true">
                     <HeaderContent>
-                        <MudTh>Product</MudTh>
-                        <MudTh>SKU</MudTh>
-                        <MudTh>Pricing Mode</MudTh>
-                        <MudTh Style="text-align:right">Price Book Rate</MudTh>
+                        <MudTh>@T["Product"]</MudTh>
+                        <MudTh>@T["SKU"]</MudTh>
+                        <MudTh>@T["Pricing Mode"]</MudTh>
+                        <MudTh Style="text-align:right">@T["Price Book Rate"]</MudTh>
                     </HeaderContent>
                     <RowTemplate>
                         <MudTd>@context.ProductName</MudTd>
@@ -356,7 +357,7 @@
         }
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="@(() => _entriesDialogOpen = false)">Close</MudButton>
+        <MudButton OnClick="@(() => _entriesDialogOpen = false)">@T["Close"]</MudButton>
     </DialogActions>
 </MudDialog>
 
@@ -463,7 +464,7 @@
     {
         if (string.IsNullOrWhiteSpace(_productForm.Name) || string.IsNullOrWhiteSpace(_productForm.Sku))
         {
-            Snackbar.Add("Name and SKU are required.", Severity.Warning);
+            Snackbar.Add(T["Name and SKU are required."], Severity.Warning);
             return;
         }
 
@@ -482,7 +483,7 @@
 
             if (resp.IsSuccessStatusCode)
             {
-                Snackbar.Add("Product saved successfully!", Severity.Success);
+                Snackbar.Add(T["Product saved successfully!"], Severity.Success);
                 _productDialogOpen = false;
                 await LoadDataAsync();
             }
@@ -517,7 +518,7 @@
     {
         if (string.IsNullOrWhiteSpace(_priceBookForm.Name))
         {
-            Snackbar.Add("Price book name is required.", Severity.Warning);
+            Snackbar.Add(T["Price book name is required."], Severity.Warning);
             return;
         }
 
@@ -527,7 +528,7 @@
             var resp = await Http.PostAsJsonAsync("api/v1/price-books", _priceBookForm);
             if (resp.IsSuccessStatusCode)
             {
-                Snackbar.Add("Price book created successfully!", Severity.Success);
+                Snackbar.Add(T["Price book created successfully!"], Severity.Success);
                 _priceBookDialogOpen = false;
                 await LoadDataAsync();
             }
@@ -559,7 +560,7 @@
     {
         if (_selectedPriceBook is null || !_overrideProductId.HasValue)
         {
-            Snackbar.Add("Please select a product.", Severity.Warning);
+            Snackbar.Add(T["Please select a product."], Severity.Warning);
             return;
         }
 
@@ -576,7 +577,7 @@
             var resp = await Http.PostAsJsonAsync($"api/v1/price-books/{_selectedPriceBook.Id}/entries", req);
             if (resp.IsSuccessStatusCode)
             {
-                Snackbar.Add("Rate updated successfully!", Severity.Success);
+                Snackbar.Add(T["Rate updated successfully!"], Severity.Success);
                 await LoadDataAsync();
                 _selectedPriceBook = _priceBooks.FirstOrDefault(pb => pb.Id == _selectedPriceBook.Id);
             }

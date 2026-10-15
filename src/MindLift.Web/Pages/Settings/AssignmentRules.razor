@@ -6,13 +6,14 @@
 @inject AppState App
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
+@inject Translator T
 
-<PageTitle>Lead assignment · MindLift</PageTitle>
+<PageTitle>@T["Lead assignment"] · MindLift</PageTitle>
 
 <div class="ml-page ml-page--form">
     <PageHeader Title="Lead assignment" Subtitle="Decides who owns a new lead. Rules run from the lowest priority number. The first rule that matches and has an active user wins.">
         <Actions>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => OpenRule(null)" data-testid="primary-action">New rule</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => OpenRule(null)" data-testid="primary-action">@T["New rule"]</MudButton>
         </Actions>
     </PageHeader>
     <SettingsNav Current="/settings/assignment-rules" />
@@ -33,21 +34,21 @@
                 <div class="ml-row" style="padding:12px 20px;border-bottom:1px solid var(--ml-border);min-height:56px" data-testid="rule-row">
                     <div class="ml-grow">
                         <MudText Typo="Typo.subtitle2">@rule.Name</MudText>
-                        <MudText Typo="Typo.caption" Class="ml-muted">Priority @rule.Priority · @MethodLabel(rule.Method) · @UsersSummary(rule.UserIds) · @ConditionText(rule.Conditions)</MudText>
+                        <MudText Typo="Typo.caption" Class="ml-muted">@T["Priority {0}", rule.Priority] · @T[MethodLabel(rule.Method)] · @UsersSummary(rule.UserIds) · @ConditionText(rule.Conditions)</MudText>
                     </div>
                     @if (!rule.IsActive)
                     {
                         <StatusChip Text="Off" Color="@StatusColors.For("Expired")" Dot="false" />
                     }
-                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="() => OpenRule(rule)" aria-label="Edit rule" />
+                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="() => OpenRule(rule)" aria-label="@T["Edit rule"]" />
                     @if (_confirmId == rule.Id)
                     {
-                        <MudButton Size="Size.Small" OnClick="() => _confirmId = null">Keep</MudButton>
-                        <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeleteAsync(rule)">Delete</MudButton>
+                        <MudButton Size="Size.Small" OnClick="() => _confirmId = null">@T["Keep"]</MudButton>
+                        <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeleteAsync(rule)">@T["Delete"]</MudButton>
                     }
                     else
                     {
-                        <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" OnClick="() => _confirmId = rule.Id" aria-label="Delete rule" />
+                        <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" OnClick="() => _confirmId = rule.Id" aria-label="@T["Delete rule"]" />
                     }
                 </div>
             }
@@ -62,43 +63,43 @@
 <FormDrawer Open="_open" OpenChanged="v => _open = v" Title="@_title" SubmitText="Save rule" Busy="_busy" OnSubmit="SaveAsync">
     <div class="ml-stack">
         @if (_formError is not null) { <MudAlert Severity="Severity.Error" Dense="true">@_formError</MudAlert> }
-        <MudTextField @bind-Value="_name" Label="Name *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="rule-name" />
-        <MudNumericField @bind-Value="_priority" Label="Priority" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" HelperText="Lower numbers run first." />
-        <MudSelect T="string" @bind-Value="_method" Label="How to pick the owner *" Variant="Variant.Outlined" Margin="Margin.Dense">
-            <MudSelectItem T="string" Value="MethodRoundRobin">Take turns (round robin)</MudSelectItem>
-            <MudSelectItem T="string" Value="MethodLoadBalanced">Fewest open leads</MudSelectItem>
-            <MudSelectItem T="string" Value="MethodSpecificUser">One specific person</MudSelectItem>
+        <MudTextField @bind-Value="_name" Label="@T["Name *"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="rule-name" />
+        <MudNumericField @bind-Value="_priority" Label="@T["Priority"]" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" HelperText="@T["Lower numbers run first."]" />
+        <MudSelect T="string" @bind-Value="_method" Label="@T["How to pick the owner *"]" Variant="Variant.Outlined" Margin="Margin.Dense">
+            <MudSelectItem T="string" Value="MethodRoundRobin">@T["Take turns (round robin)"]</MudSelectItem>
+            <MudSelectItem T="string" Value="MethodLoadBalanced">@T["Fewest open leads"]</MudSelectItem>
+            <MudSelectItem T="string" Value="MethodSpecificUser">@T["One specific person"]</MudSelectItem>
         </MudSelect>
 
-        <MudText Typo="Typo.subtitle2" Class="mt-2">Users in this rule</MudText>
-        <MudText Typo="Typo.caption" Class="ml-muted">For round robin, the order below is the turn order. For a specific person, the first user gets every matching lead.</MudText>
+        <MudText Typo="Typo.subtitle2" Class="mt-2">@T["Users in this rule"]</MudText>
+        <MudText Typo="Typo.caption" Class="ml-muted">@T["For round robin, the order below is the turn order. For a specific person, the first user gets every matching lead."]</MudText>
         @foreach (var (userId, index) in _userIds.Select((id, i) => (id, i)))
         {
             var current = index;
             <div class="ml-row" style="padding:6px 0;border-bottom:1px solid var(--ml-border)" data-testid="rule-user">
                 <MudText Typo="Typo.body2" Class="ml-grow">@(index + 1). @UserName(userId)</MudText>
-                <MudIconButton Icon="@Icons.Material.Outlined.ArrowUpward" Size="Size.Small" Disabled="index == 0" OnClick="() => MoveUser(current, -1)" aria-label="Move user up" />
-                <MudIconButton Icon="@Icons.Material.Outlined.ArrowDownward" Size="Size.Small" Disabled="index == _userIds.Count - 1" OnClick="() => MoveUser(current, 1)" aria-label="Move user down" />
-                <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small" OnClick="() => RemoveUser(current)" aria-label="Remove user" />
+                <MudIconButton Icon="@Icons.Material.Outlined.ArrowUpward" Size="Size.Small" Disabled="index == 0" OnClick="() => MoveUser(current, -1)" aria-label="@T["Move user up"]" />
+                <MudIconButton Icon="@Icons.Material.Outlined.ArrowDownward" Size="Size.Small" Disabled="index == _userIds.Count - 1" OnClick="() => MoveUser(current, 1)" aria-label="@T["Move user down"]" />
+                <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small" OnClick="() => RemoveUser(current)" aria-label="@T["Remove user"]" />
             </div>
         }
-        <MudSelect T="Guid?" Value="_pickUser" ValueChanged="AddUser" Label="Add a user" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="rule-add-user">
+        <MudSelect T="Guid?" Value="_pickUser" ValueChanged="AddUser" Label="@T["Add a user"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="rule-add-user">
             @foreach (var user in ActiveUsers())
             {
                 <MudSelectItem T="Guid?" Value="@user.Id">@user.FullName</MudSelectItem>
             }
         </MudSelect>
 
-        <MudText Typo="Typo.subtitle2" Class="mt-2">Only when</MudText>
-        <MudSelect T="string" @bind-Value="_condField" Label="Lead field" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="rule-field">
-            <MudSelectItem T="string" Value="FieldAny">Any lead</MudSelectItem>
-            <MudSelectItem T="string" Value="FieldSource">Source</MudSelectItem>
-            <MudSelectItem T="string" Value="FieldRating">Rating</MudSelectItem>
-            <MudSelectItem T="string" Value="FieldStatus">Status</MudSelectItem>
+        <MudText Typo="Typo.subtitle2" Class="mt-2">@T["Only when"]</MudText>
+        <MudSelect T="string" @bind-Value="_condField" Label="@T["Lead field"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="rule-field">
+            <MudSelectItem T="string" Value="FieldAny">@T["Any lead"]</MudSelectItem>
+            <MudSelectItem T="string" Value="FieldSource">@T["Source"]</MudSelectItem>
+            <MudSelectItem T="string" Value="FieldRating">@T["Rating"]</MudSelectItem>
+            <MudSelectItem T="string" Value="FieldStatus">@T["Status"]</MudSelectItem>
         </MudSelect>
         @if (_condField != FieldAny)
         {
-            <MudSelect T="string" @bind-Value="_condValue" Label="Equals" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="rule-value">
+            <MudSelect T="string" @bind-Value="_condValue" Label="@T["Equals"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="rule-value">
                 @foreach (var value in PicklistValues(_condField))
                 {
                     <MudSelectItem T="string" Value="@value.Value">@value.Label</MudSelectItem>
@@ -106,7 +107,7 @@
             </MudSelect>
         }
 
-        <MudCheckBox @bind-Value="_active" Label="Active" Color="Color.Primary" />
+        <MudCheckBox @bind-Value="_active" Label="@T["Active"]" Color="Color.Primary" />
     </div>
 </FormDrawer>
 
@@ -174,7 +175,7 @@
 
     private string UserName(Guid id) => _users.FirstOrDefault(u => u.Id == id)?.FullName ?? "Removed user";
 
-    private string UsersSummary(IReadOnlyList<Guid> ids) => ids.Count == 0 ? "no users" : string.Join(", ", ids.Select(UserName));
+    private string UsersSummary(IReadOnlyList<Guid> ids) => ids.Count == 0 ? T["no users"] : string.Join(", ", ids.Select(UserName));
 
     private static string MethodLabel(string method) => method switch
     {
@@ -189,7 +190,7 @@
         var condition = group?.Conditions.FirstOrDefault();
         if (condition is null)
         {
-            return "any lead";
+            return T["any lead"];
         }
 
         var value = condition.Value?.ValueKind == JsonValueKind.String ? condition.Value.Value.GetString() : condition.Value?.ToString();
@@ -257,19 +258,19 @@
         _formError = null;
         if (string.IsNullOrWhiteSpace(_name))
         {
-            _formError = "Give the rule a name.";
+            _formError = T["Give the rule a name."];
             return;
         }
 
         if (_userIds.Count == 0)
         {
-            _formError = "Add at least one user to this rule.";
+            _formError = T["Add at least one user to this rule."];
             return;
         }
 
         if (_condField != FieldAny && string.IsNullOrWhiteSpace(_condValue))
         {
-            _formError = "Choose the value the lead field must equal.";
+            _formError = T["Choose the value the lead field must equal."];
             return;
         }
 
@@ -292,12 +293,12 @@
                 : await Http.PutAsJsonAsync($"api/v1/settings/assignment-rules/{_editId}", body);
             if (!response.IsSuccessStatusCode)
             {
-                _formError = await ProblemText.FromAsync(response, "We could not save this rule.");
+                _formError = await ProblemText.FromAsync(response, T["We could not save this rule."]);
                 return;
             }
 
             _open = false;
-            Snackbar.Add("Rule saved", Severity.Success);
+            Snackbar.Add(T["Rule saved"], Severity.Success);
             await LoadAsync();
         }
         finally
@@ -312,11 +313,11 @@
         _confirmId = null;
         if (!response.IsSuccessStatusCode)
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, "We could not delete this rule."), Severity.Error);
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not delete this rule."]), Severity.Error);
             return;
         }
 
-        Snackbar.Add("Rule deleted", Severity.Success);
+        Snackbar.Add(T["Rule deleted"], Severity.Success);
         await LoadAsync();
     }
 }

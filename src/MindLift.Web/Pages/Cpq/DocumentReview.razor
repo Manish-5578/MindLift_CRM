@@ -6,6 +6,7 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject NavigationManager Nav
+@inject Translator T
 
 <div class="pa-4 d-flex flex-column" style="height: calc(100vh - 80px);">
     @if (_loading)
@@ -16,14 +17,14 @@
     }
     else if (_document == null)
     {
-        <MudAlert Severity="Severity.Error">Document not found or has been deleted.</MudAlert>
+        <MudAlert Severity="Severity.Error">@T["Document not found or has been deleted."]</MudAlert>
     }
     else
     {
         <!-- Header Bar -->
         <MudPaper Class="pa-4 mb-4 d-flex justify-space-between align-center flex-wrap gap-4" Elevation="1">
             <div class="d-flex align-center gap-3">
-                <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Nav.NavigateTo("/documents"))" aria-label="Back to documents" />
+                <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Nav.NavigateTo("/documents"))" aria-label="@T["Back to documents"]" />
                 <div>
                     <div class="d-flex align-center gap-2">
                         <MudText Typo="Typo.h5" Class="font-weight-bold">@_document.FileName</MudText>
@@ -37,10 +38,10 @@
                         }
                     </div>
                     <MudText Typo="Typo.caption" Class="text-secondary">
-                        Uploaded @(_document.UploadedAt.ToString("g")) · @FormatBytes(_document.FileSizeBytes)
+                        @T["Uploaded {0}", _document.UploadedAt.ToString("g")] · @FormatBytes(_document.FileSizeBytes)
                         @if (!string.IsNullOrEmpty(_document.RejectReason))
                         {
-                            <span class="ml-2 text-danger">· Rejected: @_document.RejectReason</span>
+                            <span class="ml-2 text-danger">· @T["Rejected: {0}", _document.RejectReason]</span>
                         }
                     </MudText>
                 </div>
@@ -49,20 +50,20 @@
             <div class="d-flex align-center gap-2">
                 <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Refresh"
                            OnClick="ReprocessAsync" Disabled="_processing">
-                    Reprocess OCR
+                    @T["Reprocess OCR"]
                 </MudButton>
                 @if (_document.Status != "Rejected")
                 {
                     <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Cancel"
                                OnClick="OpenRejectDialog" Disabled="_processing">
-                        Reject
+                        @T["Reject"]
                     </MudButton>
                 }
                 @if (_document.Status != "Approved")
                 {
                     <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.CheckCircle"
                                OnClick="OpenApproveDialog" Disabled="_processing">
-                        Approve & Apply
+                        @T["Approve & Apply"]
                     </MudButton>
                 }
             </div>
@@ -73,11 +74,11 @@
             <!-- Left Pane: Document Text / Viewer -->
             <MudPaper Class="pa-4 flex-grow-1 d-flex flex-column" Elevation="1" Style="width: 55%; overflow: hidden;">
                 <div class="d-flex justify-space-between align-center mb-2">
-                    <MudText Typo="Typo.subtitle1" Class="font-weight-bold">Document Content</MudText>
+                    <MudText Typo="Typo.subtitle1" Class="font-weight-bold">@T["Document Content"]</MudText>
                     <div class="d-flex gap-2">
                         <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Filled.Download"
                                    Href="@($"/api/v1/documents/{_document.Id}/file")" Target="_blank">
-                            Download File
+                            @T["Download File"]
                         </MudButton>
                     </div>
                 </div>
@@ -100,17 +101,17 @@
             <MudPaper Class="pa-4 d-flex flex-column" Elevation="1" Style="width: 45%; overflow-y: auto;">
                 <div class="d-flex justify-space-between align-center mb-4">
                     <div>
-                        <MudText Typo="Typo.subtitle1" Class="font-weight-bold">Intelligence & Key Information</MudText>
-                        <MudText Typo="Typo.caption" Class="text-secondary">Review and adjust extracted values before approval</MudText>
+                        <MudText Typo="Typo.subtitle1" Class="font-weight-bold">@T["Intelligence & Key Information"]</MudText>
+                        <MudText Typo="Typo.caption" Class="text-secondary">@T["Review and adjust extracted values before approval"]</MudText>
                     </div>
                     <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" OnClick="SaveFieldsAsync">
-                        Save Edits
+                        @T["Save Edits"]
                     </MudButton>
                 </div>
 
                 @if (_fields.Count == 0)
                 {
-                    <MudAlert Severity="Severity.Info" Class="my-2">No structured fields extracted from this document.</MudAlert>
+                    <MudAlert Severity="Severity.Info" Class="my-2">@T["No structured fields extracted from this document."]</MudAlert>
                 }
                 else
                 {
@@ -133,10 +134,10 @@
                 @if (_document.AssociatedAccountId.HasValue || _document.AssociatedContactId.HasValue)
                 {
                     <MudDivider Class="my-4" />
-                    <MudText Typo="Typo.subtitle2" Class="font-weight-bold mb-2">Apply to Associated Record</MudText>
+                    <MudText Typo="Typo.subtitle2" Class="font-weight-bold mb-2">@T["Apply to Associated Record"]</MudText>
                     <MudPaper Class="pa-3" Outlined="true" Style="background-color: var(--mud-palette-background-grey);">
                         <MudText Typo="Typo.body2">
-                            When approved, verified values can be synchronized to the linked @(_document.AssociatedAccountId.HasValue ? "Account" : "Contact") record.
+                            @T["When approved, verified values can be synchronized to the linked {0} record.", T[_document.AssociatedAccountId.HasValue ? "Account" : "Contact"]]
                         </MudText>
                     </MudPaper>
                 }
@@ -148,28 +149,28 @@
 <!-- Reject Dialog -->
 <MudDialog @bind-Visible="_rejectDialogOpen">
     <TitleContent>
-        <MudText Typo="Typo.h6">Reject Document</MudText>
+        <MudText Typo="Typo.h6">@T["Reject Document"]</MudText>
     </TitleContent>
     <DialogContent>
-        <MudText Typo="Typo.body2" Class="mb-3">Please specify the reason for rejecting this document:</MudText>
-        <MudTextField @bind-Value="_rejectReason" Label="Reason for rejection" Lines="3" Variant="Variant.Outlined" Required="true" />
+        <MudText Typo="Typo.body2" Class="mb-3">@T["Please specify the reason for rejecting this document:"]</MudText>
+        <MudTextField @bind-Value="_rejectReason" Label="@T["Reason for rejection"]" Lines="3" Variant="Variant.Outlined" Required="true" />
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="@(() => _rejectDialogOpen = false)">Cancel</MudButton>
-        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="ConfirmRejectAsync" Disabled="@string.IsNullOrWhiteSpace(_rejectReason)">Reject</MudButton>
+        <MudButton OnClick="@(() => _rejectDialogOpen = false)">@T["Cancel"]</MudButton>
+        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="ConfirmRejectAsync" Disabled="@string.IsNullOrWhiteSpace(_rejectReason)">@T["Reject"]</MudButton>
     </DialogActions>
 </MudDialog>
 
 <!-- Approve Dialog -->
 <MudDialog @bind-Visible="_approveDialogOpen">
     <TitleContent>
-        <MudText Typo="Typo.h6">Approve Document</MudText>
+        <MudText Typo="Typo.h6">@T["Approve Document"]</MudText>
     </TitleContent>
     <DialogContent>
-        <MudText Typo="Typo.body2" Class="mb-3">Are you sure you want to approve this document and commit its extracted data?</MudText>
+        <MudText Typo="Typo.body2" Class="mb-3">@T["Are you sure you want to approve this document and commit its extracted data?"]</MudText>
         @if (_fields.Count > 0)
         {
-            <MudText Typo="Typo.subtitle2" Class="font-weight-bold mb-1">Fields to be approved:</MudText>
+            <MudText Typo="Typo.subtitle2" Class="font-weight-bold mb-1">@T["Fields to be approved:"]</MudText>
             <MudList T="string" Dense="true">
                 @foreach (var f in _fields)
                 {
@@ -181,8 +182,8 @@
         }
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="@(() => _approveDialogOpen = false)">Cancel</MudButton>
-        <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="ConfirmApproveAsync">Approve & Save</MudButton>
+        <MudButton OnClick="@(() => _approveDialogOpen = false)">@T["Cancel"]</MudButton>
+        <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="ConfirmApproveAsync">@T["Approve & Save"]</MudButton>
     </DialogActions>
 </MudDialog>
 
@@ -237,12 +238,12 @@
             var res = await Http.PostAsync($"/api/v1/documents/{Id}/reprocess", null);
             if (res.IsSuccessStatusCode)
             {
-                Snackbar.Add("Document reprocessed successfully.", Severity.Success);
+                Snackbar.Add(T["Document reprocessed successfully."], Severity.Success);
                 await LoadDocumentAsync();
             }
             else
             {
-                Snackbar.Add("Failed to reprocess document.", Severity.Error);
+                Snackbar.Add(T["Failed to reprocess document."], Severity.Error);
             }
         }
         catch (Exception ex)
@@ -263,12 +264,12 @@
             var res = await Http.PutAsJsonAsync($"/api/v1/documents/{Id}/fields", req);
             if (res.IsSuccessStatusCode)
             {
-                Snackbar.Add("Fields saved successfully.", Severity.Success);
+                Snackbar.Add(T["Fields saved successfully."], Severity.Success);
                 await LoadDocumentAsync();
             }
             else
             {
-                Snackbar.Add("Failed to save field edits.", Severity.Error);
+                Snackbar.Add(T["Failed to save field edits."], Severity.Error);
             }
         }
         catch (Exception ex)
@@ -293,12 +294,12 @@
             var res = await Http.PostAsJsonAsync($"/api/v1/documents/{Id}/review", req);
             if (res.IsSuccessStatusCode)
             {
-                Snackbar.Add("Document marked as Rejected.", Severity.Info);
+                Snackbar.Add(T["Document marked as Rejected."], Severity.Info);
                 await LoadDocumentAsync();
             }
             else
             {
-                Snackbar.Add("Failed to reject document.", Severity.Error);
+                Snackbar.Add(T["Failed to reject document."], Severity.Error);
             }
         }
         catch (Exception ex)
@@ -339,12 +340,12 @@
             var res = await Http.PostAsJsonAsync($"/api/v1/documents/{Id}/review", req);
             if (res.IsSuccessStatusCode)
             {
-                Snackbar.Add("Document approved successfully.", Severity.Success);
+                Snackbar.Add(T["Document approved successfully."], Severity.Success);
                 await LoadDocumentAsync();
             }
             else
             {
-                Snackbar.Add("Failed to approve document.", Severity.Error);
+                Snackbar.Add(T["Failed to approve document."], Severity.Error);
             }
         }
         catch (Exception ex)

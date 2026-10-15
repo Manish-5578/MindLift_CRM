@@ -1,7 +1,8 @@
+@inject Translator T
 <div class="ml-row ml-row--wrap" style="margin-bottom:24px" data-testid="settings-nav">
     @foreach (var (label, href) in Items)
     {
-        <MudButton Variant="@(Current == href ? Variant.Filled : Variant.Outlined)" Color="@(Current == href ? Color.Primary : Color.Default)" Size="Size.Small" Href="@href">@label</MudButton>
+        <MudButton Variant="@(Current == href ? Variant.Filled : Variant.Outlined)" Color="@(Current == href ? Color.Primary : Color.Default)" Size="Size.Small" Href="@href">@T[label]</MudButton>
     }
 </div>
 

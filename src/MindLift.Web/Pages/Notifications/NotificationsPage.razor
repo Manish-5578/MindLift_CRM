@@ -4,23 +4,24 @@
 @inject AuthSession Session
 @inject NotificationClient Notifications
 @inject NavigationManager Nav
+@inject Translator T
 
-<PageTitle>Notifications · MindLift</PageTitle>
+<PageTitle>@T["Notifications"] · MindLift</PageTitle>
 
 <div class="ml-page ml-page--form">
     <PageHeader Title="Notifications" Subtitle="Assignments, mentions, reminders and results of your imports.">
         <Actions>
-            <MudButton Variant="Variant.Outlined" Href="/notifications/preferences" data-testid="open-preferences">Preferences</MudButton>
+            <MudButton Variant="Variant.Outlined" Href="/notifications/preferences" data-testid="open-preferences">@T["Preferences"]</MudButton>
             @if (_unread > 0)
             {
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="MarkAllAsync" data-testid="primary-action">Mark all as read</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="MarkAllAsync" data-testid="primary-action">@T["Mark all as read"]</MudButton>
             }
         </Actions>
     </PageHeader>
 
     <div class="ml-row ml-row--wrap" style="margin-bottom:16px" data-testid="notification-tabs">
-        <MudChip T="string" Variant="@(!_unreadOnly ? Variant.Filled : Variant.Outlined)" Color="@(!_unreadOnly ? Color.Primary : Color.Default)" OnClick="() => SetFilterAsync(false)" data-testid="tab-all">All</MudChip>
-        <MudChip T="string" Variant="@(_unreadOnly ? Variant.Filled : Variant.Outlined)" Color="@(_unreadOnly ? Color.Primary : Color.Default)" OnClick="() => SetFilterAsync(true)" data-testid="tab-unread">Unread@(_unread > 0 ? $" ({_unread})" : "")</MudChip>
+        <MudChip T="string" Variant="@(!_unreadOnly ? Variant.Filled : Variant.Outlined)" Color="@(!_unreadOnly ? Color.Primary : Color.Default)" OnClick="() => SetFilterAsync(false)" data-testid="tab-all">@T["All"]</MudChip>
+        <MudChip T="string" Variant="@(_unreadOnly ? Variant.Filled : Variant.Outlined)" Color="@(_unreadOnly ? Color.Primary : Color.Default)" OnClick="() => SetFilterAsync(true)" data-testid="tab-unread">@T["Unread"]@(_unread > 0 ? $" ({_unread})" : "")</MudChip>
     </div>
 
     @if (_error is not null)
@@ -57,7 +58,7 @@
         @if (_items.Count < _total)
         {
             <div class="ml-row" style="justify-content:center;margin-top:16px">
-                <MudButton Variant="Variant.Outlined" OnClick="MoreAsync" Disabled="_loading" data-testid="load-more">Show more</MudButton>
+                <MudButton Variant="Variant.Outlined" OnClick="MoreAsync" Disabled="_loading" data-testid="load-more">@T["Show more"]</MudButton>
             </div>
         }
     }
@@ -126,7 +127,7 @@
         }
         catch (HttpRequestException)
         {
-            _error = "We could not load your notifications. Check your connection and try again.";
+            _error = T["We could not load your notifications. Check your connection and try again."];
         }
         finally
         {

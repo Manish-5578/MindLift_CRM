@@ -8,8 +8,9 @@
 @inject HttpClient Http
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
+@inject Translator T
 
-<PageTitle>@(Id.HasValue ? "Edit Report" : "Report Builder") · MindLift</PageTitle>
+<PageTitle>@T[(Id.HasValue ? "Edit Report" : "Report Builder")] · MindLift</PageTitle>
 
 <div class="ml-page">
     <div class="d-flex flex-wrap align-center justify-space-between gap-3 mb-4">
@@ -17,16 +18,16 @@
             <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Href="/reports" Size="Size.Small" />
             <div>
                 <MudText Typo="Typo.h5" Style="font-weight:700">@(Id.HasValue ? $"Edit Report: {_name}" : "Report Builder")</MudText>
-                <MudText Typo="Typo.body2" Class="ml-muted">Configure custom data sources, grouping, formulas, and visual analytics.</MudText>
+                <MudText Typo="Typo.body2" Class="ml-muted">@T["Configure custom data sources, grouping, formulas, and visual analytics."]</MudText>
             </div>
         </div>
 
         <div class="d-flex align-center gap-2">
             <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.PlayArrow" OnClick="RunPreviewAsync" Disabled="_previewLoading" Size="Size.Small">
-                Run Preview
+                @T["Run Preview"]
             </MudButton>
             <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Save" OnClick="SaveReportAsync" Disabled="_saving" Size="Size.Small">
-                Save Report
+                @T["Save Report"]
             </MudButton>
         </div>
     </div>
@@ -44,38 +45,38 @@
                     <!-- Tab 1: Source & Type -->
                     <MudTabPanel Text="1. Source" Icon="@Icons.Material.Outlined.Source">
                         <div class="ml-stack">
-                            <MudSelect T="string" Value="_selectedSourceKey" ValueChanged="OnSourceChanged" Label="Primary Data Source *" Variant="Variant.Outlined" Margin="Margin.Dense">
+                            <MudSelect T="string" Value="_selectedSourceKey" ValueChanged="OnSourceChanged" Label="@T["Primary Data Source *"]" Variant="Variant.Outlined" Margin="Margin.Dense">
                                 @foreach (var src in _sources)
                                 {
                                     <MudSelectItem T="string" Value="@src.Key">@src.Label (@src.Key)</MudSelectItem>
                                 }
                             </MudSelect>
 
-                            <MudSelect T="ReportType" @bind-Value="_reportType" Label="Report Structure" Variant="Variant.Outlined" Margin="Margin.Dense">
-                                <MudSelectItem Value="@ReportType.Tabular">Tabular (Detailed row list)</MudSelectItem>
-                                <MudSelectItem Value="@ReportType.Summary">Summary (Grouped rows with totals)</MudSelectItem>
-                                <MudSelectItem Value="@ReportType.Matrix">Matrix (2-dimensional breakdown)</MudSelectItem>
+                            <MudSelect T="ReportType" @bind-Value="_reportType" Label="@T["Report Structure"]" Variant="Variant.Outlined" Margin="Margin.Dense">
+                                <MudSelectItem Value="@ReportType.Tabular">@T["Tabular (Detailed row list)"]</MudSelectItem>
+                                <MudSelectItem Value="@ReportType.Summary">@T["Summary (Grouped rows with totals)"]</MudSelectItem>
+                                <MudSelectItem Value="@ReportType.Matrix">@T["Matrix (2-dimensional breakdown)"]</MudSelectItem>
                             </MudSelect>
 
                             <MudDivider Class="my-2" />
 
-                            <MudText Typo="Typo.subtitle2" Style="font-weight:600">Report Details</MudText>
-                            <MudTextField @bind-Value="_name" Label="Report Name *" Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" Placeholder="e.g. Q4 Regional Sales Performance" />
-                            <MudTextField @bind-Value="_description" Label="Description" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" Placeholder="What question does this report answer?" />
+                            <MudText Typo="Typo.subtitle2" Style="font-weight:600">@T["Report Details"]</MudText>
+                            <MudTextField @bind-Value="_name" Label="@T["Report Name *"]" Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" Placeholder="@T["e.g. Q4 Regional Sales Performance"]" />
+                            <MudTextField @bind-Value="_description" Label="@T["Description"]" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" Placeholder="@T["What question does this report answer?"]" />
 
                             <div class="d-flex gap-3">
-                                <MudSelect T="Guid?" @bind-Value="_folderId" Label="Folder" Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex:1">
-                                    <MudSelectItem T="Guid?" Value="@((Guid?)null)">General (No Folder)</MudSelectItem>
+                                <MudSelect T="Guid?" @bind-Value="_folderId" Label="@T["Folder"]" Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex:1">
+                                    <MudSelectItem T="Guid?" Value="@((Guid?)null)">@T["General (No Folder)"]</MudSelectItem>
                                     @foreach (var f in _folders)
                                     {
                                         <MudSelectItem T="Guid?" Value="@f.Id">@f.Name</MudSelectItem>
                                     }
                                 </MudSelect>
 
-                                <MudSelect T="ReportVisibility" @bind-Value="_visibility" Label="Visibility" Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex:1">
-                                    <MudSelectItem Value="@ReportVisibility.Private">Private (Only Me)</MudSelectItem>
-                                    <MudSelectItem Value="@ReportVisibility.Team">Team (My Team)</MudSelectItem>
-                                    <MudSelectItem Value="@ReportVisibility.Everyone">Everyone (All Users)</MudSelectItem>
+                                <MudSelect T="ReportVisibility" @bind-Value="_visibility" Label="@T["Visibility"]" Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex:1">
+                                    <MudSelectItem Value="@ReportVisibility.Private">@T["Private (Only Me)"]</MudSelectItem>
+                                    <MudSelectItem Value="@ReportVisibility.Team">@T["Team (My Team)"]</MudSelectItem>
+                                    <MudSelectItem Value="@ReportVisibility.Everyone">@T["Everyone (All Users)"]</MudSelectItem>
                                 </MudSelect>
                             </div>
                         </div>
@@ -84,7 +85,7 @@
                     <!-- Tab 2: Columns & Metrics -->
                     <MudTabPanel Text="2. Columns" Icon="@Icons.Material.Outlined.ViewColumn">
                         <div class="ml-stack">
-                            <MudText Typo="Typo.subtitle2" Style="font-weight:600">Available Fields</MudText>
+                            <MudText Typo="Typo.subtitle2" Style="font-weight:600">@T["Available Fields"]</MudText>
                             <div class="d-flex flex-wrap gap-1 pa-2 rounded-lg" style="max-height:160px; overflow-y:auto; border:1px solid var(--ml-border); background:rgba(0,0,0,0.02)">
                                 @foreach (var fld in CurrentSourceFields)
                                 {
@@ -99,15 +100,15 @@
 
                             @if (_reportType != ReportType.Tabular)
                             {
-                                <MudText Typo="Typo.subtitle2" Style="font-weight:600">Grouping Fields</MudText>
+                                <MudText Typo="Typo.subtitle2" Style="font-weight:600">@T["Grouping Fields"]</MudText>
                                 <div class="d-flex gap-2">
-                                    <MudSelect T="string" @bind-Value="_newGroupColumn" Label="Add Grouping Field" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Style="flex:2">
+                                    <MudSelect T="string" @bind-Value="_newGroupColumn" Label="@T["Add Grouping Field"]" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Style="flex:2">
                                         @foreach (var f in CurrentSourceFields.Where(x => x.Groupable))
                                         {
                                             <MudSelectItem T="string" Value="@f.Key">@f.Label</MudSelectItem>
                                         }
                                     </MudSelect>
-                                    <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="AddGroup" Disabled="@string.IsNullOrWhiteSpace(_newGroupColumn)">Add</MudButton>
+                                    <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="AddGroup" Disabled="@string.IsNullOrWhiteSpace(_newGroupColumn)">@T["Add"]</MudButton>
                                 </div>
 
                                 @if (_groups.Count > 0)
@@ -116,7 +117,7 @@
                                         @foreach (var g in _groups)
                                         {
                                             <MudChip T="string" Size="Size.Small" Color="Color.Secondary" OnClose="() => _groups.Remove(g)">
-                                                Group: @GetFieldLabel(g.Field)
+                                                @T["Group: {0}", GetFieldLabel(g.Field)]
                                             </MudChip>
                                         }
                                     </div>
@@ -124,22 +125,22 @@
 
                                 <MudDivider Class="my-2" />
 
-                                <MudText Typo="Typo.subtitle2" Style="font-weight:600">Aggregates & Metrics</MudText>
+                                <MudText Typo="Typo.subtitle2" Style="font-weight:600">@T["Aggregates & Metrics"]</MudText>
                                 <div class="d-flex gap-2 align-center">
-                                    <MudSelect T="AggregateFunc" @bind-Value="_newAggFunc" Label="Function" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Style="width:120px">
-                                        <MudSelectItem Value="@AggregateFunc.Sum">Sum</MudSelectItem>
-                                        <MudSelectItem Value="@AggregateFunc.Count">Count</MudSelectItem>
-                                        <MudSelectItem Value="@AggregateFunc.Avg">Avg</MudSelectItem>
-                                        <MudSelectItem Value="@AggregateFunc.Min">Min</MudSelectItem>
-                                        <MudSelectItem Value="@AggregateFunc.Max">Max</MudSelectItem>
+                                    <MudSelect T="AggregateFunc" @bind-Value="_newAggFunc" Label="@T["Function"]" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Style="width:120px">
+                                        <MudSelectItem Value="@AggregateFunc.Sum">@T["Sum"]</MudSelectItem>
+                                        <MudSelectItem Value="@AggregateFunc.Count">@T["Count"]</MudSelectItem>
+                                        <MudSelectItem Value="@AggregateFunc.Avg">@T["Avg"]</MudSelectItem>
+                                        <MudSelectItem Value="@AggregateFunc.Min">@T["Min"]</MudSelectItem>
+                                        <MudSelectItem Value="@AggregateFunc.Max">@T["Max"]</MudSelectItem>
                                     </MudSelect>
-                                    <MudSelect T="string" @bind-Value="_newAggCol" Label="Field" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Style="flex:2">
+                                    <MudSelect T="string" @bind-Value="_newAggCol" Label="@T["Field"]" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Style="flex:2">
                                         @foreach (var f in CurrentSourceFields.Where(x => x.Aggregatable || _newAggFunc == AggregateFunc.Count))
                                         {
                                             <MudSelectItem T="string" Value="@f.Key">@f.Label</MudSelectItem>
                                         }
                                     </MudSelect>
-                                    <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="AddAggregate" Disabled="@string.IsNullOrWhiteSpace(_newAggCol)">Add</MudButton>
+                                    <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="AddAggregate" Disabled="@string.IsNullOrWhiteSpace(_newAggCol)">@T["Add"]</MudButton>
                                 </div>
 
                                 @if (_aggregates.Count > 0)
@@ -160,19 +161,19 @@
                     <!-- Tab 3: Filters & Date Period -->
                     <MudTabPanel Text="3. Filters" Icon="@Icons.Material.Outlined.FilterAlt">
                         <div class="ml-stack">
-                            <MudText Typo="Typo.subtitle2" Style="font-weight:600">Date Range Filter</MudText>
+                            <MudText Typo="Typo.subtitle2" Style="font-weight:600">@T["Date Range Filter"]</MudText>
                             <div class="d-flex gap-2">
-                                <MudSelect T="string" @bind-Value="_datePeriodPreset" Label="Time Horizon" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Style="flex:1">
-                                    <MudSelectItem T="string" Value="@("all_time")">All Time</MudSelectItem>
-                                    <MudSelectItem T="string" Value="@("today")">Today</MudSelectItem>
-                                    <MudSelectItem T="string" Value="@("this_week")">This Week</MudSelectItem>
-                                    <MudSelectItem T="string" Value="@("this_month")">This Month</MudSelectItem>
-                                    <MudSelectItem T="string" Value="@("last_month")">Last Month</MudSelectItem>
-                                    <MudSelectItem T="string" Value="@("this_quarter")">This Quarter</MudSelectItem>
-                                    <MudSelectItem T="string" Value="@("this_year")">This Year</MudSelectItem>
+                                <MudSelect T="string" @bind-Value="_datePeriodPreset" Label="@T["Time Horizon"]" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Style="flex:1">
+                                    <MudSelectItem T="string" Value="@("all_time")">@T["All Time"]</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("today")">@T["Today"]</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("this_week")">@T["This Week"]</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("this_month")">@T["This Month"]</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("last_month")">@T["Last Month"]</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("this_quarter")">@T["This Quarter"]</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("this_year")">@T["This Year"]</MudSelectItem>
                                 </MudSelect>
 
-                                <MudSelect T="string" @bind-Value="_dateField" Label="Date Column" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Style="flex:1">
+                                <MudSelect T="string" @bind-Value="_dateField" Label="@T["Date Column"]" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Style="flex:1">
                                     @foreach (var f in CurrentSourceFields.Where(x => x.Type == "Date"))
                                     {
                                         <MudSelectItem T="string" Value="@f.Key">@f.Label</MudSelectItem>
@@ -185,27 +186,27 @@
                     <!-- Tab 4: Visualization -->
                     <MudTabPanel Text="4. Chart" Icon="@Icons.Material.Outlined.BarChart">
                         <div class="ml-stack">
-                            <MudSelect T="ReportChartType" @bind-Value="_chartType" Label="Chart Type" Variant="Variant.Outlined" Margin="Margin.Dense">
-                                <MudSelectItem Value="@ReportChartType.Table">Table Only (No Chart)</MudSelectItem>
-                                <MudSelectItem Value="@ReportChartType.Bar">Horizontal Bar</MudSelectItem>
-                                <MudSelectItem Value="@ReportChartType.Column">Vertical Column</MudSelectItem>
-                                <MudSelectItem Value="@ReportChartType.Line">Line Chart</MudSelectItem>
-                                <MudSelectItem Value="@ReportChartType.Area">Area Chart</MudSelectItem>
-                                <MudSelectItem Value="@ReportChartType.Donut">Donut / Pie</MudSelectItem>
-                                <MudSelectItem Value="@ReportChartType.Funnel">Conversion Funnel</MudSelectItem>
+                            <MudSelect T="ReportChartType" @bind-Value="_chartType" Label="@T["Chart Type"]" Variant="Variant.Outlined" Margin="Margin.Dense">
+                                <MudSelectItem Value="@ReportChartType.Table">@T["Table Only (No Chart)"]</MudSelectItem>
+                                <MudSelectItem Value="@ReportChartType.Bar">@T["Horizontal Bar"]</MudSelectItem>
+                                <MudSelectItem Value="@ReportChartType.Column">@T["Vertical Column"]</MudSelectItem>
+                                <MudSelectItem Value="@ReportChartType.Line">@T["Line Chart"]</MudSelectItem>
+                                <MudSelectItem Value="@ReportChartType.Area">@T["Area Chart"]</MudSelectItem>
+                                <MudSelectItem Value="@ReportChartType.Donut">@T["Donut / Pie"]</MudSelectItem>
+                                <MudSelectItem Value="@ReportChartType.Funnel">@T["Conversion Funnel"]</MudSelectItem>
                             </MudSelect>
 
                             @if (_chartType != ReportChartType.Table && _chartType != ReportChartType.None)
                             {
                                 <div class="d-flex gap-2">
-                                    <MudSelect T="string" @bind-Value="_chartXAxis" Label="Category / X-Axis" Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex:1">
+                                    <MudSelect T="string" @bind-Value="_chartXAxis" Label="@T["Category / X-Axis"]" Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex:1">
                                         @foreach (var col in _selectedColumns)
                                         {
                                             <MudSelectItem T="string" Value="@col">@GetFieldLabel(col)</MudSelectItem>
                                         }
                                     </MudSelect>
 
-                                    <MudSelect T="string" @bind-Value="_chartValueCol" Label="Metric / Value Column" Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex:1">
+                                    <MudSelect T="string" @bind-Value="_chartValueCol" Label="@T["Metric / Value Column"]" Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex:1">
                                         @foreach (var col in _selectedColumns)
                                         {
                                             <MudSelectItem T="string" Value="@col">@GetFieldLabel(col)</MudSelectItem>
@@ -225,7 +226,7 @@
                     {
                         <div class="d-flex flex-column align-center justify-center pa-8">
                             <MudProgressCircular Color="Color.Primary" Indeterminate="true" Class="mb-3" />
-                            <MudText Typo="Typo.body2" Class="ml-muted">Executing query against tenant schema...</MudText>
+                            <MudText Typo="Typo.body2" Class="ml-muted">@T["Executing query against tenant schema..."]</MudText>
                         </div>
                     }
                     else if (_previewError != null)
@@ -265,7 +266,7 @@
                     }
                     else
                     {
-                        <EmptyState Title="No Preview Loaded" Subtitle="Click 'Run Preview' above to execute your current report configuration." />
+                        <EmptyState Title="No Preview Loaded" Subtitle="@T["Click 'Run Preview' above to execute your current report configuration."]" />
                     }
                 </MlCard>
             </MudItem>
@@ -465,7 +466,7 @@
             }
             else
             {
-                _previewError = "Preview failed: Unable to execute report query.";
+                _previewError = T["Preview failed: Unable to execute report query."];
             }
         }
         catch (Exception ex)
@@ -482,7 +483,7 @@
     {
         if (string.IsNullOrWhiteSpace(_name))
         {
-            Snackbar.Add("Report name is required.", Severity.Warning);
+            Snackbar.Add(T["Report name is required."], Severity.Warning);
             return;
         }
 
@@ -511,7 +512,7 @@
             if (resp.IsSuccessStatusCode)
             {
                 var saved = await resp.Content.ReadFromJsonAsync<ReportDefinitionDto>();
-                Snackbar.Add("Report saved successfully!", Severity.Success);
+                Snackbar.Add(T["Report saved successfully!"], Severity.Success);
                 if (saved != null)
                 {
                     Nav.NavigateTo($"/reports/view/{saved.Id}");
@@ -523,7 +524,7 @@
             }
             else
             {
-                Snackbar.Add("Failed to save report.", Severity.Error);
+                Snackbar.Add(T["Failed to save report."], Severity.Error);
             }
         }
         catch (Exception ex)

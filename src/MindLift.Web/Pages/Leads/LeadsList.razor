@@ -7,8 +7,9 @@
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
 @inject IJSRuntime JS
+@inject Translator T
 
-<PageTitle>@App.ModuleLabel(AppModule.Leads) · MindLift</PageTitle>
+<PageTitle>@T[App.ModuleLabel(AppModule.Leads)] · MindLift</PageTitle>
 
 <div class="ml-page ml-page--narrow">
     @if (App.Bootstrap is not null)
@@ -21,26 +22,26 @@
                         DefaultSortField="created_at" DefaultSortDir="desc">
             <HeaderActions>
                 <MudButtonGroup Variant="Variant.Outlined" Size="Size.Medium" data-testid="layout-toggle">
-                    <MudButton Href="/leads/board">Board</MudButton>
-                    <MudButton Color="Color.Primary" Href="/leads">List</MudButton>
+                    <MudButton Href="/leads/board">@T["Board"]</MudButton>
+                    <MudButton Color="Color.Primary" Href="/leads">@T["List"]</MudButton>
                 </MudButtonGroup>
                 @if (CanImport)
                 {
-                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Upload" Href="/leads/import" data-testid="import-leads">Import</MudButton>
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Upload" Href="/leads/import" data-testid="import-leads">@T["Import"]</MudButton>
                 }
                 @if (CanExport)
                 {
-                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Download" OnClick="ExportAsync" data-testid="export-leads">Export</MudButton>
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Download" OnClick="ExportAsync" data-testid="export-leads">@T["Export"]</MudButton>
                 }
                 @if (CanCreate)
                 {
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" OnClick="OpenNewLead" data-testid="primary-action">New lead</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" OnClick="OpenNewLead" data-testid="primary-action">@T["New lead"]</MudButton>
                 }
             </HeaderActions>
             <EmptyActions>
                 @if (CanCreate)
                 {
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenNewLead">New lead</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenNewLead">@T["New lead"]</MudButton>
                 }
             </EmptyActions>
         </EntityListPage>
@@ -80,13 +81,13 @@
         var response = await Http.PostAsJsonAsync("api/v1/leads/export", _list.CurrentQuery with { Page = 1, PageSize = 200 });
         if (!response.IsSuccessStatusCode)
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, "We could not export your leads."), Severity.Error);
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not export your leads."]), Severity.Error);
             return;
         }
 
         var bytes = await response.Content.ReadAsByteArrayAsync();
         await JS.InvokeVoidAsync("mindlift.downloadFile", "leads.csv", "text/csv", Convert.ToBase64String(bytes));
-        Snackbar.Add("Export ready", Severity.Success);
+        Snackbar.Add(T["Export ready"], Severity.Success);
     }
 
     private string ItemLabel => App.ModuleLabel(AppModule.Leads).ToLowerInvariant();
@@ -109,7 +110,7 @@
                 <div class="ml-cell-primary__text ml-grow">
                     <MudText Typo="Typo.subtitle1" Class="ml-truncate">@lead.FullName</MudText>
                     <MudText Typo="Typo.body2" Class="ml-muted ml-truncate">@Secondary(lead)</MudText>
-                    <MudText Typo="Typo.caption" Class="ml-muted">@(lead.Source is null ? "No source" : SourceLabel(lead.Source)) · <DateText Value="@lead.CreatedAtUtc" /></MudText>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@(lead.Source is null ? T["No source"] : SourceLabel(lead.Source)) · <DateText Value="@lead.CreatedAtUtc" /></MudText>
                 </div>
                 <StatusChip Text="@StatusLabel(lead.Status)" Color="@StatusColors.For(StatusCategory(lead.Status))" />
             </div>;
@@ -143,7 +144,7 @@
 
     private async Task OnSaved()
     {
-        Snackbar.Add("Lead saved", Severity.Success);
+        Snackbar.Add(T["Lead saved"], Severity.Success);
         if (_list is not null)
         {
             await _list.ReloadAsync();
@@ -155,7 +156,7 @@
         var response = await Http.PostAsJsonAsync("api/v1/leads/query", query);
         if (!response.IsSuccessStatusCode)
         {
-            throw new ListLoadException(await ProblemText.FromAsync(response, "We could not load your leads. Try again."));
+            throw new ListLoadException(await ProblemText.FromAsync(response, T["We could not load your leads. Try again."]));
         }
 
         return (await response.Content.ReadFromJsonAsync<PagedResult<LeadListItemDto>>())!;

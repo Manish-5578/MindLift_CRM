@@ -6,13 +6,14 @@
 @using System.Text.Json
 @inject HttpClient Http
 @inject ISnackbar Snackbar
+@inject Translator T
 
-<PageTitle>Automation rules · MindLift</PageTitle>
+<PageTitle>@T["Automation rules"] · MindLift</PageTitle>
 
 <div class="ml-page ml-page--form">
     <PageHeader Title="Automation rules" Subtitle="Trigger-Condition-Action workflows (Zoho Automation Engine). Run instant or scheduled actions when records are created, updated, or moved between stages.">
         <Actions>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => OpenRule(null)" data-testid="new-rule-action">New rule</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => OpenRule(null)" data-testid="new-rule-action">@T["New rule"]</MudButton>
         </Actions>
     </PageHeader>
     <SettingsNav Current="/settings/automation-rules" />
@@ -37,26 +38,26 @@
                                 <div class="d-flex align-center gap-2 mb-1">
                                     <MudText Typo="Typo.subtitle2">@rule.Name</MudText>
                                     <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary">@rule.EntityType.ToUpperInvariant()</MudChip>
-                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Info">@TriggerLabel(rule.TriggerType)</MudChip>
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Info">@T[TriggerLabel(rule.TriggerType)]</MudChip>
                                 </div>
                                 <MudText Typo="Typo.caption" Class="ml-muted">
-                                    Priority @rule.Priority · @rule.Actions.Count action(s): @ActionsSummary(rule.Actions)
+                                    @T["Priority {0} · {1} action(s): {2}", rule.Priority, rule.Actions.Count, ActionsSummary(rule.Actions)]
                                     @if (rule.Conditions?.Conditions.Count > 0)
                                     {
-                                        <span> · @rule.Conditions.Conditions.Count condition(s)</span>
+                                        <span> · @T["{0} condition(s)", rule.Conditions.Conditions.Count]</span>
                                     }
                                 </MudText>
                             </div>
                             <MudSwitch T="bool" Value="rule.IsActive" ValueChanged="() => ToggleRule(rule)" Color="Color.Success" Class="mr-2" />
-                            <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="() => OpenRule(rule)" aria-label="Edit rule" />
+                            <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="() => OpenRule(rule)" aria-label="@T["Edit rule"]" />
                             @if (_confirmId == rule.Id)
                             {
-                                <MudButton Size="Size.Small" OnClick="() => _confirmId = null">Keep</MudButton>
-                                <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeleteAsync(rule)">Delete</MudButton>
+                                <MudButton Size="Size.Small" OnClick="() => _confirmId = null">@T["Keep"]</MudButton>
+                                <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeleteAsync(rule)">@T["Delete"]</MudButton>
                             }
                             else
                             {
-                                <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" OnClick="() => _confirmId = rule.Id" aria-label="Delete rule" />
+                                <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" OnClick="() => _confirmId = rule.Id" aria-label="@T["Delete rule"]" />
                             }
                         </div>
                     }
@@ -81,7 +82,7 @@
                 else
                 {
                     <div style="padding:12px 20px;border-bottom:1px solid var(--ml-border);display:flex;justify-content:flex-end">
-                        <MudButton Size="Size.Small" StartIcon="@Icons.Material.Outlined.Refresh" OnClick="LoadLogsAsync">Refresh logs</MudButton>
+                        <MudButton Size="Size.Small" StartIcon="@Icons.Material.Outlined.Refresh" OnClick="LoadLogsAsync">@T["Refresh logs"]</MudButton>
                     </div>
                     @foreach (var log in _logs)
                     {
@@ -93,7 +94,7 @@
                                     <MudChip T="string" Size="Size.Small" Color="@(log.Status == "Success" ? Color.Success : Color.Error)">@log.Status</MudChip>
                                 </div>
                                 <MudText Typo="Typo.caption" Class="ml-muted">
-                                    Trigger: @log.TriggerType · Entity ID: @log.EntityId.ToString()[..8]… · @log.ExecutedAt.ToLocalTime().ToString("g")
+                                    @T["Trigger: {0} · Entity ID: {1}…", log.TriggerType, log.EntityId.ToString()[..8]] · @log.ExecutedAt.ToLocalTime().ToString("g")
                                 </MudText>
                                 @if (!string.IsNullOrWhiteSpace(log.ErrorMessage))
                                 {
@@ -115,50 +116,50 @@
             <MudAlert Severity="Severity.Error" Dense="true">@_formError</MudAlert>
         }
 
-        <MudTextField @bind-Value="_name" Label="Rule Name *" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudTextField @bind-Value="_name" Label="@T["Rule Name *"]" Variant="Variant.Outlined" Margin="Margin.Dense" />
 
-        <MudSelect T="string" @bind-Value="_entityType" Label="Applies to *" Variant="Variant.Outlined" Margin="Margin.Dense">
-            <MudSelectItem T="string" Value="@("leads")">Leads</MudSelectItem>
-            <MudSelectItem T="string" Value="@("contacts")">Contacts</MudSelectItem>
-            <MudSelectItem T="string" Value="@("accounts")">Accounts</MudSelectItem>
-            <MudSelectItem T="string" Value="@("deals")">Deals</MudSelectItem>
+        <MudSelect T="string" @bind-Value="_entityType" Label="@T["Applies to *"]" Variant="Variant.Outlined" Margin="Margin.Dense">
+            <MudSelectItem T="string" Value="@("leads")">@T["Leads"]</MudSelectItem>
+            <MudSelectItem T="string" Value="@("contacts")">@T["Contacts"]</MudSelectItem>
+            <MudSelectItem T="string" Value="@("accounts")">@T["Accounts"]</MudSelectItem>
+            <MudSelectItem T="string" Value="@("deals")">@T["Deals"]</MudSelectItem>
         </MudSelect>
 
-        <MudSelect T="AutomationTriggerType" @bind-Value="_triggerType" Label="When *" Variant="Variant.Outlined" Margin="Margin.Dense">
-            <MudSelectItem T="AutomationTriggerType" Value="AutomationTriggerType.RecordCreated">Record is Created</MudSelectItem>
-            <MudSelectItem T="AutomationTriggerType" Value="AutomationTriggerType.RecordUpdated">Record is Updated (Any field)</MudSelectItem>
-            <MudSelectItem T="AutomationTriggerType" Value="AutomationTriggerType.FieldChanged">Specific Field Changes</MudSelectItem>
+        <MudSelect T="AutomationTriggerType" @bind-Value="_triggerType" Label="@T["When *"]" Variant="Variant.Outlined" Margin="Margin.Dense">
+            <MudSelectItem T="AutomationTriggerType" Value="AutomationTriggerType.RecordCreated">@T["Record is Created"]</MudSelectItem>
+            <MudSelectItem T="AutomationTriggerType" Value="AutomationTriggerType.RecordUpdated">@T["Record is Updated (Any field)"]</MudSelectItem>
+            <MudSelectItem T="AutomationTriggerType" Value="AutomationTriggerType.FieldChanged">@T["Specific Field Changes"]</MudSelectItem>
             @if (_entityType == "deals")
             {
-                <MudSelectItem T="AutomationTriggerType" Value="AutomationTriggerType.StageChanged">Deal Stage Changes</MudSelectItem>
+                <MudSelectItem T="AutomationTriggerType" Value="AutomationTriggerType.StageChanged">@T["Deal Stage Changes"]</MudSelectItem>
             }
         </MudSelect>
 
         @if (_triggerType == AutomationTriggerType.FieldChanged)
         {
-            <MudTextField @bind-Value="_fieldKey" Label="Field Key (e.g. status, rating, cf_budget)" Variant="Variant.Outlined" Margin="Margin.Dense" />
-            <MudTextField @bind-Value="_toValue" Label="Target Value (optional - triggers on change to this value)" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudTextField @bind-Value="_fieldKey" Label="@T["Field Key (e.g. status, rating, cf_budget)"]" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudTextField @bind-Value="_toValue" Label="@T["Target Value (optional - triggers on change to this value)"]" Variant="Variant.Outlined" Margin="Margin.Dense" />
         }
 
-        <MudNumericField @bind-Value="_priority" Label="Priority" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" HelperText="Lower numbers run first." />
-        <MudSwitch T="bool" @bind-Value="_isActive" Label="Active" Color="Color.Primary" />
+        <MudNumericField @bind-Value="_priority" Label="@T["Priority"]" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" HelperText="@T["Lower numbers run first."]" />
+        <MudSwitch T="bool" @bind-Value="_isActive" Label="@T["Active"]" Color="Color.Primary" />
 
         <MudDivider Class="my-2" />
 
         <!-- CRITERIA / CONDITIONS (Zoho TCA Engine) -->
         <div class="d-flex align-center justify-space-between mb-1">
             <div>
-                <MudText Typo="Typo.subtitle2">Filter Criteria (Optional)</MudText>
-                <MudText Typo="Typo.caption" Class="ml-muted">Only run actions if record meets these conditions</MudText>
+                <MudText Typo="Typo.subtitle2">@T["Filter Criteria (Optional)"]</MudText>
+                <MudText Typo="Typo.caption" Class="ml-muted">@T["Only run actions if record meets these conditions"]</MudText>
             </div>
-            <MudButton Size="Size.Small" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add" OnClick="AddCondition">Add Condition</MudButton>
+            <MudButton Size="Size.Small" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add" OnClick="AddCondition">@T["Add Condition"]</MudButton>
         </div>
 
         @if (_conditions.Count > 1)
         {
-            <MudSelect T="string" @bind-Value="_conditionLogic" Label="Match Logic" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2">
-                <MudSelectItem T="string" Value="@("and")">Match ALL conditions (AND)</MudSelectItem>
-                <MudSelectItem T="string" Value="@("or")">Match ANY condition (OR)</MudSelectItem>
+            <MudSelect T="string" @bind-Value="_conditionLogic" Label="@T["Match Logic"]" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2">
+                <MudSelectItem T="string" Value="@("and")">@T["Match ALL conditions (AND)"]</MudSelectItem>
+                <MudSelectItem T="string" Value="@("or")">@T["Match ANY condition (OR)"]</MudSelectItem>
             </MudSelect>
         }
 
@@ -167,19 +168,19 @@
             var idx = i;
             var cond = _conditions[i];
             <div class="d-flex align-center gap-2 mb-2">
-                <MudTextField @bind-Value="cond.Field" Placeholder="Field key (e.g. rating, status)" Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex:2" />
+                <MudTextField @bind-Value="cond.Field" Placeholder="@T["Field key (e.g. rating, status)"]" Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex:2" />
                 <MudSelect T="FilterOp" @bind-Value="cond.Op" Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex:2">
-                    <MudSelectItem T="FilterOp" Value="FilterOp.Eq">Equals</MudSelectItem>
-                    <MudSelectItem T="FilterOp" Value="FilterOp.Neq">Not Equals</MudSelectItem>
-                    <MudSelectItem T="FilterOp" Value="FilterOp.Contains">Contains</MudSelectItem>
-                    <MudSelectItem T="FilterOp" Value="FilterOp.Gt">Greater Than</MudSelectItem>
-                    <MudSelectItem T="FilterOp" Value="FilterOp.Lt">Less Than</MudSelectItem>
-                    <MudSelectItem T="FilterOp" Value="FilterOp.IsEmpty">Is Empty</MudSelectItem>
-                    <MudSelectItem T="FilterOp" Value="FilterOp.IsNotEmpty">Is Not Empty</MudSelectItem>
+                    <MudSelectItem T="FilterOp" Value="FilterOp.Eq">@T["Equals"]</MudSelectItem>
+                    <MudSelectItem T="FilterOp" Value="FilterOp.Neq">@T["Not Equals"]</MudSelectItem>
+                    <MudSelectItem T="FilterOp" Value="FilterOp.Contains">@T["Contains"]</MudSelectItem>
+                    <MudSelectItem T="FilterOp" Value="FilterOp.Gt">@T["Greater Than"]</MudSelectItem>
+                    <MudSelectItem T="FilterOp" Value="FilterOp.Lt">@T["Less Than"]</MudSelectItem>
+                    <MudSelectItem T="FilterOp" Value="FilterOp.IsEmpty">@T["Is Empty"]</MudSelectItem>
+                    <MudSelectItem T="FilterOp" Value="FilterOp.IsNotEmpty">@T["Is Not Empty"]</MudSelectItem>
                 </MudSelect>
                 @if (cond.Op != FilterOp.IsEmpty && cond.Op != FilterOp.IsNotEmpty)
                 {
-                    <MudTextField @bind-Value="cond.Value" Placeholder="Value" Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex:2" />
+                    <MudTextField @bind-Value="cond.Value" Placeholder="@T["Value"]" Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex:2" />
                 }
                 <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Color="Color.Error" OnClick="() => _conditions.RemoveAt(idx)" />
             </div>
@@ -189,19 +190,19 @@
 
         <!-- ACTIONS -->
         <div class="d-flex align-center justify-space-between">
-            <MudText Typo="Typo.subtitle2">Actions to Execute</MudText>
-            <MudMenu Label="+ Add Action" Variant="Variant.Outlined" Size="Size.Small" EndIcon="@Icons.Material.Filled.ArrowDropDown">
-                <MudMenuItem OnClick="() => AddAction(AutomationActionType.CreateTask)">Create Task</MudMenuItem>
-                <MudMenuItem OnClick="() => AddAction(AutomationActionType.UpdateField)">Update Field</MudMenuItem>
-                <MudMenuItem OnClick="() => AddAction(AutomationActionType.SendNotification)">Send In-App Toast</MudMenuItem>
-                <MudMenuItem OnClick="() => AddAction(AutomationActionType.SendEmail)">Send Email</MudMenuItem>
-                <MudMenuItem OnClick="() => AddAction(AutomationActionType.Webhook)">Call Webhook</MudMenuItem>
+            <MudText Typo="Typo.subtitle2">@T["Actions to Execute"]</MudText>
+            <MudMenu Label="@T["+ Add Action"]" Variant="Variant.Outlined" Size="Size.Small" EndIcon="@Icons.Material.Filled.ArrowDropDown">
+                <MudMenuItem OnClick="() => AddAction(AutomationActionType.CreateTask)">@T["Create Task"]</MudMenuItem>
+                <MudMenuItem OnClick="() => AddAction(AutomationActionType.UpdateField)">@T["Update Field"]</MudMenuItem>
+                <MudMenuItem OnClick="() => AddAction(AutomationActionType.SendNotification)">@T["Send In-App Toast"]</MudMenuItem>
+                <MudMenuItem OnClick="() => AddAction(AutomationActionType.SendEmail)">@T["Send Email"]</MudMenuItem>
+                <MudMenuItem OnClick="() => AddAction(AutomationActionType.Webhook)">@T["Call Webhook"]</MudMenuItem>
             </MudMenu>
         </div>
 
         @if (_actions.Count == 0)
         {
-            <MudText Typo="Typo.caption" Color="Color.Warning">Add at least one action to run when this trigger fires.</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Warning">@T["Add at least one action to run when this trigger fires."]</MudText>
         }
 
         @for (var i = 0; i < _actions.Count; i++)
@@ -210,44 +211,44 @@
             var action = _actions[i];
             <MlCard Class="pa-3 mb-2" Style="border: 1px solid var(--ml-border)">
                 <div class="d-flex justify-space-between align-center mb-2">
-                    <MudText Typo="Typo.caption" Style="font-weight:600">Action @(idx + 1): @action.Type</MudText>
+                    <MudText Typo="Typo.caption" Style="font-weight:600">@T["Action {0}: {1}", idx + 1, action.Type]</MudText>
                     <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Color="Color.Error" OnClick="() => _actions.RemoveAt(idx)" />
                 </div>
 
                 @if (action.Type == AutomationActionType.CreateTask)
                 {
-                    <MudTextField @bind-Value="action.Subject" Label="Task Subject *" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                    <MudTextField @bind-Value="action.Subject" Label="@T["Task Subject *"]" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
                     <div class="d-flex gap-2">
-                        <MudNumericField @bind-Value="action.OffsetDays" Label="Due In Days" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" Class="flex-1" />
-                        <MudSelect T="string" @bind-Value="action.Priority" Label="Priority" Variant="Variant.Outlined" Margin="Margin.Dense" Class="flex-1">
-                            <MudSelectItem T="string" Value="@("Normal")">Normal</MudSelectItem>
-                            <MudSelectItem T="string" Value="@("High")">High</MudSelectItem>
-                            <MudSelectItem T="string" Value="@("Low")">Low</MudSelectItem>
+                        <MudNumericField @bind-Value="action.OffsetDays" Label="@T["Due In Days"]" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" Class="flex-1" />
+                        <MudSelect T="string" @bind-Value="action.Priority" Label="@T["Priority"]" Variant="Variant.Outlined" Margin="Margin.Dense" Class="flex-1">
+                            <MudSelectItem T="string" Value="@("Normal")">@T["Normal"]</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("High")">@T["High"]</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Low")">@T["Low"]</MudSelectItem>
                         </MudSelect>
                     </div>
                 }
                 else if (action.Type == AutomationActionType.UpdateField)
                 {
-                    <MudTextField @bind-Value="action.FieldKey" Label="Field Key (e.g. Rating, Status, cf_budget)" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
-                    <MudTextField @bind-Value="action.FieldValue" Label="New Value" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    <MudTextField @bind-Value="action.FieldKey" Label="@T["Field Key (e.g. Rating, Status, cf_budget)"]" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                    <MudTextField @bind-Value="action.FieldValue" Label="@T["New Value"]" Variant="Variant.Outlined" Margin="Margin.Dense" />
                 }
                 else if (action.Type == AutomationActionType.SendNotification)
                 {
-                    <MudTextField @bind-Value="action.NotificationMessage" Label="Notification Toast Message *" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    <MudTextField @bind-Value="action.NotificationMessage" Label="@T["Notification Toast Message *"]" Variant="Variant.Outlined" Margin="Margin.Dense" />
                 }
                 else if (action.Type == AutomationActionType.SendEmail)
                 {
-                    <MudTextField @bind-Value="action.EmailRecipient" Label="Recipient Email (optional - defaults to record email)" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
-                    <MudTextField @bind-Value="action.Subject" Label="Email Subject *" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
-                    <MudTextField @bind-Value="action.EmailBody" Label="Email Body *" Lines="3" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    <MudTextField @bind-Value="action.EmailRecipient" Label="@T["Recipient Email (optional - defaults to record email)"]" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                    <MudTextField @bind-Value="action.Subject" Label="@T["Email Subject *"]" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                    <MudTextField @bind-Value="action.EmailBody" Label="@T["Email Body *"]" Lines="3" Variant="Variant.Outlined" Margin="Margin.Dense" />
                 }
                 else if (action.Type == AutomationActionType.Webhook)
                 {
-                    <MudTextField @bind-Value="action.WebhookUrl" Label="Webhook URL (POST) *" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    <MudTextField @bind-Value="action.WebhookUrl" Label="@T["Webhook URL (POST) *"]" Variant="Variant.Outlined" Margin="Margin.Dense" />
                 }
 
                 <div class="mt-2">
-                    <MudNumericField @bind-Value="action.ScheduledDelayMinutes" Label="Execution Delay (Minutes, 0 = Instant)" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" HelperText="Leave 0 for instant execution; >0 schedules background job" />
+                    <MudNumericField @bind-Value="action.ScheduledDelayMinutes" Label="@T["Execution Delay (Minutes, 0 = Instant)"]" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" HelperText="Leave 0 for instant execution; >0 schedules background job" />
                 </div>
             </MlCard>
         }
@@ -400,13 +401,13 @@
         _formError = null;
         if (string.IsNullOrWhiteSpace(_name))
         {
-            _formError = "Name is required.";
+            _formError = T["Name is required."];
             return;
         }
 
         if (_actions.Count == 0)
         {
-            _formError = "Add at least one action.";
+            _formError = T["Add at least one action."];
             return;
         }
 
@@ -471,12 +472,12 @@
 
             if (!resp.IsSuccessStatusCode)
             {
-                _formError = "Failed to save rule. Verify all fields.";
+                _formError = T["Failed to save rule. Verify all fields."];
                 return;
             }
 
             _open = false;
-            Snackbar.Add("Automation rule saved", Severity.Success);
+            Snackbar.Add(T["Automation rule saved"], Severity.Success);
             await LoadAsync();
         }
         catch (Exception ex)
@@ -498,7 +499,7 @@
         }
         catch
         {
-            Snackbar.Add("Could not toggle rule", Severity.Error);
+            Snackbar.Add(T["Could not toggle rule"], Severity.Error);
         }
     }
 
@@ -508,12 +509,12 @@
         {
             await Http.DeleteAsync($"api/v1/automation/rules/{rule.Id}");
             _confirmId = null;
-            Snackbar.Add("Rule deleted", Severity.Info);
+            Snackbar.Add(T["Rule deleted"], Severity.Info);
             await LoadAsync();
         }
         catch
         {
-            Snackbar.Add("Could not delete rule", Severity.Error);
+            Snackbar.Add(T["Could not delete rule"], Severity.Error);
         }
     }
 
@@ -526,14 +527,14 @@
         _ => t.ToString()
     };
 
-    private static string ActionsSummary(IReadOnlyList<AutomationActionDefinition> actions)
+    private string ActionsSummary(IReadOnlyList<AutomationActionDefinition> actions)
         => string.Join(", ", actions.Select(a => a.Type switch
         {
-            AutomationActionType.CreateTask => $"Task: {a.Subject ?? "Follow up"}",
-            AutomationActionType.UpdateField => $"Set {a.FieldKey}={a.FieldValue}",
-            AutomationActionType.SendNotification => "Toast Notification",
-            AutomationActionType.SendEmail => $"Email: {a.Subject ?? "Notification"}",
-            AutomationActionType.Webhook => "Webhook",
+            AutomationActionType.CreateTask => T["Task: {0}", a.Subject ?? T["Follow up"]],
+            AutomationActionType.UpdateField => $"{T["Set"]} {a.FieldKey}={a.FieldValue}",
+            AutomationActionType.SendNotification => T["Toast Notification"],
+            AutomationActionType.SendEmail => T["Email: {0}", a.Subject ?? T["Notification"]],
+            AutomationActionType.Webhook => T["Webhook"],
             _ => a.Type.ToString()
         }));
 

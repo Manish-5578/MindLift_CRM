@@ -6,27 +6,28 @@
 @inject AppState App
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
+@inject Translator T
 
-<PageTitle>@App.ModuleLabel(AppModule.Calendar) · MindLift</PageTitle>
+<PageTitle>@T[App.ModuleLabel(AppModule.Calendar)] · MindLift</PageTitle>
 
 <div class="ml-page">
     <PageHeader Title="@App.ModuleLabel(AppModule.Calendar)" Subtitle="@RangeTitle">
         <Actions>
             <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small" data-testid="cal-views">
-                <MudButton Color='@(_view == "day" ? Color.Primary : Color.Default)' OnClick='() => SetViewAsync("day")' data-testid="cal-view-day">Day</MudButton>
-                <MudButton Color='@(_view == "week" ? Color.Primary : Color.Default)' OnClick='() => SetViewAsync("week")' data-testid="cal-view-week">Week</MudButton>
-                <MudButton Color='@(_view == "month" ? Color.Primary : Color.Default)' OnClick='() => SetViewAsync("month")' data-testid="cal-view-month">Month</MudButton>
+                <MudButton Color='@(_view == "day" ? Color.Primary : Color.Default)' OnClick='() => SetViewAsync("day")' data-testid="cal-view-day">@T["Day"]</MudButton>
+                <MudButton Color='@(_view == "week" ? Color.Primary : Color.Default)' OnClick='() => SetViewAsync("week")' data-testid="cal-view-week">@T["Week"]</MudButton>
+                <MudButton Color='@(_view == "month" ? Color.Primary : Color.Default)' OnClick='() => SetViewAsync("month")' data-testid="cal-view-month">@T["Month"]</MudButton>
             </MudButtonGroup>
-            <MudButton Variant="Variant.Outlined" OnClick="Today" data-testid="cal-today">Today</MudButton>
-            <MudIconButton Icon="@Icons.Material.Outlined.ChevronLeft" OnClick="() => Shift(-1)" aria-label="Previous" data-testid="cal-prev" />
-            <MudIconButton Icon="@Icons.Material.Outlined.ChevronRight" OnClick="() => Shift(1)" aria-label="Next" data-testid="cal-next" />
+            <MudButton Variant="Variant.Outlined" OnClick="Today" data-testid="cal-today">@T["Today"]</MudButton>
+            <MudIconButton Icon="@Icons.Material.Outlined.ChevronLeft" OnClick="() => Shift(-1)" aria-label="@T["Previous"]" data-testid="cal-prev" />
+            <MudIconButton Icon="@Icons.Material.Outlined.ChevronRight" OnClick="() => Shift(1)" aria-label="@T["Next"]" data-testid="cal-next" />
         </Actions>
     </PageHeader>
 
     <div class="ml-row ml-row--wrap" style="margin-bottom:16px">
-        <MudSelect T="string" Value="_who" ValueChanged="WhoChangedAsync" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width:220px" Label="Show" data-testid="cal-who">
-            <MudSelectItem T="string" Value="@("me")">My calendar</MudSelectItem>
-            <MudSelectItem T="string" Value="@("everyone")">Everyone</MudSelectItem>
+        <MudSelect T="string" Value="_who" ValueChanged="WhoChangedAsync" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width:220px" Label="@T["Show"]" data-testid="cal-who">
+            <MudSelectItem T="string" Value="@("me")">@T["My calendar"]</MudSelectItem>
+            <MudSelectItem T="string" Value="@("everyone")">@T["Everyone"]</MudSelectItem>
             @foreach (var user in _users)
             {
                 <MudSelectItem T="string" Value="@user.Id.ToString()">@user.FullName</MudSelectItem>
@@ -63,7 +64,7 @@
                     }
                     @if (dayEvents.Count > 3)
                     {
-                        <div class="ml-muted">+@(dayEvents.Count - 3) more</div>
+                        <div class="ml-muted">@T["+{0} more", dayEvents.Count - 3]</div>
                     }
                 </div>
             }
@@ -96,13 +97,13 @@
                     }
                     @if (!EventsOn(current).Any())
                     {
-                        <MudText Typo="Typo.caption" Class="ml-faint">Nothing</MudText>
+                        <MudText Typo="Typo.caption" Class="ml-faint">@T["Nothing"]</MudText>
                     }
                 </section>
             }
         </div>
     }
-    <MudText Typo="Typo.caption" Class="ml-muted" Style="margin-top:12px">Times are UTC. Drag a meeting or task to another day to move it; it keeps its time. Meetings are created from a record.</MudText>
+    <MudText Typo="Typo.caption" Class="ml-muted" Style="margin-top:12px">@T["Times are UTC. Drag a meeting or task to another day to move it; it keeps its time. Meetings are created from a record."]</MudText>
 </div>
 
 @code {
@@ -208,7 +209,7 @@
         }
         catch (HttpRequestException)
         {
-            _error = "We could not load the calendar. Try again.";
+            _error = T["We could not load the calendar. Try again."];
         }
         finally
         {
@@ -228,7 +229,7 @@
         {
             if (entry?.Kind == "booking")
             {
-                Snackbar.Add("A booking moves from its meeting; move the meeting instead.", Severity.Info);
+                Snackbar.Add(T["A booking moves from its meeting; move the meeting instead."], Severity.Info);
             }
 
             return;
@@ -238,7 +239,7 @@
         var response = await Http.PatchAsJsonAsync($"api/v1/activities/{entry.Id}/schedule", new { StartAt = newStart, EndAt = (DateTime?)null });
         if (!response.IsSuccessStatusCode)
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, "We could not move this item."), Severity.Error);
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not move this item."]), Severity.Error);
             return;
         }
 

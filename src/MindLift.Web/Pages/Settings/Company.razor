@@ -5,8 +5,9 @@
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
 @using MindLift.Shared.Validation
+@inject Translator T
 
-<PageTitle>Company settings · MindLift</PageTitle>
+<PageTitle>@T["Company settings"] · MindLift</PageTitle>
 
 <div class="ml-page ml-page--form">
     <PageHeader Title="Company" Subtitle="Your business details, time zone and tax settings." />
@@ -24,28 +25,28 @@
     {
         <MlCard Title="Business details">
             <div class="ml-stack">
-                <MudTextField @bind-Value="_draft.CompanyName" Label="Company name" Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" Error="@(_errors.ContainsKey("companyName"))" ErrorText="@(Err("companyName"))" />
+                <MudTextField @bind-Value="_draft.CompanyName" Label="@T["Company name"]" Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" Error="@(_errors.ContainsKey("companyName"))" ErrorText="@(Err("companyName"))" />
                 <MudGrid Spacing="3">
-                    <MudItem xs="12" sm="6"><MudTextField @bind-Value="_draft.Email" Label="Email" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
-                    <MudItem xs="12" sm="6"><MudTextField @bind-Value="_draft.Phone" Label="Phone" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+                    <MudItem xs="12" sm="6"><MudTextField @bind-Value="_draft.Email" Label="@T["Email"]" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+                    <MudItem xs="12" sm="6"><MudTextField @bind-Value="_draft.Phone" Label="@T["Phone"]" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
                 </MudGrid>
                 <MudGrid Spacing="3">
                     <MudItem xs="12" sm="6">
-                        <MudSelect T="string" @bind-Value="_draft.DefaultLanguage" Label="Default language" Variant="Variant.Outlined" Margin="Margin.Dense">
-                            <MudSelectItem T="string" Value="@("en")">English</MudSelectItem>
+                        <MudSelect T="string" @bind-Value="_draft.DefaultLanguage" Label="@T["Default language"]" Variant="Variant.Outlined" Margin="Margin.Dense">
+                            <MudSelectItem T="string" Value="@("en")">@T["English"]</MudSelectItem>
                             <MudSelectItem T="string" Value="@("ar")">العربية</MudSelectItem>
                         </MudSelect>
                     </MudItem>
-                    <MudItem xs="12" sm="6"><MudTextField @bind-Value="_draft.TimeZoneId" Label="Time zone (IANA)" Variant="Variant.Outlined" Margin="Margin.Dense" Error="@(_errors.ContainsKey("timeZoneId"))" ErrorText="@(Err("timeZoneId"))" /></MudItem>
+                    <MudItem xs="12" sm="6"><MudTextField @bind-Value="_draft.TimeZoneId" Label="@T["Time zone (IANA)"]" Variant="Variant.Outlined" Margin="Margin.Dense" Error="@(_errors.ContainsKey("timeZoneId"))" ErrorText="@(Err("timeZoneId"))" /></MudItem>
                 </MudGrid>
                 <MudGrid Spacing="3">
                     <MudItem xs="12" sm="6">
-                        <MudSelect T="int" @bind-Value="_draft.WeekStartDay" Label="Week starts on" Variant="Variant.Outlined" Margin="Margin.Dense">
-                            <MudSelectItem T="int" Value="1">Monday</MudSelectItem>
-                            <MudSelectItem T="int" Value="0">Sunday</MudSelectItem>
+                        <MudSelect T="int" @bind-Value="_draft.WeekStartDay" Label="@T["Week starts on"]" Variant="Variant.Outlined" Margin="Margin.Dense">
+                            <MudSelectItem T="int" Value="1">@T["Monday"]</MudSelectItem>
+                            <MudSelectItem T="int" Value="0">@T["Sunday"]</MudSelectItem>
                         </MudSelect>
                     </MudItem>
-                    <MudItem xs="12" sm="6"><MudNumericField @bind-Value="_draft.FiscalYearStartMonth" Label="Fiscal year starts (month 1–12)" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" Max="12" /></MudItem>
+                    <MudItem xs="12" sm="6"><MudNumericField @bind-Value="_draft.FiscalYearStartMonth" Label="@T["Fiscal year starts (month 1–12)"]" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" Max="12" /></MudItem>
                 </MudGrid>
             </div>
         </MlCard>
@@ -54,11 +55,11 @@
 
         <MlCard Title="Tax">
             <div class="ml-stack">
-                <MudSwitch @bind-Value="_draft.TaxEnabled" Label="We charge tax" Color="Color.Primary" />
+                <MudSwitch @bind-Value="_draft.TaxEnabled" Label="@T["We charge tax"]" Color="Color.Primary" />
                 <MudGrid Spacing="3">
-                    <MudItem xs="12" sm="4"><MudTextField @bind-Value="_draft.TaxLabel" Label="Tax label" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
-                    <MudItem xs="12" sm="4"><MudNumericField @bind-Value="_draft.DefaultTaxRate" Label="Rate (%)" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0m" Max="100m" Error="@(_errors.ContainsKey("defaultTaxRate"))" ErrorText="@(Err("defaultTaxRate"))" /></MudItem>
-                    <MudItem xs="12" sm="4"><MudTextField @bind-Value="_draft.TaxRegistrationNumber" Label="Tax registration number" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+                    <MudItem xs="12" sm="4"><MudTextField @bind-Value="_draft.TaxLabel" Label="@T["Tax label"]" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+                    <MudItem xs="12" sm="4"><MudNumericField @bind-Value="_draft.DefaultTaxRate" Label="@T["Rate (%)"]" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0m" Max="100m" Error="@(_errors.ContainsKey("defaultTaxRate"))" ErrorText="@(Err("defaultTaxRate"))" /></MudItem>
+                    <MudItem xs="12" sm="4"><MudTextField @bind-Value="_draft.TaxRegistrationNumber" Label="@T["Tax registration number"]" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
                 </MudGrid>
             </div>
         </MlCard>
@@ -67,15 +68,15 @@
 
         <MlCard Title="Brand colour" Subtitle="Replaces the main colour of buttons and links for everyone in your workspace." TestId="brand-colour">
             <div class="ml-row">
-                <MudTextField @bind-Value="_draft.PrimaryColor" Label="Colour (#RRGGBB)" Placeholder="#4F46E5" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:220px"
+                <MudTextField @bind-Value="_draft.PrimaryColor" Label="@T["Colour (#RRGGBB)"]" Placeholder="#4F46E5" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:220px"
                               Error="@(_errors.ContainsKey("primaryColor") || BrandProblem is not null)" ErrorText="@(Err("primaryColor") ?? BrandProblem)"
-                              HelperText="Leave empty for the MindLift colour." data-testid="brand-colour-input" />
-                <span style="@SwatchStyle" aria-label="Colour preview" data-testid="brand-colour-swatch"></span>
+                              HelperText="@T["Leave empty for the MindLift colour."]" data-testid="brand-colour-input" />
+                <span style="@SwatchStyle" aria-label="@T["Colour preview"]" data-testid="brand-colour-swatch"></span>
             </div>
         </MlCard>
 
         <div class="ml-row" style="justify-content:flex-end;margin-top:24px">
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_busy" OnClick="SaveAsync" data-testid="primary-action">Save changes</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_busy" OnClick="SaveAsync" data-testid="primary-action">@T["Save changes"]</MudButton>
         </div>
     }
 </div>
@@ -159,7 +160,7 @@
         // The button stays enabled so people can see why a save is refused (plan 18.8.4). The message is already under the field.
         if (BrandProblem is not null)
         {
-            Snackbar.Add("Please fix the highlighted fields.", Severity.Error);
+            Snackbar.Add(T["Please fix the highlighted fields."], Severity.Error);
             return;
         }
 
@@ -175,17 +176,17 @@
             var response = await Http.PutAsJsonAsync("api/v1/settings/company", request);
             if (response.IsSuccessStatusCode)
             {
-                Snackbar.Add("Saved", Severity.Success);
+                Snackbar.Add(T["Saved"], Severity.Success);
                 await App.LoadAsync();
                 return;
             }
 
             _errors = await ProblemText.FieldErrorsAsync(response);
-            Snackbar.Add(_errors.Count > 0 ? "Please fix the highlighted fields." : await ProblemText.FromAsync(response, "Could not save. Try again."), Severity.Error);
+            Snackbar.Add(_errors.Count > 0 ? "Please fix the highlighted fields." : await ProblemText.FromAsync(response, T["Could not save. Try again."]), Severity.Error);
         }
         catch (HttpRequestException)
         {
-            Snackbar.Add("We could not reach MindLift. Check your connection and try again.", Severity.Error);
+            Snackbar.Add(T["We could not reach MindLift. Check your connection and try again."], Severity.Error);
         }
         finally
         {

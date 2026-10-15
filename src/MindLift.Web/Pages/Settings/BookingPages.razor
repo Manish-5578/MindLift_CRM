@@ -2,13 +2,14 @@
 @inject HttpClient Http
 @inject AppState App
 @inject ISnackbar Snackbar
+@inject Translator T
 
-<PageTitle>Booking pages · MindLift</PageTitle>
+<PageTitle>@T["Booking pages"] · MindLift</PageTitle>
 
 <div class="ml-page ml-page--form">
     <PageHeader Title="Booking pages" Subtitle="Public pages where customers book a time with you or your team, without signing in.">
         <Actions>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => OpenForm(null)" data-testid="primary-action">New booking page</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => OpenForm(null)" data-testid="primary-action">@T["New booking page"]</MudButton>
         </Actions>
     </PageHeader>
     <SettingsNav Current="/settings/booking-pages" />
@@ -28,10 +29,10 @@
             var current = page;
             <MlCard Title="@current.Name" Subtitle="@($"{current.DurationMinutes} minutes · {(current.AssignmentMode == "RoundRobin" ? "Team, round robin" : "One person")} · {(current.IsActive ? "On" : "Off")}")" Class="mb-4" TestId="@("booking-page-" + current.Slug)">
                 <div class="ml-stack-sm">
-                    <MudText Typo="Typo.body2" data-testid="booking-link">Link: @current.PublicPath</MudText>
+                    <MudText Typo="Typo.body2" data-testid="booking-link">@T["Link: {0}", current.PublicPath]</MudText>
                     <div class="ml-row" style="justify-content:flex-end">
-                        <MudButton Size="Size.Small" OnClick="() => OpenForm(current)" data-testid="edit-booking-page">Edit</MudButton>
-                        <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeleteAsync(current)" data-testid="delete-booking-page">Delete</MudButton>
+                        <MudButton Size="Size.Small" OnClick="() => OpenForm(current)" data-testid="edit-booking-page">@T["Edit"]</MudButton>
+                        <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeleteAsync(current)" data-testid="delete-booking-page">@T["Delete"]</MudButton>
                     </div>
                 </div>
             </MlCard>
@@ -46,22 +47,22 @@
     }
 
     <div class="ml-stack">
-        <MudTextField @bind-Value="_name" Label="Name *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="bp-name" />
-        <MudTextField @bind-Value="_slug" Label="Address (letters, numbers, hyphens) *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="bp-slug" />
-        <MudTextField @bind-Value="_description" Label="Description" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />
+        <MudTextField @bind-Value="_name" Label="@T["Name *"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="bp-name" />
+        <MudTextField @bind-Value="_slug" Label="@T["Address (letters, numbers, hyphens) *"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="bp-slug" />
+        <MudTextField @bind-Value="_description" Label="@T["Description"]" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />
         <MudGrid Spacing="3">
-            <MudItem xs="6"><MudNumericField T="int" @bind-Value="_duration" Label="Minutes" Min="5" Max="480" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="bp-duration" /></MudItem>
-            <MudItem xs="6"><MudNumericField T="int" @bind-Value="_step" Label="Start times every (min)" Min="5" Max="240" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
-            <MudItem xs="6"><MudNumericField T="int" @bind-Value="_notice" Label="Notice (hours)" Min="0" Max="720" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
-            <MudItem xs="6"><MudNumericField T="int" @bind-Value="_ahead" Label="Days ahead" Min="1" Max="365" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+            <MudItem xs="6"><MudNumericField T="int" @bind-Value="_duration" Label="@T["Minutes"]" Min="5" Max="480" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="bp-duration" /></MudItem>
+            <MudItem xs="6"><MudNumericField T="int" @bind-Value="_step" Label="@T["Start times every (min)"]" Min="5" Max="240" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+            <MudItem xs="6"><MudNumericField T="int" @bind-Value="_notice" Label="@T["Notice (hours)"]" Min="0" Max="720" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+            <MudItem xs="6"><MudNumericField T="int" @bind-Value="_ahead" Label="@T["Days ahead"]" Min="1" Max="365" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
         </MudGrid>
 
-        <MudSelect T="string" @bind-Value="_mode" Label="Who takes the bookings" Variant="Variant.Outlined" Margin="Margin.Dense">
-            <MudSelectItem T="string" Value="@("SingleUser")">Only me</MudSelectItem>
-            <MudSelectItem T="string" Value="@("RoundRobin")">Everyone who is active (round robin)</MudSelectItem>
+        <MudSelect T="string" @bind-Value="_mode" Label="@T["Who takes the bookings"]" Variant="Variant.Outlined" Margin="Margin.Dense">
+            <MudSelectItem T="string" Value="@("SingleUser")">@T["Only me"]</MudSelectItem>
+            <MudSelectItem T="string" Value="@("RoundRobin")">@T["Everyone who is active (round robin)"]</MudSelectItem>
         </MudSelect>
 
-        <MudText Typo="Typo.subtitle2">Open hours</MudText>
+        <MudText Typo="Typo.subtitle2">@T["Open hours"]</MudText>
         <div class="ml-row ml-row--wrap" data-testid="bp-days">
             @foreach (var day in Days)
             {
@@ -71,20 +72,20 @@
             }
         </div>
         <MudGrid Spacing="3">
-            <MudItem xs="6"><MudTextField @bind-Value="_from" Label="From (09:00)" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="bp-from" /></MudItem>
-            <MudItem xs="6"><MudTextField @bind-Value="_to" Label="To (17:00)" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="bp-to" /></MudItem>
+            <MudItem xs="6"><MudTextField @bind-Value="_from" Label="@T["From (09:00)"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="bp-from" /></MudItem>
+            <MudItem xs="6"><MudTextField @bind-Value="_to" Label="@T["To (17:00)"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="bp-to" /></MudItem>
         </MudGrid>
-        <MudTextField @bind-Value="_timeZone" Label="Time zone (for example Asia/Dubai)" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="bp-timezone" />
+        <MudTextField @bind-Value="_timeZone" Label="@T["Time zone (for example Asia/Dubai)"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="bp-timezone" />
 
-        <MudSelect T="string" @bind-Value="_location" Label="Meeting type" Variant="Variant.Outlined" Margin="Margin.Dense">
-            <MudSelectItem T="string" Value="@("Video")">Video</MudSelectItem>
-            <MudSelectItem T="string" Value="@("Phone")">Phone</MudSelectItem>
-            <MudSelectItem T="string" Value="@("InPerson")">In person</MudSelectItem>
+        <MudSelect T="string" @bind-Value="_location" Label="@T["Meeting type"]" Variant="Variant.Outlined" Margin="Margin.Dense">
+            <MudSelectItem T="string" Value="@("Video")">@T["Video"]</MudSelectItem>
+            <MudSelectItem T="string" Value="@("Phone")">@T["Phone"]</MudSelectItem>
+            <MudSelectItem T="string" Value="@("InPerson")">@T["In person"]</MudSelectItem>
         </MudSelect>
-        <MudTextField @bind-Value="_locationValue" Label="Link or address" Variant="Variant.Outlined" Margin="Margin.Dense" />
-        <MudTextField @bind-Value="_reminders" Label="Reminders before, in minutes (for example 1440, 60)" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="bp-reminders" />
-        <MudTextField @bind-Value="_company" Label="Ask for company (required)" Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="Leave empty to ask no extra question." />
-        <MudCheckBox @bind-Value="_active" Label="Page is on" Color="Color.Primary" />
+        <MudTextField @bind-Value="_locationValue" Label="@T["Link or address"]" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudTextField @bind-Value="_reminders" Label="@T["Reminders before, in minutes (for example 1440, 60)"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="bp-reminders" />
+        <MudTextField @bind-Value="_company" Label="@T["Ask for company (required)"]" Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="@T["Leave empty to ask no extra question."]" />
+        <MudCheckBox @bind-Value="_active" Label="@T["Page is on"]" Color="Color.Primary" />
     </div>
 </FormDrawer>
 
@@ -191,17 +192,17 @@
             if (!response.IsSuccessStatusCode)
             {
                 var fields = await ProblemText.FieldErrorsAsync(response);
-                _error = fields.Count > 0 ? string.Join(" ", fields.Values) : await ProblemText.FromAsync(response, "We could not save this booking page.");
+                _error = fields.Count > 0 ? string.Join(" ", fields.Values) : await ProblemText.FromAsync(response, T["We could not save this booking page."]);
                 return;
             }
 
             _drawer = false;
-            Snackbar.Add("Booking page saved", Severity.Success);
+            Snackbar.Add(T["Booking page saved"], Severity.Success);
             await LoadAsync();
         }
         catch (HttpRequestException)
         {
-            _error = "We could not reach MindLift. Check your connection and try again.";
+            _error = T["We could not reach MindLift. Check your connection and try again."];
         }
         finally
         {
@@ -230,11 +231,11 @@
         var response = await Http.DeleteAsync($"api/v1/settings/booking-pages/{page.Id}");
         if (!response.IsSuccessStatusCode)
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, "We could not delete this booking page."), Severity.Error);
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not delete this booking page."]), Severity.Error);
             return;
         }
 
-        Snackbar.Add("Booking page deleted", Severity.Success);
+        Snackbar.Add(T["Booking page deleted"], Severity.Success);
         await LoadAsync();
     }
 }

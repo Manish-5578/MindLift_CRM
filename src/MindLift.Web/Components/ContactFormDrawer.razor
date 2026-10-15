@@ -1,3 +1,4 @@
+@inject Translator T
 <FormDrawer Open="Open" OpenChanged="OnOpenChanged" Title="@(_contactId is null ? "New contact" : "Edit contact")" SubmitText="@(_contactId is null ? "Create contact" : "Save changes")" Busy="_busy" OnSubmit="SaveAsync" IsDirty="IsDirty">
     @if (_error is not null)
     {
@@ -7,12 +8,12 @@
     @if (_duplicates.Count > 0)
     {
         <MudAlert Severity="Severity.Warning" Class="mb-3" data-testid="duplicate-warning">
-            <MudText Typo="Typo.subtitle2">Possible duplicates</MudText>
+            <MudText Typo="Typo.subtitle2">@T["Possible duplicates"]</MudText>
             @foreach (var d in _duplicates)
             {
                 <MudText Typo="Typo.body2">@d.FullName · @d.Reason</MudText>
             }
-            <MudText Typo="Typo.body2" Class="mt-2">Press the button again to create the contact anyway.</MudText>
+            <MudText Typo="Typo.body2" Class="mt-2">@T["Press the button again to create the contact anyway."]</MudText>
         </MudAlert>
     }
 
@@ -154,7 +155,7 @@
                 }
                 else
                 {
-                    _error = await ProblemText.FromAsync(response, "We could not save this contact.");
+                    _error = await ProblemText.FromAsync(response, T["We could not save this contact."]);
                 }
 
                 return;
@@ -165,7 +166,7 @@
         }
         catch (HttpRequestException)
         {
-            _error = "We could not reach MindLift. Check your connection and try again.";
+            _error = T["We could not reach MindLift. Check your connection and try again."];
         }
         finally
         {

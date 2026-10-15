@@ -5,8 +5,9 @@
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
 @inject IDialogService Dialogs
+@inject Translator T
 
-<PageTitle>Account · MindLift</PageTitle>
+<PageTitle>@T["Account"] · MindLift</PageTitle>
 
 <div class="ml-page ml-page--narrow">
     @if (_loading)
@@ -25,28 +26,28 @@
             <Badges>
                 @if (account.ParentAccountId is { } parentId)
                 {
-                    <a href="@("/accounts/" + parentId)" class="ml-link" data-testid="parent-link">Part of @account.ParentName</a>
+                    <a href="@("/accounts/" + parentId)" class="ml-link" data-testid="parent-link">@T["Part of {0}", account.ParentName]</a>
                 }
-                <MudText Typo="Typo.body2" Class="ml-muted">Created <DateText Value="@account.CreatedAtUtc" /></MudText>
+                <MudText Typo="Typo.body2" Class="ml-muted">@T["Created"] <DateText Value="@account.CreatedAtUtc" /></MudText>
             </Badges>
             <Actions>
                 @if (Can(p => p.CanDelete))
                 {
-                    <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="DeleteAsync" data-testid="delete-account">Delete</MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="DeleteAsync" data-testid="delete-account">@T["Delete"]</MudButton>
                 }
                 @if (Can(p => p.CanEdit))
                 {
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenEdit" data-testid="primary-action">Edit</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenEdit" data-testid="primary-action">@T["Edit"]</MudButton>
                 }
             </Actions>
             <ChildContent>
                 <MlCard Title="Details">
                     <div class="ml-kv" data-testid="account-details">
-                        <div class="ml-kv__label">Website</div><div class="ml-kv__value"><FieldValue Kind="FormFieldKind.Url" Value="@account.Website" /></div>
-                        <div class="ml-kv__label">Phone</div><div class="ml-kv__value"><FieldValue Kind="FormFieldKind.Phone" Value="@account.Phone" /></div>
-                        <div class="ml-kv__label">Industry</div><div class="ml-kv__value"><FieldValue Value="@account.Industry" /></div>
-                        <div class="ml-kv__label">Owner</div><div class="ml-kv__value"><FieldValue Kind="FormFieldKind.User" Value="@account.OwnerId.ToString()" Users="_users" /></div>
-                        <div class="ml-kv__label">Notes</div><div class="ml-kv__value"><FieldValue Kind="FormFieldKind.Multiline" Value="@account.Description" /></div>
+                        <div class="ml-kv__label">@T["Website"]</div><div class="ml-kv__value"><FieldValue Kind="FormFieldKind.Url" Value="@account.Website" /></div>
+                        <div class="ml-kv__label">@T["Phone"]</div><div class="ml-kv__value"><FieldValue Kind="FormFieldKind.Phone" Value="@account.Phone" /></div>
+                        <div class="ml-kv__label">@T["Industry"]</div><div class="ml-kv__value"><FieldValue Value="@account.Industry" /></div>
+                        <div class="ml-kv__label">@T["Owner"]</div><div class="ml-kv__value"><FieldValue Kind="FormFieldKind.User" Value="@account.OwnerId.ToString()" Users="_users" /></div>
+                        <div class="ml-kv__label">@T["Notes"]</div><div class="ml-kv__value"><FieldValue Kind="FormFieldKind.Multiline" Value="@account.Description" /></div>
                         @foreach (var field in CustomFields)
                         {
                             <div class="ml-kv__label">@field.Label</div>
@@ -59,7 +60,7 @@
                     <div class="ml-stack-sm">
                         @if (_summary.Contacts.Count == 0)
                         {
-                            <MudText Typo="Typo.body2" Class="ml-muted" data-testid="no-contacts">No contacts at this company yet.</MudText>
+                            <MudText Typo="Typo.body2" Class="ml-muted" data-testid="no-contacts">@T["No contacts at this company yet."]</MudText>
                         }
                         @foreach (var contact in _summary.Contacts)
                         {
@@ -73,7 +74,7 @@
                         }
                         @if (Can(p => p.CanCreate, "Contacts"))
                         {
-                            <div><MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Outlined.Add" OnClick="AddContact" data-testid="add-contact">Add contact</MudButton></div>
+                            <div><MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Outlined.Add" OnClick="AddContact" data-testid="add-contact">@T["Add contact"]</MudButton></div>
                         }
                     </div>
                 </MlCard>
@@ -81,7 +82,7 @@
                 <MlCard Title="@($"Deals ({_summary.Deals.Count})")">
                     @if (_summary.Deals.Count == 0)
                     {
-                        <MudText Typo="Typo.body2" Class="ml-muted">No deals yet.</MudText>
+                        <MudText Typo="Typo.body2" Class="ml-muted">@T["No deals yet."]</MudText>
                     }
                     @foreach (var deal in _summary.Deals)
                     {
@@ -96,15 +97,15 @@
             <Aside>
                 <MlCard Title="At a glance">
                     <div class="ml-kv" data-testid="account-totals">
-                        <div class="ml-kv__label">Open deals</div><div class="ml-kv__value">@_summary.OpenDealsAmount.ToString("N0")</div>
-                        <div class="ml-kv__label">Won deals</div><div class="ml-kv__value">@_summary.WonDealsAmount.ToString("N0")</div>
-                        <div class="ml-kv__label">Activities</div><div class="ml-kv__value">@_summary.ActivityCount</div>
+                        <div class="ml-kv__label">@T["Open deals"]</div><div class="ml-kv__value">@_summary.OpenDealsAmount.ToString("N0")</div>
+                        <div class="ml-kv__label">@T["Won deals"]</div><div class="ml-kv__value">@_summary.WonDealsAmount.ToString("N0")</div>
+                        <div class="ml-kv__label">@T["Activities"]</div><div class="ml-kv__value">@_summary.ActivityCount</div>
                     </div>
                 </MlCard>
                 <MlCard Title="@($"Child accounts ({_summary.Children.Count})")">
                     @if (_summary.Children.Count == 0)
                     {
-                        <MudText Typo="Typo.body2" Class="ml-muted">No child accounts.</MudText>
+                        <MudText Typo="Typo.body2" Class="ml-muted">@T["No child accounts."]</MudText>
                     }
                     @foreach (var child in _summary.Children)
                     {
@@ -169,13 +170,13 @@
             _summary = response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<AccountSummaryDto>() : null;
             if (!response.IsSuccessStatusCode)
             {
-                _error = await ProblemText.FromAsync(response, "We could not open this account.");
+                _error = await ProblemText.FromAsync(response, T["We could not open this account."]);
             }
         }
         catch (HttpRequestException)
         {
             _summary = null;
-            _error = "We could not reach MindLift. Check your connection and try again.";
+            _error = T["We could not reach MindLift. Check your connection and try again."];
         }
         finally
         {
@@ -197,19 +198,19 @@
 
     private async Task OnSaved()
     {
-        Snackbar.Add("Account saved", Severity.Success);
+        Snackbar.Add(T["Account saved"], Severity.Success);
         await LoadAsync();
     }
 
     private async Task OnContactSaved()
     {
-        Snackbar.Add("Contact saved", Severity.Success);
+        Snackbar.Add(T["Contact saved"], Severity.Success);
         await LoadAsync();
     }
 
     private async Task DeleteAsync()
     {
-        if (!await Dialogs.ConfirmAsync($"Delete {_summary!.Account.Name}?", "Its contacts stay, but they will no longer belong to a company.", "Delete", danger: true))
+        if (!await Dialogs.ConfirmAsync($"Delete {_summary!.Account.Name}?", T["Its contacts stay, but they will no longer belong to a company."], T["Delete"], danger: true))
         {
             return;
         }
@@ -217,11 +218,11 @@
         var response = await Http.DeleteAsync($"api/v1/accounts/{Id}");
         if (!response.IsSuccessStatusCode)
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, "We could not delete this account."), Severity.Error);
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not delete this account."]), Severity.Error);
             return;
         }
 
-        Snackbar.Add("Account deleted", Severity.Success);
+        Snackbar.Add(T["Account deleted"], Severity.Success);
         Nav.NavigateTo("/accounts");
     }
 }

@@ -4,13 +4,14 @@
 @inject AppState App
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
+@inject Translator T
 
-<PageTitle>Roles · MindLift</PageTitle>
+<PageTitle>@T["Roles"] · MindLift</PageTitle>
 
 <div class="ml-page">
     <PageHeader Title="Roles & permissions" Subtitle="What each role can see and do in every module, and which records it reaches.">
         <Actions>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => _create = true" data-testid="primary-action">New role</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => _create = true" data-testid="primary-action">@T["New role"]</MudButton>
         </Actions>
     </PageHeader>
     <SettingsNav Current="/settings/roles" />
@@ -54,16 +55,16 @@
                             {
                                 @if (_confirmDelete)
                                 {
-                                    <MudText Typo="Typo.body2">Delete this role? Its users need another role first.</MudText>
-                                    <MudButton Size="Size.Small" OnClick="() => _confirmDelete = false">Keep</MudButton>
-                                    <MudButton Size="Size.Small" Color="Color.Error" OnClick="DeleteRoleAsync">Delete role</MudButton>
+                                    <MudText Typo="Typo.body2">@T["Delete this role? Its users need another role first."]</MudText>
+                                    <MudButton Size="Size.Small" OnClick="() => _confirmDelete = false">@T["Keep"]</MudButton>
+                                    <MudButton Size="Size.Small" Color="Color.Error" OnClick="DeleteRoleAsync">@T["Delete role"]</MudButton>
                                 }
                                 else
                                 {
-                                    <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => _confirmDelete = true">Delete role</MudButton>
+                                    <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => _confirmDelete = true">@T["Delete role"]</MudButton>
                                 }
                             }
-                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="!_dirty || _busy" OnClick="SaveMatrixAsync" data-testid="save-matrix">Save permissions</MudButton>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="!_dirty || _busy" OnClick="SaveMatrixAsync" data-testid="save-matrix">@T["Save permissions"]</MudButton>
                         </div>
                     }
 
@@ -71,14 +72,14 @@
                         <table class="ml-table" style="width:100%;border-collapse:collapse;min-width:720px">
                             <thead>
                                 <tr style="background:var(--ml-surface-2);color:var(--ml-text-2);font-size:12px;font-weight:600;text-align:start">
-                                    <th style="padding:10px 12px">Module</th>
-                                    <th style="text-align:center">View</th>
-                                    <th style="text-align:center">Create</th>
-                                    <th style="text-align:center">Edit</th>
-                                    <th style="text-align:center">Delete</th>
-                                    <th style="text-align:center">Export</th>
-                                    <th style="text-align:center">Import</th>
-                                    <th style="padding-inline-start:12px">Records</th>
+                                    <th style="padding:10px 12px">@T["Module"]</th>
+                                    <th style="text-align:center">@T["View"]</th>
+                                    <th style="text-align:center">@T["Create"]</th>
+                                    <th style="text-align:center">@T["Edit"]</th>
+                                    <th style="text-align:center">@T["Delete"]</th>
+                                    <th style="text-align:center">@T["Export"]</th>
+                                    <th style="text-align:center">@T["Import"]</th>
+                                    <th style="padding-inline-start:12px">@T["Records"]</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -94,9 +95,9 @@
                                         <td style="text-align:center"><MudCheckBox T="bool" Value="row.CanImport" ValueChanged="v => SetFlag(row, PermFlag.Import, v)" Disabled="_selected.IsAdmin" Size="Size.Small" aria-label="@($"{row.Module} import")" /></td>
                                         <td style="padding-inline-start:12px">
                                             <MudSelect T="DataScope" Value="row.Scope" ValueChanged="v => SetScope(row, v)" Disabled="_selected.IsAdmin" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:150px" aria-label="@($"{row.Module} records")">
-                                                <MudSelectItem T="DataScope" Value="DataScope.Own">Own records</MudSelectItem>
-                                                <MudSelectItem T="DataScope" Value="DataScope.Team">Team's records</MudSelectItem>
-                                                <MudSelectItem T="DataScope" Value="DataScope.All">All records</MudSelectItem>
+                                                <MudSelectItem T="DataScope" Value="DataScope.Own">@T["Own records"]</MudSelectItem>
+                                                <MudSelectItem T="DataScope" Value="DataScope.Team">@T["Team's records"]</MudSelectItem>
+                                                <MudSelectItem T="DataScope" Value="DataScope.All">@T["All records"]</MudSelectItem>
                                             </MudSelect>
                                         </td>
                                     </tr>
@@ -112,12 +113,12 @@
 
 <FormDrawer Open="_create" OpenChanged="v => _create = v" Title="New role" SubmitText="Create role" Busy="_busy" OnSubmit="CreateAsync">
     <div class="ml-stack">
-        <MudTextField @bind-Value="_newName" Label="Name *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="role-name" />
-        <MudTextField @bind-Value="_newDescription" Label="Description" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />
-        <MudSelect T="DashboardView" @bind-Value="_newView" Label="Home dashboard" Variant="Variant.Outlined" Margin="Margin.Dense">
-            <MudSelectItem T="DashboardView" Value="DashboardView.Staff">Personal</MudSelectItem>
-            <MudSelectItem T="DashboardView" Value="DashboardView.Manager">Team</MudSelectItem>
-            <MudSelectItem T="DashboardView" Value="DashboardView.Admin">Company</MudSelectItem>
+        <MudTextField @bind-Value="_newName" Label="@T["Name *"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="role-name" />
+        <MudTextField @bind-Value="_newDescription" Label="@T["Description"]" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />
+        <MudSelect T="DashboardView" @bind-Value="_newView" Label="@T["Home dashboard"]" Variant="Variant.Outlined" Margin="Margin.Dense">
+            <MudSelectItem T="DashboardView" Value="DashboardView.Staff">@T["Personal"]</MudSelectItem>
+            <MudSelectItem T="DashboardView" Value="DashboardView.Manager">@T["Team"]</MudSelectItem>
+            <MudSelectItem T="DashboardView" Value="DashboardView.Admin">@T["Company"]</MudSelectItem>
         </MudSelect>
         @if (_formError is not null) { <MudAlert Severity="Severity.Error" Dense="true">@_formError</MudAlert> }
     </div>
@@ -216,7 +217,7 @@
 
     private string MatrixSubtitle => _selected?.IsAdmin == true
         ? "Admins always have full access. This matrix is read-only."
-        : "Tick what this role can do. Scope limits which records it reaches.";
+        : T["Tick what this role can do. Scope limits which records it reaches."];
 
     private string RowStyle(RoleDto role) => "padding:12px 16px;border-bottom:1px solid var(--ml-border);cursor:pointer;min-height:56px;"
         + (_selected?.Id == role.Id ? "background:var(--ml-surface-2)" : string.Empty);
@@ -241,12 +242,12 @@
                 new SaveRolePermissionsRequest(_rows.Select(r => r.ToDto()).ToList()));
             if (!response.IsSuccessStatusCode)
             {
-                Snackbar.Add(await ProblemText.FromAsync(response, "We could not save these permissions."), Severity.Error);
+                Snackbar.Add(await ProblemText.FromAsync(response, T["We could not save these permissions."]), Severity.Error);
                 return;
             }
 
             _dirty = false;
-            Snackbar.Add("Permissions saved. They apply on the user's next page load.", Severity.Success);
+            Snackbar.Add(T["Permissions saved. They apply on the user's next page load."], Severity.Success);
         }
         finally
         {
@@ -259,7 +260,7 @@
         _formError = null;
         if (string.IsNullOrWhiteSpace(_newName))
         {
-            _formError = "Give the role a name.";
+            _formError = T["Give the role a name."];
             return;
         }
 
@@ -270,7 +271,7 @@
                 new SaveRoleRequest(_newName.Trim(), string.IsNullOrWhiteSpace(_newDescription) ? null : _newDescription.Trim(), _newView));
             if (!response.IsSuccessStatusCode)
             {
-                _formError = await ProblemText.FromAsync(response, "We could not create this role.");
+                _formError = await ProblemText.FromAsync(response, T["We could not create this role."]);
                 return;
             }
 
@@ -279,7 +280,7 @@
             _newName = string.Empty;
             _newDescription = null;
             _newView = DashboardView.Staff;
-            Snackbar.Add("Role created. Set its permissions below.", Severity.Success);
+            Snackbar.Add(T["Role created. Set its permissions below."], Severity.Success);
             await LoadAsync();
             if (created is not null)
             {
@@ -306,12 +307,12 @@
         var response = await Http.DeleteAsync($"api/v1/roles/{_selected.Id}");
         if (!response.IsSuccessStatusCode)
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, "We could not delete this role."), Severity.Error);
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not delete this role."]), Severity.Error);
             _confirmDelete = false;
             return;
         }
 
-        Snackbar.Add("Role deleted", Severity.Success);
+        Snackbar.Add(T["Role deleted"], Severity.Success);
         _selected = null;
         await LoadAsync();
     }

@@ -1,8 +1,9 @@
 @inject HttpClient Http
 @inject NavigationManager Nav
+@inject Translator T
 
 <MudAutocomplete T="SearchHitDto" Value="_selected" ValueChanged="OnPickedAsync" SearchFunc="SearchAsync" ToStringFunc="hit => hit?.Title"
-                 Placeholder="Search records" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.Search"
+                 Placeholder="@T["Search records"]" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.Search"
                  Variant="Variant.Outlined" Margin="Margin.Dense" Class="ml-hide-xs mr-2" Style="max-width:320px" Clearable="true"
                  CoerceText="false" ResetValueOnEmptyText="true" MinCharacters="2" DebounceInterval="250" MaxItems="15"
                  data-testid="global-search">
@@ -20,7 +21,7 @@
         </div>
     </ItemTemplate>
     <NoItemsTemplate>
-        <MudText Typo="Typo.body2" Class="ml-muted" Style="padding:8px 16px" data-testid="search-empty">No matches</MudText>
+        <MudText Typo="Typo.body2" Class="ml-muted" Style="padding:8px 16px" data-testid="search-empty">@T["No matches"]</MudText>
     </NoItemsTemplate>
 </MudAutocomplete>
 

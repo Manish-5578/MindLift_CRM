@@ -6,8 +6,9 @@
 @inject AppState App
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
+@inject Translator T
 
-<PageTitle>Import @ItemLabel · MindLift</PageTitle>
+<PageTitle>@T["Import {0}", T[ItemLabel]] · MindLift</PageTitle>
 
 <div class="ml-page ml-page--form">
     <PageHeader Title="@("Import " + ItemLabel)" Subtitle="Bring in a list from a CSV file. Nothing is changed until you press Import."
@@ -16,7 +17,7 @@
     <div class="ml-row ml-row--wrap" style="margin-bottom:16px" data-testid="import-steps">
         @foreach (var (number, title) in Steps)
         {
-            <StatusChip Text="@($"{number}. {title}")" Dot="false" Color="@StepColor(number)" />
+            <StatusChip Text="@($"{number}. {T[title]}")" Dot="false" Color="@StepColor(number)" />
         }
     </div>
 
@@ -31,10 +32,10 @@
                 }
 
                 <MudText Typo="Typo.body2" Class="ml-muted">
-                    We read these columns: @string.Join(", ", Fields.Select(f => f.Label)). Anything else is ignored. @RequiredLabel is required.
+                    @T["We read these columns: {0}. Anything else is ignored. {1} is required.", string.Join(", ", Fields.Select(f => T[f.Label])), RequiredLabel]
                 </MudText>
                 <div>
-                    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Outlined.Download" Href="@TemplateHref" download="@TemplateFileName" data-testid="download-template">Download a template</MudButton>
+                    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Outlined.Download" Href="@TemplateHref" download="@TemplateFileName" data-testid="download-template">@T["Download a template"]</MudButton>
                 </div>
             </div>
         </MlCard>
@@ -43,7 +44,7 @@
     {
         <MlCard Title="@_fileName" Subtitle="@($"{_rows.Count - 1:N0} rows found")" Class="mb-4" TestId="import-step-check">
             <div class="ml-stack">
-                <MudText Typo="Typo.subtitle2">How we read your columns</MudText>
+                <MudText Typo="Typo.subtitle2">@T["How we read your columns"]</MudText>
                 @foreach (var match in _matches)
                 {
                     <div class="ml-row" style="padding:4px 0;border-bottom:1px solid var(--ml-border)" data-testid="column-match">
@@ -61,16 +62,16 @@
 
                 @if (!HasRequired)
                 {
-                    <MudAlert Severity="Severity.Error" Dense="true" data-testid="import-no-first-name">There is no @RequiredLabel column, so nothing can be imported. Rename a column or choose another file.</MudAlert>
+                    <MudAlert Severity="Severity.Error" Dense="true" data-testid="import-no-first-name">@T["There is no {0} column, so nothing can be imported. Rename a column or choose another file.", RequiredLabel]</MudAlert>
                 }
 
                 @if (TooManyRows)
                 {
-                    <MudAlert Severity="Severity.Error" Dense="true" data-testid="import-too-many">This file has more than 5,000 rows. Split it into smaller files.</MudAlert>
+                    <MudAlert Severity="Severity.Error" Dense="true" data-testid="import-too-many">@T["This file has more than 5,000 rows. Split it into smaller files."]</MudAlert>
                 }
                 else if (HasRequired && _rows.Count - 1 > 0)
                 {
-                    <MudAlert Severity="Severity.Info" Dense="true">Rows with an email or phone that already exists are skipped. Rows without a first name are reported.</MudAlert>
+                    <MudAlert Severity="Severity.Info" Dense="true">@T["Rows with an email or phone that already exists are skipped. Rows without a first name are reported."]</MudAlert>
                 }
             </div>
         </MlCard>
@@ -102,7 +103,7 @@
         </MlCard>
 
         <div class="ml-row" style="justify-content:space-between">
-            <MudButton Variant="Variant.Outlined" OnClick="Back" Disabled="_busy">Back</MudButton>
+            <MudButton Variant="Variant.Outlined" OnClick="Back" Disabled="_busy">@T["Back"]</MudButton>
             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ImportAsync" Disabled="_busy" data-testid="import-submit">
                 @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }
                 else { @("Import " + (_rows.Count - 1).ToString("N0") + " " + ItemLabel) }
@@ -124,7 +125,7 @@
 
                 @if (_result.Errors.Count > 0)
                 {
-                    <MudText Typo="Typo.subtitle2">What went wrong</MudText>
+                    <MudText Typo="Typo.subtitle2">@T["What went wrong"]</MudText>
                     <div class="ml-stack-sm" data-testid="import-errors">
                         @foreach (var error in _result.Errors)
                         {
@@ -136,8 +137,8 @@
         </MlCard>
 
         <div class="ml-row" style="justify-content:flex-end">
-            <MudButton Variant="Variant.Outlined" OnClick="StartOver">Import another file</MudButton>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="@ListHref" data-testid="import-done">View @ItemLabel</MudButton>
+            <MudButton Variant="Variant.Outlined" OnClick="StartOver">@T["Import another file"]</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="@ListHref" data-testid="import-done">@T["View {0}", T[ItemLabel]]</MudButton>
         </div>
     }
 </div>
@@ -226,7 +227,7 @@
         }
         catch (IOException)
         {
-            _fileError = "We could not read this file. Try saving it as CSV again.";
+            _fileError = T["We could not read this file. Try saving it as CSV again."];
         }
     }
 
@@ -241,13 +242,13 @@
     {
         if (!HasRequired)
         {
-            Snackbar.Add("Add a " + RequiredLabel + " column before importing.", Severity.Error);
+            Snackbar.Add(T["Add a {0} column before importing.", RequiredLabel], Severity.Error);
             return;
         }
 
         if (TooManyRows)
         {
-            Snackbar.Add("Split the file into smaller files of up to 5,000 rows.", Severity.Error);
+            Snackbar.Add(T["Split the file into smaller files of up to 5,000 rows."], Severity.Error);
             return;
         }
 
@@ -257,7 +258,7 @@
             var response = await Http.PostAsync(Endpoint, new StringContent(_csv, Encoding.UTF8, "text/csv"));
             if (!response.IsSuccessStatusCode)
             {
-                Snackbar.Add(await ProblemText.FromAsync(response, "We could not import this file."), Severity.Error);
+                Snackbar.Add(await ProblemText.FromAsync(response, T["We could not import this file."]), Severity.Error);
                 return;
             }
 
@@ -266,7 +267,7 @@
         }
         catch (HttpRequestException)
         {
-            Snackbar.Add("We could not reach MindLift. Check your connection and try again.", Severity.Error);
+            Snackbar.Add(T["We could not reach MindLift. Check your connection and try again."], Severity.Error);
         }
         finally
         {

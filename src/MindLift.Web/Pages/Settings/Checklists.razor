@@ -3,13 +3,14 @@
 @inject AppState App
 @inject ISnackbar Snackbar
 @inject IDialogService Dialogs
+@inject Translator T
 
-<PageTitle>Onboarding checklists · MindLift</PageTitle>
+<PageTitle>@T["Onboarding checklists"] · MindLift</PageTitle>
 
 <div class="ml-page ml-page--form">
     <PageHeader Title="Onboarding checklists" Subtitle="Tasks that are created for you when a deal is won, so every new customer gets the same start.">
         <Actions>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => OpenForm(null)" data-testid="primary-action">New checklist</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => OpenForm(null)" data-testid="primary-action">@T["New checklist"]</MudButton>
         </Actions>
     </PageHeader>
     <SettingsNav Current="/settings/checklists" />
@@ -38,8 +39,8 @@
                         <div class="ml-row"><MudIcon Icon="@Icons.Material.Outlined.CheckBoxOutlineBlank" Size="Size.Small" /><span class="ml-grow">@item.Subject</span><span class="ml-muted">@(item.OffsetDays == 0 ? "same day" : $"+{item.OffsetDays} days")</span></div>
                     }
                     <div class="ml-row" style="justify-content:flex-end">
-                        <MudButton Size="Size.Small" OnClick="() => OpenForm(current)" data-testid="edit-checklist">Edit</MudButton>
-                        <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeleteAsync(current)" data-testid="delete-checklist">Delete</MudButton>
+                        <MudButton Size="Size.Small" OnClick="() => OpenForm(current)" data-testid="edit-checklist">@T["Edit"]</MudButton>
+                        <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeleteAsync(current)" data-testid="delete-checklist">@T["Delete"]</MudButton>
                     </div>
                 </div>
             </MlCard>
@@ -54,30 +55,30 @@
     }
 
     <div class="ml-stack">
-        <MudTextField @bind-Value="_name" Label="Name *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="checklist-name" />
-        <MudSelect T="Guid?" @bind-Value="_pipelineId" Label="Pipeline" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" HelperText="Leave empty to use it for every pipeline.">
+        <MudTextField @bind-Value="_name" Label="@T["Name *"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="checklist-name" />
+        <MudSelect T="Guid?" @bind-Value="_pipelineId" Label="@T["Pipeline"]" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" HelperText="@T["Leave empty to use it for every pipeline."]">
             @foreach (var pipeline in App.Bootstrap?.Pipelines ?? [])
             {
                 <MudSelectItem T="Guid?" Value="@((Guid?)pipeline.Id)">@pipeline.Name</MudSelectItem>
             }
         </MudSelect>
-        <MudSwitch T="bool" @bind-Value="_active" Label="Active" Color="Color.Primary" />
+        <MudSwitch T="bool" @bind-Value="_active" Label="@T["Active"]" Color="Color.Primary" />
 
-        <MudText Typo="Typo.overline" Class="ml-muted">Tasks</MudText>
+        <MudText Typo="Typo.overline" Class="ml-muted">@T["Tasks"]</MudText>
         @for (var i = 0; i < _items.Count; i++)
         {
             var index = i;
             var item = _items[index];
             <div class="ml-stack-sm" style="padding:12px;border:1px solid var(--ml-border);border-radius:var(--ml-radius)" data-testid="checklist-item">
                 <div class="ml-row">
-                    <MudTextField T="string" Value="item.Subject" ValueChanged="v => item.Subject = v ?? string.Empty" Label="Task *" Variant="Variant.Outlined" Margin="Margin.Dense" Class="ml-grow" data-testid="item-subject" />
-                    <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small" OnClick="() => _items.RemoveAt(index)" aria-label="Remove task" />
+                    <MudTextField T="string" Value="item.Subject" ValueChanged="v => item.Subject = v ?? string.Empty" Label="@T["Task *"]" Variant="Variant.Outlined" Margin="Margin.Dense" Class="ml-grow" data-testid="item-subject" />
+                    <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small" OnClick="() => _items.RemoveAt(index)" aria-label="@T["Remove task"]" />
                 </div>
-                <MudNumericField T="int" Value="item.OffsetDays" ValueChanged="v => item.OffsetDays = v" Label="Days after winning" Min="0" Max="365" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="item-days" />
+                <MudNumericField T="int" Value="item.OffsetDays" ValueChanged="v => item.OffsetDays = v" Label="@T["Days after winning"]" Min="0" Max="365" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="item-days" />
             </div>
         }
 
-        <div><MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Outlined.Add" OnClick="() => _items.Add(new Row())" data-testid="add-checklist-item">Add task</MudButton></div>
+        <div><MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Outlined.Add" OnClick="() => _items.Add(new Row())" data-testid="add-checklist-item">@T["Add task"]</MudButton></div>
     </div>
 </FormDrawer>
 
@@ -152,17 +153,17 @@
             if (!response.IsSuccessStatusCode)
             {
                 var fields = await ProblemText.FieldErrorsAsync(response);
-                _error = fields.Count > 0 ? string.Join(" ", fields.Values) : await ProblemText.FromAsync(response, "We could not save this checklist.");
+                _error = fields.Count > 0 ? string.Join(" ", fields.Values) : await ProblemText.FromAsync(response, T["We could not save this checklist."]);
                 return;
             }
 
             _drawer = false;
-            Snackbar.Add("Checklist saved", Severity.Success);
+            Snackbar.Add(T["Checklist saved"], Severity.Success);
             await LoadAsync();
         }
         catch (HttpRequestException)
         {
-            _error = "We could not reach MindLift. Check your connection and try again.";
+            _error = T["We could not reach MindLift. Check your connection and try again."];
         }
         finally
         {
@@ -172,7 +173,7 @@
 
     private async Task DeleteAsync(ChecklistTemplateDto template)
     {
-        if (!await Dialogs.ConfirmAsync($"Delete {template.Name}?", "Tasks already created from it stay where they are.", "Delete", danger: true))
+        if (!await Dialogs.ConfirmAsync($"Delete {template.Name}?", T["Tasks already created from it stay where they are."], T["Delete"], danger: true))
         {
             return;
         }
@@ -180,7 +181,7 @@
         var response = await Http.DeleteAsync($"api/v1/settings/checklists/{template.Id}");
         if (!response.IsSuccessStatusCode)
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, "We could not delete this checklist."), Severity.Error);
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not delete this checklist."]), Severity.Error);
             return;
         }
 

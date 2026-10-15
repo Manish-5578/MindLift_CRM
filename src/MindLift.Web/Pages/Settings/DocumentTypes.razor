@@ -2,13 +2,14 @@
 @inject HttpClient Http
 @inject ISnackbar Snackbar
 @inject IDialogService Dialogs
+@inject Translator T
 
-<PageTitle>Document types · MindLift</PageTitle>
+<PageTitle>@T["Document types"] · MindLift</PageTitle>
 
 <div class="ml-page ml-page--form">
     <PageHeader Title="Document types" Subtitle="Choose the kind of document, the words that identify it, and the values to read from it.">
         <Actions>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => OpenForm(null)" data-testid="primary-action">New document type</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => OpenForm(null)" data-testid="primary-action">@T["New document type"]</MudButton>
         </Actions>
     </PageHeader>
     <SettingsNav Current="/settings/document-types" />
@@ -33,8 +34,8 @@
                         <div class="ml-row"><span class="ml-grow">@field.Label</span><span class="ml-muted">@field.ValueType@(field.Required ? " · required" : "")</span></div>
                     }
                     <div class="ml-row" style="justify-content:flex-end">
-                        <MudButton Size="Size.Small" OnClick="() => OpenForm(current)" data-testid="edit-doctype">Edit</MudButton>
-                        <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeleteAsync(current)" data-testid="delete-doctype">Delete</MudButton>
+                        <MudButton Size="Size.Small" OnClick="() => OpenForm(current)" data-testid="edit-doctype">@T["Edit"]</MudButton>
+                        <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeleteAsync(current)" data-testid="delete-doctype">@T["Delete"]</MudButton>
                     </div>
                 </div>
             </MlCard>
@@ -49,46 +50,46 @@
     }
 
     <div class="ml-stack">
-        <MudTextField @bind-Value="_key" Label="Key (for example trade_licence) *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="dt-key" />
-        <MudTextField @bind-Value="_name" Label="Name *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="dt-name" />
-        <MudTextField @bind-Value="_description" Label="Description" Variant="Variant.Outlined" Margin="Margin.Dense" />
-        <MudTextField @bind-Value="_keywordsText" Label="Words that identify it, one per line as text|weight" Lines="4" Variant="Variant.Outlined" Margin="Margin.Dense"
-                      HelperText="Example: Trade License|3 — a document scores the weights of the words it contains." data-testid="dt-keywords" />
-        <MudNumericField T="int" @bind-Value="_minScore" Label="Minimum score to match" Min="1" Max="1000" Variant="Variant.Outlined" Margin="Margin.Dense" />
-        <MudCheckBox @bind-Value="_active" Label="Type is on" Color="Color.Primary" />
+        <MudTextField @bind-Value="_key" Label="@T["Key (for example trade_licence) *"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="dt-key" />
+        <MudTextField @bind-Value="_name" Label="@T["Name *"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="dt-name" />
+        <MudTextField @bind-Value="_description" Label="@T["Description"]" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudTextField @bind-Value="_keywordsText" Label="@T["Words that identify it, one per line as text|weight"]" Lines="4" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      HelperText="@T["Example: Trade License|3 — a document scores the weights of the words it contains."]" data-testid="dt-keywords" />
+        <MudNumericField T="int" @bind-Value="_minScore" Label="@T["Minimum score to match"]" Min="1" Max="1000" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudCheckBox @bind-Value="_active" Label="@T["Type is on"]" Color="Color.Primary" />
 
-        <MudText Typo="Typo.subtitle2">Values to read</MudText>
+        <MudText Typo="Typo.subtitle2">@T["Values to read"]</MudText>
         @for (var i = 0; i < _fields.Count; i++)
         {
             var index = i;
             var field = _fields[index];
             <div class="ml-stack-sm" style="padding:12px;border:1px solid var(--ml-border);border-radius:var(--ml-radius)" data-testid="dt-field">
                 <div class="ml-row">
-                    <MudTextField T="string" Value="field.Label" ValueChanged="v => field.Label = v ?? string.Empty" Label="Name shown (for example Licence number) *" Variant="Variant.Outlined" Margin="Margin.Dense" Class="ml-grow" data-testid="dt-field-label" />
-                    <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small" OnClick="() => _fields.RemoveAt(index)" aria-label="Remove field" />
+                    <MudTextField T="string" Value="field.Label" ValueChanged="v => field.Label = v ?? string.Empty" Label="@T["Name shown (for example Licence number) *"]" Variant="Variant.Outlined" Margin="Margin.Dense" Class="ml-grow" data-testid="dt-field-label" />
+                    <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small" OnClick="() => _fields.RemoveAt(index)" aria-label="@T["Remove field"]" />
                 </div>
-                <MudTextField T="string" Value="field.Key" ValueChanged="v => field.Key = v ?? string.Empty" Label="Key (for example license_number) *" Variant="Variant.Outlined" Margin="Margin.Dense" />
-                <MudSelect T="string" Value="field.ValueType" ValueChanged="v => field.ValueType = v ?? DocumentValueTypes.Text" Label="Kind of value" Variant="Variant.Outlined" Margin="Margin.Dense">
-                    <MudSelectItem T="string" Value="@DocumentValueTypes.Text">Text</MudSelectItem>
-                    <MudSelectItem T="string" Value="@DocumentValueTypes.Id">Number or code</MudSelectItem>
-                    <MudSelectItem T="string" Value="@DocumentValueTypes.Number">Number</MudSelectItem>
-                    <MudSelectItem T="string" Value="@DocumentValueTypes.Amount">Amount of money</MudSelectItem>
-                    <MudSelectItem T="string" Value="@DocumentValueTypes.Date">Date</MudSelectItem>
+                <MudTextField T="string" Value="field.Key" ValueChanged="v => field.Key = v ?? string.Empty" Label="@T["Key (for example license_number) *"]" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                <MudSelect T="string" Value="field.ValueType" ValueChanged="v => field.ValueType = v ?? DocumentValueTypes.Text" Label="@T["Kind of value"]" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem T="string" Value="@DocumentValueTypes.Text">@T["Text"]</MudSelectItem>
+                    <MudSelectItem T="string" Value="@DocumentValueTypes.Id">@T["Number or code"]</MudSelectItem>
+                    <MudSelectItem T="string" Value="@DocumentValueTypes.Number">@T["Number"]</MudSelectItem>
+                    <MudSelectItem T="string" Value="@DocumentValueTypes.Amount">@T["Amount of money"]</MudSelectItem>
+                    <MudSelectItem T="string" Value="@DocumentValueTypes.Date">@T["Date"]</MudSelectItem>
                 </MudSelect>
-                <MudTextField T="string" Value="field.Anchor" ValueChanged="v => field.Anchor = string.IsNullOrWhiteSpace(v) ? null : v" Label="Label written before the value (for example Expiry Date:)" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="dt-field-anchor" />
-                <MudTextField T="string" Value="field.Pattern" ValueChanged="v => field.Pattern = string.IsNullOrWhiteSpace(v) ? null : v" Label="Or a pattern (advanced, regular expression; first group is the value)" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                <MudTextField T="string" Value="field.Anchor" ValueChanged="v => field.Anchor = string.IsNullOrWhiteSpace(v) ? null : v" Label="@T["Label written before the value (for example Expiry Date:)"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="dt-field-anchor" />
+                <MudTextField T="string" Value="field.Pattern" ValueChanged="v => field.Pattern = string.IsNullOrWhiteSpace(v) ? null : v" Label="@T["Or a pattern (advanced, regular expression; first group is the value)"]" Variant="Variant.Outlined" Margin="Margin.Dense" />
                 <div class="ml-row">
-                    <MudCheckBox T="bool" Value="field.Required" ValueChanged="v => field.Required = v" Label="Required" Color="Color.Primary" />
-                    <MudCheckBox T="bool" Value="field.IsMetric" ValueChanged="v => field.IsMetric = v" Label="Number to report on" Color="Color.Primary" />
+                    <MudCheckBox T="bool" Value="field.Required" ValueChanged="v => field.Required = v" Label="@T["Required"]" Color="Color.Primary" />
+                    <MudCheckBox T="bool" Value="field.IsMetric" ValueChanged="v => field.IsMetric = v" Label="@T["Number to report on"]" Color="Color.Primary" />
                 </div>
             </div>
         }
-        <div><MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Outlined.Add" OnClick="() => _fields.Add(new FieldRow())" data-testid="add-dt-field">Add a value</MudButton></div>
+        <div><MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Outlined.Add" OnClick="() => _fields.Add(new FieldRow())" data-testid="add-dt-field">@T["Add a value"]</MudButton></div>
 
         @if (_editing is not null)
         {
-            <MudText Typo="Typo.subtitle2">Test on a sample file</MudText>
-            <MudText Typo="Typo.caption" Class="ml-muted">Upload a file to see what this type reads. Nothing is saved.</MudText>
+            <MudText Typo="Typo.subtitle2">@T["Test on a sample file"]</MudText>
+            <MudText Typo="Typo.caption" Class="ml-muted">@T["Upload a file to see what this type reads. Nothing is saved."]</MudText>
             <InputFile OnChange="TestFileAsync" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp,.txt,.csv" data-testid="dt-test-file" />
             @if (_testResult is not null)
             {
@@ -193,17 +194,17 @@
             if (!response.IsSuccessStatusCode)
             {
                 var fields = await ProblemText.FieldErrorsAsync(response);
-                _error = fields.Count > 0 ? string.Join(" ", fields.Values) : await ProblemText.FromAsync(response, "We could not save this document type.");
+                _error = fields.Count > 0 ? string.Join(" ", fields.Values) : await ProblemText.FromAsync(response, T["We could not save this document type."]);
                 return;
             }
 
             _drawer = false;
-            Snackbar.Add("Document type saved", Severity.Success);
+            Snackbar.Add(T["Document type saved"], Severity.Success);
             await LoadAsync();
         }
         catch (HttpRequestException)
         {
-            _error = "We could not reach MindLift. Check your connection and try again.";
+            _error = T["We could not reach MindLift. Check your connection and try again."];
         }
         finally
         {
@@ -224,7 +225,7 @@
         var response = await Http.PostAsync($"api/v1/settings/document-types/{_editing.Id}/test", content);
         if (!response.IsSuccessStatusCode)
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, "We could not test this file."), Severity.Error);
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not test this file."]), Severity.Error);
             return;
         }
 
@@ -233,7 +234,7 @@
 
     private async Task DeleteAsync(DocumentTypeDto type)
     {
-        if (!await Dialogs.ConfirmAsync($"Delete {type.Name}?", "Documents already read with it keep their values.", "Delete", danger: true))
+        if (!await Dialogs.ConfirmAsync($"Delete {type.Name}?", T["Documents already read with it keep their values."], T["Delete"], danger: true))
         {
             return;
         }
@@ -241,7 +242,7 @@
         var response = await Http.DeleteAsync($"api/v1/settings/document-types/{type.Id}");
         if (!response.IsSuccessStatusCode)
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, "We could not delete this document type."), Severity.Error);
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not delete this document type."]), Severity.Error);
             return;
         }
 

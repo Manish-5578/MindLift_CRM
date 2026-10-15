@@ -6,8 +6,9 @@
 @inject ISnackbar Snackbar
 @inject IDialogService Dialogs
 @inject NavigationManager Nav
+@inject Translator T
 
-<PageTitle>Unified Inbox | MindLift CRM</PageTitle>
+<PageTitle>@T["Unified Inbox | MindLift CRM"]</PageTitle>
 
 <div class="pa-4" style="height: calc(100vh - 80px); display: flex; flex-direction: column;">
     <!-- Top Bar -->
@@ -15,16 +16,16 @@
         <div class="d-flex align-center gap-2">
             <MudIcon Icon="@Icons.Material.Filled.MarkChatUnread" Color="Color.Primary" Size="Size.Large" />
             <div>
-                <MudText Typo="Typo.h5" Class="font-weight-bold">Unified Inbox</MudText>
-                <MudText Typo="Typo.caption" Class="ml-muted">WhatsApp, Email and SMS in a single collaborative interface</MudText>
+                <MudText Typo="Typo.h5" Class="font-weight-bold">@T["Unified Inbox"]</MudText>
+                <MudText Typo="Typo.caption" Class="ml-muted">@T["WhatsApp, Email and SMS in a single collaborative interface"]</MudText>
             </div>
         </div>
         <div class="d-flex align-center gap-2">
             <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Settings" OnClick="@(() => _channelsDrawerOpen = true)">
-                Channels & Accounts
+                @T["Channels & Accounts"]
             </MudButton>
             <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Outlined.Block" OnClick="@(() => _optOutsDrawerOpen = true)">
-                Opt-Outs
+                @T["Opt-Outs"]
             </MudButton>
             <MudIconButton Icon="@Icons.Material.Outlined.Refresh" Color="Color.Default" OnClick="LoadThreadsAsync" />
         </div>
@@ -37,7 +38,7 @@
             <!-- Search & Filters -->
             <div class="pa-3 border-b">
                 <MudTextField @bind-Value="_searchQuery"
-                              Placeholder="Search messages or contacts..."
+                              Placeholder="@T["Search messages or contacts..."]"
                               Adornment="Adornment.Start"
                               AdornmentIcon="@Icons.Material.Outlined.Search"
                               Immediate="true"
@@ -48,10 +49,10 @@
                               Clearable="true" />
 
                 <div class="d-flex gap-1 mt-2">
-                    <MudChip T="string" Size="Size.Small" Variant="@(_selectedChannel == null ? Variant.Filled : Variant.Outlined)" Color="Color.Primary" OnClick="@(() => FilterByChannel(null))">All</MudChip>
-                    <MudChip T="string" Size="Size.Small" Variant="@(_selectedChannel == CommunicationChannel.WhatsApp ? Variant.Filled : Variant.Outlined)" Color="Color.Success" OnClick="@(() => FilterByChannel(CommunicationChannel.WhatsApp))">WhatsApp</MudChip>
-                    <MudChip T="string" Size="Size.Small" Variant="@(_selectedChannel == CommunicationChannel.Email ? Variant.Filled : Variant.Outlined)" Color="Color.Info" OnClick="@(() => FilterByChannel(CommunicationChannel.Email))">Email</MudChip>
-                    <MudChip T="string" Size="Size.Small" Variant="@(_selectedChannel == CommunicationChannel.Sms ? Variant.Filled : Variant.Outlined)" Color="Color.Secondary" OnClick="@(() => FilterByChannel(CommunicationChannel.Sms))">SMS</MudChip>
+                    <MudChip T="string" Size="Size.Small" Variant="@(_selectedChannel == null ? Variant.Filled : Variant.Outlined)" Color="Color.Primary" OnClick="@(() => FilterByChannel(null))">@T["All"]</MudChip>
+                    <MudChip T="string" Size="Size.Small" Variant="@(_selectedChannel == CommunicationChannel.WhatsApp ? Variant.Filled : Variant.Outlined)" Color="Color.Success" OnClick="@(() => FilterByChannel(CommunicationChannel.WhatsApp))">@T["WhatsApp"]</MudChip>
+                    <MudChip T="string" Size="Size.Small" Variant="@(_selectedChannel == CommunicationChannel.Email ? Variant.Filled : Variant.Outlined)" Color="Color.Info" OnClick="@(() => FilterByChannel(CommunicationChannel.Email))">@T["Email"]</MudChip>
+                    <MudChip T="string" Size="Size.Small" Variant="@(_selectedChannel == CommunicationChannel.Sms ? Variant.Filled : Variant.Outlined)" Color="Color.Secondary" OnClick="@(() => FilterByChannel(CommunicationChannel.Sms))">@T["SMS"]</MudChip>
                 </div>
             </div>
 
@@ -67,7 +68,7 @@
                 {
                     <div class="d-flex flex-column justify-center align-center pa-8 text-center ml-muted">
                         <MudIcon Icon="@Icons.Material.Outlined.Inbox" Size="Size.Large" Class="mb-2" />
-                        <MudText Typo="Typo.body2">No conversations found</MudText>
+                        <MudText Typo="Typo.body2">@T["No conversations found"]</MudText>
                     </div>
                 }
                 else
@@ -114,8 +115,8 @@
             {
                 <div class="d-flex flex-column justify-center align-center flex-grow-1 ml-muted text-center pa-8">
                     <MudIcon Icon="@Icons.Material.Outlined.Forum" Style="font-size: 64px;" Class="mb-3" />
-                    <MudText Typo="Typo.h6">Select a conversation to start chatting</MudText>
-                    <MudText Typo="Typo.body2">View messages across WhatsApp, Email and SMS in real-time</MudText>
+                    <MudText Typo="Typo.h6">@T["Select a conversation to start chatting"]</MudText>
+                    <MudText Typo="Typo.body2">@T["View messages across WhatsApp, Email and SMS in real-time"]</MudText>
                 </div>
             }
             else
@@ -144,13 +145,13 @@
                         @if (_selectedThread.LeadId.HasValue)
                         {
                             <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Person" OnClick="@(() => Nav.NavigateTo($"/leads/{_selectedThread.LeadId}"))">
-                                Open Lead
+                                @T["Open Lead"]
                             </MudButton>
                         }
                         else if (_selectedThread.ContactId.HasValue)
                         {
                             <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Outlined.ContactMail" OnClick="@(() => Nav.NavigateTo($"/contacts/{_selectedThread.ContactId}"))">
-                                Open Contact
+                                @T["Open Contact"]
                             </MudButton>
                         }
                     </div>
@@ -227,7 +228,7 @@
                     <div class="d-flex align-center gap-2 mb-2">
                         @if (_templates.Count > 0)
                         {
-                            <MudMenu Label="Insert Template" StartIcon="@Icons.Material.Outlined.AutoAwesome" Variant="Variant.Text" Size="Size.Small" Dense="true">
+                            <MudMenu Label="@T["Insert Template"]" StartIcon="@Icons.Material.Outlined.AutoAwesome" Variant="Variant.Text" Size="Size.Small" Dense="true">
                                 @foreach (var tpl in _templates.Where(t => t.Channel == _selectedThread.Channel))
                                 {
                                     <MudMenuItem OnClick="@(() => ApplyTemplate(tpl))">@tpl.Name</MudMenuItem>
@@ -239,7 +240,7 @@
                     @if (_selectedThread.Channel == CommunicationChannel.Email)
                     {
                         <MudTextField @bind-Value="_emailSubject"
-                                      Placeholder="Subject..."
+                                      Placeholder="@T["Subject..."]"
                                       Variant="Variant.Outlined"
                                       Margin="Margin.Dense"
                                       Class="mb-2" />
@@ -247,7 +248,7 @@
 
                     <div class="d-flex align-end gap-2">
                         <MudTextField @bind-Value="_composeText"
-                                      Placeholder="Type your message..."
+                                      Placeholder="@T["Type your message..."]"
                                       Variant="Variant.Outlined"
                                       Lines="2"
                                       Sizing="InputSizing.Auto"
@@ -265,7 +266,7 @@
                             }
                             else
                             {
-                                <span>Send</span>
+                                <span>@T["Send"]</span>
                             }
                         </MudButton>
                     </div>
@@ -278,17 +279,17 @@
 <!-- Channels Drawer -->
 <MudDrawer @bind-Open="_channelsDrawerOpen" Anchor="Anchor.End" Width="450px" Elevation="4" Variant="DrawerVariant.Temporary">
     <MudDrawerHeader Class="d-flex align-center justify-space-between border-b">
-        <MudText Typo="Typo.h6">Channels & Accounts</MudText>
+        <MudText Typo="Typo.h6">@T["Channels & Accounts"]</MudText>
         <MudIconButton Icon="@Icons.Material.Filled.Close" OnClick="@(() => _channelsDrawerOpen = false)" />
     </MudDrawerHeader>
     <div class="pa-4">
         <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" FullWidth="true" Class="mb-3" OnClick="OpenNewAccountDialog">
-            Add Channel Account
+            @T["Add Channel Account"]
         </MudButton>
 
         @if (_accounts.Count == 0)
         {
-            <MudText Typo="Typo.body2" Class="ml-muted text-center pa-4">No custom accounts configured. Using system default SMTP.</MudText>
+            <MudText Typo="Typo.body2" Class="ml-muted text-center pa-4">@T["No custom accounts configured. Using system default SMTP."]</MudText>
         }
         else
         {
@@ -306,13 +307,13 @@
                         <CardHeaderActions>
                             @if (acc.IsDefault)
                             {
-                                <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">Default</MudChip>
+                                <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">@T["Default"]</MudChip>
                             }
                         </CardHeaderActions>
                     </MudCardHeader>
                     <MudCardActions Class="d-flex justify-space-between">
                         <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => TestConnectionAsync(acc.Id))">
-                            Test Connection
+                            @T["Test Connection"]
                         </MudButton>
                         <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => DeleteAccountAsync(acc.Id))" />
                     </MudCardActions>
@@ -325,14 +326,14 @@
 <!-- Opt-Outs Drawer -->
 <MudDrawer @bind-Open="_optOutsDrawerOpen" Anchor="Anchor.End" Width="400px" Elevation="4" Variant="DrawerVariant.Temporary">
     <MudDrawerHeader Class="d-flex align-center justify-space-between border-b">
-        <MudText Typo="Typo.h6">Communication Opt-Outs</MudText>
+        <MudText Typo="Typo.h6">@T["Communication Opt-Outs"]</MudText>
         <MudIconButton Icon="@Icons.Material.Filled.Close" OnClick="@(() => _optOutsDrawerOpen = false)" />
     </MudDrawerHeader>
     <div class="pa-4">
-        <MudText Typo="Typo.caption" Class="ml-muted mb-3 d-block">Contacts or leads in this registry will be strictly blocked from receiving outbound messages.</MudText>
-        <MudTextField @bind-Value="_newOptOutTarget" Label="Phone or Email" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+        <MudText Typo="Typo.caption" Class="ml-muted mb-3 d-block">@T["Contacts or leads in this registry will be strictly blocked from receiving outbound messages."]</MudText>
+        <MudTextField @bind-Value="_newOptOutTarget" Label="@T["Phone or Email"]" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
         <MudButton Variant="Variant.Filled" Color="Color.Error" FullWidth="true" OnClick="RegisterOptOutAsync" Disabled="@string.IsNullOrWhiteSpace(_newOptOutTarget)">
-            Block Recipient
+            @T["Block Recipient"]
         </MudButton>
 
         <MudDivider Class="my-3" />
@@ -514,7 +515,7 @@
             }
             else
             {
-                Snackbar.Add(result?.Message ?? "Connection failed", Severity.Warning);
+                Snackbar.Add(T[result?.Message ?? "Connection failed"], Severity.Warning);
             }
         }
         catch (Exception ex)
@@ -529,7 +530,7 @@
         {
             await Http.DeleteAsync($"/api/v1/channels/{accountId}");
             _accounts.RemoveAll(a => a.Id == accountId);
-            Snackbar.Add("Channel account removed", Severity.Success);
+            Snackbar.Add(T["Channel account removed"], Severity.Success);
         }
         catch (Exception ex)
         {
@@ -551,7 +552,7 @@
                 {
                     _optOuts.Add(opt);
                     _newOptOutTarget = string.Empty;
-                    Snackbar.Add("Opt-out registered successfully", Severity.Success);
+                    Snackbar.Add(T["Opt-out registered successfully"], Severity.Success);
                 }
             }
         }
@@ -567,7 +568,7 @@
         {
             await Http.DeleteAsync($"/api/v1/opt-outs/{id}");
             _optOuts.RemoveAll(o => o.Id == id);
-            Snackbar.Add("Opt-out removed", Severity.Success);
+            Snackbar.Add(T["Opt-out removed"], Severity.Success);
         }
         catch (Exception ex)
         {

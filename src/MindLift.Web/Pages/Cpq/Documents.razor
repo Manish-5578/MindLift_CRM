@@ -7,27 +7,28 @@
 @inject HttpClient Http
 @inject ISnackbar Snackbar
 @inject IDialogService Dialogs
+@inject Translator T
 
-<PageTitle>Documents & Smart OCR · MindLift</PageTitle>
+<PageTitle>@T["Documents & Smart OCR"] · MindLift</PageTitle>
 
 <div class="ml-page">
     <!-- Header -->
     <div class="d-flex flex-wrap align-center justify-space-between gap-3 mb-4">
         <div>
-            <MudText Typo="Typo.h5" Style="font-weight:700">Documents & Smart OCR</MudText>
-            <MudText Typo="Typo.body2" Class="ml-muted">Upload contracts, customer proposals, vendor invoices, and track secure customer portal document requests.</MudText>
+            <MudText Typo="Typo.h5" Style="font-weight:700">@T["Documents & Smart OCR"]</MudText>
+            <MudText Typo="Typo.body2" Class="ml-muted">@T["Upload contracts, customer proposals, vendor invoices, and track secure customer portal document requests."]</MudText>
         </div>
 
         <div class="d-flex flex-wrap align-center gap-2">
             <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Outlined.AssignmentReturn" OnClick="OpenNewRequestDialog" Size="Size.Small">
-                Request Customer File
+                @T["Request Customer File"]
             </MudButton>
             <MudFileUpload T="IBrowserFile" FilesChanged="UploadDocumentAsync" Accept=".pdf,.png,.jpg,.jpeg,.txt">
                 <CustomContent Context="upload">
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.CloudUpload" Disabled="_uploading" Size="Size.Small"
                                OnClick="@(() => upload.OpenFilePickerAsync())" id="upload-document">
                         @if (_uploading) { <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" /> }
-                        Upload Document
+                        @T["Upload Document"]
                     </MudButton>
                 </CustomContent>
             </MudFileUpload>
@@ -42,7 +43,7 @@
                     <MudIcon Icon="@Icons.Material.Outlined.FolderShared" />
                 </MudAvatar>
                 <div>
-                    <MudText Typo="Typo.caption" Class="ml-muted">Total Documents</MudText>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@T["Total Documents"]</MudText>
                     <MudText Typo="Typo.h6" Style="font-weight:700">@_documents.Count</MudText>
                 </div>
             </MudPaper>
@@ -53,7 +54,7 @@
                     <MudIcon Icon="@Icons.Material.Outlined.AutoAwesome" />
                 </MudAvatar>
                 <div>
-                    <MudText Typo="Typo.caption" Class="ml-muted">OCR Processed</MudText>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@T["OCR Processed"]</MudText>
                     <MudText Typo="Typo.h6" Style="font-weight:700">@_documents.Count(d => d.OcrStatus == DocumentOcrStatus.Completed)</MudText>
                 </div>
             </MudPaper>
@@ -64,7 +65,7 @@
                     <MudIcon Icon="@Icons.Material.Outlined.PendingActions" />
                 </MudAvatar>
                 <div>
-                    <MudText Typo="Typo.caption" Class="ml-muted">Open Portal Requests</MudText>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@T["Open Portal Requests"]</MudText>
                     <MudText Typo="Typo.h6" Style="font-weight:700">@_requests.Count(r => r.Status == "Open")</MudText>
                 </div>
             </MudPaper>
@@ -75,7 +76,7 @@
                     <MudIcon Icon="@Icons.Material.Outlined.Storage" />
                 </MudAvatar>
                 <div>
-                    <MudText Typo="Typo.caption" Class="ml-muted">Total Storage</MudText>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@T["Total Storage"]</MudText>
                     <MudText Typo="Typo.h6" Style="font-weight:700">@FormatFileSize(_documents.Sum(d => d.FileSizeBytes))</MudText>
                 </div>
             </MudPaper>
@@ -93,14 +94,14 @@
         <!-- Filters Bar -->
         <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-4 d-flex flex-wrap align-center justify-space-between gap-3" Style="border-radius:12px">
             <div class="d-flex flex-wrap align-center gap-2">
-                <MudTextField @bind-Value="_searchQuery" Placeholder="Search by file name, vendor, invoice #..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.Search" Immediate="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="min-width:280px" />
-                <MudSelect T="string" @bind-Value="_categoryFilter" Placeholder="All Categories" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="min-width:160px">
-                    <MudSelectItem T="string" Value="@("")">All Categories</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Invoice")">Invoice</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Contract")">Contract</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Receipt")">Receipt</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Identity")">Identity</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("General")">General</MudSelectItem>
+                <MudTextField @bind-Value="_searchQuery" Placeholder="@T["Search by file name, vendor, invoice #..."]" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.Search" Immediate="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="min-width:280px" />
+                <MudSelect T="string" @bind-Value="_categoryFilter" Placeholder="@T["All Categories"]" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="min-width:160px">
+                    <MudSelectItem T="string" Value="@("")">@T["All Categories"]</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Invoice")">@T["Invoice"]</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Contract")">@T["Contract"]</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Receipt")">@T["Receipt"]</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Identity")">@T["Identity"]</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("General")">@T["General"]</MudSelectItem>
                 </MudSelect>
             </div>
         </MudPaper>
@@ -111,19 +112,19 @@
         }
         else if (FilteredDocuments.Count == 0)
         {
-            <EmptyState Title="No documents found" Subtitle="Upload your first business document to extract vendor names, totals, and invoice numbers." ActionLabel="Upload Document" />
+            <EmptyState Title="No documents found" Subtitle="@T["Upload your first business document to extract vendor names, totals, and invoice numbers."]" ActionLabel="Upload Document" />
         }
         else
         {
             <MudTable Items="@FilteredDocuments" Dense="true" Hover="true" Outlined="true" Style="border-radius:12px; overflow:hidden">
                 <HeaderContent>
-                    <MudTh>File</MudTh>
-                    <MudTh>Category</MudTh>
-                    <MudTh>OCR Status</MudTh>
-                    <MudTh>Detected Intelligence</MudTh>
-                    <MudTh>Portal</MudTh>
-                    <MudTh>Upload Date</MudTh>
-                    <MudTh Style="text-align:right">Actions</MudTh>
+                    <MudTh>@T["File"]</MudTh>
+                    <MudTh>@T["Category"]</MudTh>
+                    <MudTh>@T["OCR Status"]</MudTh>
+                    <MudTh>@T["Detected Intelligence"]</MudTh>
+                    <MudTh>@T["Portal"]</MudTh>
+                    <MudTh>@T["Upload Date"]</MudTh>
+                    <MudTh Style="text-align:right">@T["Actions"]</MudTh>
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="File">
@@ -169,12 +170,12 @@
                         }
                         else
                         {
-                            <MudText Typo="Typo.caption" Class="ml-muted">No structured fields extracted</MudText>
+                            <MudText Typo="Typo.caption" Class="ml-muted">@T["No structured fields extracted"]</MudText>
                         }
                     </MudTd>
                     <MudTd DataLabel="Portal">
                         @{ var linked = context.AssociatedContactId.HasValue || context.AssociatedAccountId.HasValue; }
-                        <MudTooltip Text="@(linked ? SharingTooltip : UnlinkedTooltip)">
+                        <MudTooltip Text="@T[linked ? SharingTooltip : UnlinkedTooltip]">
                             <MudSwitch T="bool" Value="context.SharedWithPortal" ValueChanged="@(v => SetSharingAsync(context, v))"
                                        Disabled="@(!linked || _sharingBusy.Contains(context.Id))" Color="Color.Info" Size="Size.Small"
                                        Label="@(context.SharedWithPortal ? SharedLabel : InternalLabel)" id="@($"share-{context.Id}")" />
@@ -186,10 +187,10 @@
                     <MudTd DataLabel="Actions" Style="text-align:right">
                         <div class="d-flex justify-end gap-2">
                             <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Filled.RateReview" Href="@($"/documents/review/{context.Id}")">
-                                Review
+                                @T["Review"]
                             </MudButton>
                             <MudButton Variant="Variant.Outlined" Color="Color.Default" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Visibility" OnClick="@(() => ViewDocumentDetails(context))">
-                                OCR Details
+                                @T["OCR Details"]
                             </MudButton>
                         </div>
                     </MudTd>
@@ -206,18 +207,18 @@
         }
         else if (_requests.Count == 0)
         {
-            <EmptyState Title="No document requests" Subtitle="Request compliance, tax, or contract files from your clients to receive them directly into MindLift." ActionLabel="New Request" OnAction="OpenNewRequestDialog" />
+            <EmptyState Title="No document requests" Subtitle="@T["Request compliance, tax, or contract files from your clients to receive them directly into MindLift."]" ActionLabel="New Request" OnAction="OpenNewRequestDialog" />
         }
         else
         {
             <MudTable Items="@_requests" Dense="true" Hover="true" Outlined="true" Style="border-radius:12px; overflow:hidden">
                 <HeaderContent>
-                    <MudTh>Title</MudTh>
-                    <MudTh>Description</MudTh>
-                    <MudTh>Due Date</MudTh>
-                    <MudTh>Status</MudTh>
-                    <MudTh>Requested Date</MudTh>
-                    <MudTh Style="text-align:right">Action</MudTh>
+                    <MudTh>@T["Title"]</MudTh>
+                    <MudTh>@T["Description"]</MudTh>
+                    <MudTh>@T["Due Date"]</MudTh>
+                    <MudTh>@T["Status"]</MudTh>
+                    <MudTh>@T["Requested Date"]</MudTh>
+                    <MudTh Style="text-align:right">@T["Action"]</MudTh>
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="Title">
@@ -236,7 +237,7 @@
                         }
                         else
                         {
-                            <span class="ml-muted">No deadline</span>
+                            <span class="ml-muted">@T["No deadline"]</span>
                         }
                     </MudTd>
                     <MudTd DataLabel="Status">
@@ -252,19 +253,19 @@
                             @if (context.Status == "Submitted")
                             {
                                 <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small" StartIcon="@Icons.Material.Outlined.CheckCircle"
-                                           Disabled="_statusBusy" OnClick="@(() => SetRequestStatusAsync(context, Completed))">Approve</MudButton>
+                                           Disabled="_statusBusy" OnClick="@(() => SetRequestStatusAsync(context, Completed))">@T["Approve"]</MudButton>
                                 <MudButton Variant="Variant.Outlined" Color="Color.Warning" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Replay"
-                                           Disabled="_statusBusy" OnClick="@(() => SetRequestStatusAsync(context, Open))">Ask again</MudButton>
+                                           Disabled="_statusBusy" OnClick="@(() => SetRequestStatusAsync(context, Open))">@T["Ask again"]</MudButton>
                             }
                             else if (context.Status == "Open")
                             {
-                                <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Outlined">Awaiting client</MudChip>
-                                <MudIconButton Icon="@Icons.Material.Outlined.Cancel" Size="Size.Small" Color="Color.Error" aria-label="Cancel request"
+                                <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Outlined">@T["Awaiting client"]</MudChip>
+                                <MudIconButton Icon="@Icons.Material.Outlined.Cancel" Size="Size.Small" Color="Color.Error" aria-label="@T["Cancel request"]"
                                                Disabled="_statusBusy" OnClick="@(() => SetRequestStatusAsync(context, Cancelled))" />
                             }
                             else if (context.Status == "Cancelled")
                             {
-                                <MudButton Variant="Variant.Text" Size="Size.Small" Disabled="_statusBusy" OnClick="@(() => SetRequestStatusAsync(context, Open))">Reopen</MudButton>
+                                <MudButton Variant="Variant.Text" Size="Size.Small" Disabled="_statusBusy" OnClick="@(() => SetRequestStatusAsync(context, Open))">@T["Reopen"]</MudButton>
                             }
                         </div>
                     </MudTd>
@@ -278,9 +279,9 @@
 <MudDialog @bind-Visible="_detailsDialogOpen" Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true })">
     <TitleContent>
         <div class="d-flex align-center justify-space-between">
-            <MudText Typo="Typo.h6" Style="font-weight:700">OCR Intelligence · @_activeDoc?.FileName</MudText>
+            <MudText Typo="Typo.h6" Style="font-weight:700">@T["OCR Intelligence"] · @_activeDoc?.FileName</MudText>
             <MudChip T="string" Color="@GetOcrColor(_activeDoc?.OcrStatus ?? DocumentOcrStatus.Pending)" Size="Size.Small" Variant="Variant.Filled">
-                @_activeDoc?.OcrStatus
+                @T[_activeDoc?.OcrStatus.ToString() ?? string.Empty]
             </MudChip>
         </div>
     </TitleContent>
@@ -290,25 +291,25 @@
             <MudGrid Spacing="2" Class="mb-3">
                 <MudItem xs="12" sm="4">
                     <MudPaper Elevation="0" Outlined="true" Class="pa-2" Style="border-radius:8px">
-                        <MudText Typo="Typo.caption" Class="ml-muted">Vendor Detected</MudText>
+                        <MudText Typo="Typo.caption" Class="ml-muted">@T["Vendor Detected"]</MudText>
                         <MudText Typo="Typo.body2" Style="font-weight:600">@(_activeDoc.OcrResult?.DetectedVendor ?? "Not found")</MudText>
                     </MudPaper>
                 </MudItem>
                 <MudItem xs="12" sm="4">
                     <MudPaper Elevation="0" Outlined="true" Class="pa-2" Style="border-radius:8px">
-                        <MudText Typo="Typo.caption" Class="ml-muted">Invoice / Doc #</MudText>
+                        <MudText Typo="Typo.caption" Class="ml-muted">@T["Invoice / Doc #"]</MudText>
                         <MudText Typo="Typo.body2" Style="font-weight:600">@(_activeDoc.OcrResult?.DetectedInvoiceNumber ?? "Not found")</MudText>
                     </MudPaper>
                 </MudItem>
                 <MudItem xs="12" sm="4">
                     <MudPaper Elevation="0" Outlined="true" Class="pa-2" Style="border-radius:8px">
-                        <MudText Typo="Typo.caption" Class="ml-muted">Extracted Total</MudText>
+                        <MudText Typo="Typo.caption" Class="ml-muted">@T["Extracted Total"]</MudText>
                         <MudText Typo="Typo.body2" Style="font-weight:600; color:var(--mud-palette-success)">@(_activeDoc.OcrResult?.DetectedTotal?.ToString("N2") ?? "Not found")</MudText>
                     </MudPaper>
                 </MudItem>
             </MudGrid>
 
-            <MudText Typo="Typo.subtitle2" Style="font-weight:700" Class="mb-1">Extracted Text Content</MudText>
+            <MudText Typo="Typo.subtitle2" Style="font-weight:700" Class="mb-1">@T["Extracted Text Content"]</MudText>
             <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-3" Style="background:var(--mud-palette-background-grey); border-radius:8px; max-height:220px; overflow-y:auto; font-family:monospace; font-size:0.85rem">
                 @if (!string.IsNullOrWhiteSpace(_activeDoc.OcrResult?.ExtractedText))
                 {
@@ -316,22 +317,22 @@
                 }
                 else
                 {
-                    <span class="ml-muted">No text extracted.</span>
+                    <span class="ml-muted">@T["No text extracted."]</span>
                 }
             </MudPaper>
 
             <div class="d-flex align-center justify-space-between">
-                <MudText Typo="Typo.caption" Class="ml-muted">Fields Extracted: @(_activeDoc.OcrResult?.ExtractedFields.Count ?? 0)</MudText>
-                <MudText Typo="Typo.caption" Class="ml-muted">Uploaded: @_activeDoc.UploadedAt.ToString("MMM dd, yyyy HH:mm")</MudText>
+                <MudText Typo="Typo.caption" Class="ml-muted">@T["Fields Extracted: {0}", _activeDoc.OcrResult?.ExtractedFields.Count ?? 0]</MudText>
+                <MudText Typo="Typo.caption" Class="ml-muted">@T["Uploaded: {0}", _activeDoc.UploadedAt.ToString("MMM dd, yyyy HH:mm")]</MudText>
             </div>
         }
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="@(() => _detailsDialogOpen = false)">Close</MudButton>
+        <MudButton OnClick="@(() => _detailsDialogOpen = false)">@T["Close"]</MudButton>
         @if (_activeDoc is not null)
         {
             <MudButton Color="Color.Primary" Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Refresh" OnClick="@(() => ReprocessOcrAsync(_activeDoc.Id))">
-                Re-process OCR
+                @T["Re-process OCR"]
             </MudButton>
         }
     </DialogActions>
@@ -340,23 +341,23 @@
 <!-- Request Customer File Dialog -->
 <MudDialog @bind-Visible="_requestDialogOpen" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true })">
     <TitleContent>
-        <MudText Typo="Typo.h6" Style="font-weight:700">Request Document from Customer</MudText>
+        <MudText Typo="Typo.h6" Style="font-weight:700">@T["Request Document from Customer"]</MudText>
     </TitleContent>
     <DialogContent>
         <div class="d-flex flex-column gap-3 py-2">
             <MudAutocomplete T="ContactListItemDto" @bind-Value="_newReqContact" SearchFunc="SearchContactsAsync" ToStringFunc="@(c => c is null ? string.Empty : ContactLabel(c))"
-                             Label="Customer contact" Required="true" Variant="Variant.Outlined" Margin="Margin.Dense" DebounceInterval="300" MinCharacters="1"
+                             Label="@T["Customer contact"]" Required="true" Variant="Variant.Outlined" Margin="Margin.Dense" DebounceInterval="300" MinCharacters="1"
                              ResetValueOnEmptyText="true" AdornmentIcon="@Icons.Material.Outlined.Person" id="request-contact" />
-            <MudTextField @bind-Value="_newReqTitle" Label="Document Name / Title" Placeholder="e.g. Valid Trade License 2026" Required="true" Variant="Variant.Outlined" Margin="Margin.Dense" />
-            <MudTextField @bind-Value="_newReqDescription" Label="Instructions for Customer" Lines="3" Placeholder="Please ensure the trade license is valid for at least 6 months and stamped." Variant="Variant.Outlined" Margin="Margin.Dense" />
-            <MudDatePicker @bind-Date="_newReqDueDate" Label="Due Date" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudTextField @bind-Value="_newReqTitle" Label="@T["Document Name / Title"]" Placeholder="@T["e.g. Valid Trade License 2026"]" Required="true" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudTextField @bind-Value="_newReqDescription" Label="@T["Instructions for Customer"]" Lines="3" Placeholder="@T["Please ensure the trade license is valid for at least 6 months and stamped."]" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudDatePicker @bind-Date="_newReqDueDate" Label="@T["Due Date"]" Variant="Variant.Outlined" Margin="Margin.Dense" />
         </div>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="@(() => _requestDialogOpen = false)">Cancel</MudButton>
+        <MudButton OnClick="@(() => _requestDialogOpen = false)">@T["Cancel"]</MudButton>
         <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SubmitNewRequestAsync" Disabled="@(string.IsNullOrWhiteSpace(_newReqTitle) || _newReqContact is null || _submittingReq)">
             @if (_submittingReq) { <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" /> }
-            Send Request
+            @T["Send Request"]
         </MudButton>
     </DialogActions>
 </MudDialog>
@@ -423,8 +424,8 @@
             {
                 Snackbar.Add(status switch
                 {
-                    Completed => "Request approved. The customer's files are marked as reviewed.",
-                    Cancelled => "Request cancelled.",
+                    Completed => T["Request approved. The customer's files are marked as reviewed."],
+                    Cancelled => T["Request cancelled."],
                     _ => "Request reopened. The customer can upload again."
                 }, Severity.Success);
                 await LoadRequestsAsync();
@@ -432,7 +433,7 @@
             }
             else
             {
-                Snackbar.Add("Could not update the request.", Severity.Error);
+                Snackbar.Add(T["Could not update the request."], Severity.Error);
             }
         }
         finally
@@ -450,11 +451,11 @@
             if (resp.IsSuccessStatusCode)
             {
                 doc.SharedWithPortal = shared;
-                Snackbar.Add(shared ? "Shared with the customer portal." : "Removed from the customer portal.", Severity.Success);
+                Snackbar.Add(shared ? T["Shared with the customer portal."] : T["Removed from the customer portal."], Severity.Success);
             }
             else
             {
-                Snackbar.Add("Could not change portal sharing.", Severity.Error);
+                Snackbar.Add(T["Could not change portal sharing."], Severity.Error);
             }
         }
         finally
@@ -538,14 +539,14 @@
             var resp = await Http.PostAsJsonAsync("api/v1/document-requests", req);
             if (resp.IsSuccessStatusCode)
             {
-                Snackbar.Add("Document request published to customer portal!", Severity.Success);
+                Snackbar.Add(T["Document request published to customer portal!"], Severity.Success);
                 _requestDialogOpen = false;
                 await LoadRequestsAsync();
                 _activeTab = 1;
             }
             else
             {
-                Snackbar.Add("Failed to create document request.", Severity.Error);
+                Snackbar.Add(T["Failed to create document request."], Severity.Error);
             }
         }
         catch (Exception ex)
@@ -643,7 +644,7 @@
             var resp = await Http.PostAsync($"api/v1/documents/{id}/ocr", null);
             if (resp.IsSuccessStatusCode)
             {
-                Snackbar.Add("OCR re-processed successfully!", Severity.Success);
+                Snackbar.Add(T["OCR re-processed successfully!"], Severity.Success);
                 await LoadDocumentsAsync();
                 _activeDoc = _documents.FirstOrDefault(d => d.Id == id);
             }

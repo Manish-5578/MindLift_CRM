@@ -10,8 +10,9 @@
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
 @inject IJSRuntime JS
+@inject Translator T
 
-<PageTitle>@(_report?.Name ?? "View Report") · MindLift</PageTitle>
+<PageTitle>@(_report is null ? T["View Report"] : _report.Name) · MindLift</PageTitle>
 
 <div class="ml-page">
     <div class="d-flex flex-wrap align-center justify-space-between gap-3 mb-4">
@@ -22,7 +23,7 @@
                     <MudText Typo="Typo.h5" Style="font-weight:700">@(_report?.Name ?? "Loading report...")</MudText>
                     @if (_report?.IsSystem == true)
                     {
-                        <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Outlined">System</MudChip>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Outlined">@T["System"]</MudChip>
                     }
                     else if (_report != null)
                     {
@@ -35,34 +36,34 @@
 
         <div class="d-flex flex-wrap align-center gap-2">
             <MudSelect T="string" Value="_selectedPeriod" ValueChanged="OnPeriodChanged" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Style="min-width:140px">
-                <MudSelectItem T="string" Value="@("all_time")">All Time</MudSelectItem>
-                <MudSelectItem T="string" Value="@("today")">Today</MudSelectItem>
-                <MudSelectItem T="string" Value="@("this_week")">This Week</MudSelectItem>
-                <MudSelectItem T="string" Value="@("this_month")">This Month</MudSelectItem>
-                <MudSelectItem T="string" Value="@("last_month")">Last Month</MudSelectItem>
-                <MudSelectItem T="string" Value="@("this_quarter")">This Quarter</MudSelectItem>
-                <MudSelectItem T="string" Value="@("this_year")">This Year</MudSelectItem>
+                <MudSelectItem T="string" Value="@("all_time")">@T["All Time"]</MudSelectItem>
+                <MudSelectItem T="string" Value="@("today")">@T["Today"]</MudSelectItem>
+                <MudSelectItem T="string" Value="@("this_week")">@T["This Week"]</MudSelectItem>
+                <MudSelectItem T="string" Value="@("this_month")">@T["This Month"]</MudSelectItem>
+                <MudSelectItem T="string" Value="@("last_month")">@T["Last Month"]</MudSelectItem>
+                <MudSelectItem T="string" Value="@("this_quarter")">@T["This Quarter"]</MudSelectItem>
+                <MudSelectItem T="string" Value="@("this_year")">@T["This Year"]</MudSelectItem>
             </MudSelect>
 
-            <MudIconButton Icon="@Icons.Material.Outlined.Refresh" Size="Size.Small" OnClick="() => ExecuteReportAsync()" aria-label="Refresh" />
+            <MudIconButton Icon="@Icons.Material.Outlined.Refresh" Size="Size.Small" OnClick="() => ExecuteReportAsync()" aria-label="@T["Refresh"]" />
 
-            <MudMenu Icon="@Icons.Material.Outlined.Download" Label="Export" Variant="Variant.Outlined" Size="Size.Small" Dense="true" EndIcon="@Icons.Material.Filled.KeyboardArrowDown">
-                <MudMenuItem Icon="@Icons.Material.Outlined.PictureAsPdf" OnClick="@(() => ExportAsync("pdf"))">Export as PDF</MudMenuItem>
-                <MudMenuItem Icon="@Icons.Material.Outlined.FilePresent" OnClick="@(() => ExportAsync("csv"))">Export as CSV</MudMenuItem>
-                <MudMenuItem Icon="@Icons.Material.Outlined.TableChart" OnClick="@(() => ExportAsync("excel"))">Export as Excel (XML)</MudMenuItem>
+            <MudMenu Icon="@Icons.Material.Outlined.Download" Label="@T["Export"]" Variant="Variant.Outlined" Size="Size.Small" Dense="true" EndIcon="@Icons.Material.Filled.KeyboardArrowDown">
+                <MudMenuItem Icon="@Icons.Material.Outlined.PictureAsPdf" OnClick="@(() => ExportAsync("pdf"))">@T["Export as PDF"]</MudMenuItem>
+                <MudMenuItem Icon="@Icons.Material.Outlined.FilePresent" OnClick="@(() => ExportAsync("csv"))">@T["Export as CSV"]</MudMenuItem>
+                <MudMenuItem Icon="@Icons.Material.Outlined.TableChart" OnClick="@(() => ExportAsync("excel"))">@T["Export as Excel (XML)"]</MudMenuItem>
             </MudMenu>
 
             @if (Id.HasValue && Id.Value != Guid.Empty)
             {
                 <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.ScheduleSend" OnClick="OpenScheduleDialogAsync" Size="Size.Small">
-                    Schedule
+                    @T["Schedule"]
                 </MudButton>
             }
 
             @if (_report != null && !_report.IsSystem)
             {
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Edit" Href="@($"/reports/builder/{_report.Id}")" Size="Size.Small">
-                    Edit Builder
+                    @T["Edit Builder"]
                 </MudButton>
             }
         </div>
@@ -81,12 +82,12 @@
         <!-- Metrics / Summary Ribbon -->
         <div class="d-flex flex-wrap gap-3 mb-4">
             <div class="pa-3 rounded-lg flex-1" style="background:var(--ml-card-bg, #fff); border:1px solid var(--ml-border); min-width:150px">
-                <MudText Typo="Typo.caption" Class="ml-muted" Style="font-weight:600; text-transform:uppercase">Total Rows</MudText>
+                <MudText Typo="Typo.caption" Class="ml-muted" Style="font-weight:600; text-transform:uppercase">@T["Total Rows"]</MudText>
                 <MudText Typo="Typo.h5" Style="font-weight:700">@_result.RowCount.ToString("N0")</MudText>
             </div>
             <div class="pa-3 rounded-lg flex-1" style="background:var(--ml-card-bg, #fff); border:1px solid var(--ml-border); min-width:150px">
-                <MudText Typo="Typo.caption" Class="ml-muted" Style="font-weight:600; text-transform:uppercase">Execution Time</MudText>
-                <MudText Typo="Typo.h5" Style="font-weight:700">@(_result.ExecutionMs) ms</MudText>
+                <MudText Typo="Typo.caption" Class="ml-muted" Style="font-weight:600; text-transform:uppercase">@T["Execution Time"]</MudText>
+                <MudText Typo="Typo.h5" Style="font-weight:700">@T["{0} ms", _result.ExecutionMs]</MudText>
             </div>
             @if (_result.Totals != null && _result.Totals.Count > 0)
             {
@@ -127,7 +128,7 @@
                         {
                             <tr>
                                 <td colspan="@_result.Columns.Count" style="text-align:center; padding:32px" class="ml-muted">
-                                    No records match this reporting period and filter criteria.
+                                    @T["No records match this reporting period and filter criteria."]
                                 </td>
                             </tr>
                         }
@@ -161,7 +162,7 @@
                                         }
                                         else if (col == _result.Columns.FirstOrDefault())
                                         {
-                                            <span>TOTAL</span>
+                                            <span>@T["TOTAL"]</span>
                                         }
                                     </td>
                                 }
@@ -178,16 +179,16 @@
     <TitleContent>
         <div class="d-flex align-center gap-2">
             <MudIcon Icon="@Icons.Material.Outlined.ScheduleSend" Color="Color.Primary" />
-            <MudText Typo="Typo.h6">Scheduled Deliveries · @(_report?.Name)</MudText>
+            <MudText Typo="Typo.h6">@T["Scheduled Deliveries"] · @(_report?.Name)</MudText>
         </div>
     </TitleContent>
     <DialogContent>
         <MudText Typo="Typo.body2" Class="ml-muted mb-4">
-            Automatically generate and email this report to your team or stakeholders on a recurring schedule.
+            @T["Automatically generate and email this report to your team or stakeholders on a recurring schedule."]
         </MudText>
 
         <!-- Existing Schedules -->
-        <MudText Typo="Typo.subtitle2" Style="font-weight:600" Class="mb-2">Configured Schedules</MudText>
+        <MudText Typo="Typo.subtitle2" Style="font-weight:600" Class="mb-2">@T["Configured Schedules"]</MudText>
         @if (_loadingSchedules)
         {
             <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-3" />
@@ -195,7 +196,7 @@
         else if (_schedules.Count == 0)
         {
             <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-4">
-                No schedules configured for this report yet. Configure your first scheduled delivery below.
+                @T["No schedules configured for this report yet. Configure your first scheduled delivery below."]
             </MudAlert>
         }
         else
@@ -207,21 +208,21 @@
                         <div>
                             <div class="d-flex align-center gap-2">
                                 <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled">@s.Format.ToUpperInvariant()</MudChip>
-                                <MudText Typo="Typo.subtitle2" Style="font-weight:600">@FormatCronDescription(s.CronExpression)</MudText>
+                                <MudText Typo="Typo.subtitle2" Style="font-weight:600">@T[FormatCronDescription(s.CronExpression)]</MudText>
                                 <MudChip T="string" Size="Size.Small" Color="@(s.IsActive ? Color.Success : Color.Default)" Variant="Variant.Outlined">
                                     @(s.IsActive ? "Active" : "Paused")
                                 </MudChip>
                             </div>
                             <MudText Typo="Typo.caption" Class="ml-muted mt-1">
-                                Recipients: @string.Join(", ", s.Recipients)
+                                @T["Recipients: {0}", string.Join(", ", s.Recipients)]
                                 @if (s.LastRunAt.HasValue)
                                 {
-                                    <span> · Last sent @s.LastRunAt.Value.ToShortDateString()</span>
+                                    <span> · @T["Last sent {0}", s.LastRunAt.Value.ToShortDateString()]</span>
                                 }
                             </MudText>
                         </div>
                         <div class="d-flex align-center gap-1">
-                            <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Color="Color.Error" OnClick="() => DeleteScheduleAsync(s.Id)" aria-label="Delete schedule" />
+                            <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Color="Color.Error" OnClick="() => DeleteScheduleAsync(s.Id)" aria-label="@T["Delete schedule"]" />
                         </div>
                     </div>
                 }
@@ -230,43 +231,43 @@
 
         <!-- Add New Schedule Form -->
         <MudDivider Class="my-3" />
-        <MudText Typo="Typo.subtitle2" Style="font-weight:600" Class="mb-3">Add New Schedule</MudText>
+        <MudText Typo="Typo.subtitle2" Style="font-weight:600" Class="mb-3">@T["Add New Schedule"]</MudText>
 
         <MudGrid Spacing="2">
             <MudItem xs="12" sm="6">
-                <MudSelect T="string" @bind-Value="_newScheduleFrequency" Label="Delivery Frequency" Variant="Variant.Outlined" Margin="Margin.Dense">
-                    <MudSelectItem Value="@("daily")">Daily (8:00 AM UTC)</MudSelectItem>
-                    <MudSelectItem Value="@("weekly")">Weekly (Monday 8:00 AM UTC)</MudSelectItem>
-                    <MudSelectItem Value="@("monthly")">Monthly (1st of month 8:00 AM UTC)</MudSelectItem>
-                    <MudSelectItem Value="@("custom")">Custom Cron Expression</MudSelectItem>
+                <MudSelect T="string" @bind-Value="_newScheduleFrequency" Label="@T["Delivery Frequency"]" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem Value="@("daily")">@T["Daily (8:00 AM UTC)"]</MudSelectItem>
+                    <MudSelectItem Value="@("weekly")">@T["Weekly (Monday 8:00 AM UTC)"]</MudSelectItem>
+                    <MudSelectItem Value="@("monthly")">@T["Monthly (1st of month 8:00 AM UTC)"]</MudSelectItem>
+                    <MudSelectItem Value="@("custom")">@T["Custom Cron Expression"]</MudSelectItem>
                 </MudSelect>
             </MudItem>
             <MudItem xs="12" sm="6">
-                <MudSelect T="string" @bind-Value="_newScheduleFormat" Label="Export Format" Variant="Variant.Outlined" Margin="Margin.Dense">
-                    <MudSelectItem Value="@("pdf")">PDF Document</MudSelectItem>
-                    <MudSelectItem Value="@("csv")">CSV Spreadsheet</MudSelectItem>
-                    <MudSelectItem Value="@("excel")">Excel Spreadsheet (XML)</MudSelectItem>
+                <MudSelect T="string" @bind-Value="_newScheduleFormat" Label="@T["Export Format"]" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem Value="@("pdf")">@T["PDF Document"]</MudSelectItem>
+                    <MudSelectItem Value="@("csv")">@T["CSV Spreadsheet"]</MudSelectItem>
+                    <MudSelectItem Value="@("excel")">@T["Excel Spreadsheet (XML)"]</MudSelectItem>
                 </MudSelect>
             </MudItem>
             @if (_newScheduleFrequency == "custom")
             {
                 <MudItem xs="12">
-                    <MudTextField @bind-Value="_newScheduleCron" Label="Cron Expression" Placeholder="0 8 * * 1" HelperText="Standard 5-part cron: min hour dom month dow" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    <MudTextField @bind-Value="_newScheduleCron" Label="@T["Cron Expression"]" Placeholder="0 8 * * 1" HelperText="@T["Standard 5-part cron: min hour dom month dow"]" Variant="Variant.Outlined" Margin="Margin.Dense" />
                 </MudItem>
             }
             <MudItem xs="12">
-                <MudTextField @bind-Value="_newScheduleRecipients" Label="Recipient Email Addresses" Placeholder="alice@company.com, bob@company.com" HelperText="Comma-separated email addresses" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                <MudTextField @bind-Value="_newScheduleRecipients" Label="@T["Recipient Email Addresses"]" Placeholder="alice@company.com, bob@company.com" HelperText="@T["Comma-separated email addresses"]" Variant="Variant.Outlined" Margin="Margin.Dense" />
             </MudItem>
         </MudGrid>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="() => _schedulesDialogOpen = false">Close</MudButton>
+        <MudButton OnClick="() => _schedulesDialogOpen = false">@T["Close"]</MudButton>
         <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveNewScheduleAsync" Disabled="_savingSchedule">
             @if (_savingSchedule)
             {
                 <MudProgressCircular Indeterminate="true" Size="Size.Small" Class="mr-2" />
             }
-            Save Schedule
+            @T["Save Schedule"]
         </MudButton>
     </DialogActions>
 </MudDialog>
@@ -324,7 +325,7 @@
             }
             else
             {
-                _error = "Report not found.";
+                _error = T["Report not found."];
             }
         }
         catch (Exception ex)
@@ -363,7 +364,7 @@
             }
             else
             {
-                _error = "Failed to execute report query.";
+                _error = T["Failed to execute report query."];
             }
         }
         catch (Exception ex)
@@ -412,7 +413,7 @@
                 var runResp = await Http.PostAsJsonAsync("api/v1/reports/run", query);
                 if (!runResp.IsSuccessStatusCode)
                 {
-                    Snackbar.Add("Could not export report.", Severity.Error);
+                    Snackbar.Add(T["Could not export report."], Severity.Error);
                     return;
                 }
                 var res = await runResp.Content.ReadFromJsonAsync<ReportResult>();
@@ -422,7 +423,7 @@
                 var bytes = System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(csv)).ToArray();
                 var safeName = (_report?.Name ?? "report").Replace(" ", "_");
                 await JS.InvokeVoidAsync("mindlift.downloadFile", $"{safeName}.csv", "text/csv", Convert.ToBase64String(bytes));
-                Snackbar.Add("Export downloaded", Severity.Success);
+                Snackbar.Add(T["Export downloaded"], Severity.Success);
                 return;
             }
 
@@ -437,11 +438,11 @@
                 };
                 var safeName = (_report?.Name ?? "report").Replace(" ", "_");
                 await JS.InvokeVoidAsync("mindlift.downloadFile", $"{safeName}.{ext}", mime, Convert.ToBase64String(bytes));
-                Snackbar.Add("Export downloaded", Severity.Success);
+                Snackbar.Add(T["Export downloaded"], Severity.Success);
             }
             else
             {
-                Snackbar.Add("Export failed.", Severity.Error);
+                Snackbar.Add(T["Export failed."], Severity.Error);
             }
         }
         catch (Exception ex)
@@ -479,7 +480,7 @@
 
         if (emails.Count == 0)
         {
-            Snackbar.Add("Please enter at least one valid recipient email address.", Severity.Warning);
+            Snackbar.Add(T["Please enter at least one valid recipient email address."], Severity.Warning);
             return;
         }
 
@@ -505,13 +506,13 @@
             var resp = await Http.PostAsJsonAsync($"api/v1/reports/{Id.Value}/schedules", req);
             if (resp.IsSuccessStatusCode)
             {
-                Snackbar.Add("Schedule saved successfully!", Severity.Success);
+                Snackbar.Add(T["Schedule saved successfully!"], Severity.Success);
                 _newScheduleRecipients = "";
                 _schedules = await Http.GetFromJsonAsync<List<ReportScheduleDto>>($"api/v1/reports/{Id.Value}/schedules") ?? [];
             }
             else
             {
-                Snackbar.Add("Failed to save schedule.", Severity.Error);
+                Snackbar.Add(T["Failed to save schedule."], Severity.Error);
             }
         }
         catch (Exception ex)
@@ -532,11 +533,11 @@
             if (resp.IsSuccessStatusCode)
             {
                 _schedules.RemoveAll(s => s.Id == scheduleId);
-                Snackbar.Add("Schedule deleted.", Severity.Success);
+                Snackbar.Add(T["Schedule deleted."], Severity.Success);
             }
             else
             {
-                Snackbar.Add("Failed to delete schedule.", Severity.Error);
+                Snackbar.Add(T["Failed to delete schedule."], Severity.Error);
             }
         }
         catch (Exception ex)

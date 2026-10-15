@@ -3,14 +3,15 @@
 @inject AuthSession Session
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
+@inject Translator T
 
-<PageTitle>Notification preferences · MindLift</PageTitle>
+<PageTitle>@T["Notification preferences"] · MindLift</PageTitle>
 
 <div class="ml-page ml-page--form">
     <PageHeader Title="Notification preferences" Subtitle="Choose what reaches you in MindLift and by email."
                 Breadcrumbs="@(new List<BreadcrumbItem> { new("Notifications", "/notifications"), new("Preferences", null, true) })">
         <Actions>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="_busy || !_dirty" data-testid="primary-action">Save preferences</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="_busy || !_dirty" data-testid="primary-action">@T["Save preferences"]</MudButton>
         </Actions>
     </PageHeader>
 
@@ -29,9 +30,9 @@
                 <table style="width:100%;border-collapse:collapse">
                     <thead>
                         <tr>
-                            <th style="text-align:start;padding:8px">Tell me when</th>
-                            <th style="padding:8px">In MindLift</th>
-                            <th style="padding:8px">By email</th>
+                            <th style="text-align:start;padding:8px">@T["Tell me when"]</th>
+                            <th style="padding:8px">@T["In MindLift"]</th>
+                            <th style="padding:8px">@T["By email"]</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -50,8 +51,8 @@
         </MlCard>
 
         <MlCard Title="Daily summary" Class="mt-4">
-            <MudSwitch T="bool" Value="_digest" ValueChanged="v => { _digest = v; _dirty = true; }" Label="Email me my day at 8:00 each morning" Color="Color.Primary" data-testid="digest-switch" />
-            <MudText Typo="Typo.caption" Class="ml-muted">Your tasks and meetings for the day and anything overdue. Nothing is sent on a day with nothing in it.</MudText>
+            <MudSwitch T="bool" Value="_digest" ValueChanged="v => { _digest = v; _dirty = true; }" Label="@T["Email me my day at 8:00 each morning"]" Color="Color.Primary" data-testid="digest-switch" />
+            <MudText Typo="Typo.caption" Class="ml-muted">@T["Your tasks and meetings for the day and anything overdue. Nothing is sent on a day with nothing in it."]</MudText>
         </MlCard>
     }
 </div>
@@ -114,16 +115,16 @@
             var response = await Http.PutAsJsonAsync("api/v1/notifications/preferences", new SaveNotificationPreferencesRequest(_rows, _digest));
             if (!response.IsSuccessStatusCode)
             {
-                Snackbar.Add(await ProblemText.FromAsync(response, "We could not save your preferences."), Severity.Error);
+                Snackbar.Add(await ProblemText.FromAsync(response, T["We could not save your preferences."]), Severity.Error);
                 return;
             }
 
             _dirty = false;
-            Snackbar.Add("Preferences saved", Severity.Success);
+            Snackbar.Add(T["Preferences saved"], Severity.Success);
         }
         catch (HttpRequestException)
         {
-            Snackbar.Add("We could not reach MindLift. Check your connection and try again.", Severity.Error);
+            Snackbar.Add(T["We could not reach MindLift. Check your connection and try again."], Severity.Error);
         }
         finally
         {

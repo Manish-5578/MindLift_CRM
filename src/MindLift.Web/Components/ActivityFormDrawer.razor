@@ -1,4 +1,5 @@
 @using System.Globalization
+@inject Translator T
 <FormDrawer Open="Open" OpenChanged="OnOpenChanged" Title="@Title" SubmitText="@(_id is null ? "Save" : "Save changes")" Busy="_busy" OnSubmit="SaveAsync" IsDirty="IsDirty">
     @if (_error is not null)
     {
@@ -196,7 +197,7 @@
                 }
                 else
                 {
-                    _error = await ProblemText.FromAsync(response, "We could not save this activity.");
+                    _error = await ProblemText.FromAsync(response, T["We could not save this activity."]);
                 }
 
                 return;
@@ -207,7 +208,7 @@
         }
         catch (HttpRequestException)
         {
-            _error = "We could not reach MindLift. Check your connection and try again.";
+            _error = T["We could not reach MindLift. Check your connection and try again."];
         }
         finally
         {

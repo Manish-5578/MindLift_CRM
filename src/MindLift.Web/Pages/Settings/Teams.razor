@@ -3,14 +3,15 @@
 @inject AppState App
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
+@inject Translator T
 
-<PageTitle>Teams & branches · MindLift</PageTitle>
+<PageTitle>@T["Teams & branches"] · MindLift</PageTitle>
 
 <div class="ml-page ml-page--form">
     <PageHeader Title="Teams & branches" Subtitle="Teams group people for team-scoped access and dashboards. Branches are offices or locations, each with its own time zone." >
         <Actions>
-            <MudButton Variant="Variant.Outlined" OnClick="() => OpenBranch(null)" data-testid="add-branch">New branch</MudButton>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => OpenTeam(null)" data-testid="primary-action">New team</MudButton>
+            <MudButton Variant="Variant.Outlined" OnClick="() => OpenBranch(null)" data-testid="add-branch">@T["New branch"]</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => OpenTeam(null)" data-testid="primary-action">@T["New team"]</MudButton>
         </Actions>
     </PageHeader>
     <SettingsNav Current="/settings/teams" />
@@ -31,17 +32,17 @@
                 <div class="ml-row" style="padding:12px 20px;border-bottom:1px solid var(--ml-border);min-height:56px" data-testid="team-row">
                     <div class="ml-grow">
                         <MudText Typo="Typo.subtitle2">@team.Name</MudText>
-                        <MudText Typo="Typo.caption" Class="ml-muted">@BranchName(team.BranchId) · Leader: @LeaderName(team.LeaderId) · @team.MemberCount @(team.MemberCount == 1 ? "member" : "members")</MudText>
+                        <MudText Typo="Typo.caption" Class="ml-muted">@BranchName(team.BranchId) · @T["Leader: {0}", LeaderName(team.LeaderId)] · @T[team.MemberCount == 1 ? "{0} member" : "{0} members", team.MemberCount]</MudText>
                     </div>
-                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="() => OpenTeam(team)" aria-label="Edit team" />
+                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="() => OpenTeam(team)" aria-label="@T["Edit team"]" />
                     @if (_confirmTeamId == team.Id)
                     {
-                        <MudButton Size="Size.Small" OnClick="() => _confirmTeamId = null">Keep</MudButton>
-                        <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeleteTeamAsync(team)">Delete</MudButton>
+                        <MudButton Size="Size.Small" OnClick="() => _confirmTeamId = null">@T["Keep"]</MudButton>
+                        <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeleteTeamAsync(team)">@T["Delete"]</MudButton>
                     }
                     else
                     {
-                        <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" OnClick="() => _confirmTeamId = team.Id" aria-label="Delete team" />
+                        <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" OnClick="() => _confirmTeamId = team.Id" aria-label="@T["Delete team"]" />
                     }
                 </div>
             }
@@ -59,15 +60,15 @@
                         <MudText Typo="Typo.subtitle2">@branch.Name</MudText>
                         <MudText Typo="Typo.caption" Class="ml-muted">@(branch.Address ?? "No address") · @(branch.TimeZoneId ?? App.Bootstrap?.Company.TimeZoneId ?? "UTC")</MudText>
                     </div>
-                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="() => OpenBranch(branch)" aria-label="Edit branch" />
+                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="() => OpenBranch(branch)" aria-label="@T["Edit branch"]" />
                     @if (_confirmBranchId == branch.Id)
                     {
-                        <MudButton Size="Size.Small" OnClick="() => _confirmBranchId = null">Keep</MudButton>
-                        <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeleteBranchAsync(branch)">Delete</MudButton>
+                        <MudButton Size="Size.Small" OnClick="() => _confirmBranchId = null">@T["Keep"]</MudButton>
+                        <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeleteBranchAsync(branch)">@T["Delete"]</MudButton>
                     }
                     else
                     {
-                        <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" OnClick="() => _confirmBranchId = branch.Id" aria-label="Delete branch" />
+                        <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" OnClick="() => _confirmBranchId = branch.Id" aria-label="@T["Delete branch"]" />
                     }
                 </div>
             }
@@ -81,16 +82,16 @@
 
 <FormDrawer Open="_teamOpen" OpenChanged="v => _teamOpen = v" Title="@_teamTitle" SubmitText="Save team" Busy="_busy" OnSubmit="SaveTeamAsync">
     <div class="ml-stack">
-        <MudTextField @bind-Value="_teamName" Label="Name *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="team-name" />
-        <MudSelect T="Guid?" @bind-Value="_teamBranchId" Label="Branch" Variant="Variant.Outlined" Margin="Margin.Dense">
-            <MudSelectItem T="Guid?" Value="(Guid?)null">No branch</MudSelectItem>
+        <MudTextField @bind-Value="_teamName" Label="@T["Name *"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="team-name" />
+        <MudSelect T="Guid?" @bind-Value="_teamBranchId" Label="@T["Branch"]" Variant="Variant.Outlined" Margin="Margin.Dense">
+            <MudSelectItem T="Guid?" Value="(Guid?)null">@T["No branch"]</MudSelectItem>
             @foreach (var branch in _branches)
             {
                 <MudSelectItem T="Guid?" Value="@branch.Id">@branch.Name</MudSelectItem>
             }
         </MudSelect>
-        <MudSelect T="Guid?" @bind-Value="_teamLeaderId" Label="Team leader" Variant="Variant.Outlined" Margin="Margin.Dense">
-            <MudSelectItem T="Guid?" Value="(Guid?)null">No leader</MudSelectItem>
+        <MudSelect T="Guid?" @bind-Value="_teamLeaderId" Label="@T["Team leader"]" Variant="Variant.Outlined" Margin="Margin.Dense">
+            <MudSelectItem T="Guid?" Value="(Guid?)null">@T["No leader"]</MudSelectItem>
             @foreach (var user in _users)
             {
                 <MudSelectItem T="Guid?" Value="@user.Id">@user.FullName</MudSelectItem>
@@ -102,9 +103,9 @@
 
 <FormDrawer Open="_branchOpen" OpenChanged="v => _branchOpen = v" Title="@_branchTitle" SubmitText="Save branch" Busy="_busy" OnSubmit="SaveBranchAsync">
     <div class="ml-stack">
-        <MudTextField @bind-Value="_branchName" Label="Name *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="branch-name" />
-        <MudTextField @bind-Value="_branchAddress" Label="Address" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />
-        <MudTextField @bind-Value="_branchTimeZone" Label="Time zone" Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="For example Asia/Dubai. Leave empty to use the company time zone." />
+        <MudTextField @bind-Value="_branchName" Label="@T["Name *"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="branch-name" />
+        <MudTextField @bind-Value="_branchAddress" Label="@T["Address"]" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />
+        <MudTextField @bind-Value="_branchTimeZone" Label="@T["Time zone"]" Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="@T["For example Asia/Dubai. Leave empty to use the company time zone."]" />
         @if (_formError is not null) { <MudAlert Severity="Severity.Error" Dense="true">@_formError</MudAlert> }
     </div>
 </FormDrawer>
@@ -197,7 +198,7 @@
         _formError = null;
         if (string.IsNullOrWhiteSpace(_teamName))
         {
-            _formError = "Give the team a name.";
+            _formError = T["Give the team a name."];
             return;
         }
 
@@ -210,12 +211,12 @@
                 : await Http.PutAsJsonAsync($"api/v1/teams/{_teamEditId}", body);
             if (!response.IsSuccessStatusCode)
             {
-                _formError = await ProblemText.FromAsync(response, "We could not save this team.");
+                _formError = await ProblemText.FromAsync(response, T["We could not save this team."]);
                 return;
             }
 
             _teamOpen = false;
-            Snackbar.Add("Team saved", Severity.Success);
+            Snackbar.Add(T["Team saved"], Severity.Success);
             await LoadAsync();
         }
         finally
@@ -229,7 +230,7 @@
         _formError = null;
         if (string.IsNullOrWhiteSpace(_branchName))
         {
-            _formError = "Give the branch a name.";
+            _formError = T["Give the branch a name."];
             return;
         }
 
@@ -243,12 +244,12 @@
                 : await Http.PutAsJsonAsync($"api/v1/branches/{_branchEditId}", body);
             if (!response.IsSuccessStatusCode)
             {
-                _formError = await ProblemText.FromAsync(response, "We could not save this branch.");
+                _formError = await ProblemText.FromAsync(response, T["We could not save this branch."]);
                 return;
             }
 
             _branchOpen = false;
-            Snackbar.Add("Branch saved", Severity.Success);
+            Snackbar.Add(T["Branch saved"], Severity.Success);
             await LoadAsync();
         }
         finally
@@ -263,11 +264,11 @@
         _confirmTeamId = null;
         if (!response.IsSuccessStatusCode)
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, "We could not delete this team."), Severity.Error);
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not delete this team."]), Severity.Error);
             return;
         }
 
-        Snackbar.Add("Team deleted", Severity.Success);
+        Snackbar.Add(T["Team deleted"], Severity.Success);
         await LoadAsync();
     }
 
@@ -277,11 +278,11 @@
         _confirmBranchId = null;
         if (!response.IsSuccessStatusCode)
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, "We could not delete this branch."), Severity.Error);
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not delete this branch."]), Severity.Error);
             return;
         }
 
-        Snackbar.Add("Branch deleted", Severity.Success);
+        Snackbar.Add(T["Branch deleted"], Severity.Success);
         await LoadAsync();
     }
 }

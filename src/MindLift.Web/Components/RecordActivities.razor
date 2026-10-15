@@ -2,16 +2,17 @@
 @inject AppState App
 @inject ISnackbar Snackbar
 @inject IDialogService Dialogs
+@inject Translator T
 
 <MlCard Title="Activities" TestId="record-activities">
     <div class="ml-stack">
         @if (CanCreate)
         {
             <div class="ml-row ml-row--wrap" data-testid="activity-actions">
-                <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Outlined.TaskAlt" OnClick="() => OpenNew(ActivityTypes.Task)" data-testid="add-task">Task</MudButton>
-                <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Call" OnClick="() => OpenNew(ActivityTypes.Call)" data-testid="add-call">Call</MudButton>
-                <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Event" OnClick="() => OpenNew(ActivityTypes.Meeting)" data-testid="add-meeting">Meeting</MudButton>
-                <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Outlined.StickyNote2" OnClick="() => OpenNew(ActivityTypes.Note)" data-testid="add-note">Note</MudButton>
+                <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Outlined.TaskAlt" OnClick="() => OpenNew(ActivityTypes.Task)" data-testid="add-task">@T["Task"]</MudButton>
+                <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Call" OnClick="() => OpenNew(ActivityTypes.Call)" data-testid="add-call">@T["Call"]</MudButton>
+                <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Event" OnClick="() => OpenNew(ActivityTypes.Meeting)" data-testid="add-meeting">@T["Meeting"]</MudButton>
+                <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Outlined.StickyNote2" OnClick="() => OpenNew(ActivityTypes.Note)" data-testid="add-note">@T["Note"]</MudButton>
             </div>
         }
 
@@ -21,7 +22,7 @@
         }
         else if (_items.Count == 0)
         {
-            <MudText Typo="Typo.body2" Class="ml-muted" data-testid="no-activities">Nothing logged yet.</MudText>
+            <MudText Typo="Typo.body2" Class="ml-muted" data-testid="no-activities">@T["Nothing logged yet."]</MudText>
         }
 
         @foreach (var item in _items)
@@ -49,7 +50,7 @@
                     }
                     @if (current.Attendees.Count > 0)
                     {
-                        <MudText Typo="Typo.caption" Class="ml-muted" data-testid="activity-guests">Guests: @string.Join(", ", current.Attendees)@(current.InvitationsSentAtUtc is null ? "" : " · invitations sent")</MudText>
+                        <MudText Typo="Typo.caption" Class="ml-muted" data-testid="activity-guests">@T["Guests: {0}", string.Join(", ", current.Attendees)]@(current.InvitationsSentAtUtc is null ? "" : " · " + T["invitations sent"])</MudText>
                     }
                     <MudText Typo="Typo.caption" Class="ml-muted">
                         @current.Type@(current.Direction is null ? "" : " · " + current.Direction)
@@ -60,11 +61,11 @@
 
                 @if (CanEdit)
                 {
-                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="() => EditAsync(current)" aria-label="Edit" />
+                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="() => EditAsync(current)" aria-label="@T["Edit"]" />
                 }
                 @if (CanDelete)
                 {
-                    <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" OnClick="() => DeleteAsync(current)" aria-label="Delete" data-testid="activity-delete" />
+                    <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" OnClick="() => DeleteAsync(current)" aria-label="@T["Delete"]" data-testid="activity-delete" />
                 }
             </div>
         }
@@ -154,7 +155,7 @@
 
     private async Task OnSaved()
     {
-        Snackbar.Add("Activity saved", Severity.Success);
+        Snackbar.Add(T["Activity saved"], Severity.Success);
         await LoadAsync();
         await OnChanged.InvokeAsync();
     }
@@ -166,7 +167,7 @@
             : await Http.PostAsync($"api/v1/activities/{item.Id}/reopen", null);
         if (!response.IsSuccessStatusCode)
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, "We could not update this activity."), Severity.Error);
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not update this activity."]), Severity.Error);
         }
 
         await LoadAsync();
@@ -175,7 +176,7 @@
 
     private async Task DeleteAsync(ActivityDto item)
     {
-        if (!await Dialogs.ConfirmAsync($"Delete {item.Subject}?", "It is removed from every record it is linked to.", "Delete", danger: true))
+        if (!await Dialogs.ConfirmAsync($"Delete {item.Subject}?", T["It is removed from every record it is linked to."], T["Delete"], danger: true))
         {
             return;
         }
@@ -183,7 +184,7 @@
         var response = await Http.DeleteAsync($"api/v1/activities/{item.Id}");
         if (!response.IsSuccessStatusCode)
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, "We could not delete this activity."), Severity.Error);
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not delete this activity."]), Severity.Error);
         }
 
         await LoadAsync();

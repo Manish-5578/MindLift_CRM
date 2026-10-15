@@ -7,19 +7,20 @@
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
 @inject IDialogService Dialogs
+@inject Translator T
 
-<PageTitle>@App.ModuleLabel(AppModule.Deals) board · MindLift</PageTitle>
+<PageTitle>@T["{0} board", T[App.ModuleLabel(AppModule.Deals)]] · MindLift</PageTitle>
 
 <div class="ml-page">
     <PageHeader Title="@App.ModuleLabel(AppModule.Deals)" Subtitle="@SubtitleText">
         <Actions>
             <MudButtonGroup Variant="Variant.Outlined" Size="Size.Medium" data-testid="layout-toggle">
-                <MudButton Color="Color.Primary" Href="/deals/board">Board</MudButton>
-                <MudButton Href="/deals">List</MudButton>
+                <MudButton Color="Color.Primary" Href="/deals/board">@T["Board"]</MudButton>
+                <MudButton Href="/deals">@T["List"]</MudButton>
             </MudButtonGroup>
             @if (CanCreate)
             {
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" OnClick="OpenNew" data-testid="primary-action">New deal</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" OnClick="OpenNew" data-testid="primary-action">@T["New deal"]</MudButton>
             }
         </Actions>
     </PageHeader>
@@ -27,14 +28,14 @@
     <div class="ml-row ml-row--wrap" style="margin-bottom:16px" data-testid="board-toolbar">
         @if (Pipelines.Count > 1)
         {
-            <MudSelect T="Guid" Value="_pipelineId" ValueChanged="PipelineChangedAsync" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:240px" aria-label="Pipeline" data-testid="pipeline-select">
+            <MudSelect T="Guid" Value="_pipelineId" ValueChanged="PipelineChangedAsync" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:240px" aria-label="@T["Pipeline"]" data-testid="pipeline-select">
                 @foreach (var pipeline in Pipelines)
                 {
                     <MudSelectItem T="Guid" Value="@pipeline.Id">@pipeline.Name</MudSelectItem>
                 }
             </MudSelect>
         }
-        <MudSwitch T="bool" Value="_mineOnly" ValueChanged="MineAsync" Label="Only mine" Color="Color.Primary" data-testid="mine-only" />
+        <MudSwitch T="bool" Value="_mineOnly" ValueChanged="MineAsync" Label="@T["Only mine"]" Color="Color.Primary" data-testid="mine-only" />
     </div>
 
     @if (_error is not null)
@@ -143,7 +144,7 @@
 
             if (!response.IsSuccessStatusCode)
             {
-                _error = await ProblemText.FromAsync(response, "We could not load your deals. Try again.");
+                _error = await ProblemText.FromAsync(response, T["We could not load your deals. Try again."]);
                 return;
             }
 
@@ -155,7 +156,7 @@
         }
         catch (HttpRequestException)
         {
-            _error = "We could not reach MindLift. Check your connection and try again.";
+            _error = T["We could not reach MindLift. Check your connection and try again."];
         }
         finally
         {
@@ -193,7 +194,7 @@
             lostReason = lost.Reason;
             lostNotes = lost.Notes;
         }
-        else if (target.Type == "Won" && !await Dialogs.ConfirmAsync($"Mark {deal.Name} as won?", "The close date is set to today and any onboarding checklist is created.", "Mark as won"))
+        else if (target.Type == "Won" && !await Dialogs.ConfirmAsync($"Mark {deal.Name} as won?", T["The close date is set to today and any onboarding checklist is created."], T["Mark as won"]))
         {
             return;
         }
@@ -205,7 +206,7 @@
         }
         else
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, "We could not move this deal."), Severity.Error);
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not move this deal."]), Severity.Error);
         }
 
         // Totals and order come from the server, so the board is reloaded whether or not the move worked.
@@ -220,7 +221,7 @@
 
     private async Task OnSaved()
     {
-        Snackbar.Add("Deal saved", Severity.Success);
+        Snackbar.Add(T["Deal saved"], Severity.Success);
         await LoadAsync();
     }
 }

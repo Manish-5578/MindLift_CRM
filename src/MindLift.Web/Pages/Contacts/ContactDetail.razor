@@ -5,8 +5,9 @@
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
 @inject IDialogService Dialogs
+@inject Translator T
 
-<PageTitle>Contact · MindLift</PageTitle>
+<PageTitle>@T["Contact"] · MindLift</PageTitle>
 
 <div class="ml-page ml-page--narrow">
     @if (_loading)
@@ -24,7 +25,7 @@
                             Breadcrumbs="@(new List<BreadcrumbItem> { new(App.ModuleLabel(AppModule.Contacts), "/contacts"), new(contact.FirstName, null, true) })">
             <Badges>
                 @if (contact.Type is not null) { <StatusChip Text="@TypeLabel(contact.Type)" Dot="false" /> }
-                <MudText Typo="Typo.body2" Class="ml-muted">Created <DateText Value="@contact.CreatedAtUtc" /></MudText>
+                <MudText Typo="Typo.body2" Class="ml-muted">@T["Created"] <DateText Value="@contact.CreatedAtUtc" /></MudText>
                 @if (_portal is not null && _portal.Status != NotInvited)
                 {
                     <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="@PortalColor" Icon="@Icons.Material.Outlined.VpnKey" data-testid="portal-status">@PortalText</MudChip>
@@ -33,7 +34,7 @@
             <Actions>
                 @if (Can(p => p.CanEdit))
                 {
-                    <MudButton Variant="Variant.Outlined" OnClick="FindDuplicatesAsync" data-testid="find-duplicates">Find duplicates</MudButton>
+                    <MudButton Variant="Variant.Outlined" OnClick="FindDuplicatesAsync" data-testid="find-duplicates">@T["Find duplicates"]</MudButton>
                 }
                 @if (Can(p => p.CanEdit) && !string.IsNullOrWhiteSpace(contact.Email))
                 {
@@ -41,11 +42,11 @@
                 }
                 @if (Can(p => p.CanDelete))
                 {
-                    <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="DeleteAsync" data-testid="delete-contact">Delete</MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="DeleteAsync" data-testid="delete-contact">@T["Delete"]</MudButton>
                 }
                 @if (Can(p => p.CanEdit))
                 {
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenEdit" data-testid="primary-action">Edit</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenEdit" data-testid="primary-action">@T["Edit"]</MudButton>
                 }
             </Actions>
             <ChildContent>
@@ -55,7 +56,7 @@
                         <div class="ml-stack">
                             @if (_candidates.Count == 0)
                             {
-                                <MudText Typo="Typo.body2" Class="ml-muted" data-testid="no-duplicates">Nothing else shares this contact's email or phone.</MudText>
+                                <MudText Typo="Typo.body2" Class="ml-muted" data-testid="no-duplicates">@T["Nothing else shares this contact's email or phone."]</MudText>
                             }
 
                             @foreach (var candidate in _candidates)
@@ -71,10 +72,10 @@
                             }
 
                             <div class="ml-row" style="justify-content:flex-end">
-                                <MudButton OnClick="() => _showDuplicates = false">Close</MudButton>
+                                <MudButton OnClick="() => _showDuplicates = false">@T["Close"]</MudButton>
                                 @if (_candidates.Count > 0)
                                 {
-                                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="MergeAsync" data-testid="merge-submit">Merge selected</MudButton>
+                                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="MergeAsync" data-testid="merge-submit">@T["Merge selected"]</MudButton>
                                 }
                             </div>
                         </div>
@@ -83,11 +84,11 @@
 
                 <MlCard Title="Details">
                     <div class="ml-kv" data-testid="contact-details">
-                        <div class="ml-kv__label">Email</div><div class="ml-kv__value"><FieldValue Kind="FormFieldKind.Email" Value="@contact.Email" /></div>
-                        <div class="ml-kv__label">Phone</div><div class="ml-kv__value"><FieldValue Kind="FormFieldKind.Phone" Value="@contact.Phone" /></div>
-                        <div class="ml-kv__label">Job title</div><div class="ml-kv__value"><FieldValue Value="@contact.JobTitle" /></div>
-                        <div class="ml-kv__label">Owner</div><div class="ml-kv__value"><FieldValue Kind="FormFieldKind.User" Value="@contact.OwnerId.ToString()" Users="_users" /></div>
-                        <div class="ml-kv__label">Notes</div><div class="ml-kv__value"><FieldValue Kind="FormFieldKind.Multiline" Value="@contact.Description" /></div>
+                        <div class="ml-kv__label">@T["Email"]</div><div class="ml-kv__value"><FieldValue Kind="FormFieldKind.Email" Value="@contact.Email" /></div>
+                        <div class="ml-kv__label">@T["Phone"]</div><div class="ml-kv__value"><FieldValue Kind="FormFieldKind.Phone" Value="@contact.Phone" /></div>
+                        <div class="ml-kv__label">@T["Job title"]</div><div class="ml-kv__value"><FieldValue Value="@contact.JobTitle" /></div>
+                        <div class="ml-kv__label">@T["Owner"]</div><div class="ml-kv__value"><FieldValue Kind="FormFieldKind.User" Value="@contact.OwnerId.ToString()" Users="_users" /></div>
+                        <div class="ml-kv__label">@T["Notes"]</div><div class="ml-kv__value"><FieldValue Kind="FormFieldKind.Multiline" Value="@contact.Description" /></div>
                         @foreach (var field in CustomFields)
                         {
                             <div class="ml-kv__label">@field.Label</div>
@@ -108,13 +109,13 @@
                     }
                     else
                     {
-                        <MudText Typo="Typo.body2" Class="ml-muted">Not linked to a company.</MudText>
+                        <MudText Typo="Typo.body2" Class="ml-muted">@T["Not linked to a company."]</MudText>
                     }
                 </MlCard>
                 <MlCard Title="@($"Deals ({_summary.DealCount})")">
                     @if (_summary.Deals.Count == 0)
                     {
-                        <MudText Typo="Typo.body2" Class="ml-muted">No deals yet.</MudText>
+                        <MudText Typo="Typo.body2" Class="ml-muted">@T["No deals yet."]</MudText>
                     }
                     @foreach (var deal in _summary.Deals)
                     {
@@ -122,7 +123,7 @@
                     }
                 </MlCard>
                 <MlCard Title="Activity">
-                    <MudText Typo="Typo.body2" Class="ml-muted" data-testid="activity-count">@_summary.ActivityCount @(_summary.ActivityCount == 1 ? "activity" : "activities") logged.</MudText>
+                    <MudText Typo="Typo.body2" Class="ml-muted" data-testid="activity-count">@T[_summary.ActivityCount == 1 ? "{0} activity logged." : "{0} activities logged.", _summary.ActivityCount]</MudText>
                 </MlCard>
             </Aside>
         </RecordDetailLayout>
@@ -180,13 +181,13 @@
             _summary = response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<ContactSummaryDto>() : null;
             if (!response.IsSuccessStatusCode)
             {
-                _error = await ProblemText.FromAsync(response, "We could not open this contact.");
+                _error = await ProblemText.FromAsync(response, T["We could not open this contact."]);
             }
         }
         catch (HttpRequestException)
         {
             _summary = null;
-            _error = "We could not reach MindLift. Check your connection and try again.";
+            _error = T["We could not reach MindLift. Check your connection and try again."];
         }
         finally
         {
@@ -200,13 +201,13 @@
     private PortalAccessStatusDto? _portal;
     private bool _inviting;
 
-    private string InviteLabel => _portal is null || _portal.Status == NotInvited ? "Invite to Portal" : "Resend portal invite";
+    private string InviteLabel => _portal is null || _portal.Status == NotInvited ? T["Invite to Portal"] : T["Resend portal invite"];
 
     private string PortalText => _portal?.Status switch
     {
-        "Active" => "Portal active",
-        "Invited" => "Portal invite sent",
-        "Disabled" => "Portal disabled",
+        "Active" => T["Portal active"],
+        "Invited" => T["Portal invite sent"],
+        "Disabled" => T["Portal disabled"],
         _ => string.Empty
     };
 
@@ -249,13 +250,13 @@
 
     private async Task OnSaved()
     {
-        Snackbar.Add("Contact saved", Severity.Success);
+        Snackbar.Add(T["Contact saved"], Severity.Success);
         await LoadAsync();
     }
 
     private async Task DeleteAsync()
     {
-        if (!await Dialogs.ConfirmAsync($"Delete {FullName}?", "The contact is removed from your lists. This cannot be undone from here.", "Delete", danger: true))
+        if (!await Dialogs.ConfirmAsync($"Delete {FullName}?", T["The contact is removed from your lists. This cannot be undone from here."], T["Delete"], danger: true))
         {
             return;
         }
@@ -263,11 +264,11 @@
         var response = await Http.DeleteAsync($"api/v1/contacts/{Id}");
         if (!response.IsSuccessStatusCode)
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, "We could not delete this contact."), Severity.Error);
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not delete this contact."]), Severity.Error);
             return;
         }
 
-        Snackbar.Add("Contact deleted", Severity.Success);
+        Snackbar.Add(T["Contact deleted"], Severity.Success);
         Nav.NavigateTo("/contacts");
     }
 
@@ -291,14 +292,14 @@
     {
         if (_selectedIds.Count == 0)
         {
-            Snackbar.Add("Tick at least one contact to merge.", Severity.Warning);
+            Snackbar.Add(T["Tick at least one contact to merge."], Severity.Warning);
             return;
         }
 
         var count = _selectedIds.Count;
         var plural = count == 1 ? string.Empty : "s";
         if (!await Dialogs.ConfirmAsync($"Merge {count} contact{plural} into {FullName}?",
-                $"The selected contact{plural} will be removed. Empty fields here are filled from {(count == 1 ? "it" : "them")}, and activities move to this contact.", "Merge", danger: true))
+                $"The selected contact{plural} will be removed. Empty fields here are filled from {(count == 1 ? "it" : "them")}, and activities move to this contact.", T["Merge"], danger: true))
         {
             return;
         }
@@ -306,7 +307,7 @@
         var response = await Http.PostAsJsonAsync($"api/v1/contacts/{Id}/merge", new MergeContactsRequest(_selectedIds.ToList()));
         if (!response.IsSuccessStatusCode)
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, "We could not merge these contacts."), Severity.Error);
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not merge these contacts."]), Severity.Error);
             return;
         }
 
@@ -330,7 +331,7 @@
             }
             else
             {
-                Snackbar.Add(await ProblemText.FromAsync(response, "Could not send portal invitation."), Severity.Error);
+                Snackbar.Add(await ProblemText.FromAsync(response, T["Could not send portal invitation."]), Severity.Error);
             }
         }
         catch (HttpRequestException ex)

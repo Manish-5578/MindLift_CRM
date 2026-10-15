@@ -2,8 +2,9 @@
 @using System.Globalization
 @layout AuthLayout
 @inject HttpClient Http
+@inject Translator T
 
-<PageTitle>Book a time · MindLift</PageTitle>
+<PageTitle>@T["Book a time"] · MindLift</PageTitle>
 
 <div class="ml-wizard" style="max-width:520px;margin-top:32px">
     @if (_loading)
@@ -12,28 +13,28 @@
     }
     else if (_info is null)
     {
-        <MudAlert Severity="Severity.Error" data-testid="book-missing">This booking page is not available.</MudAlert>
+        <MudAlert Severity="Severity.Error" data-testid="book-missing">@T["This booking page is not available."]</MudAlert>
     }
     else if (_confirmation is not null)
     {
         <div class="ml-stack" data-testid="book-confirmed">
-            <MudText Typo="Typo.h4">You are booked</MudText>
+            <MudText Typo="Typo.h4">@T["You are booked"]</MudText>
             <MudText Typo="Typo.body1">@_info.Name · @_confirmation.StartUtc.ToString("dddd d MMMM, HH:mm", CultureInfo.InvariantCulture) UTC</MudText>
-            <MudText Typo="Typo.body2" Class="ml-muted">We emailed you a calendar invitation. To cancel or move it, use the link in that email.</MudText>
-            <MudButton Variant="Variant.Outlined" Href="@_confirmation.ManagePath">Manage this booking</MudButton>
+            <MudText Typo="Typo.body2" Class="ml-muted">@T["We emailed you a calendar invitation. To cancel or move it, use the link in that email."]</MudText>
+            <MudButton Variant="Variant.Outlined" Href="@_confirmation.ManagePath">@T["Manage this booking"]</MudButton>
         </div>
     }
     else
     {
         <div class="ml-stack">
             <MudText Typo="Typo.h4" data-testid="book-title">@_info.Name</MudText>
-            <MudText Typo="Typo.body2" Class="ml-muted">@_info.CompanyName · @_info.DurationMinutes minutes</MudText>
+            <MudText Typo="Typo.body2" Class="ml-muted">@_info.CompanyName · @T["{0} minutes", _info.DurationMinutes]</MudText>
             @if (!string.IsNullOrWhiteSpace(_info.Description))
             {
                 <MudText Typo="Typo.body2">@_info.Description</MudText>
             }
 
-            <MudText Typo="Typo.subtitle2">1. Choose a day</MudText>
+            <MudText Typo="Typo.subtitle2">@T["1. Choose a day"]</MudText>
             <div class="ml-row ml-row--wrap" data-testid="book-days">
                 @foreach (var day in _days)
                 {
@@ -45,10 +46,10 @@
 
             @if (_day is not null)
             {
-                <MudText Typo="Typo.subtitle2">2. Choose a time</MudText>
+                <MudText Typo="Typo.subtitle2">@T["2. Choose a time"]</MudText>
                 @if (_slots.Count == 0)
                 {
-                    <MudText Typo="Typo.body2" Class="ml-muted" data-testid="book-no-times">No free times on this day. Try another day.</MudText>
+                    <MudText Typo="Typo.body2" Class="ml-muted" data-testid="book-no-times">@T["No free times on this day. Try another day."]</MudText>
                 }
                 <div class="ml-row ml-row--wrap" data-testid="book-slots">
                     @foreach (var slot in _slots)
@@ -62,22 +63,22 @@
 
             @if (_chosen is not null)
             {
-                <MudText Typo="Typo.subtitle2">3. Your details</MudText>
+                <MudText Typo="Typo.subtitle2">@T["3. Your details"]</MudText>
                 @if (_error is not null)
                 {
                     <MudAlert Severity="Severity.Error" Dense="true" data-testid="book-error">@_error</MudAlert>
                 }
 
-                <MudTextField @bind-Value="_name" Label="Your name *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="book-name" />
-                <MudTextField @bind-Value="_email" Label="Email *" InputType="InputType.Email" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="book-email" />
-                <MudTextField @bind-Value="_phone" Label="Phone" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                <MudTextField @bind-Value="_name" Label="@T["Your name *"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="book-name" />
+                <MudTextField @bind-Value="_email" Label="@T["Email *"]" InputType="InputType.Email" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="book-email" />
+                <MudTextField @bind-Value="_phone" Label="@T["Phone"]" Variant="Variant.Outlined" Margin="Margin.Dense" />
                 @foreach (var question in _info.Questions)
                 {
                     var key = question.Key;
                     <MudTextField T="string" Value="@AnswerOf(key)" ValueChanged="v => _answers[key] = v ?? string.Empty" Label="@(question.Label + (question.Required ? " *" : ""))"
                                   Variant="Variant.Outlined" Margin="Margin.Dense" Lines="@(question.Type == "textarea" ? 3 : 1)" />
                 }
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Size="Size.Large" Disabled="_busy" OnClick="BookAsync" data-testid="primary-action">Book this time</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Size="Size.Large" Disabled="_busy" OnClick="BookAsync" data-testid="primary-action">@T["Book this time"]</MudButton>
             }
         </div>
     }
@@ -142,7 +143,7 @@
         catch (HttpRequestException)
         {
             _slots = [];
-            _error = "We could not load the free times. Try again.";
+            _error = T["We could not load the free times. Try again."];
         }
     }
 
@@ -166,7 +167,7 @@
             }
 
             var fields = await ProblemText.FieldErrorsAsync(response);
-            _error = fields.Count > 0 ? string.Join(" ", fields.Values) : await ProblemText.FromAsync(response, "We could not book this time. Please choose another.");
+            _error = fields.Count > 0 ? string.Join(" ", fields.Values) : await ProblemText.FromAsync(response, T["We could not book this time. Please choose another."]);
             if (response.StatusCode == System.Net.HttpStatusCode.Conflict && _day is { } day)
             {
                 await PickDayAsync(day);
@@ -174,7 +175,7 @@
         }
         catch (HttpRequestException)
         {
-            _error = "We could not reach MindLift. Check your connection and try again.";
+            _error = T["We could not reach MindLift. Check your connection and try again."];
         }
         finally
         {

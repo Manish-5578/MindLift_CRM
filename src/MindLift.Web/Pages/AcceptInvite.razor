@@ -4,12 +4,13 @@
 @inject AuthSession Session
 @inject AppState App
 @inject NavigationManager Nav
+@inject Translator T
 
-<PageTitle>Join your team · MindLift</PageTitle>
+<PageTitle>@T["Join your team"] · MindLift</PageTitle>
 
 <div class="ml-wizard" style="max-width:420px;margin-top:48px">
     <div class="ml-stack">
-        <MudText Typo="Typo.h4" data-testid="page-title">Join your team</MudText>
+        <MudText Typo="Typo.h4" data-testid="page-title">@T["Join your team"]</MudText>
 
         @if (_loading)
         {
@@ -18,20 +19,20 @@
         else if (_preview is null)
         {
             <MudAlert Severity="Severity.Error" data-testid="invite-invalid">@(_error ?? "This invitation is not valid. It may have expired or been withdrawn. Ask your admin to send a new one.")</MudAlert>
-            <MudButton Variant="Variant.Outlined" Href="/login">Go to sign in</MudButton>
+            <MudButton Variant="Variant.Outlined" Href="/login">@T["Go to sign in"]</MudButton>
         }
         else
         {
-            <MudText Typo="Typo.body1" data-testid="invite-summary">Hello @_preview.FirstName, <strong>@_preview.CompanyName</strong> invited you to MindLift as @_preview.Email.</MudText>
+            <MudText Typo="Typo.body1" data-testid="invite-summary">@T["Hello {0},", _preview.FirstName] <strong>@_preview.CompanyName</strong> @T["invited you to MindLift as {0}.", _preview.Email]</MudText>
             @if (_error is not null)
             {
                 <MudAlert Severity="Severity.Error" Dense="true" data-testid="invite-error">@_error</MudAlert>
             }
 
-            <MudTextField @bind-Value="_password" Label="Choose a password" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Password" Required="true"
-                          HelperText="At least 8 characters, with upper and lower case letters and a digit." data-testid="invite-password" />
-            <MudTextField @bind-Value="_confirm" Label="Repeat the password" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Password" Required="true" OnKeyDown="OnKey" data-testid="invite-confirm" />
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Size="Size.Large" Disabled="_busy" OnClick="AcceptAsync" data-testid="primary-action">Join @_preview.CompanyName</MudButton>
+            <MudTextField @bind-Value="_password" Label="@T["Choose a password"]" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Password" Required="true"
+                          HelperText="@T["At least 8 characters, with upper and lower case letters and a digit."]" data-testid="invite-password" />
+            <MudTextField @bind-Value="_confirm" Label="@T["Repeat the password"]" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Password" Required="true" OnKeyDown="OnKey" data-testid="invite-confirm" />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Size="Size.Large" Disabled="_busy" OnClick="AcceptAsync" data-testid="primary-action">@T["Join {0}", _preview.CompanyName]</MudButton>
         }
     </div>
 </div>
@@ -58,7 +59,7 @@
         }
         catch (HttpRequestException)
         {
-            _error = "We could not reach MindLift. Check your connection and try again.";
+            _error = T["We could not reach MindLift. Check your connection and try again."];
         }
         finally
         {
@@ -76,7 +77,7 @@
         _error = null;
         if (_password != _confirm)
         {
-            _error = "The two passwords are not the same.";
+            _error = T["The two passwords are not the same."];
             return;
         }
 
@@ -87,7 +88,7 @@
             if (!response.IsSuccessStatusCode)
             {
                 var fields = await ProblemText.FieldErrorsAsync(response);
-                _error = fields.Count > 0 ? string.Join(" ", fields.Values) : await ProblemText.FromAsync(response, "We could not accept this invitation.");
+                _error = fields.Count > 0 ? string.Join(" ", fields.Values) : await ProblemText.FromAsync(response, T["We could not accept this invitation."]);
                 return;
             }
 
@@ -97,7 +98,7 @@
         }
         catch (HttpRequestException)
         {
-            _error = "We could not reach MindLift. Check your connection and try again.";
+            _error = T["We could not reach MindLift. Check your connection and try again."];
         }
         finally
         {

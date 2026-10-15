@@ -5,8 +5,9 @@
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
 @inject IDialogService Dialogs
+@inject Translator T
 
-<PageTitle>Deal · MindLift</PageTitle>
+<PageTitle>@T["Deal"] · MindLift</PageTitle>
 
 <div class="ml-page ml-page--narrow">
     @if (_loading)
@@ -29,11 +30,11 @@
             <Actions>
                 @if (Can(p => p.CanDelete))
                 {
-                    <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="DeleteAsync" data-testid="delete-deal">Delete</MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="DeleteAsync" data-testid="delete-deal">@T["Delete"]</MudButton>
                 }
                 @if (Can(p => p.CanEdit))
                 {
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenEdit" data-testid="primary-action">Edit</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenEdit" data-testid="primary-action">@T["Edit"]</MudButton>
                 }
             </Actions>
             <ChildContent>
@@ -47,25 +48,25 @@
                                        OnClick="() => MoveAsync(current)" data-testid="@("stage-" + current.Id)">@current.Name</MudButton>
                         }
                     </div>
-                    <MudText Typo="Typo.caption" Class="ml-muted mt-2" data-testid="days-in-stage">In this stage for @((int)(DateTime.UtcNow - _deal.StageChangedAtUtc).TotalDays) days</MudText>
+                    <MudText Typo="Typo.caption" Class="ml-muted mt-2" data-testid="days-in-stage">@T["In this stage for {0} days", (int)(DateTime.UtcNow - _deal.StageChangedAtUtc).TotalDays]</MudText>
                 </MlCard>
 
                 <MlCard Title="Details">
                     <div class="ml-kv" data-testid="deal-details">
-                        <div class="ml-kv__label">Amount</div><div class="ml-kv__value"><MoneyText Amount="_deal.Amount" Currency="@_deal.Currency" />@if (_deal.Currency != BaseCurrency) { <span class="ml-muted"> ≈ @_deal.AmountInBase.ToString("N0") @BaseCurrency</span> }</div>
-                        <div class="ml-kv__label">Probability</div><div class="ml-kv__value">@_deal.Probability%</div>
-                        <div class="ml-kv__label">Expected close</div><div class="ml-kv__value"><DateText Value="@_deal.ExpectedCloseDate" /></div>
+                        <div class="ml-kv__label">@T["Amount"]</div><div class="ml-kv__value"><MoneyText Amount="_deal.Amount" Currency="@_deal.Currency" />@if (_deal.Currency != BaseCurrency) { <span class="ml-muted"> ≈ @_deal.AmountInBase.ToString("N0") @BaseCurrency</span> }</div>
+                        <div class="ml-kv__label">@T["Probability"]</div><div class="ml-kv__value">@_deal.Probability%</div>
+                        <div class="ml-kv__label">@T["Expected close"]</div><div class="ml-kv__value"><DateText Value="@_deal.ExpectedCloseDate" /></div>
                         @if (_deal.ClosedAtUtc is not null)
                         {
-                            <div class="ml-kv__label">Closed</div><div class="ml-kv__value"><DateText Value="@_deal.ClosedAtUtc" /></div>
+                            <div class="ml-kv__label">@T["Closed"]</div><div class="ml-kv__value"><DateText Value="@_deal.ClosedAtUtc" /></div>
                         }
                         @if (_deal.LostReason is not null)
                         {
-                            <div class="ml-kv__label">Lost because</div><div class="ml-kv__value" data-testid="lost-reason-text">@LostReasonLabel(_deal.LostReason)@(string.IsNullOrWhiteSpace(_deal.LostNotes) ? "" : " — " + _deal.LostNotes)</div>
+                            <div class="ml-kv__label">@T["Lost because"]</div><div class="ml-kv__value" data-testid="lost-reason-text">@LostReasonLabel(_deal.LostReason)@(string.IsNullOrWhiteSpace(_deal.LostNotes) ? "" : " — " + _deal.LostNotes)</div>
                         }
-                        <div class="ml-kv__label">Company</div><div class="ml-kv__value">@if (_deal.AccountId is { } accountId) { <a href="@("/accounts/" + accountId)" class="ml-link">@_deal.AccountName</a> } else { <span class="ml-faint">—</span> }</div>
-                        <div class="ml-kv__label">Owner</div><div class="ml-kv__value"><FieldValue Kind="FormFieldKind.User" Value="@_deal.OwnerId.ToString()" Users="_users" /></div>
-                        <div class="ml-kv__label">Notes</div><div class="ml-kv__value"><FieldValue Kind="FormFieldKind.Multiline" Value="@_deal.Description" /></div>
+                        <div class="ml-kv__label">@T["Company"]</div><div class="ml-kv__value">@if (_deal.AccountId is { } accountId) { <a href="@("/accounts/" + accountId)" class="ml-link">@_deal.AccountName</a> } else { <span class="ml-faint">—</span> }</div>
+                        <div class="ml-kv__label">@T["Owner"]</div><div class="ml-kv__value"><FieldValue Kind="FormFieldKind.User" Value="@_deal.OwnerId.ToString()" Users="_users" /></div>
+                        <div class="ml-kv__label">@T["Notes"]</div><div class="ml-kv__value"><FieldValue Kind="FormFieldKind.Multiline" Value="@_deal.Description" /></div>
                         @foreach (var field in CustomFields)
                         {
                             <div class="ml-kv__label">@field.Label</div>
@@ -83,12 +84,12 @@
                     <MlCard Title="Onboarding" TestId="onboarding-card">
                         @if (_onboarding.Count == 0)
                         {
-                            <MudText Typo="Typo.body2" Class="ml-muted" data-testid="no-onboarding">No onboarding checklist applies to this deal. Add one in Settings, Onboarding checklists.</MudText>
+                            <MudText Typo="Typo.body2" Class="ml-muted" data-testid="no-onboarding">@T["No onboarding checklist applies to this deal. Add one in Settings, Onboarding checklists."]</MudText>
                         }
                         @foreach (var progress in _onboarding)
                         {
                             <div class="ml-stack-sm" data-testid="onboarding-progress">
-                                <div class="ml-row ml-row--between"><MudText Typo="Typo.subtitle2">@progress.TemplateName</MudText><MudText Typo="Typo.caption" Class="ml-muted" data-testid="onboarding-count">@progress.Completed of @progress.Total done</MudText></div>
+                                <div class="ml-row ml-row--between"><MudText Typo="Typo.subtitle2">@progress.TemplateName</MudText><MudText Typo="Typo.caption" Class="ml-muted" data-testid="onboarding-count">@T["{0} of {1} done", progress.Completed, progress.Total]</MudText></div>
                                 <MudProgressLinear Color="Color.Success" Value="@(progress.Total == 0 ? 0 : 100.0 * progress.Completed / progress.Total)" />
                             </div>
                         }
@@ -103,7 +104,7 @@
                 <MlCard Title="@($"People ({_deal.Contacts.Count})")">
                     @if (_deal.Contacts.Count == 0)
                     {
-                        <MudText Typo="Typo.body2" Class="ml-muted">No contacts on this deal.</MudText>
+                        <MudText Typo="Typo.body2" Class="ml-muted">@T["No contacts on this deal."]</MudText>
                     }
                     @foreach (var contact in _deal.Contacts)
                     {
@@ -184,7 +185,7 @@
             _deal = response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<DealDto>() : null;
             if (!response.IsSuccessStatusCode)
             {
-                _error = await ProblemText.FromAsync(response, "We could not open this deal.");
+                _error = await ProblemText.FromAsync(response, T["We could not open this deal."]);
             }
             else
             {
@@ -195,7 +196,7 @@
         catch (HttpRequestException)
         {
             _deal = null;
-            _error = "We could not reach MindLift. Check your connection and try again.";
+            _error = T["We could not reach MindLift. Check your connection and try again."];
         }
         finally
         {
@@ -217,7 +218,7 @@
 
     private async Task OnSaved()
     {
-        Snackbar.Add("Deal saved", Severity.Success);
+        Snackbar.Add(T["Deal saved"], Severity.Success);
         await LoadAsync();
     }
 
@@ -244,7 +245,7 @@
             lostReason = lost.Reason;
             lostNotes = lost.Notes;
         }
-        else if (stage.StageType == "Won" && !await Dialogs.ConfirmAsync($"Mark {_deal.Name} as won?", "The close date is set to today.", "Mark as won"))
+        else if (stage.StageType == "Won" && !await Dialogs.ConfirmAsync($"Mark {_deal.Name} as won?", T["The close date is set to today."], T["Mark as won"]))
         {
             return;
         }
@@ -252,7 +253,7 @@
         var response = await Http.PatchAsJsonAsync($"api/v1/deals/{Id}/stage", new ChangeDealStageRequest(stage.Id, lostReason, lostNotes, null, _deal.Version));
         if (!response.IsSuccessStatusCode)
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, "We could not move this deal."), Severity.Error);
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not move this deal."]), Severity.Error);
         }
 
         await LoadAsync();
@@ -266,7 +267,7 @@
 
     private async Task DeleteAsync()
     {
-        if (!await Dialogs.ConfirmAsync($"Delete {_deal!.Name}?", "The deal is removed from your lists. This cannot be undone from here.", "Delete", danger: true))
+        if (!await Dialogs.ConfirmAsync($"Delete {_deal!.Name}?", T["The deal is removed from your lists. This cannot be undone from here."], T["Delete"], danger: true))
         {
             return;
         }
@@ -274,11 +275,11 @@
         var response = await Http.DeleteAsync($"api/v1/deals/{Id}");
         if (!response.IsSuccessStatusCode)
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, "We could not delete this deal."), Severity.Error);
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not delete this deal."]), Severity.Error);
             return;
         }
 
-        Snackbar.Add("Deal deleted", Severity.Success);
+        Snackbar.Add(T["Deal deleted"], Severity.Success);
         Nav.NavigateTo("/deals");
     }
 }

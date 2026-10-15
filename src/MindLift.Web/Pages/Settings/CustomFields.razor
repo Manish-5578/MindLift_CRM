@@ -3,15 +3,16 @@
 @inject AppState App
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
+@inject Translator T
 
-<PageTitle>Custom fields · MindLift</PageTitle>
+<PageTitle>@T["Custom fields"] · MindLift</PageTitle>
 
 <div class="ml-page ml-page--form">
     <PageHeader Title="Custom fields" Subtitle="Add fields to any record type. Keys cannot change after they are created." />
     <SettingsNav Current="/settings/custom-fields" />
 
     <MlCard Title="Fields" Class="mb-4">
-        <MudSelect T="string" Value="_entity" ValueChanged="OnEntityChanged" Label="Record type" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-3" data-testid="entity-select">
+        <MudSelect T="string" Value="_entity" ValueChanged="OnEntityChanged" Label="@T["Record type"]" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-3" data-testid="entity-select">
             @foreach (var (key, label) in Entities)
             {
                 <MudSelectItem T="string" Value="@key">@label</MudSelectItem>
@@ -49,22 +50,22 @@
         <div class="ml-stack">
             @if (_error is not null) { <MudAlert Severity="Severity.Error" Dense="true" data-testid="cf-error">@_error</MudAlert> }
             <MudGrid Spacing="3">
-                <MudItem xs="12" sm="6"><MudTextField @bind-Value="_key" Label="Key (cf_…) *" Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="Lowercase letters, digits and underscores. Starts with cf_." data-testid="cf-key" /></MudItem>
-                <MudItem xs="12" sm="6"><MudTextField @bind-Value="_label" Label="Label *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="cf-label" /></MudItem>
+                <MudItem xs="12" sm="6"><MudTextField @bind-Value="_key" Label="@T["Key (cf_…) *"]" Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="@T["Lowercase letters, digits and underscores. Starts with cf_."]" data-testid="cf-key" /></MudItem>
+                <MudItem xs="12" sm="6"><MudTextField @bind-Value="_label" Label="@T["Label *"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="cf-label" /></MudItem>
             </MudGrid>
-            <MudSelect T="string" @bind-Value="_type" Label="Type *" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="cf-type">
+            <MudSelect T="string" @bind-Value="_type" Label="@T["Type *"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="cf-type">
                 @foreach (var (value, label) in Types)
                 {
-                    <MudSelectItem T="string" Value="@value">@label</MudSelectItem>
+                    <MudSelectItem T="string" Value="@value">@T[label]</MudSelectItem>
                 }
             </MudSelect>
             @if (_type is "Picklist" or "MultiPicklist")
             {
-                <MudTextField @bind-Value="_options" Label="Options, one per line as value|Label" Lines="4" Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="Example: villa|Villa" data-testid="cf-options" />
+                <MudTextField @bind-Value="_options" Label="@T["Options, one per line as value|Label"]" Lines="4" Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="@T["Example: villa|Villa"]" data-testid="cf-options" />
             }
-            <MudCheckBox @bind-Value="_required" Label="Required" Color="Color.Primary" />
+            <MudCheckBox @bind-Value="_required" Label="@T["Required"]" Color="Color.Primary" />
             <div class="ml-row" style="justify-content:flex-end">
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateAsync" data-testid="primary-action">Add field</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateAsync" data-testid="primary-action">@T["Add field"]</MudButton>
             </div>
         </div>
     </MlCard>
@@ -143,11 +144,11 @@
 
         if (!response.IsSuccessStatusCode)
         {
-            _error = await ProblemText.FromAsync(response, "We could not add this field.");
+            _error = await ProblemText.FromAsync(response, T["We could not add this field."]);
             return;
         }
 
-        Snackbar.Add("Field added", Severity.Success);
+        Snackbar.Add(T["Field added"], Severity.Success);
         _key = "cf_";
         _label = string.Empty;
         _options = string.Empty;

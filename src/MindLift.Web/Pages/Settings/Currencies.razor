@@ -3,8 +3,9 @@
 @inject AppState App
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
+@inject Translator T
 
-<PageTitle>Currencies · MindLift</PageTitle>
+<PageTitle>@T["Currencies"] · MindLift</PageTitle>
 
 <div class="ml-page ml-page--form">
     <PageHeader Title="Currencies" Subtitle="The base currency reports use, the currencies you can record deals in, and their rates." />
@@ -19,10 +20,10 @@
         <MlCard Title="Currencies" Class="mb-4">
             <div class="ml-stack">
                 @if (_error is not null) { <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert> }
-                <MudTextField @bind-Value="_base" Label="Base currency (ISO code)" Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="Three letters, for example AED." data-testid="base-currency" />
-                <MudTextField @bind-Value="_enabled" Label="Other currencies you use" Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="Comma-separated, for example USD, EUR." data-testid="enabled-currencies" />
+                <MudTextField @bind-Value="_base" Label="@T["Base currency (ISO code)"]" Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="@T["Three letters, for example AED."]" data-testid="base-currency" />
+                <MudTextField @bind-Value="_enabled" Label="@T["Other currencies you use"]" Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="@T["Comma-separated, for example USD, EUR."]" data-testid="enabled-currencies" />
                 <div class="ml-row" style="justify-content:flex-end">
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveCurrenciesAsync" data-testid="primary-action">Save currencies</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveCurrenciesAsync" data-testid="primary-action">@T["Save currencies"]</MudButton>
                 </div>
             </div>
         </MlCard>
@@ -31,21 +32,21 @@
             <div class="ml-stack">
                 @if (_rates.Count == 0)
                 {
-                    <MudText Typo="Typo.body2" Class="ml-muted">No rates yet. Enable a currency above, then add its rate.</MudText>
+                    <MudText Typo="Typo.body2" Class="ml-muted">@T["No rates yet. Enable a currency above, then add its rate."]</MudText>
                 }
                 @foreach (var rate in _rates)
                 {
                     <div class="ml-row" style="padding:6px 0;border-bottom:1px solid var(--ml-border)">
                         <div class="ml-grow"><MudText Typo="Typo.body1">1 @rate.Currency = @rate.RateToBase.ToString("0.########") @_base</MudText></div>
                         <MudText Typo="Typo.caption" Class="ml-muted"><DateText Value="@rate.EffectiveDate" Relative="false" /></MudText>
-                        <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" OnClick="() => DeleteRateAsync(rate.Id)" aria-label="Delete rate" />
+                        <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" OnClick="() => DeleteRateAsync(rate.Id)" aria-label="@T["Delete rate"]" />
                     </div>
                 }
                 <div class="ml-row ml-row--wrap">
-                    <MudTextField @bind-Value="_rateCode" Label="Currency" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:120px" />
-                    <MudNumericField @bind-Value="_rateValue" Label="Rate" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0.00000001m" Style="max-width:160px" />
-                    <MudDatePicker @bind-Date="_rateDate" Label="Effective" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:180px" />
-                    <MudButton Variant="Variant.Outlined" OnClick="AddRateAsync">Add rate</MudButton>
+                    <MudTextField @bind-Value="_rateCode" Label="@T["Currency"]" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:120px" />
+                    <MudNumericField @bind-Value="_rateValue" Label="@T["Rate"]" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0.00000001m" Style="max-width:160px" />
+                    <MudDatePicker @bind-Date="_rateDate" Label="@T["Effective"]" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:180px" />
+                    <MudButton Variant="Variant.Outlined" OnClick="AddRateAsync">@T["Add rate"]</MudButton>
                 </div>
             </div>
         </MlCard>
@@ -99,11 +100,11 @@
         var response = await Http.PutAsJsonAsync("api/v1/settings/currencies", new SaveCurrencySettingsRequest(_base.Trim().ToUpperInvariant(), others));
         if (!response.IsSuccessStatusCode)
         {
-            _error = await ProblemText.FromAsync(response, "We could not save the currencies.");
+            _error = await ProblemText.FromAsync(response, T["We could not save the currencies."]);
             return;
         }
 
-        Snackbar.Add("Currencies saved", Severity.Success);
+        Snackbar.Add(T["Currencies saved"], Severity.Success);
         await LoadAsync();
     }
 
@@ -111,7 +112,7 @@
     {
         if (_rateValue is null || _rateDate is null || string.IsNullOrWhiteSpace(_rateCode))
         {
-            Snackbar.Add("Enter a currency, a rate and a date.", Severity.Warning);
+            Snackbar.Add(T["Enter a currency, a rate and a date."], Severity.Warning);
             return;
         }
 
@@ -119,13 +120,13 @@
             new SaveExchangeRateRequest(_rateCode.Trim().ToUpperInvariant(), _rateValue.Value, _rateDate.Value));
         if (!response.IsSuccessStatusCode)
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, "We could not add this rate."), Severity.Error);
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not add this rate."]), Severity.Error);
             return;
         }
 
         _rateCode = string.Empty;
         _rateValue = null;
-        Snackbar.Add("Rate added", Severity.Success);
+        Snackbar.Add(T["Rate added"], Severity.Success);
         await LoadAsync();
     }
 
