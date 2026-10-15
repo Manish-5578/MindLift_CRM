@@ -1,5 +1,6 @@
 @page "/calendar"
 @using System.Globalization
+@using MindLift.Shared.Calendar
 @inject HttpClient Http
 @inject AuthSession Session
 @inject AppState App
@@ -148,25 +149,7 @@
     }
 
     /// <summary>The days shown for the view: one day, seven days from the week's Monday, or the six weeks around the month.</summary>
-    private void Rebuild()
-    {
-        if (_view == "day")
-        {
-            _days = [_anchor];
-            return;
-        }
-
-        if (_view == "month")
-        {
-            var first = new DateOnly(_anchor.Year, _anchor.Month, 1);
-            var start = first.AddDays(-(((int)first.DayOfWeek + 6) % 7));
-            _days = Enumerable.Range(0, 42).Select(i => start.AddDays(i)).ToList();
-            return;
-        }
-
-        var monday = _anchor.AddDays(-(((int)_anchor.DayOfWeek + 6) % 7));
-        _days = Enumerable.Range(0, 7).Select(i => monday.AddDays(i)).ToList();
-    }
+    private void Rebuild() => _days = CalendarGrid.Days(_view, _anchor).ToList();
 
     private async Task SetViewAsync(string view)
     {
@@ -184,12 +167,7 @@
 
     private async Task Shift(int step)
     {
-        _anchor = _view switch
-        {
-            "day" => _anchor.AddDays(step),
-            "month" => _anchor.AddMonths(step),
-            _ => _anchor.AddDays(7 * step),
-        };
+        _anchor = CalendarGrid.Shift(_view, _anchor, step);
         Rebuild();
         await LoadAsync();
     }
@@ -206,8 +184,9 @@
         _error = null;
         try
         {
-            var from = _days[0].ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
-            var to = _days[^1].AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
+            var (fromUtc, toUtc) = CalendarGrid.Range(_days);
+            var from = fromUtc.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
+            var to = toUtc.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
             var url = $"api/v1/calendar/events?from={from}&to={to}";
             if (_who == "everyone")
             {
@@ -255,7 +234,7 @@
             return;
         }
 
-        var newStart = day.ToDateTime(TimeOnly.FromDateTime(entry.StartUtc), DateTimeKind.Utc);
+        var newStart = CalendarGrid.Moved(entry.StartUtc, day);
         var response = await Http.PatchAsJsonAsync($"api/v1/activities/{entry.Id}/schedule", new { StartAt = newStart, EndAt = (DateTime?)null });
         if (!response.IsSuccessStatusCode)
         {
@@ -267,7 +246,7 @@
         await LoadAsync();
     }
 
-    private string MonthCellClass(DateOnly day) => "ml-month__cell" + (day.Month != _anchor.Month ? " ml-month__cell--other" : string.Empty);
+    private string MonthCellClass(DateOnly day) => "ml-month__cell" + (CalendarGrid.IsOtherMonth(day, _anchor) ? " ml-month__cell--other" : string.Empty);
 
     private static string EventClass(CalendarEventDto e) => e.Kind switch
     {
