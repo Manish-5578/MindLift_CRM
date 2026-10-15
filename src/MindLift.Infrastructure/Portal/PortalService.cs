@@ -1,6 +1,9 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Hangfire;
+using Microsoft.Extensions.Options;
+using MindLift.Infrastructure.Communication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MindLift.Application.Abstractions;
@@ -17,12 +20,19 @@ public sealed class PortalService(
     AppDbContext db,
     ITenantContext tenant,
     TokenService tokenService,
-    IEmailSender emailSender,
+    IBackgroundJobClient jobs,
+    ISecretProtector secretProtector,
+    IOptions<AppOptions> app,
     IDocumentOcrService ocrService,
     INotificationService notifications) : IPortalService
 {
     private Guid CurrentTenantId => tenant.TenantId ?? throw new UnauthorizedAccessException("Tenant context required.");
     private static readonly PasswordHasher<PortalUser> Hasher = new();
+
+    /// <summary>A password is checked against this when no usable account exists, so a missing account takes as long to refuse as a wrong password.</summary>
+    private static readonly string StandInHash = Hasher.HashPassword(new PortalUser(), Convert.ToHexString(RandomNumberGenerator.GetBytes(16)));
+
+    private static UnauthorizedException InvalidCredentials() => new("invalid_credentials", "Invalid email or password.");
 
     public async Task<PortalBrandingDto> GetBrandingAsync(string tenantSlug, CancellationToken ct = default)
     {
@@ -65,19 +75,18 @@ public sealed class PortalService(
         var normEmail = req.Email.Trim().ToUpperInvariant();
         var user = await db.PortalUsers
             .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(u => u.TenantId == t.Id && u.NormalizedEmail == normEmail && !u.IsDeleted, ct)
-            ?? throw new UnauthorizedException("invalid_credentials", "Invalid email or password.");
+            .FirstOrDefaultAsync(u => u.TenantId == t.Id && u.NormalizedEmail == normEmail && !u.IsDeleted, ct);
 
-        if (!user.IsActive)
-            throw new UnauthorizedException("account_inactive", "Your portal account is deactivated.");
+        // One answer for every reason sign-in can fail (no such address, deactivated, no password yet, locked, wrong password),
+        // so the response does not reveal whether an address has portal access.
+        var usable = user is { IsActive: true, PasswordHash: { Length: > 0 } } && !(user.LockoutEnd.HasValue && user.LockoutEnd > DateTime.UtcNow);
+        if (!usable)
+        {
+            Hasher.VerifyHashedPassword(new PortalUser(), StandInHash, req.Password);
+            throw InvalidCredentials();
+        }
 
-        if (user.LockoutEnd.HasValue && user.LockoutEnd > DateTime.UtcNow)
-            throw new UnauthorizedException("account_locked", "Account is temporarily locked. Try again later.");
-
-        if (string.IsNullOrEmpty(user.PasswordHash))
-            throw new UnauthorizedException("password_not_set", "Password not set. Please use magic link sign-in.");
-
-        var verifyResult = Hasher.VerifyHashedPassword(user, user.PasswordHash, req.Password);
+        var verifyResult = Hasher.VerifyHashedPassword(user!, user!.PasswordHash!, req.Password);
         if (verifyResult == PasswordVerificationResult.Failed)
         {
             user.FailedLoginCount++;
@@ -86,7 +95,7 @@ public sealed class PortalService(
                 user.LockoutEnd = DateTime.UtcNow.AddMinutes(15);
             }
             await db.SaveChangesAsync(ct);
-            throw new UnauthorizedException("invalid_credentials", "Invalid email or password.");
+            throw InvalidCredentials();
         }
 
         user.FailedLoginCount = 0;
@@ -126,7 +135,7 @@ public sealed class PortalService(
         db.PortalTokens.Add(token);
         await db.SaveChangesAsync(ct);
 
-        var magicUrl = $"/portal/{t.Slug}/magic?token={plainToken}";
+        var magicUrl = $"{app.Value.BaseUrl.TrimEnd('/')}/portal/{t.Slug}/magic?token={plainToken}";
         var subject = $"Your {t.Name} Portal Sign-In Link";
         var body = $"""
             Hello,
@@ -140,11 +149,7 @@ public sealed class PortalService(
             {t.Name} Customer Portal
             """;
 
-        try
-        {
-            await emailSender.SendAsync(user.Email, subject, body, ct);
-        }
-        catch { }
+        QueueEmail(user.Email, subject, body);
     }
 
     public async Task<PortalLoginResponse> VerifyMagicLinkAsync(string tenantSlug, PortalMagicLinkVerifyRequest req, CancellationToken ct = default)
@@ -166,11 +171,13 @@ public sealed class PortalService(
         if (token.UsedAt.HasValue || token.ExpiresAt < DateTime.UtcNow)
             throw new UnauthorizedException("expired_token", "Magic link has expired or already been used.");
 
-        token.UsedAt = DateTime.UtcNow;
+        // Claiming the token is a single database step, so two requests with the same link cannot both sign in.
+        if (!await TryConsumeAsync(token, ct))
+            throw new UnauthorizedException("expired_token", "Magic link has expired or already been used.");
 
         var user = await db.PortalUsers
             .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(u => u.Id == token.PortalUserId && !u.IsDeleted, ct)
+            .FirstOrDefaultAsync(u => u.Id == token.PortalUserId && u.TenantId == t.Id && !u.IsDeleted, ct)
             ?? throw new NotFoundException("User", token.PortalUserId);
 
         user.LastLoginAt = DateTime.UtcNow;
@@ -203,17 +210,21 @@ public sealed class PortalService(
         if (token.UsedAt.HasValue || token.ExpiresAt < DateTime.UtcNow)
             throw new UnauthorizedException("expired_token", "Invitation token has expired.");
 
-        token.UsedAt = DateTime.UtcNow;
+        if (!await TryConsumeAsync(token, ct))
+            throw new UnauthorizedException("expired_token", "Invitation token has expired.");
 
         var user = await db.PortalUsers
             .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(u => u.Id == token.PortalUserId && !u.IsDeleted, ct)
+            .FirstOrDefaultAsync(u => u.Id == token.PortalUserId && u.TenantId == t.Id && !u.IsDeleted, ct)
             ?? throw new NotFoundException("User", token.PortalUserId);
+
+        // Sending an invitation switches access on. A person deactivated since then stays deactivated.
+        if (!user.IsActive)
+            throw new UnauthorizedException("account_inactive", "Your portal account is deactivated.");
 
         user.PasswordHash = Hasher.HashPassword(user, req.Password);
         user.ActivatedAt = DateTime.UtcNow;
         user.LastLoginAt = DateTime.UtcNow;
-        user.IsActive = true;
 
         return await IssueAsync(t.Id, user, ct);
     }
@@ -250,7 +261,13 @@ public sealed class PortalService(
             throw new UnauthorizedException("account_inactive", "Your portal account is deactivated.");
         }
 
-        token.UsedAt = DateTime.UtcNow;
+        if (!await TryConsumeAsync(token, ct))
+        {
+            // Another request used this token between the check above and now, which is the same as a reused token.
+            await RevokeRefreshTokensAsync(t.Id, token.PortalUserId, ct);
+            throw new UnauthorizedException("refresh_token_reused", "Your session has ended. Please sign in again.");
+        }
+
         return await IssueAsync(t.Id, user, ct);
     }
 
@@ -303,14 +320,32 @@ public sealed class PortalService(
         var user = await db.PortalUsers.FirstOrDefaultAsync(u => u.Id == portalUserId && !u.IsDeleted, ct)
             ?? throw new NotFoundException("PortalUser", portalUserId);
 
-        if (string.IsNullOrEmpty(user.PasswordHash)
-            || Hasher.VerifyHashedPassword(user, user.PasswordHash, req.CurrentPassword) == PasswordVerificationResult.Failed)
+        if (user.LockoutEnd.HasValue && user.LockoutEnd > DateTime.UtcNow)
         {
+            throw new ValidationException(new Dictionary<string, string[]> { ["currentPassword"] = ["Too many attempts. Try again later."] });
+        }
+
+        var currentIsRight = !string.IsNullOrEmpty(user.PasswordHash)
+            && Hasher.VerifyHashedPassword(user, user.PasswordHash, req.CurrentPassword) != PasswordVerificationResult.Failed;
+        if (!currentIsRight)
+        {
+            // Wrong attempts count like wrong sign-ins, so a stolen session cannot be used to guess the password.
+            user.FailedLoginCount++;
+            if (user.FailedLoginCount >= 5)
+            {
+                user.LockoutEnd = DateTime.UtcNow.AddMinutes(15);
+            }
+
+            await db.SaveChangesAsync(ct);
             throw new ValidationException(new Dictionary<string, string[]> { ["currentPassword"] = ["The current password is not correct."] });
         }
 
+        user.FailedLoginCount = 0;
         user.PasswordHash = Hasher.HashPassword(user, req.NewPassword);
         await db.SaveChangesAsync(ct);
+
+        // Other devices have to sign in again with the new password.
+        await RevokeRefreshTokensAsync(user.TenantId, user.Id, ct);
     }
 
     private const string RefreshPurpose = "Refresh";
@@ -336,6 +371,23 @@ public sealed class PortalService(
         {
             throw new ForbiddenException("The customer portal is switched off for this company.", "portal_disabled");
         }
+    }
+
+    /// <summary>Marks a token used in one database step. False means someone else used it first.</summary>
+    private async Task<bool> TryConsumeAsync(PortalToken token, CancellationToken ct)
+    {
+        var now = DateTime.UtcNow;
+        var rows = await db.PortalTokens.IgnoreQueryFilters()
+            .Where(x => x.Id == token.Id && x.TenantId == token.TenantId && x.UsedAt == null)
+            .ExecuteUpdateAsync(set => set.SetProperty(x => x.UsedAt, now), ct);
+        return rows == 1;
+    }
+
+    /// <summary>Queues an email with a live link in it. Sending happens in the background and is retried, and the body is protected while it waits.</summary>
+    private void QueueEmail(string to, string subject, string body)
+    {
+        var protectedBody = secretProtector.Protect(body);
+        jobs.Enqueue<PortalEmailJob>(job => job.SendAsync(to, subject, protectedBody, CancellationToken.None));
     }
 
     private async Task RevokeRefreshTokensAsync(Guid tenantId, Guid portalUserId, CancellationToken ct)
@@ -756,17 +808,12 @@ public sealed class PortalService(
         await db.SaveChangesAsync(ct);
 
         var tenantEntity = await db.Tenants.IgnoreQueryFilters().FirstAsync(t => t.Id == CurrentTenantId, ct);
-        var inviteUrl = $"/portal/{tenantEntity.Slug}/accept-invite?token={plainToken}";
+        var inviteUrl = $"{app.Value.BaseUrl.TrimEnd('/')}/portal/{tenantEntity.Slug}/accept-invite?token={plainToken}";
 
-        try
-        {
-            await emailSender.SendAsync(
-                user.Email,
-                $"{tenantEntity.Name} invited you to their Customer Portal",
-                $"You have been invited to the customer portal. Set up your access here: {inviteUrl}",
-                ct);
-        }
-        catch { }
+        QueueEmail(
+            user.Email,
+            $"{tenantEntity.Name} invited you to their Customer Portal",
+            $"You have been invited to the customer portal. Set up your access here: {inviteUrl}");
     }
 
     public async Task<PortalAccessStatusDto> GetContactAccessAsync(Guid contactId, CancellationToken ct = default)
@@ -870,6 +917,17 @@ public sealed class PortalService(
 
         var contact = await db.Contacts.AsNoTracking().FirstOrDefaultAsync(c => c.Id == req.ContactId && !c.IsDeleted, ct)
             ?? throw new ValidationException(new Dictionary<string, string[]> { ["contactId"] = ["Choose an existing contact."] });
+
+        // The account and deal must be this company's own. The database only checks that an id exists somewhere.
+        if (req.AccountId is { } accountId && !await db.Accounts.AnyAsync(a => a.Id == accountId && !a.IsDeleted, ct))
+        {
+            throw new ValidationException(new Dictionary<string, string[]> { ["accountId"] = ["Choose an existing account."] });
+        }
+
+        if (req.DealId is { } dealId && !await db.Deals.AnyAsync(d => d.Id == dealId && !d.IsDeleted, ct))
+        {
+            throw new ValidationException(new Dictionary<string, string[]> { ["dealId"] = ["Choose an existing deal."] });
+        }
 
         var entity = new DocumentRequest
         {

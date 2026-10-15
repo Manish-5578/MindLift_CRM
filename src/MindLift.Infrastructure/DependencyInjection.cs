@@ -121,6 +121,7 @@ public static class DependencyInjection
         services.AddScoped<INotificationService, MindLift.Infrastructure.Notifications.NotificationService>();
         services.AddScoped<MindLift.Infrastructure.Notifications.NotificationQueryService>();
         services.AddScoped<MindLift.Infrastructure.Notifications.NotificationEmailJob>();
+        services.AddScoped<MindLift.Infrastructure.Portal.PortalEmailJob>();
         services.AddScoped<MindLift.Infrastructure.Notifications.ImportNotifier>();
         services.AddScoped<MindLift.Infrastructure.Notifications.ActivityReminderJob>();
         services.AddScoped<MindLift.Infrastructure.Notifications.OverdueTaskJob>();

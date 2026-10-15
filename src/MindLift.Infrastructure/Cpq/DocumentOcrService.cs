@@ -46,6 +46,40 @@ public sealed class DocumentOcrService(
         return path;
     }
 
+    /// <summary>The file types a document can be, with the content type each is stored and served as.</summary>
+    private static readonly Dictionary<string, string> AllowedContentTypes = new(StringComparer.Ordinal)
+    {
+        [".pdf"] = "application/pdf",
+        [".png"] = "image/png",
+        [".jpg"] = "image/jpeg",
+        [".jpeg"] = "image/jpeg",
+        [".webp"] = "image/webp",
+        [".tif"] = "image/tiff",
+        [".tiff"] = "image/tiff",
+        [".bmp"] = "image/bmp",
+        [".txt"] = "text/plain",
+        [".csv"] = "text/csv",
+        [".md"] = "text/markdown",
+        [".docx"] = "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        [".xlsx"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    };
+
+    /// <summary>A record a document is linked to must be this company's own. The database only checks that an id exists somewhere, so another company's id would otherwise be accepted.</summary>
+    private async Task EnsureLinkedRecordsExistAsync(Guid? accountId, Guid? dealId, Guid? quoteId, Guid? invoiceId, Guid? contactId, CancellationToken ct)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (accountId is { } account && !await db.Set<Account>().AnyAsync(x => x.Id == account && !x.IsDeleted, ct)) errors["accountId"] = ["Choose an existing account."];
+        if (dealId is { } deal && !await db.Set<Deal>().AnyAsync(x => x.Id == deal && !x.IsDeleted, ct)) errors["dealId"] = ["Choose an existing deal."];
+        if (quoteId is { } quote && !await db.Set<Quote>().AnyAsync(x => x.Id == quote && !x.IsDeleted, ct)) errors["quoteId"] = ["Choose an existing quote."];
+        if (invoiceId is { } invoice && !await db.Set<Invoice>().AnyAsync(x => x.Id == invoice && !x.IsDeleted, ct)) errors["invoiceId"] = ["Choose an existing invoice."];
+        if (contactId is { } contact && !await db.Set<Contact>().AnyAsync(x => x.Id == contact && !x.IsDeleted, ct)) errors["contactId"] = ["Choose an existing contact."];
+
+        if (errors.Count > 0)
+        {
+            throw new ValidationException(errors);
+        }
+    }
+
     public async Task<BusinessDocumentDto> UploadDocumentAsync(
         string fileName,
         string contentType,
@@ -60,11 +94,20 @@ public sealed class DocumentOcrService(
         bool sharedWithPortal = false,
         CancellationToken ct = default)
     {
+        // Only the kinds of file a business document can be are accepted, and the stored type comes from the extension, not from what the sender claims.
+        var extension = Path.GetExtension(fileName).ToLowerInvariant();
+        if (!AllowedContentTypes.TryGetValue(extension, out var storedContentType))
+        {
+            throw new ValidationException("File", "This file type is not allowed. Use PDF, JPG, PNG, WEBP, TIF, BMP, TXT, CSV, MD, DOCX or XLSX.");
+        }
+
         // A renamed file (for example an executable called scan.png) must not be stored as the type it claims to be.
-        if (!MindLift.Infrastructure.Files.FileService.SignatureMatches(Path.GetExtension(fileName), fileBytes))
+        if (!MindLift.Infrastructure.Files.FileService.SignatureMatches(extension, fileBytes))
         {
             throw new ValidationException("File", "The file content does not match its type.");
         }
+
+        await EnsureLinkedRecordsExistAsync(accountId, dealId, quoteId, invoiceId, contactId, ct);
 
         var storageKey = $"docs/{CurrentTenantId}/{Guid.NewGuid():N}_{Path.GetFileName(fileName)}";
         using var stream = new MemoryStream(fileBytes);
@@ -74,7 +117,7 @@ public sealed class DocumentOcrService(
         {
             TenantId = CurrentTenantId,
             FileName = fileName,
-            ContentType = contentType,
+            ContentType = storedContentType,
             FileSizeBytes = fileSize,
             StorageKey = storageKey,
             Category = string.IsNullOrWhiteSpace(category) ? "General" : category.Trim(),
