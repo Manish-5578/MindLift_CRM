@@ -30,14 +30,20 @@ services:
         condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-mindlift};Username=${POSTGRES_USER:-mindlift};Password=${POSTGRES_PASSWORD:?Database password required}"
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-mindlift};Username=${POSTGRES_USER:-mindlift};Password=${POSTGRES_PASSWORD:?Database password required}"
       Database__MigrateOnStartup: "true"
       Jwt__SigningKey: "${JWT_SIGNING_KEY:?JWT signing key required}"
       Jwt__Issuer: "${JWT_ISSUER:-https://app.mindlift.io}"
       Jwt__Audience: "${JWT_AUDIENCE:-mindlift-api}"
-      PortalJwt__SigningKey: "${PORTAL_JWT_SIGNING_KEY:?Portal JWT signing key required}"
-      PortalJwt__Issuer: "${PORTAL_JWT_ISSUER:-https://app.mindlift.io}"
-      PortalJwt__Audience: "${PORTAL_JWT_AUDIENCE:-mindlift-portal}"
+      # Encrypts the mail passwords, provider tokens and webhook secrets a workspace stores. Use a long random value that is not the signing key.
+      Security__SecretKey: "${SECRET_KEY:?Secret key required}"
+      # The public address of the app. It is put into emailed links (sign-in, invitations, reminders) and used to check Twilio webhook signatures.
+      App__BaseUrl: "${APP_BASE_URL:?Public address of the app required, for example https://crm.example.com}"
+      # WhatsApp: the token you give Meta when you register the webhook. Leave empty if WhatsApp is not used.
+      Communication__WhatsAppVerifyToken: "${WHATSAPP_VERIFY_TOKEN:-}"
+      # Behind a reverse proxy, set FORWARDED_HEADERS_ENABLED=true and name the proxy so rate limits count each customer.
+      ForwardedHeaders__Enabled: "${FORWARDED_HEADERS_ENABLED:-false}"
+      ForwardedHeaders__KnownProxies__0: "${FORWARDED_PROXY_ADDRESS:-127.0.0.1}"
       Ocr__TesseractPath: "/usr/bin/tesseract"
       Ocr__Languages: "eng+ara"
     ports:

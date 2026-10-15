@@ -56,8 +56,9 @@ To launch the production stack with PostgreSQL, Hangfire workers, and the web/AP
    POSTGRES_DB=mindlift
    POSTGRES_USER=mindlift_admin
    POSTGRES_PASSWORD=UseAStrongRandomPassword123!
-   JWT_SIGNING_KEY=Minimum32CharacterSecretKeyForStaffTokens12345!
-   PORTAL_JWT_SIGNING_KEY=Minimum32CharacterSecretKeyForPortalTokens12345!
+   JWT_SIGNING_KEY=<a random string of at least 32 characters>
+   SECRET_KEY=<a different random string; it encrypts stored mail passwords and provider tokens>
+   APP_BASE_URL=https://crm.example.com
    ```
 
 3. Launch with Docker Compose:
@@ -78,14 +79,21 @@ To launch the production stack with PostgreSQL, Hangfire workers, and the web/AP
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `ASPNETCORE_ENVIRONMENT` | No | `Production` | Hosting environment (`Development` or `Production`). |
-| `ConnectionStrings__DefaultConnection` | **Yes** | — | PostgreSQL connection string with host, port, database, user, and password. |
+| `ConnectionStrings__Default` | **Yes** | — | PostgreSQL connection string with host, port, database, user, and password. |
 | `Database__MigrateOnStartup` | No | `true` | When true, applies pending EF Core migrations on application boot. |
 | `Jwt__SigningKey` | **Yes** | — | HMAC-SHA256 secret key for signing staff access tokens (min 32 bytes). |
 | `Jwt__Issuer` | No | `https://app.mindlift.io` | Staff JWT issuer URL. |
 | `Jwt__Audience` | No | `mindlift-api` | Staff JWT audience string. |
-| `PortalJwt__SigningKey` | **Yes** | — | HMAC-SHA256 secret key for signing customer portal access tokens. |
-| `PortalJwt__Issuer` | No | `https://app.mindlift.io` | Customer portal JWT issuer URL. |
-| `PortalJwt__Audience` | No | `mindlift-portal` | Customer portal JWT audience string. |
+| `Security__SecretKey` | **Yes** | falls back to the signing key | Encrypts the mail passwords, provider tokens and webhook secrets a workspace stores. Changing it makes values saved with the old key unreadable, so those secrets must be entered again. |
+| `App__BaseUrl` | **Yes** | `http://localhost:5082` | The public address of the app, for example `https://crm.example.com`. It is put into emailed links (sign-in, invitations, booking and reminder emails). Without it, links point at localhost. |
+| `Communication__WhatsAppVerifyToken` | If WhatsApp is used | — | The token you give Meta when you register the WhatsApp webhook. If it is not set, the registration handshake is refused. |
+| `Communication__PublicBaseUrl` | No | `App__BaseUrl` | The address Twilio is configured to call. Twilio signs this exact address, so set it if a proxy changes the address the app sees. |
+| `RateLimiting__PublicPermitsPerMinute` | No | `120` | Requests per minute per client address for sign-in, sign-up, magic links, public booking and website forms. Over the limit gives 429. |
+| `RateLimiting__WebhookPermitsPerMinute` | No | `1200` | Requests per minute per client address for provider webhooks. |
+| `ForwardedHeaders__Enabled` | No | `false` | Set to `true` behind a reverse proxy so the app sees the real client address and scheme. See section 9. |
+| `ForwardedHeaders__KnownProxies__0` | With the setting above | a proxy on the same machine | The address of a proxy to trust. Add `__1`, `__2` for more. |
+| `ForwardedHeaders__KnownNetworks__0` | No | — | An address range to trust, for example `10.0.0.0/8`. |
+| `Hangfire__DashboardEnabled` | No | `false` | Serves the background job dashboard at `/hangfire`, to requests from the same machine only. |
 | `Ocr__TesseractPath` | No | `/usr/bin/tesseract` | Absolute path to the Tesseract binary. |
 | `Ocr__Languages` | No | `eng+ara` | OCR language codes to process. |
 | `Ocr__MaxFileSizeMb` | No | `25` | Maximum upload size per document file in MB. |
@@ -125,7 +133,7 @@ MindLift CRM executes asynchronous workflows through scheduled recurring jobs:
 | `activity-reminders` | Every minute | Checks upcoming tasks and calls due within the user's notification window. |
 | `daily-digest` | Hourly | Aggregates daily summaries for tenants configured for digest emails. |
 
-In Development mode, the Hangfire dashboard is accessible at `/hangfire`. In production, access is restricted to authenticated platform administrators.
+The Hangfire dashboard is off by default. Set `Hangfire__DashboardEnabled=true` to serve it at `/hangfire`; even then it answers only requests from the same machine, so reach it through an SSH tunnel and never expose it publicly.
 
 ---
 
@@ -143,8 +151,28 @@ The OCR pipeline extracts structured information from uploaded receipts, trade l
 
 ## 7. Security & Hardening Checklist
 
-- [x] **Rate Limiting:** Protects sensitive authentication and sign-in routes against brute-force attacks.
 - [x] **File Upload Restrictions:** Maximum file size enforced at 25 MB; executable/script extensions (`.exe`, `.bat`, `.sh`, `.ps1`, etc.) are rejected with 400 Bad Request.
-- [x] **Cross-Realm Protection:** Portal tokens are signed with a distinct key and audience (`mindlift-portal`); staff tokens cannot access portal customer endpoints and vice-versa.
+- [x] **Cross-Realm Protection:** Portal tokens carry their own audience (`mindlift-portal`) and a customer claim, and are checked by a separate authentication scheme, so staff tokens cannot reach portal customer endpoints and the other way round. Both kinds are signed with the same `Jwt__SigningKey`; there is no separate portal key.
 - [x] **Non-Root Execution:** The Docker container executes with unprivileged user permissions (`$APP_UID`).
 - [x] **Token Revocation:** Automatic refresh token rotation with family reuse breach detection revokes compromised sessions immediately.
+- [x] **Rate Limiting:** Sign-in, sign-up, magic links, public booking, website forms and webhooks are limited per client address (settings above). Account lockout also applies after 5 wrong passwords, for staff and for portal customers.
+- [x] **Webhook Authentication:** WhatsApp (Meta) webhooks must carry a valid `X-Hub-Signature-256`, and Twilio webhooks a valid `X-Twilio-Signature`, checked against the secret saved on that channel. A channel with no secret never accepts webhooks, and a verified request can only reach its own workspace.
+- [x] **Encrypted Secrets:** Mail passwords, provider tokens and webhook secrets are encrypted at rest with AES-256 and an integrity check, using `Security__SecretKey`. Set it explicitly in production.
+- [x] **Upload Checks:** Document uploads accept only listed file types, check that the file contents match the type, and are stored with the content type of their extension.
+- [x] **Security Headers:** Every response carries `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` and `frame-ancestors 'none'`. A full Content-Security-Policy is not set.
+
+---
+
+## 8. Provider Webhooks (WhatsApp and Twilio SMS)
+
+1. In Settings, add the channel and enter its secret: the **app secret** for WhatsApp (from the Meta app), or the **auth token** for Twilio. Save the WhatsApp **phone number ID** as well.
+2. Register the webhook with the provider:
+   - WhatsApp: `https://<your address>/api/v1/webhooks/whatsapp`, with the same token as `Communication__WhatsAppVerifyToken`.
+   - Twilio: `https://<your address>/api/v1/webhooks/twilio`. The address must match `Communication__PublicBaseUrl` (or `App__BaseUrl`) exactly, including `https`.
+3. A request that fails verification is refused with 401 and nothing is stored. If messages stop arriving, check that the secret on the channel matches the provider and, for Twilio, that the public address is the one the provider calls.
+
+---
+
+## 9. Running Behind a Reverse Proxy
+
+By default the app uses the address the connection comes from. Behind a proxy that is the proxy, so every customer would share one rate limit. Set `ForwardedHeaders__Enabled=true` and name the proxy with `ForwardedHeaders__KnownProxies__0` (or a range in `ForwardedHeaders__KnownNetworks__0`). The app then reads the client address and scheme from `X-Forwarded-For` and `X-Forwarded-Proto`, but only from the proxies you named. With none named, only a proxy on the same machine is trusted. An address that is not valid stops the app at startup with a message saying which one.

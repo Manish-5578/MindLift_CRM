@@ -98,14 +98,10 @@ public sealed class WebhookAuthenticator(AppDbContext db, ISecretProtector secre
             return null;
         }
 
-        string authToken;
-        try
+        var authToken = secretProtector.Unprotect(protectedToken);
+        if (string.IsNullOrEmpty(authToken))
         {
-            authToken = secretProtector.Unprotect(protectedToken);
-        }
-        catch (CryptographicException)
-        {
-            return null;
+            return null; // The stored token could not be opened.
         }
 
         return VerifyTwilioSignature(url, form, signatureHeader, authToken) ? new VerifiedChannel(account.Id, account.TenantId) : null;
