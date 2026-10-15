@@ -1,19 +1,22 @@
 @inherits LayoutComponentBase
 @inject AppState App
+@inject Translator T
+@inject IJSRuntime JS
+@implements IDisposable
 
 <MudThemeProvider Theme="_theme" />
 <MudPopoverProvider />
 <MudDialogProvider MaxWidth="MaxWidth.Small" FullWidth="true" CloseButton="true" BackdropClick="false" />
 <MudSnackbarProvider />
 
-<MudRTLProvider RightToLeft="App.IsArabic">
+<MudRTLProvider RightToLeft="T.IsArabic">
     <MudLayout>
         <MudMainContent>
             <div class="ml-page" style="min-height:100vh">
                 <div class="ml-stack" style="align-items:center">
                     <MudText Typo="Typo.subtitle1" Class="mt-6" Style="font-weight:700;color:var(--ml-primary)">MindLift</MudText>
                 </div>
-                @Body
+                <div @key="T.Language" class="ml-lang-root">@Body</div>
             </div>
         </MudMainContent>
     </MudLayout>
@@ -21,4 +24,23 @@
 
 @code {
     private readonly MudTheme _theme = MindLiftTheme.Create();
+
+    protected override void OnInitialized() => T.Changed += OnLanguageChanged;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LanguagePreference.ApplySavedAsync(JS, T);
+            await LanguagePreference.ApplyDirectionAsync(JS, T);
+        }
+    }
+
+    private void OnLanguageChanged()
+    {
+        _ = LanguagePreference.ApplyDirectionAsync(JS, T);
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => T.Changed -= OnLanguageChanged;
 }

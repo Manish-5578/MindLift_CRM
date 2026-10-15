@@ -34,6 +34,11 @@
         // Called from Blazor (IJSRuntime). Theme and language live on <html> so CSS tokens and RTL switch.
         window.mindlift = {
             setTheme: function (theme) { document.documentElement.setAttribute('data-theme', theme); },
+            // Sets the page language and direction without saving a choice. Used for a language that comes from the profile.
+            applyLanguage: function (lang) {
+                document.documentElement.setAttribute('lang', lang);
+                document.documentElement.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
+            },
             setLanguage: function (lang) {
                 document.documentElement.setAttribute('lang', lang);
                 document.documentElement.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');

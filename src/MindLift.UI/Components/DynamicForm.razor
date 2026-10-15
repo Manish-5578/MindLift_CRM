@@ -1,3 +1,5 @@
+@inject Translator T
+
 <div class="ml-stack" data-testid="dynamic-form">
     <MudGrid Spacing="3">
         @foreach (var field in Fields)
@@ -11,7 +13,7 @@
                                    Clearable="true" Error="HasError(current.Key)" ErrorText="@ErrorOf(current.Key)" data-testid="@TestIdOf(current)">
                             @foreach (var option in (current.Options ?? []).Where(o => o.IsActive))
                             {
-                                <MudSelectItem T="string" Value="@option.Value">@option.Label</MudSelectItem>
+                                <MudSelectItem T="string" Value="@option.Value">@T[option.Label]</MudSelectItem>
                             }
                         </MudSelect>
                         break;
@@ -53,7 +55,7 @@
 
     @if (CustomFields.Count > 0)
     {
-        <MudText Typo="Typo.overline" Class="ml-muted mt-2">Details</MudText>
+        <MudText Typo="Typo.overline" Class="ml-muted mt-2">@T["Details"]</MudText>
         <CustomFieldEditor Fields="CustomFields" Values="CustomValues" ValuesChanged="CustomValuesChanged" />
     }
 </div>
@@ -87,7 +89,7 @@
     private static string FlagText(bool value) => value ? "true" : "false";
     private bool HasError(string key) => Errors?.ContainsKey(key) == true;
     private string? ErrorOf(string key) => Errors?.GetValueOrDefault(key);
-    private static string LabelOf(FormField field) => field.Required ? field.Label + " *" : field.Label;
+    private string LabelOf(FormField field) => field.Required ? T[field.Label] + " *" : T[field.Label];
     private static string TestIdOf(FormField field) => field.TestId ?? "field-" + field.Key;
 
     private static InputType InputTypeOf(FormFieldKind kind) => kind switch

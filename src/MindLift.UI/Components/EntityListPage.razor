@@ -1,6 +1,7 @@
 @typeparam TItem
 @using MindLift.Shared.Filtering
 @inject NavigationManager Nav
+@inject Translator T
 @implements IDisposable
 
 <PageHeader Title="@Title" Subtitle="@SubtitleText">
@@ -15,21 +16,21 @@
                 @foreach (var view in Views)
                 {
                     var current = view;
-                    <MudButton Color="@ViewColor(current)" OnClick="() => SelectViewAsync(current)" data-testid="@ViewTestId(current)">@current.Label</MudButton>
+                    <MudButton Color="@ViewColor(current)" OnClick="() => SelectViewAsync(current)" data-testid="@ViewTestId(current)">@T[current.Label]</MudButton>
                 }
             </MudButtonGroup>
         </div>
     }
 
     <div class="ml-row ml-row--wrap" style="padding:12px 20px;border-bottom:1px solid var(--ml-border)" data-testid="list-toolbar">
-        <MudTextField T="string" Value="_state.Search" ValueChanged="SearchAsync" Immediate="true" DebounceInterval="300" Placeholder="@SearchPlaceholder"
+        <MudTextField T="string" Value="_state.Search" ValueChanged="SearchAsync" Immediate="true" DebounceInterval="300" Placeholder="@T[SearchPlaceholder]"
                       Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.Search"
                       Class="ml-grow" Style="max-width:360px" data-testid="search" />
 
         @if (Fields.Count > 0)
         {
             <MudBadge Content="FilterCount" Visible="FilterCount > 0" Color="Color.Primary" Overlap="true">
-                <MudButton Variant="Variant.Outlined" Size="Size.Medium" StartIcon="@Icons.Material.Outlined.FilterList" OnClick="OpenFilters" data-testid="open-filters">Filters</MudButton>
+                <MudButton Variant="Variant.Outlined" Size="Size.Medium" StartIcon="@Icons.Material.Outlined.FilterList" OnClick="OpenFilters" data-testid="open-filters">@T["Filters"]</MudButton>
             </MudBadge>
         }
 
@@ -41,7 +42,7 @@
 
         @if (_state.IsNarrowed)
         {
-            <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="ClearAsync" data-testid="clear-filters">Clear</MudButton>
+            <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="ClearAsync" data-testid="clear-filters">@T["Clear"]</MudButton>
         }
     </div>
 
@@ -66,7 +67,7 @@
         {
             <EmptyState Icon="@Icons.Material.Outlined.SearchOff" Title="No results" Message="Try different keywords or clear the filters.">
                 <Actions>
-                    <MudButton Variant="Variant.Outlined" OnClick="ClearAsync" data-testid="empty-clear">Clear filters</MudButton>
+                    <MudButton Variant="Variant.Outlined" OnClick="ClearAsync" data-testid="empty-clear">@T["Clear filters"]</MudButton>
                 </Actions>
             </EmptyState>
         }
@@ -84,7 +85,7 @@
                                 @if (current.SortField is not null)
                                 {
                                     <button type="button" @onclick="() => SortAsync(current.SortField)" data-testid="@SortTestId(current)">
-                                        @current.Header
+                                        @T[current.Header]
                                         @if (_state.SortField == current.SortField)
                                         {
                                             <MudIcon Icon="@SortIcon()" Size="Size.Small" />
@@ -93,7 +94,7 @@
                                 }
                                 else
                                 {
-                                    @current.Header
+                                    @T[current.Header]
                                 }
                             </th>
                         }
@@ -134,8 +135,8 @@
         <div class="ml-row ml-row--between" style="padding:12px 20px;border-top:1px solid var(--ml-border)" data-testid="list-pager">
             <MudText Typo="Typo.caption" Class="ml-muted">@PagerText</MudText>
             <div class="ml-row">
-                <MudIconButton Icon="@Icons.Material.Outlined.ChevronLeft" Disabled="_state.Page <= 1" OnClick="() => GoToPageAsync(_state.Page - 1)" aria-label="Previous page" data-testid="page-prev" />
-                <MudIconButton Icon="@Icons.Material.Outlined.ChevronRight" Disabled="_state.Page >= PageCount" OnClick="() => GoToPageAsync(_state.Page + 1)" aria-label="Next page" data-testid="page-next" />
+                <MudIconButton Icon="@(T.IsArabic ? Icons.Material.Outlined.ChevronRight : Icons.Material.Outlined.ChevronLeft)" Disabled="_state.Page <= 1" OnClick="() => GoToPageAsync(_state.Page - 1)" aria-label="@T["Previous page"]" data-testid="page-prev" />
+                <MudIconButton Icon="@(T.IsArabic ? Icons.Material.Outlined.ChevronLeft : Icons.Material.Outlined.ChevronRight)" Disabled="_state.Page >= PageCount" OnClick="() => GoToPageAsync(_state.Page + 1)" aria-label="@T["Next page"]" data-testid="page-next" />
             </div>
         </div>
     }
@@ -144,15 +145,15 @@
 <MudDrawer Open="_filtersOpen" OpenChanged="v => _filtersOpen = v" Anchor="Anchor.End" Variant="DrawerVariant.Temporary" Elevation="3" Width="420px" Class="ml-form-drawer" data-testid="filters-drawer">
     <div class="ml-stack" style="height:100%">
         <div class="ml-row ml-row--between" style="padding:16px 24px;border-bottom:1px solid var(--ml-border);min-height:64px">
-            <MudText Typo="Typo.h5">Filters</MudText>
-            <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small" OnClick="CloseFilters" aria-label="Close filters" />
+            <MudText Typo="Typo.h5">@T["Filters"]</MudText>
+            <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small" OnClick="CloseFilters" aria-label="@T["Close filters"]" />
         </div>
         <div style="padding:24px;overflow:auto;flex:1 1 auto">
             <FilterBuilder Fields="Fields" Picklists="Picklists" Users="Users" Value="_draft" ValueChanged="g => _draft = g" />
         </div>
         <div class="ml-row" style="justify-content:flex-end;padding:16px 24px;border-top:1px solid var(--ml-border)">
-            <MudButton Variant="Variant.Text" OnClick="ResetFiltersAsync" data-testid="filters-reset">Reset</MudButton>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ApplyFiltersAsync" data-testid="filters-apply">Apply</MudButton>
+            <MudButton Variant="Variant.Text" OnClick="ResetFiltersAsync" data-testid="filters-reset">@T["Reset"]</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ApplyFiltersAsync" data-testid="filters-apply">@T["Apply"]</MudButton>
         </div>
     </div>
 </MudDrawer>
@@ -207,11 +208,11 @@
 
     private string DefaultViewKey => DefaultView ?? Views.FirstOrDefault()?.Key ?? string.Empty;
 
-    private string? SubtitleText => _result is null ? null : $"{_result.Total:N0} {ItemLabel}";
+    private string? SubtitleText => _result is null ? null : $"{_result.Total:N0} {T[ItemLabel]}";
 
     private int PageCount => _result is null ? 1 : Math.Max(1, (int)Math.Ceiling(_result.Total / (double)PageSize));
 
-    private string PagerText => _result is null ? string.Empty : $"{_result.Total:N0} {ItemLabel} · page {_state.Page} of {PageCount}";
+    private string PagerText => _result is null ? string.Empty : T["{0} {1} · page {2} of {3}", _result.Total.ToString("N0"), T[ItemLabel], _state.Page, PageCount];
 
     private int FilterCount => _state.Filter?.Conditions.Count ?? 0;
 
@@ -317,7 +318,7 @@
             if (request == _requestId)
             {
                 _result = null;
-                _error = "We could not reach MindLift. Check your connection and try again.";
+                _error = T["We could not reach MindLift. Check your connection and try again."];
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -325,7 +326,7 @@
             if (request == _requestId)
             {
                 _result = null;
-                _error = "We could not load this list. Try again.";
+                _error = T["We could not load this list. Try again."];
             }
         }
         finally
@@ -435,7 +436,7 @@
         {
             if (Fields.FirstOrDefault(f => f.Key == condition.Field) is { } field)
             {
-                yield return (condition, FilterDescriber.Describe(condition, field, Picklists, Users));
+                yield return (condition, FilterDescriber.Describe(condition, field, Picklists, Users, T));
             }
         }
     }

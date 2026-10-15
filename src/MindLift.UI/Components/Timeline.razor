@@ -1,7 +1,9 @@
+@inject Translator T
+
 <div class="ml-timeline" data-testid="@TestId">
     @if (Items.Count == 0)
     {
-        <MudText Typo="Typo.body2" Class="ml-muted" data-testid="timeline-empty">@EmptyText</MudText>
+        <MudText Typo="Typo.body2" Class="ml-muted" data-testid="timeline-empty">@T[EmptyText]</MudText>
     }
     @foreach (var item in Items)
     {

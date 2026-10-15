@@ -1,11 +1,12 @@
 @using Microsoft.AspNetCore.Components.Forms
+@inject Translator T
 
 <div class="ml-dropzone @(_active ? "ml-dropzone--active" : "")" data-testid="file-dropzone"
      @ondragenter="() => _active = true" @ondragleave="() => _active = false" @ondrop="() => _active = false">
-    <InputFile OnChange="OnChange" multiple="@Multiple" accept="@Accept" capture="@Capture" aria-label="Choose files to upload" />
+    <InputFile OnChange="OnChange" multiple="@Multiple" accept="@Accept" capture="@Capture" aria-label="@T["Choose files to upload"]" />
     <div class="ml-stack" style="align-items:center;text-align:center;pointer-events:none">
         <MudIcon Icon="@Icons.Material.Outlined.CloudUpload" Color="Color.Primary" Style="font-size:36px" />
-        <MudText Typo="Typo.body1"><strong>Drag &amp; drop files here</strong> or <span class="ml-link">browse</span></MudText>
+        <MudText Typo="Typo.body1"><strong>@T["Drag & drop files here"]</strong> @T["or"] <span class="ml-link">@T["browse"]</span></MudText>
         <MudText Typo="Typo.caption" Class="ml-muted">@Hint</MudText>
     </div>
 </div>
@@ -32,7 +33,7 @@
                         <MudProgressLinear Value="percent" Size="Size.Small" Color="Color.Primary" Style="height:4px" />
                     }
                 </div>
-                <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small" OnClick="() => Remove(current)" aria-label="@("Remove " + current.Name)" />
+                <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small" OnClick="() => Remove(current)" aria-label="@T["Remove {0}", current.Name]" />
             </div>
         }
     </div>
@@ -64,7 +65,7 @@
     /// <summary>Raised with the files that passed the checks, after every change to the list.</summary>
     [Parameter] public EventCallback<IReadOnlyList<IBrowserFile>> FilesChanged { get; set; }
 
-    private string Hint => HintText ?? $"{DescribeAccept()} · up to {MaxSizeMb} MB each";
+    private string Hint => HintText is null ? T["{0} · up to {1} MB each", DescribeAccept(), MaxSizeMb] : T[HintText];
 
     private string DescribeAccept()
         => string.Join(", ", Accept.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
@@ -91,10 +92,10 @@
     {
         if (!IsAccepted(file))
         {
-            return "File type not supported";
+            return T["File type not supported"];
         }
 
-        return file.Size > MaxSizeMb * 1024L * 1024L ? $"File is larger than {MaxSizeMb} MB" : null;
+        return file.Size > MaxSizeMb * 1024L * 1024L ? T["File is larger than {0} MB", MaxSizeMb] : null;
     }
 
     private bool IsAccepted(IBrowserFile file)

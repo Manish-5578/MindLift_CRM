@@ -1,7 +1,7 @@
 <MlCard Loading="Loading" OnClick="Navigate" TestId="@($"kpi-{Key}")">
     <div class="ml-stack-sm">
         <div class="ml-row ml-row--between">
-            <MudText Typo="Typo.overline" Class="ml-muted">@Label</MudText>
+            <MudText Typo="Typo.overline" Class="ml-muted">@T[Label]</MudText>
             @if (Icon is not null) { <MudIcon Icon="@Icon" Size="Size.Small" Class="ml-faint" /> }
         </div>
         <div class="ml-kpi-value" title="@Tooltip">@Value</div>
@@ -19,13 +19,14 @@
                     @($"{Math.Abs(Delta.Value):0.#}%")
                 </span>
             }
-            @if (Caption is not null) { <MudText Typo="Typo.caption" Class="ml-faint">@Caption</MudText> }
+            @if (Caption is not null) { <MudText Typo="Typo.caption" Class="ml-faint">@T[Caption]</MudText> }
         </div>
     </div>
 </MlCard>
 
 @code {
     [Inject] NavigationManager Nav { get; set; } = default!;
+    [Inject] Translator T { get; set; } = default!;
     [Parameter, EditorRequired] public string Key { get; set; } = "";
     [Parameter, EditorRequired] public string Label { get; set; } = "";
     [Parameter] public string Value { get; set; } = "—";

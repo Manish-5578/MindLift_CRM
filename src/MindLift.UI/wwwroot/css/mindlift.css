@@ -204,3 +204,6 @@ html[dir="rtl"] .ml-nav .mud-nav-link.active { box-shadow:inset -3px 0 0 var(--m
 .ml-month__date { font-size:12px; font-weight:600; }
 .ml-month .ml-week__event { padding:2px 6px; font-size:12px; }
 @media (max-width: 959px) { .ml-month__cell { min-height:64px; } }
+
+/* Wraps a screen so a language change redraws it. It adds no box of its own. */
+.ml-lang-root { display: contents; }

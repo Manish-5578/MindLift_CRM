@@ -1,20 +1,22 @@
+@inject Translator T
+
 <MudDialog>
     <TitleContent>
-        <MudText Typo="Typo.h5">@Title</MudText>
+        <MudText Typo="Typo.h5">@T[Title]</MudText>
     </TitleContent>
     <DialogContent>
         <div class="ml-stack">
             @if (!string.IsNullOrWhiteSpace(Message))
             {
-                <MudText Typo="Typo.body1" Class="ml-muted">@Message</MudText>
+                <MudText Typo="Typo.body1" Class="ml-muted">@T[Message]</MudText>
             }
-            <MudTextField @bind-Value="_reason" Label="@Label" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" Immediate="true" AutoFocus="true"
+            <MudTextField @bind-Value="_reason" Label="@T[Label]" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" Immediate="true" AutoFocus="true"
                           Error="@(_error is not null)" ErrorText="@_error" data-testid="reason-input" />
         </div>
     </DialogContent>
     <DialogActions>
-        <MudButton Variant="Variant.Text" OnClick="Cancel" data-testid="reason-cancel">Cancel</MudButton>
-        <MudButton Variant="Variant.Filled" Color="@(Danger ? Color.Error : Color.Primary)" OnClick="Confirm" data-testid="reason-ok">@ConfirmText</MudButton>
+        <MudButton Variant="Variant.Text" OnClick="Cancel" data-testid="reason-cancel">@T["Cancel"]</MudButton>
+        <MudButton Variant="Variant.Filled" Color="@(Danger ? Color.Error : Color.Primary)" OnClick="Confirm" data-testid="reason-ok">@T[ConfirmText]</MudButton>
     </DialogActions>
 </MudDialog>
 
@@ -35,7 +37,7 @@
         // The button stays enabled. A missing reason is explained under the field instead (plan 18.8.4).
         if (string.IsNullOrWhiteSpace(_reason))
         {
-            _error = "A reason is required.";
+            _error = T["A reason is required."];
             return;
         }
 

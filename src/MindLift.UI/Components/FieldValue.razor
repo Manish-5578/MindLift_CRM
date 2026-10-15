@@ -1,3 +1,5 @@
+@inject Translator T
+
 @if (string.IsNullOrWhiteSpace(Value))
 {
     <span class="ml-faint" data-testid="field-empty">—</span>
@@ -23,7 +25,7 @@ else
             }
             break;
         case FormFieldKind.Picklist:
-            <span>@(Options?.FirstOrDefault(o => o.Value == Value)?.Label ?? Value)</span>
+            <span>@(Options?.FirstOrDefault(o => o.Value == Value) is { } option ? T[option.Label] : Value)</span>
             break;
         case FormFieldKind.User:
             <span>@(Users?.FirstOrDefault(u => u.Id.ToString() == Value)?.FullName ?? "—")</span>

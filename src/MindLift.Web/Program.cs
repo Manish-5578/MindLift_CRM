@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using MudBlazor;
 using MudBlazor.Services;
+using MindLift.UI.Localization;
 using MindLift.Web;
 using MindLift.Web.Services;
 
@@ -11,6 +12,7 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 
 var apiBase = new Uri(builder.HostEnvironment.BaseAddress);
 
+builder.Services.AddMindLiftLocalization();
 builder.Services.AddScoped<AuthSession>();
 builder.Services.AddScoped<AppState>();
 builder.Services.AddScoped<NotificationClient>();

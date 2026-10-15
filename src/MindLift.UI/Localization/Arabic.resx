@@ -1,0 +1,368 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!--
+    Arabic text for the staff app. Each entry's name is the English wording the screen uses, and its value is the Arabic.
+    A phrase with no entry here is shown in English. Placeholders such as {0} must appear in the Arabic as well.
+    Please have a native Arabic speaker review the wording before it is shown to customers.
+  -->
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Save" xml:space="preserve">
+    <value>حفظ</value>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>إلغاء</value>
+  </data>
+  <data name="Are you sure?" xml:space="preserve">
+    <value>هل أنت متأكد؟</value>
+  </data>
+  <data name="A reason is required." xml:space="preserve">
+    <value>السبب مطلوب.</value>
+  </data>
+  <data name="Add a reason" xml:space="preserve">
+    <value>أضف سببًا</value>
+  </data>
+  <data name="Reason *" xml:space="preserve">
+    <value>السبب *</value>
+  </data>
+  <data name="Confirm" xml:space="preserve">
+    <value>تأكيد</value>
+  </data>
+  <data name="Something went wrong" xml:space="preserve">
+    <value>حدث خطأ ما</value>
+  </data>
+  <data name="We could not load this. Check your connection and try again." xml:space="preserve">
+    <value>تعذّر تحميل هذه الصفحة. تحقّق من اتصالك وحاول مرة أخرى.</value>
+  </data>
+  <data name="Try again" xml:space="preserve">
+    <value>حاول مرة أخرى</value>
+  </data>
+  <data name="Close" xml:space="preserve">
+    <value>إغلاق</value>
+  </data>
+  <data name="Discard changes?" xml:space="preserve">
+    <value>تجاهل التغييرات؟</value>
+  </data>
+  <data name="You have unsaved changes. They will be lost." xml:space="preserve">
+    <value>لديك تغييرات غير محفوظة. ستُفقد.</value>
+  </data>
+  <data name="Discard" xml:space="preserve">
+    <value>تجاهل</value>
+  </data>
+  <data name="Nothing here yet." xml:space="preserve">
+    <value>لا يوجد شيء هنا بعد.</value>
+  </data>
+  <data name="Nothing here yet" xml:space="preserve">
+    <value>لا يوجد شيء هنا بعد</value>
+  </data>
+  <data name="Owner" xml:space="preserve">
+    <value>المالك</value>
+  </data>
+  <data name="Filters" xml:space="preserve">
+    <value>عوامل التصفية</value>
+  </data>
+  <data name="Clear" xml:space="preserve">
+    <value>مسح</value>
+  </data>
+  <data name="Clear filters" xml:space="preserve">
+    <value>مسح عوامل التصفية</value>
+  </data>
+  <data name="Previous page" xml:space="preserve">
+    <value>الصفحة السابقة</value>
+  </data>
+  <data name="Next page" xml:space="preserve">
+    <value>الصفحة التالية</value>
+  </data>
+  <data name="Close filters" xml:space="preserve">
+    <value>إغلاق عوامل التصفية</value>
+  </data>
+  <data name="Reset" xml:space="preserve">
+    <value>إعادة تعيين</value>
+  </data>
+  <data name="Apply" xml:space="preserve">
+    <value>تطبيق</value>
+  </data>
+  <data name="{0} {1} · page {2} of {3}" xml:space="preserve">
+    <value>{0} {1} · الصفحة {2} من {3}</value>
+  </data>
+  <data name="We could not reach MindLift. Check your connection and try again." xml:space="preserve">
+    <value>تعذّر الوصول إلى MindLift. تحقّق من اتصالك وحاول مرة أخرى.</value>
+  </data>
+  <data name="We could not load this list. Try again." xml:space="preserve">
+    <value>تعذّر تحميل هذه القائمة. حاول مرة أخرى.</value>
+  </data>
+  <data name="No results" xml:space="preserve">
+    <value>لا توجد نتائج</value>
+  </data>
+  <data name="Try different keywords or clear the filters." xml:space="preserve">
+    <value>جرّب كلمات مختلفة أو امسح عوامل التصفية.</value>
+  </data>
+  <data name="Search" xml:space="preserve">
+    <value>بحث</value>
+  </data>
+  <data name="records" xml:space="preserve">
+    <value>سجلات</value>
+  </data>
+  <data name="Show records that match" xml:space="preserve">
+    <value>أظهر السجلات المطابقة</value>
+  </data>
+  <data name="Match all or any" xml:space="preserve">
+    <value>مطابقة الكل أو أيٍّ منها</value>
+  </data>
+  <data name="all" xml:space="preserve">
+    <value>الكل</value>
+  </data>
+  <data name="any" xml:space="preserve">
+    <value>أيٌّ</value>
+  </data>
+  <data name="of these" xml:space="preserve">
+    <value>من هذه الشروط</value>
+  </data>
+  <data name="Field" xml:space="preserve">
+    <value>الحقل</value>
+  </data>
+  <data name="Condition" xml:space="preserve">
+    <value>الشرط</value>
+  </data>
+  <data name="Value" xml:space="preserve">
+    <value>القيمة</value>
+  </data>
+  <data name="From" xml:space="preserve">
+    <value>من</value>
+  </data>
+  <data name="To" xml:space="preserve">
+    <value>إلى</value>
+  </data>
+  <data name="Date" xml:space="preserve">
+    <value>التاريخ</value>
+  </data>
+  <data name="Period" xml:space="preserve">
+    <value>الفترة</value>
+  </data>
+  <data name="Values" xml:space="preserve">
+    <value>القيم</value>
+  </data>
+  <data name="Person" xml:space="preserve">
+    <value>الشخص</value>
+  </data>
+  <data name="Remove filter" xml:space="preserve">
+    <value>إزالة عامل التصفية</value>
+  </data>
+  <data name="Yes" xml:space="preserve">
+    <value>نعم</value>
+  </data>
+  <data name="No" xml:space="preserve">
+    <value>لا</value>
+  </data>
+  <data name="Me" xml:space="preserve">
+    <value>أنا</value>
+  </data>
+  <data name="Add filter" xml:space="preserve">
+    <value>إضافة عامل تصفية</value>
+  </data>
+  <data name="is" xml:space="preserve">
+    <value>يساوي</value>
+  </data>
+  <data name="is not" xml:space="preserve">
+    <value>لا يساوي</value>
+  </data>
+  <data name="contains" xml:space="preserve">
+    <value>يحتوي على</value>
+  </data>
+  <data name="does not contain" xml:space="preserve">
+    <value>لا يحتوي على</value>
+  </data>
+  <data name="starts with" xml:space="preserve">
+    <value>يبدأ بـ</value>
+  </data>
+  <data name="is empty" xml:space="preserve">
+    <value>فارغ</value>
+  </data>
+  <data name="is not empty" xml:space="preserve">
+    <value>غير فارغ</value>
+  </data>
+  <data name="is greater than" xml:space="preserve">
+    <value>أكبر من</value>
+  </data>
+  <data name="is at least" xml:space="preserve">
+    <value>على الأقل</value>
+  </data>
+  <data name="is less than" xml:space="preserve">
+    <value>أقل من</value>
+  </data>
+  <data name="is at most" xml:space="preserve">
+    <value>على الأكثر</value>
+  </data>
+  <data name="is between" xml:space="preserve">
+    <value>بين</value>
+  </data>
+  <data name="is any of" xml:space="preserve">
+    <value>أيٌّ من</value>
+  </data>
+  <data name="is none of" xml:space="preserve">
+    <value>ليس أيًّا من</value>
+  </data>
+  <data name="is in" xml:space="preserve">
+    <value>ضمن</value>
+  </data>
+  <data name="Today" xml:space="preserve">
+    <value>اليوم</value>
+  </data>
+  <data name="Yesterday" xml:space="preserve">
+    <value>أمس</value>
+  </data>
+  <data name="This week" xml:space="preserve">
+    <value>هذا الأسبوع</value>
+  </data>
+  <data name="Last week" xml:space="preserve">
+    <value>الأسبوع الماضي</value>
+  </data>
+  <data name="This month" xml:space="preserve">
+    <value>هذا الشهر</value>
+  </data>
+  <data name="Last month" xml:space="preserve">
+    <value>الشهر الماضي</value>
+  </data>
+  <data name="This quarter" xml:space="preserve">
+    <value>هذا الربع</value>
+  </data>
+  <data name="Last quarter" xml:space="preserve">
+    <value>الربع الماضي</value>
+  </data>
+  <data name="This year" xml:space="preserve">
+    <value>هذا العام</value>
+  </data>
+  <data name="Last year" xml:space="preserve">
+    <value>العام الماضي</value>
+  </data>
+  <data name="and" xml:space="preserve">
+    <value>و</value>
+  </data>
+  <data name="Someone" xml:space="preserve">
+    <value>شخص ما</value>
+  </data>
+  <data name="Move this card" xml:space="preserve">
+    <value>نقل هذه البطاقة</value>
+  </data>
+  <data name="Move to" xml:space="preserve">
+    <value>نقل إلى</value>
+  </data>
+  <data name="Nothing here" xml:space="preserve">
+    <value>لا يوجد شيء هنا</value>
+  </data>
+  <data name="Choose files to upload" xml:space="preserve">
+    <value>اختر الملفات لرفعها</value>
+  </data>
+  <data name="Drag &amp; drop files here" xml:space="preserve">
+    <value>اسحب الملفات وأفلتها هنا</value>
+  </data>
+  <data name="or" xml:space="preserve">
+    <value>أو</value>
+  </data>
+  <data name="browse" xml:space="preserve">
+    <value>تصفّح</value>
+  </data>
+  <data name="Remove {0}" xml:space="preserve">
+    <value>إزالة {0}</value>
+  </data>
+  <data name="{0} · up to {1} MB each" xml:space="preserve">
+    <value>{0} · حتى {1} ميغابايت لكل ملف</value>
+  </data>
+  <data name="File type not supported" xml:space="preserve">
+    <value>نوع الملف غير مدعوم</value>
+  </data>
+  <data name="File is larger than {0} MB" xml:space="preserve">
+    <value>حجم الملف أكبر من {0} ميغابايت</value>
+  </data>
+  <data name="Details" xml:space="preserve">
+    <value>التفاصيل</value>
+  </data>
+  <data name="leads" xml:space="preserve">
+    <value>العملاء المحتملون</value>
+  </data>
+  <data name="contacts" xml:space="preserve">
+    <value>جهات الاتصال</value>
+  </data>
+  <data name="accounts" xml:space="preserve">
+    <value>الحسابات</value>
+  </data>
+  <data name="deals" xml:space="preserve">
+    <value>الصفقات</value>
+  </data>
+  <data name="activities" xml:space="preserve">
+    <value>الأنشطة</value>
+  </data>
+  <data name="Toggle navigation" xml:space="preserve">
+    <value>تبديل التنقل</value>
+  </data>
+  <data name="Account menu" xml:space="preserve">
+    <value>قائمة الحساب</value>
+  </data>
+  <data name="Notification preferences" xml:space="preserve">
+    <value>تفضيلات الإشعارات</value>
+  </data>
+  <data name="Light mode" xml:space="preserve">
+    <value>الوضع الفاتح</value>
+  </data>
+  <data name="Dark mode" xml:space="preserve">
+    <value>الوضع الداكن</value>
+  </data>
+  <data name="Sign out" xml:space="preserve">
+    <value>تسجيل الخروج</value>
+  </data>
+  <data name="Dashboard" xml:space="preserve">
+    <value>لوحة التحكم</value>
+  </data>
+  <data name="Settings" xml:space="preserve">
+    <value>الإعدادات</value>
+  </data>
+  <data name="Leads" xml:space="preserve">
+    <value>العملاء المحتملون</value>
+  </data>
+  <data name="Contacts" xml:space="preserve">
+    <value>جهات الاتصال</value>
+  </data>
+  <data name="Accounts" xml:space="preserve">
+    <value>الحسابات</value>
+  </data>
+  <data name="Deals" xml:space="preserve">
+    <value>الصفقات</value>
+  </data>
+  <data name="Activities" xml:space="preserve">
+    <value>الأنشطة</value>
+  </data>
+  <data name="Calendar" xml:space="preserve">
+    <value>التقويم</value>
+  </data>
+  <data name="Unified Inbox" xml:space="preserve">
+    <value>صندوق الوارد الموحّد</value>
+  </data>
+  <data name="Reports" xml:space="preserve">
+    <value>التقارير</value>
+  </data>
+  <data name="Products" xml:space="preserve">
+    <value>المنتجات</value>
+  </data>
+  <data name="Quotations" xml:space="preserve">
+    <value>عروض الأسعار</value>
+  </data>
+  <data name="Quotes" xml:space="preserve">
+    <value>عروض الأسعار</value>
+  </data>
+  <data name="Invoices" xml:space="preserve">
+    <value>الفواتير</value>
+  </data>
+  <data name="Documents" xml:space="preserve">
+    <value>المستندات</value>
+  </data>
+</root>

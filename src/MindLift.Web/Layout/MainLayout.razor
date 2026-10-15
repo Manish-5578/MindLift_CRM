@@ -1,6 +1,7 @@
 @inherits LayoutComponentBase
 @inject AuthSession Session
 @inject AppState App
+@inject Translator T
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @using MindLift.Shared.Validation
@@ -12,11 +13,11 @@
 <MudSnackbarProvider />
 
 <CascadingValue Value="_isDark" Name="IsDarkMode">
-<CascadingValue Value="App.IsArabic" Name="IsRtl">
-<MudRTLProvider RightToLeft="App.IsArabic">
+<CascadingValue Value="T.IsArabic" Name="IsRtl">
+<MudRTLProvider RightToLeft="T.IsArabic">
     <MudLayout>
         <MudAppBar Elevation="0" Class="ml-appbar" Dense="false">
-            <MudIconButton Icon="@Icons.Material.Outlined.Menu" Color="Color.Inherit" OnClick="@(() => _drawerOpen = !_drawerOpen)" aria-label="Toggle navigation" />
+            <MudIconButton Icon="@Icons.Material.Outlined.Menu" Color="Color.Inherit" OnClick="@(() => _drawerOpen = !_drawerOpen)" aria-label="@T["Toggle navigation"]" />
             <MudText Typo="Typo.subtitle1" Class="ml-hide-xs">@(App.Bootstrap?.Company.CompanyName ?? "MindLift")</MudText>
             <MudSpacer />
             @if (Session.IsSignedIn && App.Bootstrap is not null)
@@ -24,13 +25,13 @@
                 <GlobalSearch />
                 <QuickAdd />
                 <NotificationBell />
-                <MudMenu Icon="@Icons.Material.Outlined.Person" Color="Color.Inherit" AriaLabel="Account menu" Dense="true">
+                <MudMenu Icon="@Icons.Material.Outlined.Person" Color="Color.Inherit" AriaLabel="@T["Account menu"]" Dense="true">
                     <MudText Typo="Typo.body2" Class="px-4 py-2 ml-muted">@App.Bootstrap.User.FullName</MudText>
                     <MudDivider />
-                    <MudMenuItem Href="/notifications/preferences">Notification preferences</MudMenuItem>
-                    <MudMenuItem OnClick="ToggleDark">@(_isDark ? "Light mode" : "Dark mode")</MudMenuItem>
+                    <MudMenuItem Href="/notifications/preferences">@T["Notification preferences"]</MudMenuItem>
+                    <MudMenuItem OnClick="ToggleDark">@(_isDark ? T["Light mode"] : T["Dark mode"])</MudMenuItem>
                     <MudMenuItem OnClick="ToggleLanguage">@(App.IsArabic ? "English" : "العربية")</MudMenuItem>
-                    <MudMenuItem OnClick="SignOut">Sign out</MudMenuItem>
+                    <MudMenuItem OnClick="SignOut">@T["Sign out"]</MudMenuItem>
                 </MudMenu>
             }
         </MudAppBar>
@@ -39,22 +40,23 @@
         {
             <MudDrawer @bind-Open="_drawerOpen" Elevation="0" ClipMode="DrawerClipMode.Always" Variant="DrawerVariant.Responsive">
                 <MudNavMenu Class="ml-nav">
-                    <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Outlined.SpaceDashboard">Dashboard</MudNavLink>
+                    <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Outlined.SpaceDashboard">@T["Dashboard"]</MudNavLink>
                     @foreach (var item in NavItems)
                     {
-                        <MudNavLink Href="@item.Href" Icon="@item.Icon">@item.Label</MudNavLink>
+                        <MudNavLink Href="@item.Href" Icon="@item.Icon">@T[item.Label]</MudNavLink>
                     }
                     <MudDivider Class="my-2" />
                     @if (App.CanView(AppModule.Settings))
                     {
-                        <MudNavLink Href="/settings/company" Icon="@Icons.Material.Outlined.Settings">Settings</MudNavLink>
+                        <MudNavLink Href="/settings/company" Icon="@Icons.Material.Outlined.Settings">@T["Settings"]</MudNavLink>
                     }
                 </MudNavMenu>
             </MudDrawer>
         }
 
         <MudMainContent>
-            @Body
+            @* A new key when the language changes makes every screen draw itself again in the new language. *@
+            <div @key="T.Language" class="ml-lang-root">@Body</div>
         </MudMainContent>
     </MudLayout>
 </MudRTLProvider>
@@ -93,6 +95,7 @@
     protected override void OnInitialized()
     {
         Session.Changed += StateHasChanged;
+        T.Changed += OnLanguageChanged;
         App.Changed += OnAppChanged;
         Nav.LocationChanged += OnLocationChanged;
         ApplyBrandColor();
@@ -142,6 +145,21 @@
         }
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LanguagePreference.ApplySavedAsync(JS, T);
+            await LanguagePreference.ApplyDirectionAsync(JS, T);
+        }
+    }
+
+    private void OnLanguageChanged()
+    {
+        _ = LanguagePreference.ApplyDirectionAsync(JS, T);
+        _ = InvokeAsync(StateHasChanged);
+    }
+
     private async Task ToggleDark()
     {
         _isDark = !_isDark;
@@ -150,8 +168,9 @@
 
     private async Task ToggleLanguage()
     {
-        var next = App.IsArabic ? "en" : "ar";
+        var next = T.IsArabic ? "en" : "ar";
         await JS.InvokeVoidAsync("mindlift.setLanguage", next);
+        T.Choose(next);
     }
 
     private async Task SignOut()
@@ -169,6 +188,7 @@
     public void Dispose()
     {
         Session.Changed -= StateHasChanged;
+        T.Changed -= OnLanguageChanged;
         App.Changed -= OnAppChanged;
         Nav.LocationChanged -= OnLocationChanged;
     }

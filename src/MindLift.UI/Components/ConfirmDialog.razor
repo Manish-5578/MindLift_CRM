@@ -1,13 +1,15 @@
+@inject Translator T
+
 <MudDialog>
     <TitleContent>
-        <MudText Typo="Typo.h5">@Title</MudText>
+        <MudText Typo="Typo.h5">@T[Title]</MudText>
     </TitleContent>
     <DialogContent>
-        <MudText Typo="Typo.body1" Class="ml-muted">@Message</MudText>
+        <MudText Typo="Typo.body1" Class="ml-muted">@T[Message]</MudText>
     </DialogContent>
     <DialogActions>
-        <MudButton Variant="Variant.Text" OnClick="Cancel" data-testid="confirm-cancel">Cancel</MudButton>
-        <MudButton Variant="Variant.Filled" Color="@(Danger ? Color.Error : Color.Primary)" OnClick="Confirm" data-testid="confirm-ok">@ConfirmText</MudButton>
+        <MudButton Variant="Variant.Text" OnClick="Cancel" data-testid="confirm-cancel">@T["Cancel"]</MudButton>
+        <MudButton Variant="Variant.Filled" Color="@(Danger ? Color.Error : Color.Primary)" OnClick="Confirm" data-testid="confirm-ok">@T[ConfirmText]</MudButton>
     </DialogActions>
 </MudDialog>
 

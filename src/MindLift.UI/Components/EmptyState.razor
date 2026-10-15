@@ -1,7 +1,9 @@
+@inject Translator T
+
 <div class="ml-state @(Compact ? "ml-state--compact" : "")" data-testid="empty-state">
     <div class="ml-state__icon"><MudIcon Icon="@Icon" Style="font-size:36px" /></div>
-    <MudText Typo="Typo.h6">@Title</MudText>
-    @if (Message is not null) { <MudText Typo="Typo.body1" Class="ml-state__message">@Message</MudText> }
+    <MudText Typo="Typo.h6">@T[Title]</MudText>
+    @if (Message is not null) { <MudText Typo="Typo.body1" Class="ml-state__message">@T[Message]</MudText> }
     @if (Actions is not null) { <div class="ml-state__actions">@Actions</div> }
 </div>
 

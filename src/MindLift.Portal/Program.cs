@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using MindLift.Portal;
 using MindLift.Portal.Services;
+using MindLift.UI.Localization;
 using MudBlazor;
 using MudBlazor.Services;
 
@@ -12,6 +13,7 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 // The app lives under /portal/, the API at the site root.
 var apiBase = new Uri(new Uri(builder.HostEnvironment.BaseAddress), "/");
 
+builder.Services.AddMindLiftLocalization();
 builder.Services.AddScoped<PortalSession>();
 builder.Services.AddScoped<PortalText>();
 builder.Services.AddScoped(sp => new HttpClient(new PortalAuthHandler(sp.GetRequiredService<PortalSession>())) { BaseAddress = apiBase });

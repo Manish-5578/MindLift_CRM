@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using MindLift.Shared.Contracts;
 using MindLift.Shared.Filtering;
 using MindLift.UI.Components;
+using MindLift.UI.Localization;
 using MudBlazor;
 using FieldType = MindLift.Shared.Filtering.FieldType;
 using FilterOperator = MindLift.Shared.Filtering.FilterOperator;
@@ -23,6 +24,7 @@ public sealed class FilterBuilderTests : BunitContext, IAsyncLifetime
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddMudServices();
+        Services.AddMindLiftLocalization();
     }
 
     private static FieldDto Field(string key, string label, FieldType type, bool filterable = true, bool hidden = false)

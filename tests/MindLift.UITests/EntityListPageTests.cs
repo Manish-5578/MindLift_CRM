@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using MindLift.Shared.Contracts;
 using MindLift.Shared.Filtering;
 using MindLift.UI.Components;
+using MindLift.UI.Localization;
 using MudBlazor;
 using MudBlazor.Services;
 using FieldType = MindLift.Shared.Filtering.FieldType;
@@ -25,6 +26,7 @@ public sealed class EntityListPageTests : BunitContext, IAsyncLifetime
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddMudServices();
+        Services.AddMindLiftLocalization();
     }
 
     private static readonly IReadOnlyList<ListColumn<Row>> Columns =
@@ -391,5 +393,43 @@ public sealed class EntityListPageTests : BunitContext, IAsyncLifetime
         var list = Create(new Fake(), p => p.Add(c => c.CardTemplate, r => b => b.AddMarkupContent(0, $"<b class=\"card-name\">{r.Name}</b>")));
 
         list.FindAll("[data-testid=card] .card-name").Count.ShouldBe(2);
+    }
+
+    /// <summary>The drawing of an icon, so a test can tell which arrow a button shows.</summary>
+    private static string IconPath(string icon) => System.Text.RegularExpressions.Regex.Matches(icon, "d=\"([^\"]+)\"").Last().Groups[1].Value;
+
+    [Fact]
+    public void In_english_previous_points_left_and_next_points_right()
+    {
+        var list = Create(new Fake { Total = 60 });
+
+        list.Find("[data-testid=page-prev]").InnerHtml.ShouldContain(IconPath(Icons.Material.Outlined.ChevronLeft));
+        list.Find("[data-testid=page-next]").InnerHtml.ShouldContain(IconPath(Icons.Material.Outlined.ChevronRight));
+    }
+
+    [Fact]
+    public void In_arabic_the_page_arrows_point_the_other_way()
+    {
+        Services.GetRequiredService<Translator>().SetLanguage("ar");
+
+        var list = Create(new Fake { Total = 60 });
+
+        // The layout mirrors, so "previous" sits on the right and its arrow must point right.
+        list.Find("[data-testid=page-prev]").InnerHtml.ShouldContain(IconPath(Icons.Material.Outlined.ChevronRight));
+        list.Find("[data-testid=page-next]").InnerHtml.ShouldContain(IconPath(Icons.Material.Outlined.ChevronLeft));
+    }
+
+    [Fact]
+    public void In_arabic_the_toolbar_pager_and_count_use_arabic_text()
+    {
+        Services.GetRequiredService<Translator>().SetLanguage("ar");
+
+        var list = Create(new Fake { Total = 60 });
+
+        list.Find("[data-testid=open-filters]").TextContent.ShouldContain("عوامل التصفية");
+        list.Find("[data-testid=page-prev]").GetAttribute("aria-label").ShouldBe("الصفحة السابقة");
+        list.Find("[data-testid=page-next]").GetAttribute("aria-label").ShouldBe("الصفحة التالية");
+        list.Markup.ShouldContain("60 العملاء المحتملون");
+        list.Markup.ShouldContain("الصفحة 1 من 3");
     }
 }

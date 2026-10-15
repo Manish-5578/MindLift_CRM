@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using MindLift.Shared.Contracts;
 using MindLift.Shared.Enums;
+using MindLift.UI.Localization;
 
 namespace MindLift.Web.Services;
 
@@ -8,7 +9,7 @@ namespace MindLift.Web.Services;
 /// The workspace configuration loaded from /api/v1/app/bootstrap after sign-in (plan 7.2).
 /// Pages read modules, labels and permissions from here, never hard-coded.
 /// </summary>
-public sealed class AppState(HttpClient http, AuthSession session)
+public sealed class AppState(HttpClient http, AuthSession session, Translator translator)
 {
     public BootstrapDto? Bootstrap { get; private set; }
 
@@ -18,8 +19,8 @@ public sealed class AppState(HttpClient http, AuthSession session)
     /// <summary>True when an admin has not finished or skipped through the setup wizard yet.</summary>
     public bool SetupPending => IsAdmin && Onboarding is { CurrentStep: < OnboardingSteps.Completed };
 
-    /// <summary>Arabic layout (right to left) when the signed-in user's language is Arabic.</summary>
-    public bool IsArabic => Bootstrap?.User is { } user && user.Language == "ar";
+    /// <summary>Arabic text and layout (right to left). The language is the person's own choice, or their profile's language until they make one.</summary>
+    public bool IsArabic => translator.IsArabic;
 
     public event Action? Changed;
 
@@ -35,6 +36,7 @@ public sealed class AppState(HttpClient http, AuthSession session)
         if (Bootstrap is not null)
         {
             session.SetMe(Bootstrap.User);
+            translator.UseDefault(Bootstrap.User.Language);
             Onboarding = await LoadOnboardingAsync();
         }
 

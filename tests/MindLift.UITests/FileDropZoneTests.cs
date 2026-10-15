@@ -1,3 +1,4 @@
+using MindLift.UI.Localization;
 using Bunit;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
@@ -20,6 +21,7 @@ public sealed class FileDropZoneTests : BunitContext, IAsyncLifetime
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddMudServices();
+        Services.AddMindLiftLocalization();
     }
 
     private (IRenderedComponent<FileDropZone> Zone, List<IReadOnlyList<IBrowserFile>> Calls) Create(Action<ComponentParameterCollectionBuilder<FileDropZone>>? configure = null)

@@ -1,4 +1,5 @@
 using Microsoft.JSInterop;
+using MindLift.UI.Localization;
 
 namespace MindLift.Portal.Services;
 
@@ -6,7 +7,7 @@ namespace MindLift.Portal.Services;
 /// English and Arabic text for the customer portal. Kept in one place so every screen can switch language,
 /// and so pages never put string literals inside Razor attribute expressions.
 /// </summary>
-public sealed class PortalText(IJSRuntime js)
+public sealed class PortalText(IJSRuntime js, Translator translator)
 {
     public string Language { get; private set; } = "en";
     public bool IsArabic => Language == "ar";
@@ -18,6 +19,7 @@ public sealed class PortalText(IJSRuntime js)
     public async Task SetLanguageAsync(string language)
     {
         Language = language == "ar" ? "ar" : "en";
+        translator.Choose(Language);
         try
         {
             await js.InvokeVoidAsync("mindliftPortal.setLanguage", Language);

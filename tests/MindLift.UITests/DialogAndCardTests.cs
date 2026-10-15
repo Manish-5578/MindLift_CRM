@@ -1,6 +1,7 @@
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using MindLift.UI.Components;
+using MindLift.UI.Localization;
 using MudBlazor;
 using MudBlazor.Services;
 using Shouldly;
@@ -18,6 +19,7 @@ public sealed class DialogAndCardTests : BunitContext, IAsyncLifetime
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddMudServices();
+        Services.AddMindLiftLocalization();
     }
 
     private IRenderedComponent<MudDialogProvider> StartProviders()

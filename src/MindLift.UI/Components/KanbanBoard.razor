@@ -1,4 +1,5 @@
 @typeparam TItem
+@inject Translator T
 
 <div class="ml-stack" data-testid="kanban">
     @* Phones show one column at a time and pick it here (plan 18.9.6). *@
@@ -7,7 +8,7 @@
         {
             var current = column;
             <MudChip T="string" Size="Size.Small" Variant="@(ActiveKey == current.Key ? Variant.Filled : Variant.Outlined)" Color="@(ActiveKey == current.Key ? Color.Primary : Color.Default)"
-                     OnClick="() => _active = current.Key" data-testid="@PickerTestId(current)">@current.Label (@current.Total)</MudChip>
+                     OnClick="() => _active = current.Key" data-testid="@PickerTestId(current)">@T[current.Label] (@current.Total)</MudChip>
         }
     </div>
 
@@ -15,7 +16,7 @@
         @foreach (var column in Columns)
         {
             var current = column;
-            <section class="@ColumnClass(current)" aria-label="@current.Label" data-testid="@ColumnTestId(current)"
+            <section class="@ColumnClass(current)" aria-label="@T[current.Label]" data-testid="@ColumnTestId(current)"
                      @ondragenter="() => OnDragEnter(current.Key)" @ondragover="() => OnDragEnter(current.Key)" @ondragover:preventDefault="true"
                      @ondrop="() => DropAsync(current.Key)" @ondrop:preventDefault="true" @ondragleave="() => OnDragLeave(current.Key)">
                 <header class="ml-kanban__header">
@@ -24,7 +25,7 @@
                         {
                             <span class="ml-kanban__dot" style="@DotStyle(current)"></span>
                         }
-                        <MudText Typo="Typo.subtitle2" Class="ml-grow ml-truncate">@current.Label</MudText>
+                        <MudText Typo="Typo.subtitle2" Class="ml-grow ml-truncate">@T[current.Label]</MudText>
                     </div>
                     <MudText Typo="Typo.caption" Class="ml-muted" data-testid="@CountTestId(current)">@CountText(current)</MudText>
                 </header>
@@ -39,12 +40,12 @@
 
                             @* No dragging on phones, so each card has a menu to move it. *@
                             <div class="ml-only-xs">
-                                <MudMenu Icon="@Icons.Material.Outlined.MoreVert" Size="Size.Small" AriaLabel="Move this card" Dense="true">
-                                    <MudText Typo="Typo.caption" Class="px-4 py-1 ml-muted">Move to</MudText>
+                                <MudMenu Icon="@Icons.Material.Outlined.MoreVert" Size="Size.Small" AriaLabel="@T["Move this card"]" Dense="true">
+                                    <MudText Typo="Typo.caption" Class="px-4 py-1 ml-muted">@T["Move to"]</MudText>
                                     @foreach (var target in Columns.Where(c => c.Key != current.Key))
                                     {
                                         var to = target;
-                                        <MudMenuItem OnClick="() => MoveAsync(card, current.Key, to.Key)" data-testid="@MoveTestId(to)">@to.Label</MudMenuItem>
+                                        <MudMenuItem OnClick="() => MoveAsync(card, current.Key, to.Key)" data-testid="@MoveTestId(to)">@T[to.Label]</MudMenuItem>
                                     }
                                 </MudMenu>
                             </div>
@@ -53,7 +54,7 @@
 
                     @if (!ItemsIn(current.Key).Any())
                     {
-                        <MudText Typo="Typo.caption" Class="ml-muted ml-kanban__empty" data-testid="kanban-empty">@EmptyText</MudText>
+                        <MudText Typo="Typo.caption" Class="ml-muted ml-kanban__empty" data-testid="kanban-empty">@T[EmptyText]</MudText>
                     }
 
                     @if (ColumnFooter is not null)

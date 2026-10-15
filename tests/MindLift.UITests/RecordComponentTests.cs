@@ -1,3 +1,4 @@
+using MindLift.UI.Localization;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using MindLift.Shared.Contracts;
@@ -18,6 +19,7 @@ public sealed class RecordComponentTests : BunitContext, IAsyncLifetime
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddMudServices();
+        Services.AddMindLiftLocalization();
     }
 
     // ---------- FieldValue ----------

@@ -1,4 +1,5 @@
 @using FieldType = MindLift.Shared.Filtering.FieldType
+@inject Translator T
 @foreach (var field in Fields)
 {
     switch (field.Type)
@@ -19,7 +20,7 @@
             <MudSelect T="string" Value="@GetText(field.Key)" ValueChanged="v => Set(field.Key, v)" Label="@Label(field)" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-3" data-testid="@($"cf-{field.Key}")">
                 @foreach (var option in field.Options ?? [])
                 {
-                    <MudSelectItem T="string" Value="@option.Value">@option.Label</MudSelectItem>
+                    <MudSelectItem T="string" Value="@option.Value">@T[option.Label]</MudSelectItem>
                 }
             </MudSelect>
             break;
@@ -37,7 +38,7 @@
     [Parameter, EditorRequired] public Dictionary<string, JsonElement?> Values { get; set; } = new();
     [Parameter] public EventCallback<Dictionary<string, JsonElement?>> ValuesChanged { get; set; }
 
-    private string Label(FieldDto field) => field.IsRequired ? $"{field.Label} *" : field.Label;
+    private string Label(FieldDto field) => field.IsRequired ? $"{T[field.Label]} *" : T[field.Label];
 
     private string? GetText(string key) => Values.TryGetValue(key, out var v) && v is { ValueKind: JsonValueKind.String } s ? s.GetString() : null;
 

@@ -1,19 +1,20 @@
 @inject IDialogService Dialogs
+@inject Translator T
 
 <MudDrawer Open="Open" OpenChanged="OnOpenChanged" Anchor="Anchor.End" Variant="DrawerVariant.Temporary" Elevation="3" Width="480px" Class="ml-form-drawer" data-testid="form-drawer">
     <div class="ml-stack" style="height:100%">
         <div class="ml-row ml-row--between" style="padding:16px 24px;border-bottom:1px solid var(--ml-border);min-height:64px">
-            <MudText Typo="Typo.h5">@Title</MudText>
-            <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small" OnClick="RequestClose" aria-label="Close" />
+            <MudText Typo="Typo.h5">@T[Title]</MudText>
+            <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small" OnClick="RequestClose" aria-label="@T["Close"]" />
         </div>
         <div style="padding:24px;overflow:auto;flex:1 1 auto">
             @ChildContent
         </div>
         <div class="ml-row" style="justify-content:flex-end;padding:16px 24px;border-top:1px solid var(--ml-border)">
-            <MudButton Variant="Variant.Text" OnClick="RequestClose">Cancel</MudButton>
+            <MudButton Variant="Variant.Text" OnClick="RequestClose">@T["Cancel"]</MudButton>
             <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="Busy" OnClick="OnSubmit" data-testid="drawer-submit">
                 @if (Busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }
-                else { @SubmitText }
+                else { @T[SubmitText] }
             </MudButton>
         </div>
     </div>
@@ -40,7 +41,7 @@
     {
         if (!value && IsDirty && !Busy)
         {
-            var discard = await Dialogs.ConfirmAsync("Discard changes?", "You have unsaved changes. They will be lost.", "Discard", danger: true);
+            var discard = await Dialogs.ConfirmAsync(T["Discard changes?"], T["You have unsaved changes. They will be lost."], T["Discard"], danger: true);
             if (!discard)
             {
                 // The drawer closed itself in the browser. Tell it to stay open.

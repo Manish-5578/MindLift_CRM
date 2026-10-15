@@ -1,11 +1,13 @@
+@inject Translator T
+
 <div class="ml-state" data-testid="error-state">
     <div class="ml-state__icon ml-state__icon--error"><MudIcon Icon="@Icons.Material.Outlined.ErrorOutline" Style="font-size:36px" /></div>
-    <MudText Typo="Typo.h6">@Title</MudText>
-    <MudText Typo="Typo.body1" Class="ml-state__message">@Message</MudText>
+    <MudText Typo="Typo.h6">@T[Title]</MudText>
+    <MudText Typo="Typo.body1" Class="ml-state__message">@T[Message]</MudText>
     @if (OnRetry.HasDelegate)
     {
         <div class="ml-state__actions">
-            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Refresh" OnClick="OnRetry" data-testid="error-retry">Try again</MudButton>
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Refresh" OnClick="OnRetry" data-testid="error-retry">@T["Try again"]</MudButton>
         </div>
     }
 </div>
