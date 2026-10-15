@@ -220,10 +220,10 @@
     ];
 
     private string SourceLabel(string? code)
-        => code is null ? "—" : App.Bootstrap?.Picklists.FirstOrDefault(p => p.Key == "lead_source")?.Values.FirstOrDefault(v => v.Value == code)?.Label ?? code;
+        => code is null ? "—" : App.PicklistLabel("lead_source", code);
 
     private string StatusLabel(string code)
-        => App.Bootstrap?.Picklists.FirstOrDefault(p => p.Key == "lead_status")?.Values.FirstOrDefault(v => v.Value == code)?.Label ?? code;
+        => App.PicklistLabel("lead_status", code);
 
     private static string StatusCategory(string code) => code switch
     {

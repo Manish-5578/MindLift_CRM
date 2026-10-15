@@ -108,7 +108,7 @@
                             </MudChip>
                         </MudTd>
                         <MudTd>
-                            <MudText Typo="Typo.body2">@context.StartDate.ToString("MMM d, yyyy") – @context.EndDate.ToString("MMM d, yyyy")</MudText>
+                            <MudText Typo="Typo.body2">@Formatting.Format(context.StartDate, "MMM d, yyyy", T) – @Formatting.Format(context.EndDate, "MMM d, yyyy", T)</MudText>
                         </MudTd>
                         <MudTd Style="text-align:right">
                             <MudText Typo="Typo.subtitle2" Style="font-weight:700">

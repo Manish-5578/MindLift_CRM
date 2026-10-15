@@ -89,5 +89,14 @@ public sealed class AppState(HttpClient http, AuthSession session, Translator tr
         return plural ? setting.PluralLabel : setting.SingularLabel;
     }
 
+    /// <summary>
+    /// The label of a picklist choice. In Arabic it is the Arabic name the workspace stores for it, or the translated English name. An unknown code is shown as it is.
+    /// </summary>
+    public string PicklistLabel(string picklistKey, string? code)
+    {
+        var value = Bootstrap?.Picklists.FirstOrDefault(p => p.Key == picklistKey)?.Values.FirstOrDefault(v => v.Value == code);
+        return value is null ? code ?? string.Empty : translator.Pick(value.Label, value.LabelAr);
+    }
+
     public bool IsAdmin => Bootstrap?.User.IsAdmin == true;
 }

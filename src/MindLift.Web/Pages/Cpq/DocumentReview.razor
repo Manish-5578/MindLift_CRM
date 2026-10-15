@@ -38,7 +38,7 @@
                         }
                     </div>
                     <MudText Typo="Typo.caption" Class="text-secondary">
-                        @T["Uploaded {0}", _document.UploadedAt.ToString("g")] · @FormatBytes(_document.FileSizeBytes)
+                        @T["Uploaded {0}", Formatting.Format(_document.UploadedAt, "g", T)] · @FormatBytes(_document.FileSizeBytes)
                         @if (!string.IsNullOrEmpty(_document.RejectReason))
                         {
                             <span class="ml-2 text-danger">· @T["Rejected: {0}", _document.RejectReason]</span>

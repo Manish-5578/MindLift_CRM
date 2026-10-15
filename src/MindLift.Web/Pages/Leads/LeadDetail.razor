@@ -416,5 +416,5 @@
     private string? RatingLabel(string? code) => code is null ? null : PicklistLabel("lead_rating", code);
 
     private string PicklistLabel(string key, string code)
-        => App.Bootstrap?.Picklists.FirstOrDefault(p => p.Key == key)?.Values.FirstOrDefault(v => v.Value == code)?.Label ?? code;
+        => App.PicklistLabel(key, code);
 }

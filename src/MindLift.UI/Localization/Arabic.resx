@@ -4157,4 +4157,430 @@
   <data name="{0} of {1} done" xml:space="preserve">
     <value>تم إنجاز {0} من {1}</value>
   </data>
+  <data name="20 ft" xml:space="preserve">
+    <value>20 قدم</value>
+  </data>
+  <data name="40 ft" xml:space="preserve">
+    <value>40 قدم</value>
+  </data>
+  <data name="40 ft high cube" xml:space="preserve">
+    <value>40 قدم عالية</value>
+  </data>
+  <data name="Agreement" xml:space="preserve">
+    <value>اتفاقية</value>
+  </data>
+  <data name="Air" xml:space="preserve">
+    <value>جوي</value>
+  </data>
+  <data name="Apartment" xml:space="preserve">
+    <value>شقة</value>
+  </data>
+  <data name="Bayut" xml:space="preserve">
+    <value>بيوت</value>
+  </data>
+  <data name="Bedrooms" xml:space="preserve">
+    <value>غرف النوم</value>
+  </data>
+  <data name="Booked" xml:space="preserve">
+    <value>تم الحجز</value>
+  </data>
+  <data name="Booking" xml:space="preserve">
+    <value>حجز</value>
+  </data>
+  <data name="Budget" xml:space="preserve">
+    <value>الميزانية</value>
+  </data>
+  <data name="Busy" xml:space="preserve">
+    <value>مشغول</value>
+  </data>
+  <data name="Campaign" xml:space="preserve">
+    <value>حملة</value>
+  </data>
+  <data name="Client" xml:space="preserve">
+    <value>عميل</value>
+  </data>
+  <data name="Closed Lost" xml:space="preserve">
+    <value>مغلقة - خاسرة</value>
+  </data>
+  <data name="Closed Won" xml:space="preserve">
+    <value>مغلقة - ناجحة</value>
+  </data>
+  <data name="Cold" xml:space="preserve">
+    <value>بارد</value>
+  </data>
+  <data name="Competitor" xml:space="preserve">
+    <value>منافس</value>
+  </data>
+  <data name="Completed" xml:space="preserve">
+    <value>مكتمل</value>
+  </data>
+  <data name="Connected" xml:space="preserve">
+    <value>متصل</value>
+  </data>
+  <data name="Consulted" xml:space="preserve">
+    <value>تمت الاستشارة</value>
+  </data>
+  <data name="Contact info" xml:space="preserve">
+    <value>بيانات الاتصال</value>
+  </data>
+  <data name="Contacted" xml:space="preserve">
+    <value>تم التواصل</value>
+  </data>
+  <data name="Container type" xml:space="preserve">
+    <value>نوع الحاوية</value>
+  </data>
+  <data name="Converted" xml:space="preserve">
+    <value>تم التحويل</value>
+  </data>
+  <data name="Corporate services" xml:space="preserve">
+    <value>الخدمات المؤسسية</value>
+  </data>
+  <data name="Date of birth" xml:space="preserve">
+    <value>تاريخ الميلاد</value>
+  </data>
+  <data name="Delivered" xml:space="preserve">
+    <value>تم التسليم</value>
+  </data>
+  <data name="Destination" xml:space="preserve">
+    <value>الوجهة</value>
+  </data>
+  <data name="Discovery" xml:space="preserve">
+    <value>الاستكشاف</value>
+  </data>
+  <data name="Doctor" xml:space="preserve">
+    <value>الطبيب</value>
+  </data>
+  <data name="Doctor referral" xml:space="preserve">
+    <value>إحالة من طبيب</value>
+  </data>
+  <data name="Documents collected" xml:space="preserve">
+    <value>تم جمع المستندات</value>
+  </data>
+  <data name="Dubizzle" xml:space="preserve">
+    <value>دوبيزل</value>
+  </data>
+  <data name="Engagement" xml:space="preserve">
+    <value>ارتباط</value>
+  </data>
+  <data name="Engagements" xml:space="preserve">
+    <value>الارتباطات</value>
+  </data>
+  <data name="Enquiry" xml:space="preserve">
+    <value>استفسار</value>
+  </data>
+  <data name="Fee basis" xml:space="preserve">
+    <value>أساس الرسوم</value>
+  </data>
+  <data name="Finance consulting" xml:space="preserve">
+    <value>الاستشارات المالية</value>
+  </data>
+  <data name="Fixed" xml:space="preserve">
+    <value>ثابت</value>
+  </data>
+  <data name="Follow-up" xml:space="preserve">
+    <value>متابعة</value>
+  </data>
+  <data name="Free zone" xml:space="preserve">
+    <value>منطقة حرة</value>
+  </data>
+  <data name="Freight partner" xml:space="preserve">
+    <value>شريك شحن</value>
+  </data>
+  <data name="General business" xml:space="preserve">
+    <value>أعمال عامة</value>
+  </data>
+  <data name="Healthcare" xml:space="preserve">
+    <value>الرعاية الصحية</value>
+  </data>
+  <data name="Hot" xml:space="preserve">
+    <value>ساخن</value>
+  </data>
+  <data name="Hourly" xml:space="preserve">
+    <value>بالساعة</value>
+  </data>
+  <data name="In progress" xml:space="preserve">
+    <value>قيد التنفيذ</value>
+  </data>
+  <data name="In transit" xml:space="preserve">
+    <value>في الطريق</value>
+  </data>
+  <data name="Insurance provider" xml:space="preserve">
+    <value>شركة التأمين</value>
+  </data>
+  <data name="Insurance referral" xml:space="preserve">
+    <value>إحالة من شركة تأمين</value>
+  </data>
+  <data name="Invoiced" xml:space="preserve">
+    <value>تمت الفوترة</value>
+  </data>
+  <data name="Jurisdiction" xml:space="preserve">
+    <value>الجهة</value>
+  </data>
+  <data name="LCL" xml:space="preserve">
+    <value>شحنة جزئية</value>
+  </data>
+  <data name="Land" xml:space="preserve">
+    <value>أرض</value>
+  </data>
+  <data name="Lead details" xml:space="preserve">
+    <value>تفاصيل العميل</value>
+  </data>
+  <data name="Leased" xml:space="preserve">
+    <value>مؤجر</value>
+  </data>
+  <data name="Leasing" xml:space="preserve">
+    <value>التأجير</value>
+  </data>
+  <data name="Left voicemail" xml:space="preserve">
+    <value>ترك رسالة صوتية</value>
+  </data>
+  <data name="License expiry" xml:space="preserve">
+    <value>انتهاء الرخصة</value>
+  </data>
+  <data name="Location" xml:space="preserve">
+    <value>الموقع</value>
+  </data>
+  <data name="Logistics" xml:space="preserve">
+    <value>الخدمات اللوجستية</value>
+  </data>
+  <data name="Mainland" xml:space="preserve">
+    <value>البر الرئيسي</value>
+  </data>
+  <data name="Needs analysis" xml:space="preserve">
+    <value>تحليل الاحتياج</value>
+  </data>
+  <data name="Negotiation" xml:space="preserve">
+    <value>التفاوض</value>
+  </data>
+  <data name="New" xml:space="preserve">
+    <value>جديد</value>
+  </data>
+  <data name="No answer" xml:space="preserve">
+    <value>لا رد</value>
+  </data>
+  <data name="No budget" xml:space="preserve">
+    <value>لا توجد ميزانية</value>
+  </data>
+  <data name="No response" xml:space="preserve">
+    <value>لا رد</value>
+  </data>
+  <data name="Not interested" xml:space="preserve">
+    <value>غير مهتم</value>
+  </data>
+  <data name="Offer" xml:space="preserve">
+    <value>عرض</value>
+  </data>
+  <data name="Office" xml:space="preserve">
+    <value>مكتب</value>
+  </data>
+  <data name="Offshore" xml:space="preserve">
+    <value>خارج الدولة</value>
+  </data>
+  <data name="Origin" xml:space="preserve">
+    <value>المنشأ</value>
+  </data>
+  <data name="Other" xml:space="preserve">
+    <value>أخرى</value>
+  </data>
+  <data name="Partner" xml:space="preserve">
+    <value>شريك</value>
+  </data>
+  <data name="Patient case" xml:space="preserve">
+    <value>حالة مريض</value>
+  </data>
+  <data name="Patient cases" xml:space="preserve">
+    <value>حالات المرضى</value>
+  </data>
+  <data name="Policy number" xml:space="preserve">
+    <value>رقم الوثيقة</value>
+  </data>
+  <data name="Preferred location" xml:space="preserve">
+    <value>الموقع المفضل</value>
+  </data>
+  <data name="Property Deal" xml:space="preserve">
+    <value>صفقة عقار</value>
+  </data>
+  <data name="Property Deals" xml:space="preserve">
+    <value>صفقات العقارات</value>
+  </data>
+  <data name="Property Finder" xml:space="preserve">
+    <value>بروبرتي فايندر</value>
+  </data>
+  <data name="Property type" xml:space="preserve">
+    <value>نوع العقار</value>
+  </data>
+  <data name="Prospect" xml:space="preserve">
+    <value>عميل محتمل</value>
+  </data>
+  <data name="Qualification" xml:space="preserve">
+    <value>التأهيل</value>
+  </data>
+  <data name="Qualified" xml:space="preserve">
+    <value>مؤهل</value>
+  </data>
+  <data name="Quote" xml:space="preserve">
+    <value>عرض سعر</value>
+  </data>
+  <data name="Real estate" xml:space="preserve">
+    <value>العقارات</value>
+  </data>
+  <data name="Referral" xml:space="preserve">
+    <value>إحالة</value>
+  </data>
+  <data name="Renewal date" xml:space="preserve">
+    <value>تاريخ التجديد</value>
+  </data>
+  <data name="Requirements" xml:space="preserve">
+    <value>المتطلبات</value>
+  </data>
+  <data name="Retainer" xml:space="preserve">
+    <value>اشتراك</value>
+  </data>
+  <data name="Sales" xml:space="preserve">
+    <value>المبيعات</value>
+  </data>
+  <data name="Service type" xml:space="preserve">
+    <value>نوع الخدمة</value>
+  </data>
+  <data name="Shipment" xml:space="preserve">
+    <value>شحنة</value>
+  </data>
+  <data name="Shipments" xml:space="preserve">
+    <value>الشحنات</value>
+  </data>
+  <data name="Signed" xml:space="preserve">
+    <value>موقع</value>
+  </data>
+  <data name="Social media" xml:space="preserve">
+    <value>وسائل التواصل</value>
+  </data>
+  <data name="Submitted" xml:space="preserve">
+    <value>مقدمة</value>
+  </data>
+  <data name="Success fee" xml:space="preserve">
+    <value>نسبة من النجاح</value>
+  </data>
+  <data name="Supplier" xml:space="preserve">
+    <value>مورد</value>
+  </data>
+  <data name="Timing" xml:space="preserve">
+    <value>التوقيت</value>
+  </data>
+  <data name="Townhouse" xml:space="preserve">
+    <value>تاون هاوس</value>
+  </data>
+  <data name="Trade license no." xml:space="preserve">
+    <value>رقم الرخصة التجارية</value>
+  </data>
+  <data name="Viewing" xml:space="preserve">
+    <value>معاينة</value>
+  </data>
+  <data name="Villa" xml:space="preserve">
+    <value>فيلا</value>
+  </data>
+  <data name="Walk-in" xml:space="preserve">
+    <value>زيارة مباشرة</value>
+  </data>
+  <data name="Warm" xml:space="preserve">
+    <value>دافئ</value>
+  </data>
+  <data name="Weight (kg)" xml:space="preserve">
+    <value>الوزن (كغ)</value>
+  </data>
+  <data name="Wrong number" xml:space="preserve">
+    <value>رقم خاطئ</value>
+  </data>
+  <data name="Closed by {0} on {1}" xml:space="preserve">
+    <value>أُغلقت بواسطة {0} في {1}</value>
+  </data>
+  <data name="Avg Deal Size" xml:space="preserve">
+    <value>متوسط حجم الصفقة</value>
+  </data>
+  <data name="Completed Activities Summary" xml:space="preserve">
+    <value>ملخص الأنشطة المكتملة</value>
+  </data>
+  <data name="Completed Activities" xml:space="preserve">
+    <value>الأنشطة المكتملة</value>
+  </data>
+  <data name="Deals Closing Soon" xml:space="preserve">
+    <value>صفقات تُغلق قريبًا</value>
+  </data>
+  <data name="Deals In Progress" xml:space="preserve">
+    <value>صفقات قيد التنفيذ</value>
+  </data>
+  <data name="Key Performance Indicators" xml:space="preserve">
+    <value>مؤشرات الأداء الرئيسية</value>
+  </data>
+  <data name="Lead Conversion" xml:space="preserve">
+    <value>تحويل العملاء المحتملين</value>
+  </data>
+  <data name="Leads By Source" xml:space="preserve">
+    <value>العملاء المحتملون حسب المصدر</value>
+  </data>
+  <data name="Monthly Revenue" xml:space="preserve">
+    <value>الإيرادات الشهرية</value>
+  </data>
+  <data name="My Day" xml:space="preserve">
+    <value>يومي</value>
+  </data>
+  <data name="Open Pipeline" xml:space="preserve">
+    <value>المسار المفتوح</value>
+  </data>
+  <data name="Pipeline Funnel Velocity" xml:space="preserve">
+    <value>سرعة قمع المسار</value>
+  </data>
+  <data name="Recent Closed Wins" xml:space="preserve">
+    <value>أحدث الصفقات الرابحة</value>
+  </data>
+  <data name="Sales Target Progress" xml:space="preserve">
+    <value>تقدم هدف المبيعات</value>
+  </data>
+  <data name="System Health &amp; Capacity" xml:space="preserve">
+    <value>سلامة النظام وسعته</value>
+  </data>
+  <data name="Tasks Overdue" xml:space="preserve">
+    <value>المهام المتأخرة</value>
+  </data>
+  <data name="Team Leaderboard" xml:space="preserve">
+    <value>ترتيب الفريق</value>
+  </data>
+  <data name="Team Overdue Tasks" xml:space="preserve">
+    <value>مهام الفريق المتأخرة</value>
+  </data>
+  <data name="Unknown" xml:space="preserve">
+    <value>غير معروف</value>
+  </data>
+  <data name="Upcoming Meetings" xml:space="preserve">
+    <value>الاجتماعات القادمة</value>
+  </data>
+  <data name="Win Rate" xml:space="preserve">
+    <value>نسبة الفوز</value>
+  </data>
+  <data name="InReview" xml:space="preserve">
+    <value>قيد المراجعة</value>
+  </data>
+  <data name="PartiallyPaid" xml:space="preserve">
+    <value>مدفوعة جزئيًا</value>
+  </data>
+  <data name="NeedsReview" xml:space="preserve">
+    <value>بحاجة إلى مراجعة</value>
+  </data>
+  <data name="Queued" xml:space="preserve">
+    <value>في قائمة الانتظار</value>
+  </data>
+  <data name="Processing" xml:space="preserve">
+    <value>قيد المعالجة</value>
+  </data>
+  <data name="Pending" xml:space="preserve">
+    <value>قيد الانتظار</value>
+  </data>
+  <data name="Failed" xml:space="preserve">
+    <value>فشل</value>
+  </data>
+  <data name="Approved" xml:space="preserve">
+    <value>معتمد</value>
+  </data>
+  <data name="Urgent" xml:space="preserve">
+    <value>عاجلة</value>
+  </data>
 </root>

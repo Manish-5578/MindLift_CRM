@@ -19,7 +19,7 @@
     {
         <div class="ml-stack" data-testid="book-confirmed">
             <MudText Typo="Typo.h4">@T["You are booked"]</MudText>
-            <MudText Typo="Typo.body1">@_info.Name · @_confirmation.StartUtc.ToString("dddd d MMMM, HH:mm", CultureInfo.InvariantCulture) UTC</MudText>
+            <MudText Typo="Typo.body1">@_info.Name · @Formatting.Format(_confirmation.StartUtc, "dddd d MMMM, HH:mm", T) UTC</MudText>
             <MudText Typo="Typo.body2" Class="ml-muted">@T["We emailed you a calendar invitation. To cancel or move it, use the link in that email."]</MudText>
             <MudButton Variant="Variant.Outlined" Href="@_confirmation.ManagePath">@T["Manage this booking"]</MudButton>
         </div>
@@ -40,7 +40,7 @@
                 {
                     var current = day;
                     <MudChip T="string" Variant="@(_day == current ? Variant.Filled : Variant.Outlined)" Color="@(_day == current ? Color.Primary : Color.Default)"
-                             OnClick="() => PickDayAsync(current)" data-testid="@("day-" + current.ToString("yyyy-MM-dd"))">@current.ToString("ddd d MMM", CultureInfo.InvariantCulture)</MudChip>
+                             OnClick="() => PickDayAsync(current)" data-testid="@("day-" + current.ToString("yyyy-MM-dd"))">@Formatting.Format(current, "ddd d MMM", T)</MudChip>
                 }
             </div>
 
@@ -56,7 +56,7 @@
                     {
                         var current = slot;
                         <MudButton Variant="@(_chosen == current.StartUtc ? Variant.Filled : Variant.Outlined)" Color="Color.Primary" Size="Size.Small"
-                                   OnClick="() => _chosen = current.StartUtc" data-testid="@("slot-" + current.StartUtc.ToString("HHmm"))">@current.StartUtc.ToString("HH:mm", CultureInfo.InvariantCulture)</MudButton>
+                                   OnClick="() => _chosen = current.StartUtc" data-testid="@("slot-" + current.StartUtc.ToString("HHmm"))">@Formatting.Format(current.StartUtc, "HH:mm", T)</MudButton>
                     }
                 </div>
             }

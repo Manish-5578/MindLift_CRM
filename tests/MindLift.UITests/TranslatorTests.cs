@@ -155,4 +155,39 @@ public sealed class TranslatorTests
         translator["contacts"].ShouldBe(translator["Contacts"]);
         translator["Contacts"].ShouldBe("جهات الاتصال");
     }
+
+    [Fact]
+    public void A_stored_arabic_name_wins_in_arabic_and_is_ignored_in_english()
+    {
+        var translator = new Translator();
+
+        translator.Pick("Zebra stage", "مرحلة مخصصة").ShouldBe("Zebra stage");
+
+        translator.SetLanguage("ar");
+        translator.Pick("Zebra stage", "مرحلة مخصصة").ShouldBe("مرحلة مخصصة");
+        translator.Pick("Zebra stage", "  ").ShouldBe("Zebra stage");
+        translator.Pick("Zebra stage", null).ShouldBe("Zebra stage");
+    }
+
+    [Fact]
+    public void Without_a_stored_arabic_name_the_dictionary_is_used_and_then_the_english_name()
+    {
+        var translator = new Translator();
+        translator.SetLanguage("ar");
+
+        translator.Pick("Contacts", null).ShouldBe("جهات الاتصال");
+        translator.Pick("A stage nobody translated", null).ShouldBe("A stage nobody translated");
+    }
+
+    [Fact]
+    public void The_names_the_server_already_stores_in_arabic_are_in_the_dictionary_too()
+    {
+        var translator = new Translator();
+        translator.SetLanguage("ar");
+
+        // From the built-in picklists and the industry templates.
+        translator["Contacted"].ShouldBe("تم التواصل");
+        translator["Referral"].ShouldBe("إحالة");
+        translator["Viewing"].ShouldBe("معاينة");
+    }
 }

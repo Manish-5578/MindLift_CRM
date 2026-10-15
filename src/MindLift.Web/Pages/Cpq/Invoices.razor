@@ -126,11 +126,11 @@
                     </div>
                 </MudTd>
                 <MudTd DataLabel="Issue Date">
-                    <MudText Typo="Typo.body2">@context.IssueDate.ToString("MMM dd, yyyy")</MudText>
+                    <MudText Typo="Typo.body2">@Formatting.Format(context.IssueDate, "MMM dd, yyyy", T)</MudText>
                 </MudTd>
                 <MudTd DataLabel="Due Date">
                     <MudText Typo="Typo.body2" Color="@(context.DueDate < DateTime.UtcNow && context.BalanceDue > 0 ? Color.Error : Color.Default)">
-                        @context.DueDate.ToString("MMM dd, yyyy")
+                        @Formatting.Format(context.DueDate, "MMM dd, yyyy", T)
                     </MudText>
                 </MudTd>
                 <MudTd DataLabel="Total" Style="text-align:right">
@@ -242,8 +242,8 @@
                     <MudText Typo="Typo.body2" Class="ml-muted">@T["Terms: {0}", _activeInvoice.PaymentTerms ?? "Net 30"]</MudText>
                 </div>
                 <div class="text-right">
-                    <MudText Typo="Typo.body2">@T["Issue: {0}", _activeInvoice.IssueDate.ToString("MMM dd, yyyy")]</MudText>
-                    <MudText Typo="Typo.body2">@T["Due: {0}", _activeInvoice.DueDate.ToString("MMM dd, yyyy")]</MudText>
+                    <MudText Typo="Typo.body2">@T["Issue: {0}", Formatting.Format(_activeInvoice.IssueDate, "MMM dd, yyyy", T)]</MudText>
+                    <MudText Typo="Typo.body2">@T["Due: {0}", Formatting.Format(_activeInvoice.DueDate, "MMM dd, yyyy", T)]</MudText>
                 </div>
             </div>
 
@@ -295,7 +295,7 @@
                         <MudTh Style="text-align:right">@T["Amount"]</MudTh>
                     </HeaderContent>
                     <RowTemplate>
-                        <MudTd>@context.PaymentDate.ToString("MMM dd, yyyy HH:mm")</MudTd>
+                        <MudTd>@Formatting.Format(context.PaymentDate, "MMM dd, yyyy HH:mm", T)</MudTd>
                         <MudTd>@context.Method</MudTd>
                         <MudTd>@(context.ReferenceNumber ?? "—")</MudTd>
                         <MudTd Style="text-align:right; font-weight:700; color:var(--mud-palette-success)">@_activeInvoice.Currency @context.Amount.ToString("N2")</MudTd>

@@ -14,7 +14,7 @@ public static class FilterDescriber
 {
     public static string Describe(FilterCondition condition, FieldDto field, IReadOnlyList<PicklistDto>? picklists = null, IReadOnlyList<UserListItem>? users = null, Translator? translator = null)
     {
-        var text = $"{Say(translator, field.Label)} {Say(translator, FilterOperators.Label(condition.Op))}";
+        var text = $"{Pick(translator, field.Label, field.LabelAr)} {Say(translator, FilterOperators.Label(condition.Op))}";
         if (FilterOperators.NeedsNoValue(condition.Op) || condition.Value is not { } value)
         {
             return text;
@@ -24,6 +24,8 @@ public static class FilterDescriber
     }
 
     private static string Say(Translator? translator, string english) => translator is null ? english : translator[english];
+
+    private static string Pick(Translator? translator, string english, string? arabic) => translator is null ? english : translator.Pick(english, arabic);
 
     private static string ValueText(FilterOperator op, JsonElement value, FieldDto field, IReadOnlyList<PicklistDto>? picklists, IReadOnlyList<UserListItem>? users, Translator? translator)
     {
@@ -79,10 +81,10 @@ public static class FilterDescriber
 
         if (field.Options is { Count: > 0 } && field.Options.FirstOrDefault(o => o.Value == raw) is { } option)
         {
-            return Say(translator, option.Label);
+            return Pick(translator, option.Label, option.LabelAr);
         }
 
         var list = picklists?.FirstOrDefault(p => p.Key == field.PicklistKey);
-        return list?.Values.FirstOrDefault(v => v.Value == raw)?.Label is { } label ? Say(translator, label) : raw;
+        return list?.Values.FirstOrDefault(v => v.Value == raw) is { } picked ? Pick(translator, picked.Label, picked.LabelAr) : raw;
     }
 }

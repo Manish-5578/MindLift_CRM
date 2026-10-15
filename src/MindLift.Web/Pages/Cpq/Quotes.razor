@@ -126,7 +126,7 @@
                     </div>
                 </MudTd>
                 <MudTd DataLabel="Expiry">
-                    <MudText Typo="Typo.body2">@(context.ExpirationDate?.ToString("MMM dd, yyyy") ?? "—")</MudText>
+                    <MudText Typo="Typo.body2">@(context.ExpirationDate is { } expiry ? Formatting.Format(expiry, "MMM dd, yyyy", T) : "—")</MudText>
                 </MudTd>
                 <MudTd DataLabel="Total Value" Style="text-align:right">
                     <MudText Typo="Typo.body2" Style="font-weight:700">
@@ -248,7 +248,7 @@
         {
             <div class="mb-3">
                 <MudText Typo="Typo.h6">@_activeQuote.Title</MudText>
-                <MudText Typo="Typo.body2" Class="ml-muted">@T["Valid until: {0} · Terms: {1}", _activeQuote.ExpirationDate?.ToString("MMM dd, yyyy") ?? T["Open-ended"], _activeQuote.TermsAndConditions ?? T["Standard"]]</MudText>
+                <MudText Typo="Typo.body2" Class="ml-muted">@T["Valid until: {0} · Terms: {1}", _activeQuote.ExpirationDate is { } until ? Formatting.Format(until, "MMM dd, yyyy", T) : T["Open-ended"], _activeQuote.TermsAndConditions ?? T["Standard"]]</MudText>
             </div>
 
             <MudTable Items="@_activeQuote.LineItems" Dense="true" Outlined="true" Class="mb-3">

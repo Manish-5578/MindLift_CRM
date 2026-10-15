@@ -19,7 +19,7 @@
     {
         <div class="ml-stack" data-testid="manage-card">
             <MudText Typo="Typo.h4">@_booking.PageName</MudText>
-            <MudText Typo="Typo.body1" data-testid="manage-when">@_booking.CompanyName · @_booking.StartUtc.ToString("dddd d MMMM yyyy, HH:mm", CultureInfo.InvariantCulture) UTC</MudText>
+            <MudText Typo="Typo.body1" data-testid="manage-when">@_booking.CompanyName · @Formatting.Format(_booking.StartUtc, "dddd d MMMM yyyy, HH:mm", T) UTC</MudText>
             <MudText Typo="Typo.body2" Class="ml-muted">@T["{0} minutes", _booking.DurationMinutes] · @T[_booking.LocationType]@(string.IsNullOrWhiteSpace(_booking.LocationValue) ? "" : ": " + _booking.LocationValue)</MudText>
             <MudChip T="string" Size="Size.Small">@StatusLabel</MudChip>
 

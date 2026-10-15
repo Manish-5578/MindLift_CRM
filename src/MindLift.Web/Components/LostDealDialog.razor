@@ -10,7 +10,7 @@
                        Error="@(_error is not null)" ErrorText="@_error" data-testid="lost-reason">
                 @foreach (var value in Reasons)
                 {
-                    <MudSelectItem T="string" Value="@value.Value">@value.Label</MudSelectItem>
+                    <MudSelectItem T="string" Value="@value.Value">@T.Pick(value.Label, value.LabelAr)</MudSelectItem>
                 }
             </MudSelect>
             <MudTextField @bind-Value="_notes" Label="@T["Notes"]" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" data-testid="lost-notes" />

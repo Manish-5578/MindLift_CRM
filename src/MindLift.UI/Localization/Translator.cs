@@ -32,6 +32,13 @@ public sealed class Translator
     public string this[string english, params object?[] values]
         => string.Format(CultureInfo.InvariantCulture, this[english], values);
 
+    /// <summary>
+    /// A name that may come with its own Arabic spelling from the server (a field, a picklist choice, a stage). In Arabic the stored Arabic name is used when there is one;
+    /// otherwise the English name is translated from the file, or shown as it is.
+    /// </summary>
+    public string Pick(string english, string? arabic)
+        => IsArabic && !string.IsNullOrWhiteSpace(arabic) ? arabic : this[english];
+
     /// <summary>The language a person picked themselves (the language switch, or a preference saved in the browser). It outranks the profile's language.</summary>
     public void Choose(string? language)
     {

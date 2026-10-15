@@ -182,7 +182,7 @@
                         </MudTooltip>
                     </MudTd>
                     <MudTd DataLabel="Date">
-                        <MudText Typo="Typo.body2">@context.UploadedAt.ToString("MMM dd, yyyy HH:mm")</MudText>
+                        <MudText Typo="Typo.body2">@Formatting.Format(context.UploadedAt, "MMM dd, yyyy HH:mm", T)</MudText>
                     </MudTd>
                     <MudTd DataLabel="Actions" Style="text-align:right">
                         <div class="d-flex justify-end gap-2">
@@ -232,7 +232,7 @@
                         {
                             var isOverdue = context.DueDate.Value < DateOnly.FromDateTime(DateTime.UtcNow) && context.Status == "Open";
                             <MudChip T="string" Size="Size.Small" Color="@(isOverdue ? Color.Error : Color.Default)" Variant="Variant.Outlined">
-                                @context.DueDate.Value.ToString("MMM dd, yyyy")
+                                @Formatting.Format(context.DueDate.Value, "MMM dd, yyyy", T)
                             </MudChip>
                         }
                         else
@@ -246,7 +246,7 @@
                         </MudChip>
                     </MudTd>
                     <MudTd DataLabel="Requested Date">
-                        <MudText Typo="Typo.body2">@context.CreatedAt.ToString("MMM dd, yyyy")</MudText>
+                        <MudText Typo="Typo.body2">@Formatting.Format(context.CreatedAt, "MMM dd, yyyy", T)</MudText>
                     </MudTd>
                     <MudTd DataLabel="Action" Style="text-align:right">
                         <div class="d-flex justify-end gap-1">
@@ -323,7 +323,7 @@
 
             <div class="d-flex align-center justify-space-between">
                 <MudText Typo="Typo.caption" Class="ml-muted">@T["Fields Extracted: {0}", _activeDoc.OcrResult?.ExtractedFields.Count ?? 0]</MudText>
-                <MudText Typo="Typo.caption" Class="ml-muted">@T["Uploaded: {0}", _activeDoc.UploadedAt.ToString("MMM dd, yyyy HH:mm")]</MudText>
+                <MudText Typo="Typo.caption" Class="ml-muted">@T["Uploaded: {0}", Formatting.Format(_activeDoc.UploadedAt, "MMM dd, yyyy HH:mm", T)]</MudText>
             </div>
         }
     </DialogContent>

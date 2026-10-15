@@ -47,7 +47,7 @@ Finish these before M7. Later milestones depend on them.
 | C6 | Lead import wizard (upload CSV, map columns, preview, run, result) and export button | M6 (steps 7 and 8) | API exists. Make the pipeline generic (4.10) so M7 and M8 reuse it |
 | C7 | Merge action on lead screens: pick duplicates, choose survivor, confirm | M6 | API exists: `POST /api/v1/leads/{id}/merge` |
 | C8 | Disqualify form: highlight the empty Reason field, not just a toast | M6 | |
-| C9 (PAUSED by the user) | Arabic strings: move all UI text into `.resx` files, translate, and mirror the pager arrows in RTL | M5 | Currently the layout mirrors but the words stay English |
+| C9 (DONE 2026-10-15, native review pending) | Arabic strings: move all UI text into `.resx` files, translate, and mirror the pager arrows in RTL | M5 | Staff app text now goes through `Translator`, with 1,500+ Arabic phrases in `src/MindLift.UI/Localization/Arabic.resx`; the language switch changes text and layout; page arrows mirror. Not done: custom Arabic stage names on the deal board and list (needs an API change), server-generated text (validation messages, notification and email bodies), and a native-speaker review of the wording. |
 | C10 | Tenant brand colour applied to the theme | M5 | `PrimaryColor` is already saved in company settings |
 | C11 | Route gating: redirect to the onboarding wizard until setup is finished | M5 | |
 | C12 | Notifications bell (static for now) and global search box (wired in M7) | M5 (step 9) | |

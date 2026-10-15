@@ -102,7 +102,7 @@
             <MudSelect T="string" @bind-Value="_condValue" Label="@T["Equals"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="rule-value">
                 @foreach (var value in PicklistValues(_condField))
                 {
-                    <MudSelectItem T="string" Value="@value.Value">@value.Label</MudSelectItem>
+                    <MudSelectItem T="string" Value="@value.Value">@T.Pick(value.Label, value.LabelAr)</MudSelectItem>
                 }
             </MudSelect>
         }
@@ -198,7 +198,7 @@
     }
 
     private string LabelFor(string field, string? value)
-        => PicklistValues(field).FirstOrDefault(v => v.Value == value)?.Label ?? value ?? string.Empty;
+        => PicklistValues(field).FirstOrDefault(v => v.Value == value) is { } picked ? T.Pick(picked.Label, picked.LabelAr) : value ?? string.Empty;
 
     private IEnumerable<PicklistValueDto> PicklistValues(string field)
     {

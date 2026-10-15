@@ -154,7 +154,7 @@
     private bool Can(Func<ModulePermissionDto, bool> check) => App.Bootstrap?.Permissions.Any(p => p.Module == "Contacts" && check(p)) == true;
 
     private string? TypeLabel(string code)
-        => App.Bootstrap?.Picklists.FirstOrDefault(p => p.Key == "contact_type")?.Values.FirstOrDefault(v => v.Value == code)?.Label ?? code;
+        => App.PicklistLabel("contact_type", code);
 
     private string? CustomText(string key)
         => _summary!.Contact.CustomFields.TryGetValue(key, out var value) && value.ValueKind != JsonValueKind.Null ? value.ToString() : null;

@@ -161,7 +161,7 @@
         => _deal!.CustomFields.TryGetValue(key, out var value) && value.ValueKind != JsonValueKind.Null ? value.ToString() : null;
 
     private string LostReasonLabel(string code)
-        => App.Bootstrap?.Picklists.FirstOrDefault(p => p.Key == "lost_reason")?.Values.FirstOrDefault(v => v.Value == code)?.Label ?? code;
+        => App.PicklistLabel("lost_reason", code);
 
     protected override async Task OnParametersSetAsync()
     {

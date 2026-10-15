@@ -83,7 +83,7 @@
                 {
                     <div class="pa-4 rounded-lg flex-1" style="background:var(--ml-card-bg, #fff);border:1px solid var(--ml-border);min-width:180px;cursor:pointer" @onclick="() => NavigateTo(tile.DrillDownUrl)">
                         <div class="d-flex justify-space-between align-center mb-1">
-                            <MudText Typo="Typo.caption" Class="ml-muted" Style="font-weight:600;text-transform:uppercase">@tile.Label</MudText>
+                            <MudText Typo="Typo.caption" Class="ml-muted" Style="font-weight:600;text-transform:uppercase">@T[tile.Label]</MudText>
                             @if (tile.ChangePct is not null)
                             {
                                 <MudChip T="string" Size="Size.Small" Color="@(tile.Trend == tile.GoodWhen ? Color.Success : Color.Error)" Variant="Variant.Text" Class="pa-0">
@@ -168,7 +168,7 @@
             @foreach (var w in _dashboard.Widgets)
             {
                 <div class="d-flex align-center justify-space-between pa-2 rounded" style="border:1px solid var(--ml-border)">
-                    <MudText Typo="Typo.body2">@w.Title</MudText>
+                    <MudText Typo="Typo.body2">@T[w.Title]</MudText>
                     <MudSwitch T="bool" Value="@(!w.IsHidden)" ValueChanged="v => ToggleWidgetVisibility(w, !v)" Color="Color.Primary" />
                 </div>
             }
@@ -199,7 +199,7 @@
         }
     }
 
-    private static string DateLine => DateTime.Now.ToString("dddd, dd MMMM yyyy", CultureInfo.InvariantCulture);
+    private string DateLine => Formatting.Format(DateTime.Now, "dddd, dd MMMM yyyy", T);
 
     protected override async Task OnInitializedAsync()
     {
@@ -390,7 +390,7 @@
                             <div class="d-flex align-center justify-space-between py-2" style="border-bottom:1px solid var(--ml-border)">
                                 <div>
                                     <MudText Typo="Typo.body2" Style="font-weight:600">@m.Subject</MudText>
-                                    <MudText Typo="Typo.caption" Class="ml-muted">@m.StartAt.ToString("t") – @m.EndAt.ToString("t")</MudText>
+                                    <MudText Typo="Typo.caption" Class="ml-muted">@Formatting.Format(m.StartAt, "t", T) – @Formatting.Format(m.EndAt, "t", T)</MudText>
                                 </div>
                                 <MudButton Variant="Variant.Text" Size="Size.Small" Href="/calendar">View</MudButton>
                             </div>
@@ -417,7 +417,7 @@
                     <div class="d-flex align-center justify-space-between py-2" style="border-bottom:1px solid var(--ml-border)">
                         <div>
                             <MudText Typo="Typo.body2" Style="font-weight:600">@m.Subject</MudText>
-                            <MudText Typo="Typo.caption" Class="ml-muted">@m.StartAt.ToString("ddd, dd MMM · t")</MudText>
+                            <MudText Typo="Typo.caption" Class="ml-muted">@Formatting.Format(m.StartAt, "ddd, dd MMM · t", T)</MudText>
                         </div>
                         <MudButton Size="Size.Small" Variant="Variant.Outlined" Href="/calendar">Calendar</MudButton>
                     </div>
@@ -657,7 +657,7 @@
                     <div class="d-flex align-center justify-space-between py-2" style="border-bottom:1px solid var(--ml-border)">
                         <div>
                             <MudText Typo="Typo.body2" Style="font-weight:600">@win.DealName</MudText>
-                            <MudText Typo="Typo.caption" Class="ml-muted">Closed by @win.OwnerName on @win.ClosedAt.ToString("dd MMM yyyy")</MudText>
+                            <MudText Typo="Typo.caption" Class="ml-muted">@T["Closed by {0} on {1}", win.OwnerName, Formatting.Format(win.ClosedAt, "dd MMM yyyy", T)]</MudText>
                         </div>
                         <MudChip T="string" Size="Size.Small" Color="Color.Success">@win.Amount.ToString("N0") @win.Currency</MudChip>
                     </div>

@@ -56,7 +56,7 @@
         <MudSelect T="string" @bind-Value="_source" Label="@T["Lead source *"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="form-source">
             @foreach (var value in SourceValues())
             {
-                <MudSelectItem T="string" Value="@value.Value">@value.Label</MudSelectItem>
+                <MudSelectItem T="string" Value="@value.Value">@T.Pick(value.Label, value.LabelAr)</MudSelectItem>
             }
         </MudSelect>
         <MudTextField @bind-Value="_successMessage" Label="@T["Message after submit"]" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" HelperText="@T["Shown to the visitor after they send the form."]" />

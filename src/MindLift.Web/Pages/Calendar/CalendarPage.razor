@@ -59,7 +59,7 @@
                     @foreach (var entry in dayEvents.Take(3))
                     {
                         <div class="@EventClass(entry)" draggable="true" data-testid="cal-event" data-kind="@entry.Kind" @ondragstart="() => _dragging = entry">
-                            <span class="ml-truncate">@entry.StartUtc.ToString("HH:mm", CultureInfo.InvariantCulture) @entry.Title</span>
+                            <span class="ml-truncate">@Formatting.Format(entry.StartUtc, "HH:mm", T) @entry.Title</span>
                         </div>
                     }
                     @if (dayEvents.Count > 3)
@@ -76,18 +76,18 @@
             @foreach (var day in _days)
             {
                 var current = day;
-                <section class="ml-week__day" data-testid="@("cal-day-" + current.ToString("yyyy-MM-dd"))" aria-label="@current.ToString("dddd d MMMM", CultureInfo.InvariantCulture)"
+                <section class="ml-week__day" data-testid="@("cal-day-" + current.ToString("yyyy-MM-dd"))" aria-label="@Formatting.Format(current, "dddd d MMMM", T)"
                          @ondragover:preventDefault="true" @ondrop="() => DropAsync(current)">
                     <header class="ml-week__head">
-                        <MudText Typo="Typo.subtitle2">@current.ToString("ddd d", CultureInfo.InvariantCulture)</MudText>
-                        <MudText Typo="Typo.caption" Class="ml-muted">@current.ToString("MMM", CultureInfo.InvariantCulture)</MudText>
+                        <MudText Typo="Typo.subtitle2">@Formatting.Format(current, "ddd d", T)</MudText>
+                        <MudText Typo="Typo.caption" Class="ml-muted">@Formatting.Format(current, "MMM", T)</MudText>
                     </header>
                     @foreach (var item in EventsOn(current))
                     {
                         var entry = item;
                         <a class="@EventClass(entry)" href="@(entry.Href ?? "#")" draggable="true" @ondragstart="() => _dragging = entry"
                            data-testid="cal-event" data-kind="@entry.Kind">
-                            <span class="ml-week__time">@entry.StartUtc.ToString("HH:mm", CultureInfo.InvariantCulture)</span>
+                            <span class="ml-week__time">@Formatting.Format(entry.StartUtc, "HH:mm", T)</span>
                             <span class="ml-truncate">@entry.Title</span>
                             @if (entry.LinkedName is not null)
                             {
@@ -118,8 +118,8 @@
     private CalendarEventDto? _dragging;
 
     private string RangeTitle => _days.Count == 0 ? string.Empty
-        : _view == "month" ? _anchor.ToString("MMMM yyyy", CultureInfo.InvariantCulture)
-        : _view == "day" ? _anchor.ToString("dddd d MMMM yyyy", CultureInfo.InvariantCulture)
+        : _view == "month" ? Formatting.Format(_anchor, "MMMM yyyy", T)
+        : _view == "day" ? Formatting.Format(_anchor, "dddd d MMMM yyyy", T)
         : $"{_days[0]:d MMM} – {_days[^1]:d MMM yyyy}";
 
     protected override async Task OnInitializedAsync()
@@ -186,8 +186,8 @@
         try
         {
             var (fromUtc, toUtc) = CalendarGrid.Range(_days);
-            var from = fromUtc.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
-            var to = toUtc.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
+            var from = Formatting.Format(fromUtc, "yyyy-MM-ddTHH:mm:ssZ", T);
+            var to = Formatting.Format(toUtc, "yyyy-MM-ddTHH:mm:ssZ", T);
             var url = $"api/v1/calendar/events?from={from}&to={to}";
             if (_who == "everyone")
             {

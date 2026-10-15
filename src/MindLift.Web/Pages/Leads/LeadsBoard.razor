@@ -107,7 +107,7 @@
     {
         var statuses = App.Bootstrap?.Picklists.FirstOrDefault(p => p.Key == "lead_status")?.Values
             .Where(v => v.IsActive && v.Value != "converted").OrderBy(v => v.SortOrder).ToList() ?? [];
-        _columns = statuses.Select(s => new KanbanColumn(s.Value, s.Label, StatusDot(s.Value, s.Color))).ToList();
+        _columns = statuses.Select(s => new KanbanColumn(s.Value, T.Pick(s.Label, s.LabelAr), StatusDot(s.Value, s.Color))).ToList();
     }
 
     private static string StatusDot(string status, string? color) => color ?? status switch
@@ -120,7 +120,7 @@
     };
 
     private string SourceLabel(string? code)
-        => code is null ? "No source" : App.Bootstrap?.Picklists.FirstOrDefault(p => p.Key == "lead_source")?.Values.FirstOrDefault(v => v.Value == code)?.Label ?? code;
+        => code is null ? T["No source"] : App.PicklistLabel("lead_source", code);
 
     private static string MoreTestId(string key) => "kanban-more-" + key;
 

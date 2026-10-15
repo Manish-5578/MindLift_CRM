@@ -108,4 +108,17 @@ public sealed class ArabicTextTests : BunitContext
         Render<PageHeader>(p => p.Add(c => c.Title, "Contacts").Add(c => c.TranslateTitle, false))
             .Find("[data-testid=page-title]").TextContent.ShouldBe("Contacts");
     }
+
+    [Fact]
+    public void A_filter_chip_uses_the_arabic_names_stored_for_the_field_and_its_choices()
+    {
+        var translator = new Translator();
+        translator.SetLanguage("ar");
+        var field = new FieldDto("status", "Status", "حالة العميل", FieldType.Picklist, false, false, false, true, "s",
+            [new PicklistOptionDto("new", "New", "جديد تمامًا", null)]);
+        var condition = new FilterCondition { Field = "status", Op = FilterOperator.Eq, Value = JsonSerializer.SerializeToElement("new") };
+
+        FilterDescriber.Describe(condition, field, translator: translator).ShouldBe("حالة العميل يساوي جديد تمامًا");
+        FilterDescriber.Describe(condition, field).ShouldBe("Status is New");
+    }
 }
