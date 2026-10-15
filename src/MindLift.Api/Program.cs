@@ -97,6 +97,21 @@ foreach (var type in typeof(Program).Assembly.GetTypes().Where(t =>
 }
 
 builder.Services.AddControllers(options => options.Filters.Add<ValidationActionFilter>());
+
+// Rate limits per client address. "public" covers sign-in, sign-up, magic links, public booking and website forms; "webhook" covers provider callbacks.
+// Both are configurable, and the limits are per minute.
+var publicPermits = builder.Configuration.GetValue<int?>("RateLimiting:PublicPermitsPerMinute") ?? 120;
+var webhookPermits = builder.Configuration.GetValue<int?>("RateLimiting:WebhookPermitsPerMinute") ?? 1200;
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("public", context => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions { PermitLimit = publicPermits, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+    options.AddPolicy("webhook", context => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions { PermitLimit = webhookPermits, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+});
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddOpenApi();
@@ -218,6 +233,7 @@ app.UseBlazorFrameworkFiles();
 app.UseBlazorFrameworkFiles("/portal");
 app.UseStaticFiles();
 
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseMiddleware<TenantResolutionMiddleware>();
 app.UseMiddleware<SubscriptionGuardMiddleware>();

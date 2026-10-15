@@ -281,12 +281,14 @@ public sealed class CommunicationService(
         }
     }
 
-    public async Task HandleInboundMessageAsync(InboundMessagePayload payload, CancellationToken ct = default)
+    public async Task HandleInboundMessageAsync(InboundMessagePayload payload, Guid? channelAccountId = null, CancellationToken ct = default)
     {
         var cleanTo = payload.To.Trim().TrimStart('+');
-        // 1. Find channel account across all tenants
-        var account = await dbContext.ChannelAccounts.IgnoreQueryFilters()
-            .FirstOrDefaultAsync(a => a.Channel == payload.Channel && (a.SenderAddress == payload.To || a.PhoneNumberId == payload.To || a.PhoneNumberId == cleanTo || a.SenderAddress == cleanTo), ct);
+        // 1. Find the channel account across all tenants. A verified webhook names it, so the body cannot redirect the message to another workspace.
+        var account = channelAccountId is { } verifiedId
+            ? await dbContext.ChannelAccounts.IgnoreQueryFilters().FirstOrDefaultAsync(a => a.Id == verifiedId && a.Channel == payload.Channel, ct)
+            : await dbContext.ChannelAccounts.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(a => a.Channel == payload.Channel && (a.SenderAddress == payload.To || a.PhoneNumberId == payload.To || a.PhoneNumberId == cleanTo || a.SenderAddress == cleanTo), ct);
 
         if (account == null)
         {
@@ -377,10 +379,10 @@ public sealed class CommunicationService(
         await dbContext.SaveChangesAsync(ct);
     }
 
-    public async Task UpdateMessageStatusAsync(string externalMessageId, MessageStatus status, DateTime? timestamp = null, string? error = null, CancellationToken ct = default)
+    public async Task UpdateMessageStatusAsync(string externalMessageId, MessageStatus status, DateTime? timestamp = null, string? error = null, Guid? tenantId = null, CancellationToken ct = default)
     {
         var message = await dbContext.Messages.IgnoreQueryFilters()
-            .FirstOrDefaultAsync(m => m.ExternalMessageId == externalMessageId, ct);
+            .FirstOrDefaultAsync(m => m.ExternalMessageId == externalMessageId && (tenantId == null || m.TenantId == tenantId), ct);
 
         if (message == null) return;
 

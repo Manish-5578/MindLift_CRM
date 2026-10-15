@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using MindLift.Api.Auth;
 using MindLift.Application.Abstractions;
 using MindLift.Application.Common.Exceptions;
@@ -13,6 +14,7 @@ namespace MindLift.Api.Controllers;
 
 [ApiController]
 [Route("api/v1/portal")]
+[EnableRateLimiting("public")]
 public sealed class PortalAuthController(IPortalService portalService) : ControllerBase
 {
     private const string RefreshCookieName = "ml_portal_refresh";

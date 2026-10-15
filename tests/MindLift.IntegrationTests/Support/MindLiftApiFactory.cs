@@ -42,6 +42,9 @@ public sealed class RecordingEmailSender : IEmailSender
 /// </summary>
 public sealed class MindLiftApiFactory : WebApplicationFactory<Program>
 {
+    /// <summary>The token the tests register their WhatsApp webhook with. It only exists in the test host.</summary>
+    public const string WhatsAppVerifyToken = "test-only-verify-token";
+
     /// <summary>A fresh database for this host. Created on first use, so the factory can be constructed synchronously.</summary>
     private readonly Lazy<string> _connectionString = new(() => SharedPostgres.NewDatabaseConnectionStringAsync().GetAwaiter().GetResult());
 
@@ -53,6 +56,10 @@ public sealed class MindLiftApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("ConnectionStrings:Default", _connectionString.Value);
         builder.UseSetting("Database:MigrateOnStartup", "true");
         builder.UseSetting("Hangfire:WorkerCount", "2");
+        // Many tests sign in from the one test address, so the limits are lifted here. RateLimitTests sets a low limit of its own.
+        builder.UseSetting("RateLimiting:PublicPermitsPerMinute", "100000");
+        builder.UseSetting("RateLimiting:WebhookPermitsPerMinute", "100000");
+        builder.UseSetting("Communication:WhatsAppVerifyToken", WhatsAppVerifyToken);
         builder.UseSetting("Storage:LocalPath", Path.Combine(Path.GetTempPath(), "mindlift-test-files"));
 
         builder.ConfigureTestServices(services =>

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using MindLift.Api.Auth;
 using MindLift.Infrastructure.Bookings;
 using MindLift.Shared.Contracts;
@@ -63,6 +64,7 @@ public sealed class BookingPagesController(BookingPageService pages) : Controlle
 [ApiController]
 [Route("api/v1/public/booking")]
 [AllowAnonymous]
+[EnableRateLimiting("public")]
 public sealed class PublicBookingController(PublicBookingService booking) : ControllerBase
 {
     [AllowAnonymous]

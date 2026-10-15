@@ -222,7 +222,8 @@ public sealed class OmnichannelFlowTests(MindLiftApiFactory factory) : IClassFix
             IsDefault: true,
             IsActive: true,
             AutoCreateLeads: true,
-            PhoneNumberId: "19998887777"
+            PhoneNumberId: "19998887777",
+            WebhookSecret: "omni-test-secret"
         ));
         chResp.StatusCode.ShouldBe(HttpStatusCode.OK);
 
@@ -267,7 +268,7 @@ public sealed class OmnichannelFlowTests(MindLiftApiFactory factory) : IClassFix
             }
         };
 
-        var postResp = await factory.CreateClient().PostAsJsonAsync("/api/v1/webhooks/whatsapp", webhookPayload);
+        var postResp = await factory.CreateClient().SendAsync(WebhookRequests.WhatsApp(webhookPayload, "omni-test-secret"));
         postResp.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         // Verify Inbound message in Inbox

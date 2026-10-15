@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using MindLift.Application.Abstractions;
 using MindLift.Application.Common.Exceptions;
 using MindLift.Infrastructure.Administration;
@@ -14,6 +15,7 @@ namespace MindLift.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/v1/auth")]
+[EnableRateLimiting("public")]
 public sealed class AuthController(
     AuthService auth,
     InvitationService invitations,

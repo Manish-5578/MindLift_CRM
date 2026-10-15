@@ -3,9 +3,11 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using MindLift.Api.Auth;
 using MindLift.Application.Abstractions;
 using MindLift.Domain.Entities;
+using MindLift.Infrastructure.Communication;
 using MindLift.Infrastructure.Persistence;
 using MindLift.Shared.Contracts;
 using MindLift.Shared.Enums;
@@ -160,98 +162,98 @@ public sealed class OptOutsController(IOptOutService optOuts) : ControllerBase
     }
 }
 
+/// <summary>
+/// Inbound provider webhooks. These are anonymous by nature, so every request must prove it comes from the provider: Meta requests carry an HMAC of the body
+/// and Twilio requests carry an HMAC of the URL and form values. A request that cannot be verified is refused before anything is read or stored.
+/// </summary>
 [ApiController]
 [Route("api/v1/webhooks")]
 [AllowAnonymous]
+[EnableRateLimiting("webhook")]
 public sealed class WebhooksController(
     ICommunicationService communication,
-    AppDbContext dbContext,
-    ITenantContext tenant,
+    WebhookAuthenticator authenticator,
+    IConfiguration configuration,
     ILogger<WebhooksController> logger) : ControllerBase
 {
+    /// <summary>Provider payloads are small; anything larger is refused.</summary>
+    private const int MaxBodyBytes = 1_000_000;
+
     [HttpGet("whatsapp")]
     public IActionResult VerifyWhatsApp(
         [FromQuery(Name = "hub.mode")] string? mode,
         [FromQuery(Name = "hub.verify_token")] string? token,
         [FromQuery(Name = "hub.challenge")] string? challenge)
     {
-        if (mode == "subscribe" && !string.IsNullOrEmpty(token) && !string.IsNullOrEmpty(challenge))
+        if (mode == "subscribe" && !string.IsNullOrEmpty(challenge) && authenticator.VerifyRegistrationToken(token))
         {
-            return Ok(challenge);
+            return Content(challenge, "text/plain");
         }
-        return Forbid();
+
+        return StatusCode(StatusCodes.Status403Forbidden);
     }
 
     [HttpPost("whatsapp")]
+    [RequestSizeLimit(MaxBodyBytes)]
     public async Task<IActionResult> HandleWhatsAppWebhook(CancellationToken ct)
     {
-        using var reader = new StreamReader(Request.Body);
-        var rawBody = await reader.ReadToEndAsync(ct);
+        using var buffer = new MemoryStream();
+        await Request.Body.CopyToAsync(buffer, ct);
+        var body = buffer.ToArray();
+        var signature = Request.Headers["X-Hub-Signature-256"].ToString();
 
-        // Parse JSON
-        using var doc = JsonDocument.Parse(rawBody);
-        if (!doc.RootElement.TryGetProperty("entry", out var entries))
+        using var doc = TryParse(body);
+        if (doc is null)
         {
-            return Ok();
+            return BadRequest();
         }
 
-        foreach (var entry in entries.EnumerateArray())
+        // Every change is checked against the channel it names before anything is stored.
+        var verified = new List<(JsonElement Value, VerifiedChannel Channel)>();
+        foreach (var value in Values(doc.RootElement))
         {
-            if (!entry.TryGetProperty("changes", out var changes)) continue;
-
-            foreach (var change in changes.EnumerateArray())
+            var metadata = value.TryGetProperty("metadata", out var m) ? m : default;
+            var channel = await authenticator.VerifyWhatsAppAsync(Text(metadata, "phone_number_id"), Text(metadata, "display_phone_number"), body, signature, ct);
+            if (channel is null)
             {
-                if (!change.TryGetProperty("value", out var val)) continue;
+                logger.LogWarning("Refused a WhatsApp webhook that could not be verified.");
+                return Unauthorized();
+            }
 
-                // Handle message status updates
-                if (val.TryGetProperty("statuses", out var statuses))
+            verified.Add((value, channel));
+        }
+
+        foreach (var (value, channel) in verified)
+        {
+            if (value.TryGetProperty("statuses", out var statuses) && statuses.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var s in statuses.EnumerateArray())
                 {
-                    foreach (var s in statuses.EnumerateArray())
+                    var id = Text(s, "id");
+                    var status = Text(s, "status") switch
                     {
-                        var id = s.GetProperty("id").GetString();
-                        var statusStr = s.GetProperty("status").GetString();
-                        var status = statusStr switch
-                        {
-                            "sent" => MessageStatus.Sent,
-                            "delivered" => MessageStatus.Delivered,
-                            "read" => MessageStatus.Read,
-                            "failed" => MessageStatus.Failed,
-                            _ => MessageStatus.Sent
-                        };
+                        "delivered" => MessageStatus.Delivered,
+                        "read" => MessageStatus.Read,
+                        "failed" => MessageStatus.Failed,
+                        _ => MessageStatus.Sent
+                    };
 
-                        if (!string.IsNullOrEmpty(id))
-                        {
-                            await communication.UpdateMessageStatusAsync(id, status, ct: ct);
-                        }
+                    if (!string.IsNullOrEmpty(id))
+                    {
+                        await communication.UpdateMessageStatusAsync(id, status, tenantId: channel.TenantId, ct: ct);
                     }
                 }
+            }
 
-                // Handle inbound messages
-                if (val.TryGetProperty("messages", out var messages))
+            if (value.TryGetProperty("messages", out var messages) && messages.ValueKind == JsonValueKind.Array)
+            {
+                var toPhone = value.TryGetProperty("metadata", out var metadata) ? Text(metadata, "display_phone_number") ?? string.Empty : string.Empty;
+                foreach (var m in messages.EnumerateArray())
                 {
-                    var metadata = val.GetProperty("metadata");
-                    var toPhone = metadata.GetProperty("display_phone_number").GetString() ?? "";
-
-                    foreach (var m in messages.EnumerateArray())
-                    {
-                        var from = m.GetProperty("from").GetString() ?? "";
-                        var msgId = m.GetProperty("id").GetString();
-                        var text = m.TryGetProperty("text", out var t) && t.TryGetProperty("body", out var b)
-                            ? b.GetString() ?? ""
-                            : "[Media message]";
-
-                        var payload = new InboundMessagePayload(
-                            CommunicationChannel.WhatsApp,
-                            from,
-                            toPhone,
-                            null,
-                            text,
-                            msgId,
-                            DateTime.UtcNow
-                        );
-
-                        await communication.HandleInboundMessageAsync(payload, ct);
-                    }
+                    var from = Text(m, "from") ?? string.Empty;
+                    var text = m.TryGetProperty("text", out var t) ? Text(t, "body") ?? string.Empty : "[Media message]";
+                    var payload = new InboundMessagePayload(CommunicationChannel.WhatsApp, from, toPhone, null, text, Text(m, "id"), DateTime.UtcNow);
+                    await communication.HandleInboundMessageAsync(payload, channel.AccountId, ct);
                 }
             }
         }
@@ -260,9 +262,23 @@ public sealed class WebhooksController(
     }
 
     [HttpPost("twilio")]
+    [RequestSizeLimit(MaxBodyBytes)]
     public async Task<IActionResult> HandleTwilioWebhook(CancellationToken ct)
     {
+        if (!Request.HasFormContentType)
+        {
+            return BadRequest();
+        }
+
         var form = await Request.ReadFormAsync(ct);
+        var values = form.ToDictionary(p => p.Key, p => p.Value.ToString(), StringComparer.Ordinal);
+        var channel = await authenticator.VerifyTwilioAsync(PublicUrl(), values, Request.Headers["X-Twilio-Signature"].ToString(), ct);
+        if (channel is null)
+        {
+            logger.LogWarning("Refused a Twilio webhook that could not be verified.");
+            return Unauthorized();
+        }
+
         var messageSid = form["MessageSid"].ToString();
         var smsStatus = form["SmsStatus"].ToString();
 
@@ -277,7 +293,7 @@ public sealed class WebhooksController(
                 _ => MessageStatus.Sent
             };
 
-            await communication.UpdateMessageStatusAsync(messageSid, status, ct: ct);
+            await communication.UpdateMessageStatusAsync(messageSid, status, tenantId: channel.TenantId, ct: ct);
             return Ok();
         }
 
@@ -288,19 +304,58 @@ public sealed class WebhooksController(
 
         if (!string.IsNullOrEmpty(from) && !string.IsNullOrEmpty(body))
         {
-            var payload = new InboundMessagePayload(
-                CommunicationChannel.Sms,
-                from,
-                to,
-                null,
-                body,
-                messageSid,
-                DateTime.UtcNow
-            );
-
-            await communication.HandleInboundMessageAsync(payload, ct);
+            var payload = new InboundMessagePayload(CommunicationChannel.Sms, from, to, null, body, messageSid, DateTime.UtcNow);
+            await communication.HandleInboundMessageAsync(payload, channel.AccountId, ct);
         }
 
         return Ok();
     }
+
+    /// <summary>The address the provider called, as it was configured with them. Twilio signs this exact text, so a proxy must not change it.</summary>
+    private string PublicUrl()
+    {
+        var baseUrl = configuration["Communication:PublicBaseUrl"] ?? configuration["App:BaseUrl"];
+        var path = Request.Path + Request.QueryString.ToString();
+        return !string.IsNullOrWhiteSpace(baseUrl) ? baseUrl.TrimEnd('/') + path : $"{Request.Scheme}://{Request.Host}{path}";
+    }
+
+    private static JsonDocument? TryParse(byte[] body)
+    {
+        try
+        {
+            return JsonDocument.Parse(body);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Every <c>value</c> object under <c>entry[].changes[]</c>, skipping anything that is not shaped that way.</summary>
+    private static IEnumerable<JsonElement> Values(JsonElement root)
+    {
+        if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("entry", out var entries) || entries.ValueKind != JsonValueKind.Array)
+        {
+            yield break;
+        }
+
+        foreach (var entry in entries.EnumerateArray())
+        {
+            if (entry.ValueKind != JsonValueKind.Object || !entry.TryGetProperty("changes", out var changes) || changes.ValueKind != JsonValueKind.Array)
+            {
+                continue;
+            }
+
+            foreach (var change in changes.EnumerateArray())
+            {
+                if (change.ValueKind == JsonValueKind.Object && change.TryGetProperty("value", out var value) && value.ValueKind == JsonValueKind.Object)
+                {
+                    yield return value;
+                }
+            }
+        }
+    }
+
+    private static string? Text(JsonElement element, string name)
+        => element.ValueKind == JsonValueKind.Object && element.TryGetProperty(name, out var property) && property.ValueKind == JsonValueKind.String ? property.GetString() : null;
 }

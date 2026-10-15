@@ -30,8 +30,11 @@ public interface ICommunicationService
     Task<List<InboxThreadDto>> GetInboxThreadsAsync(CommunicationChannel? channel = null, string? search = null, CancellationToken ct = default);
     Task<List<MessageDto>> GetRecordMessagesAsync(string entityType, Guid entityId, CancellationToken ct = default);
     Task MarkThreadReadAsync(Guid threadId, CancellationToken ct = default);
-    Task HandleInboundMessageAsync(InboundMessagePayload payload, CancellationToken ct = default);
-    Task UpdateMessageStatusAsync(string externalMessageId, MessageStatus status, DateTime? timestamp = null, string? error = null, CancellationToken ct = default);
+    /// <summary>Stores an inbound message. When <paramref name="channelAccountId"/> is given (a verified webhook), that channel is used and the addresses in the payload are not trusted to pick the workspace.</summary>
+    Task HandleInboundMessageAsync(InboundMessagePayload payload, Guid? channelAccountId = null, CancellationToken ct = default);
+
+    /// <summary>Updates a delivery status. When <paramref name="tenantId"/> is given (a verified webhook), only that workspace's messages can change.</summary>
+    Task UpdateMessageStatusAsync(string externalMessageId, MessageStatus status, DateTime? timestamp = null, string? error = null, Guid? tenantId = null, CancellationToken ct = default);
 }
 
 public interface IChannelAccountService

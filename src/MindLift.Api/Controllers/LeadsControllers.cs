@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using MindLift.Api.Auth;
 using MindLift.Infrastructure.Notifications;
 using MindLift.Infrastructure.Leads;
@@ -128,6 +129,7 @@ public sealed class LeadSettingsController(LeadSettingsService settings) : Contr
 /// <summary>Public endpoint for website forms. Anonymous; the token selects the workspace. Not behind the subscription guard for reads.</summary>
 [ApiController]
 [Route("api/v1/public/forms")]
+[EnableRateLimiting("public")]
 public sealed class PublicFormsController(PublicFormService forms) : ControllerBase
 {
     [AllowAnonymous]
