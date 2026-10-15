@@ -128,6 +128,10 @@ ipch/
 
 # Visual Studio Trace Files
 *.e2e
+# The browser test project is named MindLift.E2E, which the rule above would otherwise ignore.
+!tests/MindLift.E2E/
+# Screenshots are produced by every browser test run, so they are not tracked.
+tests/MindLift.E2E/screenshots/
 
 # TFS 2012 Local Workspace
 $tf/
