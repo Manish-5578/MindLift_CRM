@@ -814,6 +814,13 @@ public sealed class PublicFormService(AppDbContext db, ITenantContext tenant, Le
             throw new NotFoundException("Form", token);
         }
 
+        // A workspace that has lapsed takes no new leads, so the form acts as if it were switched off.
+        var workspace = await db.Tenants.AsNoTracking().Where(t => t.Id == form.TenantId).Select(t => new { t.Status, t.TrialEndsAt }).FirstOrDefaultAsync(cancellationToken);
+        if (workspace is null || MindLift.Infrastructure.Tenancy.TenantAccess.IsLapsed(workspace.Status, workspace.TrialEndsAt, clock.UtcNow))
+        {
+            throw new NotFoundException("Form", token);
+        }
+
         // Honeypot: bots fill the hidden field. Pretend success and store nothing.
         if (!string.IsNullOrEmpty(submission.Hp))
         {

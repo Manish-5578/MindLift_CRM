@@ -371,6 +371,13 @@ public sealed class PortalService(
         {
             throw new ForbiddenException("The customer portal is switched off for this company.", "portal_disabled");
         }
+
+        // A suspended workspace is switched off entirely. A past-due one keeps its portal readable, like its staff reads.
+        var status = await db.Tenants.AsNoTracking().Where(t => t.Id == tenantId).Select(t => t.Status).FirstOrDefaultAsync(ct);
+        if (MindLift.Infrastructure.Tenancy.TenantAccess.IsSuspended(status))
+        {
+            throw new ForbiddenException("The customer portal is not available for this company.", "portal_disabled");
+        }
     }
 
     /// <summary>Marks a token used in one database step. False means someone else used it first.</summary>

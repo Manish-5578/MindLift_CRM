@@ -38,6 +38,14 @@ public sealed class AutomationScheduledJob(
         CancellationToken cancellationToken = default
     )
     {
+        // An action scheduled before the workspace lapsed does not run after it has.
+        var workspace = await db.Tenants.AsNoTracking().Where(t => t.Id == tenantId).Select(t => new { t.Status, t.TrialEndsAt }).FirstOrDefaultAsync(cancellationToken);
+        if (workspace is null || MindLift.Infrastructure.Tenancy.TenantAccess.IsLapsed(workspace.Status, workspace.TrialEndsAt, clock.UtcNow))
+        {
+            logger.LogInformation("Scheduled action dropped: the workspace has lapsed.");
+            return;
+        }
+
         using var scope = tenant.Use(tenantId);
 
         var rule = await db.AutomationRules.FirstOrDefaultAsync(r => r.Id == ruleId, cancellationToken);

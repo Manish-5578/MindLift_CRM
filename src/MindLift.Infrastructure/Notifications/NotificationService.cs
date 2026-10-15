@@ -141,6 +141,13 @@ public sealed class NotificationEmailJob(AppDbContext db, IEmailSender email, IO
     [AutomaticRetry(Attempts = 3, DelaysInSeconds = [1, 2, 5])]
     public async Task SendAsync(Guid tenantId, Guid userId, string title, string? body, string? url, CancellationToken cancellationToken)
     {
+        // A notification queued before the workspace lapsed is not emailed after it.
+        var workspace = await db.Tenants.AsNoTracking().Where(t => t.Id == tenantId).Select(t => new { t.Status, t.TrialEndsAt }).FirstOrDefaultAsync(cancellationToken);
+        if (workspace is null || MindLift.Infrastructure.Tenancy.TenantAccess.IsLapsed(workspace.Status, workspace.TrialEndsAt, DateTime.UtcNow))
+        {
+            return;
+        }
+
         var user = await db.Users.IgnoreQueryFilters().AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId && u.TenantId == tenantId && u.IsActive, cancellationToken);
         if (user?.Email is null)
         {

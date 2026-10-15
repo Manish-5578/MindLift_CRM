@@ -38,6 +38,13 @@ public sealed class ReportScheduleJob(
             return;
         }
 
+        var workspace = await db.Tenants.AsNoTracking().Where(t => t.Id == tenantId).Select(t => new { t.Status, t.TrialEndsAt }).FirstOrDefaultAsync(ct);
+        if (workspace is null || MindLift.Infrastructure.Tenancy.TenantAccess.IsLapsed(workspace.Status, workspace.TrialEndsAt, DateTime.UtcNow))
+        {
+            logger.LogInformation("Skipping report schedule {ScheduleId}: the workspace has lapsed.", scheduleId);
+            return;
+        }
+
         var report = await db.ReportDefinitions
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(r => r.Id == schedule.ReportId && r.TenantId == tenantId && !r.IsDeleted, ct);

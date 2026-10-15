@@ -170,6 +170,12 @@ public sealed class PublicBookingService(
     public async Task<BookingConfirmationDto> RescheduleAsync(string token, RescheduleBookingRequest request, CancellationToken cancellationToken = default)
     {
         var (workspace, page, found) = await ResolveAsync(token, cancellationToken);
+        if (MindLift.Infrastructure.Tenancy.TenantAccess.IsLapsed(workspace.Status, workspace.TrialEndsAt, clock.UtcNow))
+        {
+            // A lapsed workspace takes no new bookings, and moving one is a new booking. The customer can still cancel.
+            throw new NotFoundException("Booking page", page.Slug);
+        }
+
         using var scope = tenant.Use(workspace.Id);
         var start = DateTime.SpecifyKind(request.Start, DateTimeKind.Utc);
         var end = start.AddMinutes(page.DurationMinutes);
@@ -213,7 +219,7 @@ public sealed class PublicBookingService(
     private async Task<(Tenant Workspace, BookingPage Page)> FindAsync(string tenantSlug, string pageSlug, CancellationToken cancellationToken)
     {
         var workspace = await db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == tenantSlug.ToLower(), cancellationToken);
-        if (workspace is null || workspace.Status is "Suspended" or "Cancelled")
+        if (workspace is null || MindLift.Infrastructure.Tenancy.TenantAccess.IsLapsed(workspace.Status, workspace.TrialEndsAt, clock.UtcNow))
         {
             throw new NotFoundException("Booking page", pageSlug);
         }

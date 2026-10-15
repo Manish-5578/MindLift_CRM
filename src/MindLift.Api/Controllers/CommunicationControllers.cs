@@ -173,6 +173,7 @@ public sealed class OptOutsController(IOptOutService optOuts) : ControllerBase
 public sealed class WebhooksController(
     ICommunicationService communication,
     WebhookAuthenticator authenticator,
+    MindLift.Infrastructure.Tenancy.TenantStanding standing,
     IConfiguration configuration,
     ILogger<WebhooksController> logger) : ControllerBase
 {
@@ -218,6 +219,13 @@ public sealed class WebhooksController(
             {
                 logger.LogWarning("Refused a WhatsApp webhook that could not be verified.");
                 return Unauthorized();
+            }
+
+            // A workspace that has lapsed takes no new messages. The request is genuine, so it is acknowledged (the provider stops retrying) and nothing is stored.
+            if (await standing.IsLapsedAsync(channel.TenantId, ct))
+            {
+                logger.LogWarning("Ignored a WhatsApp webhook for a workspace that has lapsed.");
+                return Ok();
             }
 
             verified.Add((value, channel));
@@ -277,6 +285,12 @@ public sealed class WebhooksController(
         {
             logger.LogWarning("Refused a Twilio webhook that could not be verified.");
             return Unauthorized();
+        }
+
+        if (await standing.IsLapsedAsync(channel.TenantId, ct))
+        {
+            logger.LogWarning("Ignored a Twilio webhook for a workspace that has lapsed.");
+            return Ok();
         }
 
         var messageSid = form["MessageSid"].ToString();

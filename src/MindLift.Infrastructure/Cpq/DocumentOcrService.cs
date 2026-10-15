@@ -506,9 +506,10 @@ public sealed class DocumentOcrService(
     public async Task<int> RunExpiryChecksAsync(CancellationToken ct = default)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var good = MindLift.Infrastructure.Tenancy.TenantAccess.InGoodStanding(db.Set<Tenant>(), DateTime.UtcNow);
         var docs = await db.Set<BusinessDocument>()
             .IgnoreQueryFilters()
-            .Where(d => !d.IsDeleted && d.Status == "Approved" && d.ExpiryDate.HasValue)
+            .Where(d => good.Contains(d.TenantId) && !d.IsDeleted && d.Status == "Approved" && d.ExpiryDate.HasValue)
             .ToListAsync(ct);
 
         int alertsSent = 0;

@@ -109,8 +109,9 @@ public sealed class BookingReminderJob(AppDbContext db, ITenantContext tenant, I
     public async Task<int> RunAsync(CancellationToken cancellationToken = default)
     {
         var now = clock.UtcNow;
+        var good = MindLift.Infrastructure.Tenancy.TenantAccess.InGoodStanding(db.Tenants, now);
         var upcoming = await db.Bookings.IgnoreQueryFilters().AsNoTracking()
-            .Where(b => !b.IsDeleted && b.Status == BookingStatus.Confirmed && b.StartAt > now && b.StartAt <= now.AddDays(8))
+            .Where(b => good.Contains(b.TenantId) && !b.IsDeleted && b.Status == BookingStatus.Confirmed && b.StartAt > now && b.StartAt <= now.AddDays(8))
             .OrderBy(b => b.StartAt).Take(BatchSize).ToListAsync(cancellationToken);
 
         var sent = 0;

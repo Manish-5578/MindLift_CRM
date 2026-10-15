@@ -30,10 +30,11 @@ public sealed class ActivityReminderJob(AppDbContext db, ITenantContext tenant, 
     public async Task<int> RunAsync(CancellationToken cancellationToken = default)
     {
         var now = clock.UtcNow;
+        var good = MindLift.Infrastructure.Tenancy.TenantAccess.InGoodStanding(db.Tenants, now);
 
         // A reminder is set at most 30 days ahead, so nothing due later than that can be ready. The exact minute is checked in memory.
         var candidates = await db.Activities.IgnoreQueryFilters()
-            .Where(a => !a.IsDeleted && a.Status == "Open" && a.DueAt != null && a.ReminderMinutes != null && a.ReminderSentAt == null
+            .Where(a => good.Contains(a.TenantId) && !a.IsDeleted && a.Status == "Open" && a.DueAt != null && a.ReminderMinutes != null && a.ReminderSentAt == null
                 && (a.Type == "Task" || a.Type == "Meeting") && a.DueAt <= now.AddDays(31))
             .OrderBy(a => a.DueAt).Take(BatchSize * 4).ToListAsync(cancellationToken);
         var due = candidates.Where(a => a.DueAt!.Value.AddMinutes(-a.ReminderMinutes!.Value) <= now).Take(BatchSize).ToList();
@@ -75,8 +76,9 @@ public sealed class OverdueTaskJob(AppDbContext db, ITenantContext tenant, INoti
     public async Task<int> RunAsync(CancellationToken cancellationToken = default)
     {
         var now = clock.UtcNow;
+        var good = MindLift.Infrastructure.Tenancy.TenantAccess.InGoodStanding(db.Tenants, now);
         var overdue = await db.Activities.IgnoreQueryFilters().AsNoTracking()
-            .Where(a => !a.IsDeleted && a.Type == "Task" && a.Status == "Open" && a.DueAt != null && a.DueAt < now && a.OverdueNotifiedAt == null)
+            .Where(a => good.Contains(a.TenantId) && !a.IsDeleted && a.Type == "Task" && a.Status == "Open" && a.DueAt != null && a.DueAt < now && a.OverdueNotifiedAt == null)
             .OrderBy(a => a.DueAt).Take(BatchSize).ToListAsync(cancellationToken);
 
         await TenantBatch.ForEachTenantAsync(overdue, a => a.TenantId, tenant, async (_, rows) =>
@@ -109,8 +111,9 @@ public sealed class DailyDigestJob(AppDbContext db, ITenantContext tenant, IEmai
     public async Task<int> RunAsync(CancellationToken cancellationToken = default)
     {
         var now = clock.UtcNow;
+        var good = MindLift.Infrastructure.Tenancy.TenantAccess.InGoodStanding(db.Tenants, now);
         var wanted = await db.NotificationPreferences.IgnoreQueryFilters().AsNoTracking()
-            .Where(p => !p.IsDeleted && p.Type == NotificationTypes.DailyDigest && p.Email).ToListAsync(cancellationToken);
+            .Where(p => good.Contains(p.TenantId) && !p.IsDeleted && p.Type == NotificationTypes.DailyDigest && p.Email).ToListAsync(cancellationToken);
 
         var sent = 0;
         await TenantBatch.ForEachTenantAsync(wanted, p => p.TenantId, tenant, async (_, rows) =>

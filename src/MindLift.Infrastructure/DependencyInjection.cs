@@ -183,6 +183,7 @@ public static class DependencyInjection
         services.AddScoped<IChannelAccountService, MindLift.Infrastructure.Communication.ChannelAccountService>();
         services.AddScoped<ICommunicationService, MindLift.Infrastructure.Communication.CommunicationService>();
         services.AddScoped<MindLift.Infrastructure.Communication.WebhookAuthenticator>();
+        services.AddScoped<MindLift.Infrastructure.Tenancy.TenantStanding>();
 
         // Reports & Analytics (M14).
         services.AddSingleton<MindLift.Infrastructure.Reporting.IReportDataSourceRegistry, MindLift.Infrastructure.Reporting.ReportDataSourceRegistry>();
