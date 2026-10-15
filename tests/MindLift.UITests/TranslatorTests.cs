@@ -126,4 +126,33 @@ public sealed class TranslatorTests
 
         translator.IsArabic.ShouldBeTrue();
     }
+
+    [Fact]
+    public void The_Arabic_source_file_has_no_two_names_that_differ_only_by_letter_case()
+    {
+        // A resource file keeps just one of two such names and drops the other without a warning, so a translation would silently go missing.
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "MindLift.slnx")))
+        {
+            dir = dir.Parent;
+        }
+
+        dir.ShouldNotBeNull();
+        var file = Path.Combine(dir.FullName, "src", "MindLift.UI", "Localization", "Arabic.resx");
+        var names = System.Xml.Linq.XDocument.Load(file).Root!.Elements("data").Select(e => (string)e.Attribute("name")!).ToList();
+
+        names.Count.ShouldBeGreaterThan(0);
+        names.GroupBy(n => n, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1).Select(g => string.Join(" / ", g)).ShouldBeEmpty();
+        Translator.ArabicEntries.Count.ShouldBe(names.Count, "every name in the file should reach the translator");
+    }
+
+    [Fact]
+    public void A_phrase_is_found_whatever_its_letter_case()
+    {
+        var translator = new Translator();
+        translator.SetLanguage("ar");
+
+        translator["contacts"].ShouldBe(translator["Contacts"]);
+        translator["Contacts"].ShouldBe("جهات الاتصال");
+    }
 }

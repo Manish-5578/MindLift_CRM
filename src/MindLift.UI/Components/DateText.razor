@@ -1,3 +1,4 @@
+@inject Translator T
 <span class="@(Danger ? "ml-num ml-delta--bad" : "ml-num")" title="@Tooltip">@Display</span>
 
 @code {
@@ -7,8 +8,8 @@
     [Parameter] public bool Danger { get; set; }
 
     private string Display => Value is null ? "—"
-        : Relative ? Formatting.Relative(Value.Value, DateTime.UtcNow)
-        : Value.Value.ToString("dd MMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
+        : Relative ? Formatting.Relative(Value.Value, DateTime.UtcNow, T)
+        : Formatting.ShortDate(Value.Value, T);
 
-    private string? Tooltip => Value?.ToString("dddd, dd MMMM yyyy, HH:mm 'UTC'", System.Globalization.CultureInfo.InvariantCulture);
+    private string? Tooltip => Value is { } value ? Formatting.FullDateTime(value, T) : null;
 }

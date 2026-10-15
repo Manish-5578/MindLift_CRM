@@ -287,21 +287,6 @@
   <data name="Details" xml:space="preserve">
     <value>التفاصيل</value>
   </data>
-  <data name="leads" xml:space="preserve">
-    <value>العملاء المحتملون</value>
-  </data>
-  <data name="contacts" xml:space="preserve">
-    <value>جهات الاتصال</value>
-  </data>
-  <data name="accounts" xml:space="preserve">
-    <value>الحسابات</value>
-  </data>
-  <data name="deals" xml:space="preserve">
-    <value>الصفقات</value>
-  </data>
-  <data name="activities" xml:space="preserve">
-    <value>الأنشطة</value>
-  </data>
   <data name="Toggle navigation" xml:space="preserve">
     <value>تبديل التنقل</value>
   </data>
@@ -364,5 +349,23 @@
   </data>
   <data name="Documents" xml:space="preserve">
     <value>المستندات</value>
+  </data>
+  <data name="Just now" xml:space="preserve">
+    <value>الآن</value>
+  </data>
+  <data name="{0} min ago" xml:space="preserve">
+    <value>منذ {0} دقيقة</value>
+  </data>
+  <data name="{0} h ago" xml:space="preserve">
+    <value>منذ {0} ساعة</value>
+  </data>
+  <data name="{0} days ago" xml:space="preserve">
+    <value>منذ {0} أيام</value>
+  </data>
+  <data name="in {0} h" xml:space="preserve">
+    <value>بعد {0} ساعة</value>
+  </data>
+  <data name="in {0} days" xml:space="preserve">
+    <value>بعد {0} أيام</value>
   </data>
 </root>

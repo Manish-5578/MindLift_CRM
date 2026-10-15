@@ -63,7 +63,8 @@ public sealed class Translator
 
     private static IReadOnlyDictionary<string, string> LoadArabic()
     {
-        var entries = new Dictionary<string, string>(StringComparer.Ordinal);
+        // Arabic has no letter case, so "leads" and "Leads" share one entry. A resource file cannot hold two names that differ only by case anyway.
+        var entries = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var assembly = typeof(Translator).Assembly;
         var resource = assembly.GetManifestResourceNames().FirstOrDefault(name => name.EndsWith("Localization.Arabic.resources", StringComparison.Ordinal));
         if (resource is null)

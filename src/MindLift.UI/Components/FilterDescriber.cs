@@ -74,7 +74,7 @@ public static class FilterDescriber
 
         if (field.Type is FieldType.Date or FieldType.DateTime && DateTime.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var date))
         {
-            return date.ToString("dd MMM yyyy", CultureInfo.InvariantCulture);
+            return Formatting.ShortDate(date, translator);
         }
 
         if (field.Options is { Count: > 0 } && field.Options.FirstOrDefault(o => o.Value == raw) is { } option)

@@ -1,4 +1,5 @@
 using System.Globalization;
+using MindLift.UI.Localization;
 
 namespace MindLift.UI.Components;
 
@@ -41,23 +42,43 @@ public static class Formatting
         return $"{(bytes / (1024d * 1024d)).ToString("0.#", CultureInfo.InvariantCulture)} MB";
     }
 
-    /// <summary>Relative text for recent times, otherwise the date (plan 18.7 DateText).</summary>
-    public static string Relative(DateTime utc, DateTime nowUtc)
+    private static readonly string[] ArabicMonths =
+        ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+
+    private static readonly string[] ArabicDays = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+
+    /// <summary>"15 Oct 2026", or "15 أكتوبر 2026" in Arabic. Western digits in both languages.</summary>
+    public static string ShortDate(DateTime date, Translator? translator = null)
+        => translator is { IsArabic: true }
+            ? $"{date.Day.ToString("00", CultureInfo.InvariantCulture)} {ArabicMonths[date.Month - 1]} {date.Year.ToString(CultureInfo.InvariantCulture)}"
+            : date.ToString("dd MMM yyyy", CultureInfo.InvariantCulture);
+
+    /// <summary>"Thursday, 15 October 2026, 14:30 UTC", or the same in Arabic.</summary>
+    public static string FullDateTime(DateTime utc, Translator? translator = null)
+        => translator is { IsArabic: true }
+            ? $"{ArabicDays[(int)utc.DayOfWeek]}، {ShortDate(utc, translator)}، {utc.ToString("HH:mm", CultureInfo.InvariantCulture)} UTC"
+            : utc.ToString("dddd, dd MMMM yyyy, HH:mm 'UTC'", CultureInfo.InvariantCulture);
+
+    /// <summary>Relative text for recent times, otherwise the date (plan 18.7 DateText). Pass the translator to read it in Arabic.</summary>
+    public static string Relative(DateTime utc, DateTime nowUtc, Translator? translator = null)
     {
+        string Say(string english, params object[] values)
+            => string.Format(CultureInfo.InvariantCulture, translator is null ? english : translator[english], values);
+
         var span = nowUtc - utc;
         if (span < TimeSpan.Zero)
         {
             var ahead = -span;
-            if (ahead.TotalDays < 1) return $"in {Math.Max(1, (int)ahead.TotalHours)} h";
-            if (ahead.TotalDays <= 6) return $"in {(int)ahead.TotalDays} days";
-            return utc.ToString("dd MMM yyyy", CultureInfo.InvariantCulture);
+            if (ahead.TotalDays < 1) return Say("in {0} h", Math.Max(1, (int)ahead.TotalHours));
+            if (ahead.TotalDays <= 6) return Say("in {0} days", (int)ahead.TotalDays);
+            return ShortDate(utc, translator);
         }
 
-        if (span.TotalMinutes < 1) return "Just now";
-        if (span.TotalMinutes < 60) return $"{(int)span.TotalMinutes} min ago";
-        if (span.TotalHours < 24) return $"{(int)span.TotalHours} h ago";
-        if (span.TotalDays < 2) return "Yesterday";
-        if (span.TotalDays <= 6) return $"{(int)span.TotalDays} days ago";
-        return utc.ToString("dd MMM yyyy", CultureInfo.InvariantCulture);
+        if (span.TotalMinutes < 1) return Say("Just now");
+        if (span.TotalMinutes < 60) return Say("{0} min ago", (int)span.TotalMinutes);
+        if (span.TotalHours < 24) return Say("{0} h ago", (int)span.TotalHours);
+        if (span.TotalDays < 2) return Say("Yesterday");
+        if (span.TotalDays <= 6) return Say("{0} days ago", (int)span.TotalDays);
+        return ShortDate(utc, translator);
     }
 }

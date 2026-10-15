@@ -1,6 +1,7 @@
+@inject Translator T
 <span class="ml-chip" style="--chip:@Color" data-testid="status-chip">
     @if (Dot) { <span class="ml-chip__dot"></span> }
-    @Text
+    @T[Text]
 </span>
 
 @code {

@@ -1,7 +1,8 @@
+@inject Translator T
 <MlCard Title="@Title" Class="@Class" TestId="@TestId" HeaderActions="HeaderActions">
     @if (!string.IsNullOrWhiteSpace(Description))
     {
-        <MudText Typo="Typo.body2" Class="ml-muted" Style="margin-bottom:16px">@Description</MudText>
+        <MudText Typo="Typo.body2" Class="ml-muted" Style="margin-bottom:16px">@T[Description]</MudText>
     }
     @ChildContent
 </MlCard>

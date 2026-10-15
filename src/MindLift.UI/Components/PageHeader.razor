@@ -1,14 +1,16 @@
+@inject Translator T
+
 <div class="ml-page-header" data-testid="page-header">
     @if (Breadcrumbs is { Count: > 0 })
     {
-        <MudBreadcrumbs Items="Breadcrumbs" Class="ml-breadcrumbs" MaxItems="4" />
+        <MudBreadcrumbs Items="TranslatedBreadcrumbs" Class="ml-breadcrumbs" MaxItems="4" />
     }
     <div class="ml-page-header__row">
         <div class="ml-page-header__titles">
-            <MudText Typo="Typo.h4" Class="ml-truncate" data-testid="page-title">@Title</MudText>
+            <MudText Typo="Typo.h4" Class="ml-truncate" data-testid="page-title">@(TranslateTitle ? T[Title] : Title)</MudText>
             @if (!string.IsNullOrWhiteSpace(Subtitle))
             {
-                <MudText Typo="Typo.body2" Class="ml-muted">@Subtitle</MudText>
+                <MudText Typo="Typo.body2" Class="ml-muted">@T[Subtitle]</MudText>
             }
         </div>
         @if (Actions is not null)
@@ -25,7 +27,14 @@
 @code {
     [Parameter, EditorRequired] public string Title { get; set; } = "";
     [Parameter] public string? Subtitle { get; set; }
+
+    /// <summary>True for a fixed title such as "Contacts". Pass false when the title is a record's own name, so the name is never looked up as a phrase.</summary>
+    [Parameter] public bool TranslateTitle { get; set; } = true;
+
     [Parameter] public List<BreadcrumbItem>? Breadcrumbs { get; set; }
+
+    private List<BreadcrumbItem> TranslatedBreadcrumbs
+        => (Breadcrumbs ?? []).Select(b => new BreadcrumbItem(T[b.Text], b.Href, b.Disabled)).ToList();
     [Parameter] public RenderFragment? Actions { get; set; }
     [Parameter] public RenderFragment? Tabs { get; set; }
 }

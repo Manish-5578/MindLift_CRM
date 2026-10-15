@@ -82,4 +82,30 @@ public sealed class ArabicTextTests : BunitContext
 
         FilterDescriber.Describe(condition, field, translator: translator).ShouldContain("10 و 20");
     }
+
+    [Fact]
+    public void Dates_and_relative_times_are_written_in_arabic_with_western_digits()
+    {
+        var translator = new Translator();
+        translator.SetLanguage("ar");
+        var now = new DateTime(2026, 10, 15, 12, 0, 0, DateTimeKind.Utc);
+
+        Formatting.ShortDate(new DateTime(2026, 3, 5), translator).ShouldBe("05 مارس 2026");
+        Formatting.ShortDate(new DateTime(2026, 3, 5)).ShouldBe("05 Mar 2026");
+        Formatting.FullDateTime(new DateTime(2026, 10, 15, 14, 30, 0, DateTimeKind.Utc), translator).ShouldBe("الخميس، 15 أكتوبر 2026، 14:30 UTC");
+        Formatting.Relative(now.AddMinutes(-5), now, translator).ShouldBe("منذ 5 دقيقة");
+        Formatting.Relative(now.AddSeconds(-10), now, translator).ShouldBe("الآن");
+        Formatting.Relative(now.AddDays(-1.5), now, translator).ShouldBe("أمس");
+        Formatting.Relative(now.AddMinutes(-5), now).ShouldBe("5 min ago");
+    }
+
+    [Fact]
+    public void A_page_title_is_translated_but_a_record_name_that_matches_a_phrase_is_left_alone()
+    {
+        UseArabic();
+
+        Render<PageHeader>(p => p.Add(c => c.Title, "Contacts")).Find("[data-testid=page-title]").TextContent.ShouldBe("جهات الاتصال");
+        Render<PageHeader>(p => p.Add(c => c.Title, "Contacts").Add(c => c.TranslateTitle, false))
+            .Find("[data-testid=page-title]").TextContent.ShouldBe("Contacts");
+    }
 }
