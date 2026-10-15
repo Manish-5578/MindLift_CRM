@@ -152,14 +152,39 @@ public sealed class DocumentOcrService(
         // 1. Read every page: PDF text layer where there is one, OCR for scans and photos.
         IReadOnlyList<PageText> pages = [];
         string rawText = string.Empty;
+        string? tempPath = null;
         try
         {
-            pages = await pageReader.ReadAsync(await SaveTempCopyAsync(doc, ct), ct);
+            tempPath = await SaveTempCopyAsync(doc, ct);
+            pages = await pageReader.ReadAsync(tempPath, ct);
             rawText = string.Join("\n", pages.Select(p => p.Text));
+        }
+        catch (OcrBusyException)
+        {
+            // Too many documents are being read. This one is not failed; it goes back to waiting so it can be tried again.
+            doc.OcrStatus = (int)DocumentOcrStatus.Pending;
+            doc.Status = "Queued";
+            await db.SaveChangesAsync(ct);
+            throw new BusinessRuleException("ocr_busy", "The document reader is busy. Try again in a minute.");
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogWarning(ex, "Could not read document {DocId}", documentId);
+        }
+        finally
+        {
+            // The copy made for reading is only needed while it is read.
+            if (tempPath is not null)
+            {
+                try
+                {
+                    File.Delete(tempPath);
+                }
+                catch (IOException)
+                {
+                    // Left for the system's temporary file cleanup.
+                }
+            }
         }
 
         bool isBinaryOrEmpty = string.IsNullOrWhiteSpace(rawText);

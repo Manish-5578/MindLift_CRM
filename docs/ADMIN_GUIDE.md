@@ -97,6 +97,13 @@ To launch the production stack with PostgreSQL, Hangfire workers, and the web/AP
 | `Ocr__TesseractPath` | No | `/usr/bin/tesseract` | Absolute path to the Tesseract binary. |
 | `Ocr__Languages` | No | `eng+ara` | OCR language codes to process. |
 | `Ocr__MaxFileSizeMb` | No | `25` | Maximum upload size per document file in MB. |
+| `Ocr__MaxPages` | No | `50` | Pages read from one PDF; later pages are ignored. |
+| `Ocr__MaxDocumentSeconds` | No | `300` | Time one document may take in total before it is stopped. |
+| `Ocr__MaxConcurrentDocuments` | No | `2` | Documents read at once. Others wait up to `Ocr__QueueSeconds` (default `30`), then the upload is left queued and the caller gets `ocr_busy`. |
+| `Ocr__MaxPagePixels` | No | `40000000` | Pixels in one rendered PDF page. Larger pages are rendered at a lower resolution, down to `Ocr__MinRenderDpi` (default `100`), and skipped below that. |
+| `Ocr__MaxImagePixels` | No | `60000000` | Pixels in an uploaded picture; larger ones are refused. |
+| `Ocr__MaxTextCharacters` | No | `2000000` | Characters read from a plain text file. |
+| `Ocr__MaxOutputMegabytes` | No | `20` | Output accepted from Tesseract before it is stopped. |
 | `Hangfire__WorkerCount` | No | `20` | Number of concurrent background job worker threads. |
 
 ---

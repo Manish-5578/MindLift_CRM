@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MindLift.Infrastructure.Cpq;
+using SkiaSharp;
 using PdfPig = UglyToad.PdfPig;
 
 namespace MindLift.Infrastructure.Documents.Text;
@@ -15,18 +16,37 @@ public sealed record PageWord(string Text, double Confidence, double X, double Y
 /// <summary>
 /// Reads the text of any supported file (plan 19.5). A PDF page with a text layer is read directly, with no OCR.
 /// A scanned PDF page, or a photo, is rendered to an image and read with Tesseract.
+/// Reading is bounded: only so many documents are read at once, one document may take only so long, a page or picture may have only so many pixels,
+/// a PDF is read only up to its page limit, and a text file only up to a character limit (all in <see cref="OcrOptions"/>).
 /// </summary>
-public sealed class DocumentPageReader(IOcrEngine ocr, IOptions<OcrOptions> options, ILogger<DocumentPageReader> logger)
+public sealed class DocumentPageReader(IOcrEngine ocr, IOptions<OcrOptions> options, ILogger<DocumentPageReader> logger, OcrGate? gate = null)
 {
     /// <summary>A page with fewer characters than this in its text layer is treated as a scan.</summary>
     public const int MinTextLayerChars = 20;
 
-    public const int MaxPages = 50;
-
     private static readonly string[] ImageExtensions = [".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp"];
     private static readonly string[] TextExtensions = [".txt", ".csv", ".md"];
 
+    /// <summary>
+    /// Reads every page. Throws <see cref="OcrBusyException"/> when no place frees up in time, <see cref="TimeoutException"/> when the document takes longer than allowed,
+    /// and <see cref="InvalidDataException"/> for a picture that cannot be read or is too large.
+    /// </summary>
     public async Task<IReadOnlyList<PageText>> ReadAsync(string path, CancellationToken cancellationToken)
+    {
+        using var place = gate is null ? null : await gate.EnterAsync(cancellationToken);
+        using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        budget.CancelAfter(TimeSpan.FromSeconds(Math.Max(1, options.Value.MaxDocumentSeconds)));
+        try
+        {
+            return await ReadCoreAsync(path, budget.Token);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException($"Reading the document took longer than {options.Value.MaxDocumentSeconds} seconds.");
+        }
+    }
+
+    private async Task<IReadOnlyList<PageText>> ReadCoreAsync(string path, CancellationToken cancellationToken)
     {
         var extension = Path.GetExtension(path).ToLowerInvariant();
         if (extension == ".pdf")
@@ -36,8 +56,14 @@ public sealed class DocumentPageReader(IOcrEngine ocr, IOptions<OcrOptions> opti
 
         if (TextExtensions.Contains(extension))
         {
-            // Plain text already has its characters, so there is nothing to recognise.
-            var text = await File.ReadAllTextAsync(path, cancellationToken);
+            // Plain text already has its characters, so there is nothing to recognise. Only the first part of a very long file is read.
+            using var reader = new StreamReader(path);
+            var (text, truncated) = await BoundedText.ReadAsync(reader, Math.Max(1, options.Value.MaxTextCharacters), drain: false, cancellationToken);
+            if (truncated)
+            {
+                logger.LogWarning("The text file {File} is longer than {Limit} characters, so only the start was read.", Path.GetFileName(path), options.Value.MaxTextCharacters);
+            }
+
             return [new PageText(1, text, "Digital", [])];
         }
 
@@ -54,7 +80,12 @@ public sealed class DocumentPageReader(IOcrEngine ocr, IOptions<OcrOptions> opti
     {
         var pages = new List<PageText>();
         using var pdf = PdfPig.PdfDocument.Open(path);
-        var count = Math.Min(pdf.NumberOfPages, MaxPages);
+        var limit = Math.Max(1, options.Value.MaxPages);
+        var count = Math.Min(pdf.NumberOfPages, limit);
+        if (pdf.NumberOfPages > limit)
+        {
+            logger.LogWarning("The PDF {File} has {Pages} pages; only the first {Limit} are read.", Path.GetFileName(path), pdf.NumberOfPages, limit);
+        }
 
         for (var number = 1; number <= count; number++)
         {
@@ -72,8 +103,16 @@ public sealed class DocumentPageReader(IOcrEngine ocr, IOptions<OcrOptions> opti
             }
             else
             {
-                // A scanned page: render it at OCR resolution, then read the image.
-                var image = RenderPage(path, number);
+                // A scanned page: render it at OCR resolution (lower for a very large page), then read the image.
+                var dpi = RenderDpiFor(page.Width, page.Height);
+                if (dpi == 0)
+                {
+                    logger.LogWarning("Page {Page} of {File} is {Width} x {Height} points, too large to read, so it was skipped.", number, Path.GetFileName(path), page.Width, page.Height);
+                    pages.Add(new PageText(number, string.Empty, "Skipped", []));
+                    continue;
+                }
+
+                var image = RenderPage(path, number, dpi);
                 try
                 {
                     pages.Add(await OcrImageAsync(image, number, cancellationToken));
@@ -88,26 +127,65 @@ public sealed class DocumentPageReader(IOcrEngine ocr, IOptions<OcrOptions> opti
         return pages;
     }
 
-    private string RenderPage(string pdfPath, int pageNumber)
+    /// <summary>
+    /// The resolution to render a page of this size (in points, 72 to the inch) at: the OCR resolution, or lower so the picture stays within the pixel limit.
+    /// Zero means the page is too big to read even at the lowest resolution allowed.
+    /// </summary>
+    public int RenderDpiFor(double widthPoints, double heightPoints)
+    {
+        var dpi = Math.Max(1, options.Value.OcrDpi);
+        if (!(widthPoints > 0) || !(heightPoints > 0) || double.IsInfinity(widthPoints) || double.IsInfinity(heightPoints))
+        {
+            return 0;
+        }
+
+        var pixels = widthPoints / 72.0 * dpi * (heightPoints / 72.0 * dpi);
+        var limit = Math.Max(1, options.Value.MaxPagePixels);
+        if (pixels <= limit)
+        {
+            return dpi;
+        }
+
+        var scaled = (int)Math.Floor(dpi * Math.Sqrt(limit / pixels));
+        return scaled >= Math.Max(1, options.Value.MinRenderDpi) ? scaled : 0;
+    }
+
+    private static string RenderPage(string pdfPath, int pageNumber, int dpi)
     {
         var output = Path.Combine(Path.GetTempPath(), $"page_{Guid.NewGuid():N}.png");
         using var input = File.OpenRead(pdfPath);
-        PDFtoImage.Conversion.SavePng(output, input, page: pageNumber - 1, options: new PDFtoImage.RenderOptions(Dpi: options.Value.OcrDpi));
+        PDFtoImage.Conversion.SavePng(output, input, page: pageNumber - 1, options: new PDFtoImage.RenderOptions(Dpi: dpi));
         return output;
+    }
+
+    /// <summary>The picture's size, read from its header without decoding it. A file that is not a readable picture, or has too many pixels, is refused.</summary>
+    private (int Width, int Height) ImageSize(string imagePath)
+    {
+        using var codec = SKCodec.Create(imagePath) ?? throw new InvalidDataException("The file is not a picture that can be read.");
+        var (width, height) = (codec.Info.Width, codec.Info.Height);
+        var limit = Math.Max(1, options.Value.MaxImagePixels);
+        if (width <= 0 || height <= 0 || (long)width * height > limit)
+        {
+            throw new InvalidDataException($"The picture is {width} x {height} pixels, which is more than the {limit / 1_000_000} million allowed.");
+        }
+
+        return (width, height);
     }
 
     private async Task<PageText> OcrImageAsync(string imagePath, int pageNumber, CancellationToken cancellationToken)
     {
+        var size = ImageSize(imagePath);
         var result = await ocr.RecognizeAsync(imagePath, new OcrRequest(options.Value.Languages), cancellationToken);
-        var width = Math.Max(result.ImageWidth, 1);
-        var height = Math.Max(result.ImageHeight, 1);
+
+        // The engine reports pixel positions. They are turned into fractions of the picture, using the size read from the file when the engine does not give one.
+        var width = Math.Max(result.ImageWidth > 0 ? result.ImageWidth : size.Width, 1);
+        var height = Math.Max(result.ImageHeight > 0 ? result.ImageHeight : size.Height, 1);
         var words = result.Words.Select(w => new PageWord(w.Text, w.Confidence, (double)w.Left / width, (double)w.Top / height,
             (double)w.Width / width, (double)w.Height / height)).ToList();
         var text = JoinLines(result.Words.Select(w => (w.Text, (double)-w.Top, (double)w.Height, (double)w.Left)));
         logger.LogInformation("Read page {Page} by OCR: {Words} words", pageNumber, words.Count);
         return new PageText(pageNumber, text, "Ocr", words);
     }
-
 
     /// <summary>
     /// Builds the page text with one line per printed line, so a label and the value after it stay together.
@@ -132,6 +210,7 @@ public sealed class DocumentPageReader(IOcrEngine ocr, IOptions<OcrOptions> opti
 
         return string.Join("\n", lines.Select(l => string.Join(" ", l.OrderBy(w => w.Left).Select(w => w.Text))));
     }
+
     private static void TryDelete(string path)
     {
         try

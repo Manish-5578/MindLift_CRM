@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using MindLift.Infrastructure.Documents.Text;
 
 namespace MindLift.Infrastructure.Cpq;
 
@@ -21,7 +22,33 @@ public sealed class OcrOptions
     public int ThumbWidth { get; set; } = 200;
     public int PageTimeoutSeconds { get; set; } = 60;
     public int MaxFileSizeMb { get; set; } = 25;
+
+    /// <summary>Pages read from one PDF. Later pages are not read.</summary>
     public int MaxPages { get; set; } = 50;
+
+    /// <summary>The longest one document may take to read, in seconds. Longer and the read stops and the document is marked Failed.</summary>
+    public int MaxDocumentSeconds { get; set; } = 300;
+
+    /// <summary>How many documents are read at the same time across the app.</summary>
+    public int MaxConcurrentDocuments { get; set; } = 2;
+
+    /// <summary>How long a document waits for a place when that many are already being read, in seconds, before it is told to try again.</summary>
+    public int QueueSeconds { get; set; } = 30;
+
+    /// <summary>The most pixels a rendered PDF page may have. A bigger page is rendered at a lower resolution, down to <see cref="MinRenderDpi"/>.</summary>
+    public int MaxPagePixels { get; set; } = 40_000_000;
+
+    /// <summary>The lowest resolution a large PDF page is rendered at. A page that would need less is skipped.</summary>
+    public int MinRenderDpi { get; set; } = 100;
+
+    /// <summary>The most pixels an uploaded picture may have. A bigger one is refused before it is opened for reading.</summary>
+    public int MaxImagePixels { get; set; } = 60_000_000;
+
+    /// <summary>The most characters read from a plain text file.</summary>
+    public int MaxTextCharacters { get; set; } = 2_000_000;
+
+    /// <summary>The most output one Tesseract run may produce, in megabytes. A run that produces more is stopped.</summary>
+    public int MaxOutputMegabytes { get; set; } = 20;
 }
 
 public sealed record OcrRequest(string Languages, int PageSegMode = 3, string? CharWhitelist = null);
@@ -101,6 +128,9 @@ public sealed class TesseractCliOcrEngine : IOcrEngine
             StandardOutputEncoding = Encoding.UTF8
         };
 
+        // One thread per run: Tesseract otherwise uses every processor for a single page, and several runs at once would starve the app.
+        psi.Environment["OMP_THREAD_LIMIT"] = "1";
+
         psi.ArgumentList.Add(imagePath);
         psi.ArgumentList.Add("stdout");
         psi.ArgumentList.Add("-l");
@@ -127,11 +157,31 @@ public sealed class TesseractCliOcrEngine : IOcrEngine
         psi.ArgumentList.Add("tessedit_create_tsv=1");
 
         using var proc = Process.Start(psi) ?? throw new InvalidOperationException("Could not start Tesseract process.");
+        try
+        {
+            proc.PriorityClass = ProcessPriorityClass.BelowNormal;
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or System.ComponentModel.Win32Exception or PlatformNotSupportedException)
+        {
+            // Not allowed here: it runs at normal priority.
+        }
+
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(TimeSpan.FromSeconds(_options.PageTimeoutSeconds));
 
-        var stdoutTask = proc.StandardOutput.ReadToEndAsync(cts.Token);
-        var stderrTask = proc.StandardError.ReadToEndAsync(cts.Token);
+        // The output is read with a ceiling. A run that goes past it is stopped, so a page of noise cannot fill memory.
+        var maxOutput = Math.Max(1, _options.MaxOutputMegabytes) * 1_000_000;
+        var stdoutTask = Task.Run(async () =>
+        {
+            var read = await BoundedText.ReadAsync(proc.StandardOutput, maxOutput, drain: false, cts.Token);
+            if (read.Truncated)
+            {
+                try { proc.Kill(entireProcessTree: true); } catch { }
+            }
+
+            return read;
+        }, cts.Token);
+        var stderrTask = BoundedText.ReadAsync(proc.StandardError, 64_000, drain: true, cts.Token);
 
         try
         {
@@ -143,8 +193,13 @@ public sealed class TesseractCliOcrEngine : IOcrEngine
             throw new TimeoutException($"Tesseract OCR processing timed out on {imagePath}");
         }
 
-        var stdout = await stdoutTask;
-        var stderr = await stderrTask;
+        var (stdout, tooMuchOutput) = await stdoutTask;
+        var (stderr, _) = await stderrTask;
+
+        if (tooMuchOutput)
+        {
+            throw new InvalidOperationException($"Tesseract produced more than {_options.MaxOutputMegabytes} MB of output for {imagePath}, so it was stopped.");
+        }
 
         if (proc.ExitCode != 0)
         {
