@@ -266,7 +266,11 @@ public sealed class ChannelAccountService(
         account.Username = request.Username;
         account.PhoneNumberId = request.PhoneNumberId;
         account.AccountSid = request.AccountSid;
-        account.WebhookSecret = request.WebhookSecret;
+        // Like the password and the auth token, the webhook secret is only replaced when a new one is given, and it is stored encrypted.
+        if (!string.IsNullOrEmpty(request.WebhookSecret))
+        {
+            account.WebhookSecret = WebhookSecrets.Seal(secretProtector, request.WebhookSecret);
+        }
 
         if (!string.IsNullOrEmpty(request.Password))
         {

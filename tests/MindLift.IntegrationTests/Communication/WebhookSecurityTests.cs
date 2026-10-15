@@ -1,7 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.Extensions.Configuration;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using MindLift.Infrastructure.Communication;
+using MindLift.Infrastructure.Persistence;
 using MindLift.IntegrationTests.Support;
 using MindLift.Shared.Contracts;
 using Shouldly;
@@ -146,5 +149,58 @@ public sealed class WebhookSecurityTests(MindLiftApiFactory factory) : IClassFix
 
         (await client.SendAsync(WebhookRequests.Twilio(url, form, "twilio-test-token"))).StatusCode.ShouldBe(HttpStatusCode.OK);
         (await InboxAsync(owner, "Sms")).ShouldContain(t => t.ParticipantAddress == "+15550007");
+    }
+
+    private async Task<string?> StoredSecretAsync(string number)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await db.ChannelAccounts.IgnoreQueryFilters().Where(a => a.PhoneNumberId == number).Select(a => a.WebhookSecret).SingleAsync();
+    }
+
+    [Fact]
+    public async Task A_webhook_secret_is_stored_encrypted_and_still_verifies_requests()
+    {
+        var owner = await Workspaces.SignupAsync(factory);
+        var number = NewNumber();
+        await CreateWhatsAppChannelAsync(owner, number, "plain-secret-value");
+
+        var stored = await StoredSecretAsync(number);
+
+        stored.ShouldNotBeNull();
+        stored.ShouldNotContain("plain-secret-value");
+        WebhookSecrets.IsSealed(stored).ShouldBeTrue();
+        var response = await factory.CreateClient().SendAsync(WebhookRequests.WhatsApp(WebhookRequests.InboundWhatsApp(number, "+" + number, "+15550301", "wamid.sealed", "hi"), "plain-secret-value"));
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task An_older_plain_text_secret_is_converted_and_keeps_working()
+    {
+        var owner = await Workspaces.SignupAsync(factory);
+        var number = NewNumber();
+        await CreateWhatsAppChannelAsync(owner, number, "temporary");
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.ChannelAccounts.IgnoreQueryFilters().Where(a => a.PhoneNumberId == number)
+                .ExecuteUpdateAsync(set => set.SetProperty(a => a.WebhookSecret, "legacy-plain-secret"));
+        }
+
+        // Before the conversion the plain value is still accepted.
+        (await factory.CreateClient().SendAsync(WebhookRequests.WhatsApp(WebhookRequests.InboundWhatsApp(number, "+" + number, "+15550302", "wamid.legacy1", "hi"), "legacy-plain-secret")))
+            .StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var converted = await WebhookSecrets.SealAllAsync(scope.ServiceProvider.GetRequiredService<AppDbContext>(), scope.ServiceProvider.GetRequiredService<ISecretProtector>());
+            converted.ShouldBeGreaterThanOrEqualTo(1);
+        }
+
+        var stored = await StoredSecretAsync(number);
+        WebhookSecrets.IsSealed(stored).ShouldBeTrue();
+        stored.ShouldNotContain("legacy-plain-secret");
+        (await factory.CreateClient().SendAsync(WebhookRequests.WhatsApp(WebhookRequests.InboundWhatsApp(number, "+" + number, "+15550303", "wamid.legacy2", "hi"), "legacy-plain-secret")))
+            .StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 }

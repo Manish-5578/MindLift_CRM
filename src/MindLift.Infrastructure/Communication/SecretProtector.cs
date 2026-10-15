@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace MindLift.Infrastructure.Communication;
 
@@ -14,9 +15,15 @@ public sealed class SecretProtector : ISecretProtector
 {
     private readonly byte[] _key;
 
-    public SecretProtector(IConfiguration configuration)
+    public SecretProtector(IConfiguration configuration, ILogger<SecretProtector>? logger = null)
     {
-        var rawKey = configuration["Security:SecretKey"] ?? configuration["Jwt:Key"] ?? "MindLift-Default-Master-Encryption-Secret-Key-2026!";
+        var rawKey = configuration["Security:SecretKey"] ?? configuration["Jwt:Key"];
+        if (string.IsNullOrEmpty(rawKey))
+        {
+            logger?.LogWarning("Neither Security:SecretKey nor Jwt:Key is set, so stored channel secrets are encrypted with a key built into the program. Set Security:SecretKey in production.");
+            rawKey = "MindLift-Default-Master-Encryption-Secret-Key-2026!";
+        }
+
         using var sha = SHA256.Create();
         _key = sha.ComputeHash(Encoding.UTF8.GetBytes(rawKey));
     }

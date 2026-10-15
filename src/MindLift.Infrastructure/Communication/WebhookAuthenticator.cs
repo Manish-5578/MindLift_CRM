@@ -55,7 +55,8 @@ public sealed class WebhookAuthenticator(AppDbContext db, ISecretProtector secre
         }
 
         var account = matches[0];
-        if (string.IsNullOrEmpty(account.WebhookSecret) || !VerifyMetaSignature(body, signatureHeader, account.WebhookSecret))
+        var secret = WebhookSecrets.Open(secretProtector, account.WebhookSecret);
+        if (string.IsNullOrEmpty(secret) || !VerifyMetaSignature(body, signatureHeader, secret))
         {
             return null;
         }

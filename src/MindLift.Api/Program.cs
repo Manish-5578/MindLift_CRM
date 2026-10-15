@@ -96,6 +96,7 @@ foreach (var type in typeof(Program).Assembly.GetTypes().Where(t =>
     builder.Services.AddScoped(typeof(IValidator<>).MakeGenericType(argument), type);
 }
 
+builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(options => MindLift.Api.Hosting.ForwardedHeadersSetup.Configure(options, builder.Configuration));
 builder.Services.AddControllers(options => options.Filters.Add<ValidationActionFilter>());
 
 // Rate limits per client address. "public" covers sign-in, sign-up, magic links, public booking and website forms; "webhook" covers provider callbacks.
@@ -183,6 +184,15 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await db.Database.MigrateAsync();
     await PlanCatalog.EnsureAsync(db);
+
+    // Webhook secrets saved before they were encrypted are converted once.
+    await MindLift.Infrastructure.Communication.WebhookSecrets.SealAllAsync(db, scope.ServiceProvider.GetRequiredService<MindLift.Infrastructure.Communication.ISecretProtector>());
+}
+
+// Behind a reverse proxy this makes the client address and scheme the real ones. Off unless ForwardedHeaders:Enabled is set.
+if (MindLift.Api.Hosting.ForwardedHeadersSetup.IsEnabled(app.Configuration))
+{
+    app.UseForwardedHeaders();
 }
 
 app.UseSerilogRequestLogging();
