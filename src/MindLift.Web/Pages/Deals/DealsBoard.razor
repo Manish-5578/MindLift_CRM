@@ -150,7 +150,7 @@
 
             _board = await response.Content.ReadFromJsonAsync<DealBoardDto>();
             _pipelineId = _board!.PipelineId;
-            _columns = _board.Stages.Select(s => new KanbanColumn(s.Id.ToString(), s.Name, s.Color ?? TypeColor(s.Type), s.Count,
+            _columns = _board.Stages.Select(s => new KanbanColumn(s.Id.ToString(), T.Pick(s.Name, s.NameAr), s.Color ?? TypeColor(s.Type), s.Count,
                 $"{s.TotalInBase:N0} {_board.BaseCurrency}" + (s.Type == "Open" ? $" · {s.WeightedInBase:N0} weighted" : string.Empty))).ToList();
             _view = _board.Stages.ToDictionary(s => s.Id.ToString(), s => (IReadOnlyList<DealCardDto>)s.Deals);
         }

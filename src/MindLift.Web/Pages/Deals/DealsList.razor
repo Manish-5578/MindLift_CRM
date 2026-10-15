@@ -102,7 +102,7 @@
                         <MudText Typo="Typo.caption" Class="ml-muted ml-truncate">@(d.AccountName ?? d.PrimaryContactName ?? "—")</MudText>
                     </div>,
             },
-            new() { Header = "Stage", Cell = d => @<StatusChip Text="@d.StageName" Color="@StatusColors.For(d.Status == "Won" ? "Won" : d.Status == "Lost" ? "Lost" : "Working")" /> },
+            new() { Header = "Stage", Cell = d => @<StatusChip Text="@T.Pick(d.StageName, d.StageNameAr)" Color="@StatusColors.For(d.Status == "Won" ? "Won" : d.Status == "Lost" ? "Lost" : "Working")" /> },
             new() { Header = "Amount", SortField = "amount", AlignEnd = true, Cell = d => @<MoneyText Amount="d.Amount" Currency="@d.Currency" /> },
             new() { Header = "Expected close", SortField = "expected_close_date", HideOnTablet = true, Cell = d => @<DateText Value="@d.ExpectedCloseDate" /> },
             new() { Header = "Owner", Cell = d => @<span>@(d.OwnerName ?? "—")</span> },
@@ -115,7 +115,7 @@
                     <MoneyText Amount="d.Amount" Currency="@d.Currency" />
                 </div>
                 <MudText Typo="Typo.body2" Class="ml-muted ml-truncate">@(d.AccountName ?? d.PrimaryContactName ?? "—")</MudText>
-                <StatusChip Text="@d.StageName" Color="@StatusColors.For(d.Status == "Won" ? "Won" : d.Status == "Lost" ? "Lost" : "Working")" />
+                <StatusChip Text="@T.Pick(d.StageName, d.StageNameAr)" Color="@StatusColors.For(d.Status == "Won" ? "Won" : d.Status == "Lost" ? "Lost" : "Working")" />
             </div>;
 
         _users = await RecordLookups.UsersAsync(Http);

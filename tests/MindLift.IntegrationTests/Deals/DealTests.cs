@@ -326,4 +326,32 @@ public sealed class DealTests(MindLiftApiFactory factory) : IClassFixture<MindLi
         (await s.Session.Client.DeleteAsync($"/api/v1/deals/{deal.Id}")).StatusCode.ShouldBe(HttpStatusCode.NoContent);
         (await s.Session.Client.GetAsync($"/api/v1/deals/{deal.Id}")).StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
+
+    [Fact]
+    public async Task The_board_carries_the_arabic_name_of_each_stage()
+    {
+        var s = await StartAsync();
+
+        var board = await SendAsync<DealBoardDto>(await s.Session.Client.PostAsJsonAsync("/api/v1/deals/board", new { }));
+
+        board.Stages.ShouldAllBe(column => !string.IsNullOrWhiteSpace(column.NameAr));
+        foreach (var column in board.Stages)
+        {
+            column.NameAr.ShouldBe(s.Pipeline.Stages.Single(stage => stage.Id == column.Id).NameAr);
+        }
+    }
+
+    [Fact]
+    public async Task The_stage_history_carries_the_arabic_stage_names()
+    {
+        var s = await StartAsync();
+        var deal = await CreateAsync(s, NewDeal("History deal", 1000));
+        await MoveAsync(s, deal.Id, s.Won);
+
+        var history = await SendAsync<List<DealStageHistoryDto>>(await s.Session.Client.GetAsync($"/api/v1/deals/{deal.Id}/history"));
+
+        var move = history.First();
+        move.ToStageAr.ShouldBe(s.Won.NameAr);
+        move.FromStageAr.ShouldBe(s.Open().NameAr);
+    }
 }

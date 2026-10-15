@@ -47,7 +47,7 @@
             var currencies = (App.Bootstrap?.Currencies.EnabledCurrencies ?? []).Select((c, i) => Option(c, c, i)).ToList();
             var pipelineId = Guid.TryParse(_values.GetValueOrDefault("pipelineId"), out var id) ? id : _pipelines.FirstOrDefault(p => p.IsDefault)?.Id;
             var stages = _pipelines.FirstOrDefault(p => p.Id == pipelineId)?.Stages.Where(s => s.StageType == "Open" || _dealId is not null)
-                .OrderBy(s => s.SortOrder).Select((s, i) => Option(s.Id.ToString(), s.Name, i)).ToList() ?? [];
+                .OrderBy(s => s.SortOrder).Select((s, i) => Option(s.Id.ToString(), T.Pick(s.Name, s.NameAr), i)).ToList() ?? [];
             return
             [
                 new("name", "Deal name", Required: true, TestId: "deal-name"),

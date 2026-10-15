@@ -106,7 +106,7 @@ public sealed class DealService(
                 d.AccountId is { } a ? lookups.Accounts.GetValueOrDefault(a) : null,
                 d.PrimaryContactId is { } c ? lookups.Contacts.GetValueOrDefault(c) : null,
                 d.OwnerId, lookups.Owners.GetValueOrDefault(d.OwnerId), d.ExpectedCloseDate, IsRotting(d, stage, now), (int)(now - d.StageChangedAt).TotalDays, d.Version)).ToList();
-            return new DealBoardStageDto(stage.Id, stage.Name, stage.StageType, stage.Color, stage.Probability, inStage.Count, total, weighted, cards);
+            return new DealBoardStageDto(stage.Id, stage.Name, stage.StageType, stage.Color, stage.Probability, inStage.Count, total, weighted, cards, stage.NameAr);
         }).ToList();
 
         return new DealBoardDto(pipeline, settings.BaseCurrency, columns);
@@ -117,15 +117,17 @@ public sealed class DealService(
         await LoadScopedAsync(id, cancellationToken);
         var rows = await db.DealStageHistory.AsNoTracking().Where(h => h.DealId == id).OrderByDescending(h => h.ChangedAt).ToListAsync(cancellationToken);
         var stageIds = rows.SelectMany(r => new[] { r.FromStageId, r.ToStageId }).Where(s => s != null).Select(s => s!.Value).Distinct().ToList();
-        var stages = await db.PipelineStages.AsNoTracking().IgnoreQueryFilters().Where(s => stageIds.Contains(s.Id)).ToDictionaryAsync(s => s.Id, s => s.Name, cancellationToken);
+        var stages = await db.PipelineStages.AsNoTracking().IgnoreQueryFilters().Where(s => stageIds.Contains(s.Id)).ToDictionaryAsync(s => s.Id, s => (s.Name, s.NameAr), cancellationToken);
         var users = await RecordHelpers.OwnerNamesAsync(db, rows.Where(r => r.ChangedById != null).Select(r => r.ChangedById!.Value).Distinct(), cancellationToken);
 
         return rows.Select(r => new DealStageHistoryDto(
-            r.FromStageId is { } f ? stages.GetValueOrDefault(f) : null,
-            stages.GetValueOrDefault(r.ToStageId) ?? "—",
+            r.FromStageId is { } f ? stages.GetValueOrDefault(f).Name : null,
+            stages.GetValueOrDefault(r.ToStageId).Name ?? "—",
             r.ChangedAt,
             r.ChangedById is { } u ? users.GetValueOrDefault(u) : null,
-            r.SecondsInFromStage is { } s ? Math.Round(s / 86400d, 1) : null)).ToList();
+            r.SecondsInFromStage is { } s ? Math.Round(s / 86400d, 1) : null,
+            r.FromStageId is { } fa ? stages.GetValueOrDefault(fa).NameAr : null,
+            stages.GetValueOrDefault(r.ToStageId).NameAr)).ToList();
     }
 
     // ---------- writing ----------
@@ -621,7 +623,7 @@ public sealed class DealService(
             stage?.Name ?? "—", stage?.StageType ?? "Open", d.Status, d.Probability, d.AccountId,
             d.AccountId is { } a ? l.Accounts.GetValueOrDefault(a) : null,
             d.PrimaryContactId is { } c ? l.Contacts.GetValueOrDefault(c) : null,
-            d.OwnerId, l.Owners.GetValueOrDefault(d.OwnerId), d.ExpectedCloseDate, IsRotting(d, stage, l.Now), d.CreatedAt);
+            d.OwnerId, l.Owners.GetValueOrDefault(d.OwnerId), d.ExpectedCloseDate, IsRotting(d, stage, l.Now), d.CreatedAt, stage?.NameAr);
     }
 
     private async Task<DealDto> MapAsync(Deal d, CancellationToken cancellationToken)

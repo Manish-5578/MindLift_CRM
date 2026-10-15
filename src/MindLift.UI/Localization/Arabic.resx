@@ -4583,4 +4583,10 @@
   <data name="Urgent" xml:space="preserve">
     <value>عاجلة</value>
   </data>
+  <data name="Created in {0}" xml:space="preserve">
+    <value>أُنشئت في {0}</value>
+  </data>
+  <data name="{0} days in {1}" xml:space="preserve">
+    <value>{0} يومًا في {1}</value>
+  </data>
 </root>

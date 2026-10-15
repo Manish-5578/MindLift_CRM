@@ -21,7 +21,8 @@ public sealed record DealListItemDto(
     string? OwnerName,
     DateTime? ExpectedCloseDate,
     bool IsRotting,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAtUtc,
+    string? StageNameAr = null);
 
 public sealed record DealContactDto(Guid ContactId, string FullName, string? Role, bool IsPrimary);
 
@@ -93,8 +94,9 @@ public sealed record DealBoardStageDto(
     int Count,
     decimal TotalInBase,
     decimal WeightedInBase,
-    IReadOnlyList<DealCardDto> Deals);
+    IReadOnlyList<DealCardDto> Deals,
+    string? NameAr = null);
 
 public sealed record DealBoardDto(Guid PipelineId, string BaseCurrency, IReadOnlyList<DealBoardStageDto> Stages);
 
-public sealed record DealStageHistoryDto(string? FromStage, string ToStage, DateTime ChangedAtUtc, string? ChangedBy, double? DaysInFromStage);
+public sealed record DealStageHistoryDto(string? FromStage, string ToStage, DateTime ChangedAtUtc, string? ChangedBy, double? DaysInFromStage, string? FromStageAr = null, string? ToStageAr = null);

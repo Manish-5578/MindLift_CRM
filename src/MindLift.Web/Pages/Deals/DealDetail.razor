@@ -45,7 +45,7 @@
                             var current = stage;
                             <MudButton Variant="@(current.Id == _deal.StageId ? Variant.Filled : Variant.Outlined)" Size="Size.Small"
                                        Color="@StageColor(current)" Disabled="@(!Can(p => p.CanEdit))"
-                                       OnClick="() => MoveAsync(current)" data-testid="@("stage-" + current.Id)">@current.Name</MudButton>
+                                       OnClick="() => MoveAsync(current)" data-testid="@("stage-" + current.Id)">@T.Pick(current.Name, current.NameAr)</MudButton>
                         }
                     </div>
                     <MudText Typo="Typo.caption" Class="ml-muted mt-2" data-testid="days-in-stage">@T["In this stage for {0} days", (int)(DateTime.UtcNow - _deal.StageChangedAtUtc).TotalDays]</MudText>
@@ -206,8 +206,8 @@
 
     private IReadOnlyList<TimelineItem> HistoryItems()
         => _history.Select(h => new TimelineItem(h.ChangedAtUtc,
-            h.FromStage is null ? $"Created in {h.ToStage}" : $"{h.FromStage} → {h.ToStage}",
-            string.Join(" · ", new[] { h.ChangedBy, h.DaysInFromStage is { } days ? $"{days:0.#} days in {h.FromStage}" : null }.Where(s => !string.IsNullOrWhiteSpace(s))),
+            h.FromStage is null ? T["Created in {0}", T.Pick(h.ToStage, h.ToStageAr)] : $"{T.Pick(h.FromStage, h.FromStageAr)} → {T.Pick(h.ToStage, h.ToStageAr)}",
+            string.Join(" · ", new[] { h.ChangedBy, h.DaysInFromStage is { } days ? T["{0} days in {1}", days.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture), T.Pick(h.FromStage ?? string.Empty, h.FromStageAr)] : null }.Where(s => !string.IsNullOrWhiteSpace(s))),
             Icons.Material.Outlined.SwapHoriz)).ToList();
 
     private void OpenEdit()
