@@ -7,8 +7,11 @@ using PdfPig = UglyToad.PdfPig;
 
 namespace MindLift.Infrastructure.Documents.Text;
 
-/// <summary>Text of one page, with where each word sits (normalised 0–1 of the page) and where it came from.</summary>
-public sealed record PageText(int PageNumber, string Text, string Source, IReadOnlyList<PageWord> Words);
+/// <summary>
+/// Text of one page, with where each word sits (normalised 0–1 of the page) and where it came from.
+/// <c>Confidence</c> (0–100) says how sure the reading is; <c>LowConfidence</c> asks a person to check the page.
+/// </summary>
+public sealed record PageText(int PageNumber, string Text, string Source, IReadOnlyList<PageWord> Words, double? Confidence = null, bool LowConfidence = false);
 
 /// <summary>A word with its box as fractions of the page width and height, so the review screen can draw it at any size.</summary>
 public sealed record PageWord(string Text, double Confidence, double X, double Y, double Width, double Height);
@@ -19,8 +22,10 @@ public sealed record PageWord(string Text, double Confidence, double X, double Y
 /// Reading is bounded: only so many documents are read at once, one document may take only so long, a page or picture may have only so many pixels,
 /// a PDF is read only up to its page limit, and a text file only up to a character limit (all in <see cref="OcrOptions"/>).
 /// </summary>
-public sealed class DocumentPageReader(IOcrEngine ocr, IOptions<OcrOptions> options, ILogger<DocumentPageReader> logger, OcrGate? gate = null)
+public sealed class DocumentPageReader(IOcrEngine ocr, IOptions<OcrOptions> options, ILogger<DocumentPageReader> logger, OcrGate? gate = null, IEnumerable<IOcrEngine>? otherEngines = null)
 {
+    private readonly OcrPagePipeline _pipeline = new(ocr, (otherEngines ?? []).ToList(), options.Value, logger);
+
     /// <summary>A page with fewer characters than this in its text layer is treated as a scan.</summary>
     public const int MinTextLayerChars = 20;
 
@@ -64,7 +69,7 @@ public sealed class DocumentPageReader(IOcrEngine ocr, IOptions<OcrOptions> opti
                 logger.LogWarning("The text file {File} is longer than {Limit} characters, so only the start was read.", Path.GetFileName(path), options.Value.MaxTextCharacters);
             }
 
-            return [new PageText(1, text, "Digital", [])];
+            return [new PageText(1, text, "Digital", [], 100)];
         }
 
         if (ImageExtensions.Contains(extension))
@@ -99,7 +104,7 @@ public sealed class DocumentPageReader(IOcrEngine ocr, IOptions<OcrOptions> opti
                 var height = page.Height;
                 var boxes = words.Select(w => new PageWord(w.Text, 100, w.BoundingBox.Left / width, 1 - w.BoundingBox.Top / height,
                     w.BoundingBox.Width / width, w.BoundingBox.Height / height)).ToList();
-                pages.Add(new PageText(number, text, "Digital", boxes));
+                pages.Add(new PageText(number, text, "Digital", boxes, 100));
             }
             else
             {
@@ -131,26 +136,29 @@ public sealed class DocumentPageReader(IOcrEngine ocr, IOptions<OcrOptions> opti
     /// The resolution to render a page of this size (in points, 72 to the inch) at: the OCR resolution, or lower so the picture stays within the pixel limit.
     /// Zero means the page is too big to read even at the lowest resolution allowed.
     /// </summary>
-    public int RenderDpiFor(double widthPoints, double heightPoints)
+    public int RenderDpiFor(double widthPoints, double heightPoints) => RenderDpiFor(options.Value, widthPoints, heightPoints);
+
+    /// <summary>The same, for any set of options.</summary>
+    public static int RenderDpiFor(OcrOptions options, double widthPoints, double heightPoints)
     {
-        var dpi = Math.Max(1, options.Value.OcrDpi);
+        var dpi = Math.Max(1, options.OcrDpi);
         if (!(widthPoints > 0) || !(heightPoints > 0) || double.IsInfinity(widthPoints) || double.IsInfinity(heightPoints))
         {
             return 0;
         }
 
         var pixels = widthPoints / 72.0 * dpi * (heightPoints / 72.0 * dpi);
-        var limit = Math.Max(1, options.Value.MaxPagePixels);
+        var limit = Math.Max(1, options.MaxPagePixels);
         if (pixels <= limit)
         {
             return dpi;
         }
 
         var scaled = (int)Math.Floor(dpi * Math.Sqrt(limit / pixels));
-        return scaled >= Math.Max(1, options.Value.MinRenderDpi) ? scaled : 0;
+        return scaled >= Math.Max(1, options.MinRenderDpi) ? scaled : 0;
     }
 
-    private static string RenderPage(string pdfPath, int pageNumber, int dpi)
+    public static string RenderPage(string pdfPath, int pageNumber, int dpi)
     {
         var output = Path.Combine(Path.GetTempPath(), $"page_{Guid.NewGuid():N}.png");
         using var input = File.OpenRead(pdfPath);
@@ -175,16 +183,10 @@ public sealed class DocumentPageReader(IOcrEngine ocr, IOptions<OcrOptions> opti
     private async Task<PageText> OcrImageAsync(string imagePath, int pageNumber, CancellationToken cancellationToken)
     {
         var size = ImageSize(imagePath);
-        var result = await ocr.RecognizeAsync(imagePath, new OcrRequest(options.Value.Languages), cancellationToken);
-
-        // The engine reports pixel positions. They are turned into fractions of the picture, using the size read from the file when the engine does not give one.
-        var width = Math.Max(result.ImageWidth > 0 ? result.ImageWidth : size.Width, 1);
-        var height = Math.Max(result.ImageHeight > 0 ? result.ImageHeight : size.Height, 1);
-        var words = result.Words.Select(w => new PageWord(w.Text, w.Confidence, (double)w.Left / width, (double)w.Top / height,
-            (double)w.Width / width, (double)w.Height / height)).ToList();
-        var text = JoinLines(result.Words.Select(w => (w.Text, (double)-w.Top, (double)w.Height, (double)w.Left)));
-        logger.LogInformation("Read page {Page} by OCR: {Words} words", pageNumber, words.Count);
-        return new PageText(pageNumber, text, "Ocr", words);
+        var reading = await _pipeline.ReadAsync(imagePath, size.Width, size.Height, cancellationToken);
+        logger.LogInformation("Read page {Page} by OCR: {Words} words, confidence {Confidence:0.#}{Low} ({Attempts} reading(s))", pageNumber, reading.Words.Count,
+            reading.Confidence, reading.LowConfidence ? ", LOW" : string.Empty, reading.Attempts);
+        return new PageText(pageNumber, reading.Text, "Ocr", reading.Words, reading.Confidence, reading.LowConfidence);
     }
 
     /// <summary>

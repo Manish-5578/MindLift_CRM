@@ -200,6 +200,7 @@ public static class DependencyInjection
         services.AddScoped<IDocumentOcrService, MindLift.Infrastructure.Cpq.DocumentOcrService>();
         services.AddSingleton<MindLift.Infrastructure.Documents.Text.OcrGate>();
         services.AddScoped<MindLift.Infrastructure.Documents.Text.DocumentPageReader>();
+        services.AddScoped<MindLift.Infrastructure.Documents.Text.SearchablePdfService>();
         services.AddScoped<MindLift.Infrastructure.Documents.Extraction.DocumentTypeService>();
         services.AddScoped<MindLift.Infrastructure.Cpq.DocumentExpiryJob>();
         services.AddScoped<MindLift.Infrastructure.Cpq.OcrHealthCheck>();

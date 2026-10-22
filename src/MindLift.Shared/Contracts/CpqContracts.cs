@@ -318,6 +318,12 @@ public sealed class OcrResultDto
     public string? DetectedInvoiceNumber { get; set; }
     public DateTime? DetectedDate { get; set; }
     public TimeSpan ProcessingDuration { get; set; }
+
+    /// <summary>How well the pages were read, 0–1 (1 for a file that already had its text). Null when the document was not read.</summary>
+    public double? ReadConfidence { get; set; }
+
+    /// <summary>Pages that scored low even after every way of reading them was tried. A person should check these against the original.</summary>
+    public List<int> LowConfidencePages { get; set; } = [];
 }
 
 public sealed class BusinessDocumentDto

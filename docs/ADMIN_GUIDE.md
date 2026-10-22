@@ -104,6 +104,12 @@ To launch the production stack with PostgreSQL, Hangfire workers, and the web/AP
 | `Ocr__MaxImagePixels` | No | `60000000` | Pixels in an uploaded picture; larger ones are refused. |
 | `Ocr__MaxTextCharacters` | No | `2000000` | Characters read from a plain text file. |
 | `Ocr__MaxOutputMegabytes` | No | `20` | Output accepted from Tesseract before it is stopped. |
+| `Ocr__EnhanceImages` | No | `true` | Clean each page picture before reading it: straighten it, raise its contrast, enlarge small ones, and try other settings when the reading scores low. `false` hands the original picture to Tesseract once. |
+| `Ocr__DetectOrientation` | No | `true` | Turn a page that was scanned sideways or upside down the right way up. Needs `osd.traineddata` in the tessdata folder. |
+| `Ocr__EnhanceMaxPixels` | No | `25000000` | Pictures with more pixels than this are read as they are, without cleaning, to bound memory. |
+| `Ocr__TargetPageConfidence` | No | `85` | A page that scores this (0–100) or more is accepted at once. |
+| `Ocr__MinPageConfidence` | No | `70` | A page that still scores below this after every attempt is marked low-confidence for a person to check. |
+| `Ocr__MaxAttemptsPerPage` | No | `5` | The most readings of one page (original, denoised, black-and-white, other layouts) while its score stays low. A page that reads like noise is also tried turned, up to three more readings. |
 | `Hangfire__WorkerCount` | No | `20` | Number of concurrent background job worker threads. |
 
 ---

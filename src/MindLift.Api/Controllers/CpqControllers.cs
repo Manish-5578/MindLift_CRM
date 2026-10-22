@@ -261,6 +261,16 @@ public sealed class DocumentsController(IDocumentOcrService ocrService) : Contro
         return File(result.Value.Stream, result.Value.ContentType, result.Value.FileName);
     }
 
+    /// <summary>The document as a PDF whose text can be searched and copied. Made on request from the stored scan; the stored file is not changed.</summary>
+    [HttpGet("{id:guid}/searchable-pdf")]
+    [HasPermission(AppModule.Documents, PermissionAction.View)]
+    public async Task<IActionResult> GetSearchablePdf(Guid id, CancellationToken ct = default)
+    {
+        var result = await ocrService.GetSearchablePdfAsync(id, ct);
+        if (result == null) return NotFound();
+        return File(result.Value.Stream, result.Value.ContentType, result.Value.FileName);
+    }
+
     [HttpPost("upload")]
     [HasPermission(AppModule.Documents, PermissionAction.Create)]
     public async Task<ActionResult<BusinessDocumentDto>> Upload(

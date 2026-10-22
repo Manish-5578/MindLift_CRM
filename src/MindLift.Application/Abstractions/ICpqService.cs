@@ -55,6 +55,12 @@ public interface IDocumentOcrService
     Task<IReadOnlyList<BusinessDocumentDto>> GetDocumentsAsync(Guid? accountId = null, Guid? dealId = null, CancellationToken ct = default);
     Task<BusinessDocumentDto?> GetDocumentByIdAsync(Guid id, CancellationToken ct = default);
     Task<(Stream Stream, string ContentType, string FileName)?> GetDocumentStreamAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>
+    /// A copy of a scanned PDF or picture as a PDF whose text can be searched and copied. A PDF that already has text on every page is returned as it is.
+    /// Null when the document does not exist.
+    /// </summary>
+    Task<(Stream Stream, string ContentType, string FileName)?> GetSearchablePdfAsync(Guid id, CancellationToken ct = default);
     Task<bool> DeleteDocumentAsync(Guid id, CancellationToken ct = default);
     Task<BusinessDocumentDto> ReviewDocumentAsync(Guid id, ReviewDocumentRequest request, Guid reviewerUserId, CancellationToken ct = default);
     Task<bool> UpdateExtractedFieldsAsync(Guid id, UpdateExtractedFieldsRequest request, CancellationToken ct = default);

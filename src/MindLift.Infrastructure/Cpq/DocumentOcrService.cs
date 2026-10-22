@@ -26,6 +26,7 @@ public sealed class DocumentOcrService(
     IOcrEngine ocrEngine,
     INotificationService notifications,
     DocumentPageReader pageReader,
+    SearchablePdfService searchablePdf,
     ILogger<DocumentOcrService> logger) : IDocumentOcrService
 {
     private Guid CurrentTenantId => tenant.TenantId ?? throw new UnauthorizedAccessException("Tenant context required.");
@@ -186,6 +187,11 @@ public sealed class DocumentOcrService(
                 }
             }
         }
+
+        // How well the pages were read. A file that already had its text is exact; a scan or photo is only as good as its reading.
+        var scanned = pages.Where(p => p.Source == "Ocr").ToList();
+        var readConfidence = scanned.Count == 0 ? 1.0 : Math.Clamp(scanned.Average(p => p.Confidence ?? 0) / 100.0, 0, 1);
+        var lowConfidencePages = pages.Where(p => p.LowConfidence).Select(p => p.PageNumber).ToList();
 
         bool isBinaryOrEmpty = string.IsNullOrWhiteSpace(rawText);
 
@@ -390,6 +396,17 @@ public sealed class DocumentOcrService(
             }
         }
 
+        // A field's confidence is how sure the extractor is of the match; it can be no surer than the reading it matched in.
+        if (readConfidence < 1.0)
+        {
+            foreach (var field in extractedFields)
+            {
+                field.Confidence = Math.Round(field.Confidence * readConfidence, 2);
+            }
+
+            overallConfidence = Math.Round(overallConfidence * readConfidence, 2);
+        }
+
         doc.Category = detectedCategory;
         doc.OcrStatus = (int)DocumentOcrStatus.Completed;
         doc.Status = "NeedsReview";
@@ -416,7 +433,9 @@ public sealed class DocumentOcrService(
             DetectedInvoiceNumber = invoiceNum,
             DetectedTotal = total,
             DetectedDate = detectedDate,
-            ProcessingDuration = sw.Elapsed
+            ProcessingDuration = sw.Elapsed,
+            ReadConfidence = Math.Round(readConfidence, 2),
+            LowConfidencePages = lowConfidencePages
         };
     }
 
@@ -620,6 +639,57 @@ public sealed class DocumentOcrService(
 
         var stream = await fileStorage.OpenReadAsync(doc.StorageKey, ct);
         return (stream, doc.ContentType, doc.FileName);
+    }
+
+    public async Task<(Stream Stream, string ContentType, string FileName)?> GetSearchablePdfAsync(Guid id, CancellationToken ct = default)
+    {
+        var doc = await db.Set<BusinessDocument>().AsNoTracking().FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted, ct);
+        if (doc == null) return null;
+
+        string? tempPath = null;
+        string? copy;
+        try
+        {
+            tempPath = await SaveTempCopyAsync(doc, ct);
+            copy = await searchablePdf.CreateAsync(tempPath, ct);
+        }
+        catch (OcrBusyException)
+        {
+            throw new BusinessRuleException("ocr_busy", "The document reader is busy. Try again in a minute.");
+        }
+        catch (NotSupportedException ex)
+        {
+            throw new ValidationException("File", ex.Message);
+        }
+        catch (Exception ex) when (ex is TimeoutException or InvalidDataException or InvalidOperationException)
+        {
+            logger.LogWarning(ex, "Could not make a searchable copy of document {DocId}", id);
+            throw new BusinessRuleException("searchable_pdf_failed", "A searchable copy could not be made of this document.");
+        }
+        finally
+        {
+            if (tempPath is not null)
+            {
+                try
+                {
+                    File.Delete(tempPath);
+                }
+                catch (IOException)
+                {
+                    // Left for the system's temporary file cleanup.
+                }
+            }
+        }
+
+        // Already searchable: the stored file is the answer.
+        if (copy is null)
+        {
+            return (await fileStorage.OpenReadAsync(doc.StorageKey, ct), doc.ContentType, doc.FileName);
+        }
+
+        var name = Path.GetFileNameWithoutExtension(doc.FileName ?? "document") + "-searchable.pdf";
+        var stream = new FileStream(copy, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, FileOptions.DeleteOnClose);
+        return (stream, "application/pdf", name);
     }
 
     public async Task<bool> DeleteDocumentAsync(Guid id, CancellationToken ct = default)
