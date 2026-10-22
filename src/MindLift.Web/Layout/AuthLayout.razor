@@ -15,6 +15,7 @@
             <div class="ml-page" style="min-height:100vh">
                 <div class="ml-stack" style="align-items:center">
                     <MudText Typo="Typo.subtitle1" Class="mt-6" Style="font-weight:700;color:var(--ml-primary)">MindLift</MudText>
+                    <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="ToggleLanguage">@(T.IsArabic ? "English" : "العربية")</MudButton>
                 </div>
                 <div @key="T.Language" class="ml-lang-root">@Body</div>
             </div>
@@ -40,6 +41,13 @@
     {
         _ = LanguagePreference.ApplyDirectionAsync(JS, T);
         _ = InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ToggleLanguage()
+    {
+        var next = T.IsArabic ? "en" : "ar";
+        await JS.InvokeVoidAsync("mindlift.setLanguage", next);
+        T.Choose(next);
     }
 
     public void Dispose() => T.Changed -= OnLanguageChanged;
