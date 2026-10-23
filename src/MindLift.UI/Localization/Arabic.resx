@@ -4709,4 +4709,19 @@
   <data name="Deleted" xml:space="preserve">
     <value>تم الحذف</value>
   </data>
+  <data name="Team: {0}" xml:space="preserve">
+    <value>الفريق: {0}</value>
+  </data>
+  <data name="Times are in your time zone ({0}). Drag a meeting or task to another hour or day to move it." xml:space="preserve">
+    <value>الأوقات بتوقيتك المحلي ({0}). اسحب اجتماعًا أو مهمة إلى ساعة أو يوم آخر لنقلها.</value>
+  </data>
+  <data name="Related to {0}" xml:space="preserve">
+    <value>مرتبط بـ {0}</value>
+  </data>
+  <data name="Attendees: {0}" xml:space="preserve">
+    <value>الحضور: {0}</value>
+  </data>
+  <data name="Moved to {0}" xml:space="preserve">
+    <value>تم النقل إلى {0}</value>
+  </data>
 </root>

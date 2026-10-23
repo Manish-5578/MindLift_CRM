@@ -19,15 +19,23 @@
                 <MudButton Color='@(_view == "month" ? Color.Primary : Color.Default)' OnClick='() => SetViewAsync("month")' data-testid="cal-view-month">@T["Month"]</MudButton>
             </MudButtonGroup>
             <MudButton Variant="Variant.Outlined" OnClick="Today" data-testid="cal-today">@T["Today"]</MudButton>
-            <MudIconButton Icon="@Icons.Material.Outlined.ChevronLeft" OnClick="() => Shift(-1)" aria-label="@T["Previous"]" data-testid="cal-prev" />
-            <MudIconButton Icon="@Icons.Material.Outlined.ChevronRight" OnClick="() => Shift(1)" aria-label="@T["Next"]" data-testid="cal-next" />
+            <MudIconButton Icon="@(T.IsArabic ? Icons.Material.Outlined.ChevronRight : Icons.Material.Outlined.ChevronLeft)" OnClick="() => Shift(-1)" aria-label="@T["Previous"]" data-testid="cal-prev" />
+            <MudIconButton Icon="@(T.IsArabic ? Icons.Material.Outlined.ChevronLeft : Icons.Material.Outlined.ChevronRight)" OnClick="() => Shift(1)" aria-label="@T["Next"]" data-testid="cal-next" />
+            @if (CanCreate)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" OnClick="NewMeeting" data-testid="cal-new-meeting">@T["New meeting"]</MudButton>
+            }
         </Actions>
     </PageHeader>
 
     <div class="ml-row ml-row--wrap" style="margin-bottom:16px">
-        <MudSelect T="string" Value="_who" ValueChanged="WhoChangedAsync" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width:220px" Label="@T["Show"]" data-testid="cal-who">
+        <MudSelect T="string" Value="_who" ValueChanged="WhoChangedAsync" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width:240px;max-width:340px" Label="@T["Show"]" data-testid="cal-who">
             <MudSelectItem T="string" Value="@("me")">@T["My calendar"]</MudSelectItem>
             <MudSelectItem T="string" Value="@("everyone")">@T["Everyone"]</MudSelectItem>
+            @foreach (var team in _teams)
+            {
+                <MudSelectItem T="string" Value="@(TeamPrefix + team.Id)">@T["Team: {0}", team.Name]</MudSelectItem>
+            }
             @foreach (var user in _users)
             {
                 <MudSelectItem T="string" Value="@user.Id.ToString()">@user.FullName</MudSelectItem>
@@ -46,25 +54,28 @@
     else if (_view == "month")
     {
         <div class="ml-month" data-testid="cal-month">
-            @foreach (var name in new[] { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" })
+            @foreach (var day in _days.Take(7))
             {
-                <div class="ml-month__head">@name</div>
+                <div class="ml-month__head">@Formatting.Format(day, "ddd", T)</div>
             }
             @foreach (var day in _days)
             {
                 var current = day;
                 var dayEvents = EventsOn(current).ToList();
-                <div class="@MonthCellClass(current)" data-testid="@("cal-day-" + current.ToString("yyyy-MM-dd"))" @ondragover:preventDefault="true" @ondrop="() => DropAsync(current)">
+                <div class="@MonthCellClass(current)" data-testid="@("cal-day-" + current.ToString("yyyy-MM-dd"))"
+                     @ondragover:preventDefault="true" @ondrop="() => DropOnDayAsync(current)">
                     <div class="ml-month__date">@current.Day</div>
                     @foreach (var entry in dayEvents.Take(3))
                     {
-                        <div class="@EventClass(entry)" draggable="true" data-testid="cal-event" data-kind="@entry.Kind" @ondragstart="() => _dragging = entry">
-                            <span class="ml-truncate">@Formatting.Format(entry.StartUtc, "HH:mm", T) @entry.Title</span>
-                        </div>
+                        var item = entry;
+                        <button type="button" class="@EventClass(item)" draggable="@Movable(item).ToString().ToLowerInvariant()" @ondragstart="() => _dragging = item"
+                                @onclick="() => OpenCardAsync(item)" data-testid="cal-event" data-kind="@item.Kind">
+                            <span class="ml-truncate">@LocalTime(item.StartUtc) @item.Title</span>
+                        </button>
                     }
                     @if (dayEvents.Count > 3)
                     {
-                        <div class="ml-muted">@T["+{0} more", dayEvents.Count - 3]</div>
+                        <button type="button" class="ml-link-button ml-muted" @onclick="() => OpenDayAsync(current)" data-testid="cal-more">@T["+{0} more", dayEvents.Count - 3]</button>
                     }
                 </div>
             }
@@ -72,55 +83,125 @@
     }
     else
     {
-        <div class='@(_view == "day" ? "ml-week ml-week--day" : "ml-week")' data-testid="cal-week">
-            @foreach (var day in _days)
-            {
-                var current = day;
-                <section class="ml-week__day" data-testid="@("cal-day-" + current.ToString("yyyy-MM-dd"))" aria-label="@Formatting.Format(current, "dddd d MMMM", T)"
-                         @ondragover:preventDefault="true" @ondrop="() => DropAsync(current)">
-                    <header class="ml-week__head">
-                        <MudText Typo="Typo.subtitle2">@Formatting.Format(current, "ddd d", T)</MudText>
-                        <MudText Typo="Typo.caption" Class="ml-muted">@Formatting.Format(current, "MMM", T)</MudText>
-                    </header>
-                    @foreach (var item in EventsOn(current))
+        @* Day and week: one column per day and one row per hour. Drop an item on an hour to move it there. *@
+        <div class="ml-timegrid-scroll">
+            <div class="ml-timegrid" style="--ml-days:@_days.Count" data-testid="cal-week">
+                <div class="ml-timegrid__corner"></div>
+                @foreach (var day in _days)
+                {
+                    <div class="@DayHeadClass(day)" data-testid="@("cal-day-" + day.ToString("yyyy-MM-dd"))">
+                        <MudText Typo="Typo.subtitle2">@Formatting.Format(day, "ddd d", T)</MudText>
+                        <MudText Typo="Typo.caption" Class="ml-muted">@Formatting.Format(day, "MMM", T)</MudText>
+                    </div>
+                }
+
+                @foreach (var hour in Hours)
+                {
+                    var currentHour = hour;
+                    <div class="ml-timegrid__hour">@HourLabel(currentHour)</div>
+                    @foreach (var day in _days)
                     {
-                        var entry = item;
-                        <a class="@EventClass(entry)" href="@(entry.Href ?? "#")" draggable="true" @ondragstart="() => _dragging = entry"
-                           data-testid="cal-event" data-kind="@entry.Kind">
-                            <span class="ml-week__time">@Formatting.Format(entry.StartUtc, "HH:mm", T)</span>
-                            <span class="ml-truncate">@entry.Title</span>
-                            @if (entry.LinkedName is not null)
+                        var currentDay = day;
+                        <div class="ml-timegrid__slot" data-testid="@($"cal-slot-{currentDay:yyyy-MM-dd}-{currentHour:00}")"
+                             @ondragover:preventDefault="true" @ondrop="() => DropOnHourAsync(currentDay, currentHour)">
+                            @foreach (var entry in EventsAt(currentDay, currentHour))
                             {
-                                <span class="ml-muted ml-truncate">@entry.LinkedName</span>
+                                var item = entry;
+                                <button type="button" class="@EventClass(item)" draggable="@Movable(item).ToString().ToLowerInvariant()" @ondragstart="() => _dragging = item"
+                                        @onclick="() => OpenCardAsync(item)" data-testid="cal-event" data-kind="@item.Kind">
+                                    <span class="ml-week__time">@LocalTime(item.StartUtc)–@LocalTime(item.EndUtc)</span>
+                                    <span class="ml-truncate">@item.Title</span>
+                                    @if (item.LinkedName is not null)
+                                    {
+                                        <span class="ml-muted ml-truncate">@item.LinkedName</span>
+                                    }
+                                </button>
                             }
-                        </a>
+                        </div>
                     }
-                    @if (!EventsOn(current).Any())
-                    {
-                        <MudText Typo="Typo.caption" Class="ml-faint">@T["Nothing"]</MudText>
-                    }
-                </section>
-            }
+                }
+            </div>
         </div>
     }
-    <MudText Typo="Typo.caption" Class="ml-muted" Style="margin-top:12px">@T["Times are UTC. Drag a meeting or task to another day to move it; it keeps its time. Meetings are created from a record."]</MudText>
+    <MudText Typo="Typo.caption" Class="ml-muted" Style="margin-top:12px" data-testid="cal-zone">
+        @T["Times are in your time zone ({0}). Drag a meeting or task to another hour or day to move it.", ZoneName]
+    </MudText>
 </div>
 
+@* The card shown when an item is clicked (plan 18.9.7): its time, people, place and record, with Open and Edit. *@
+<MudDialog @bind-Visible="_cardOpen" Options="new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseButton = true }" data-testid="cal-card">
+    <TitleContent><MudText Typo="Typo.h6">@_card?.Title</MudText></TitleContent>
+    <DialogContent>
+        @if (_card is { } card)
+        {
+            <div class="ml-stack" style="gap:8px">
+                <MudText Typo="Typo.body2" data-testid="cal-card-time">@CardTime(card)</MudText>
+                <MudText Typo="Typo.body2" Class="ml-muted">@KindLabel(card.Kind)@(card.OwnerName is null ? null : " · " + card.OwnerName)</MudText>
+                @if (card.LinkedName is not null)
+                {
+                    <MudText Typo="Typo.body2">@T["Related to {0}", card.LinkedName]</MudText>
+                }
+                @if (_cardDetail is { } detail)
+                {
+                    @if (!string.IsNullOrWhiteSpace(detail.Location))
+                    {
+                        <MudText Typo="Typo.body2" data-testid="cal-card-location">@detail.Location</MudText>
+                    }
+                    @if (detail.Attendees.Count > 0)
+                    {
+                        <MudText Typo="Typo.body2" data-testid="cal-card-attendees">@T["Attendees: {0}", string.Join(", ", detail.Attendees)]</MudText>
+                    }
+                }
+            </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        @if (_card?.Href is { } href)
+        {
+            <MudButton Href="@href" data-testid="cal-card-open">@T["Open"]</MudButton>
+        }
+        @if (_cardDetail is not null && CanEdit)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="EditCard" data-testid="cal-card-edit">@T["Edit"]</MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+<ActivityFormDrawer @ref="_form" @bind-Open="_drawer" OnSaved="OnSavedAsync" />
+
 @code {
+    private const string TeamPrefix = "team:";
+
+    /// <summary>The hours the day and week views show. Items outside them are placed in the first or last row, so none is hidden.</summary>
+    private static readonly int[] Hours = Enumerable.Range(7, 14).ToArray();
+
+    private readonly TimeZoneInfo _zone = TimeZoneInfo.Local;
     private string _view = "week";
     private DateOnly _anchor;
     private List<DateOnly> _days = [];
     private List<CalendarEventDto> _events = [];
     private List<UserListItem> _users = [];
+    private List<TeamDto> _teams = [];
     private string _who = "me";
     private bool _loading = true;
     private string? _error;
     private CalendarEventDto? _dragging;
+    private bool _cardOpen;
+    private CalendarEventDto? _card;
+    private ActivityDto? _cardDetail;
+    private ActivityFormDrawer? _form;
+    private bool _drawer;
+
+    private bool CanCreate => App.Bootstrap?.Permissions.Any(p => p.Module == "Activities" && p.CanCreate) == true;
+
+    private bool CanEdit => App.Bootstrap?.Permissions.Any(p => p.Module == "Activities" && p.CanEdit) == true;
+
+    private string ZoneName => _zone.Id == "UTC" || _zone.BaseUtcOffset == TimeSpan.Zero && !_zone.SupportsDaylightSavingTime ? "UTC" : _zone.Id;
 
     private string RangeTitle => _days.Count == 0 ? string.Empty
         : _view == "month" ? Formatting.Format(_anchor, "MMMM yyyy", T)
         : _view == "day" ? Formatting.Format(_anchor, "dddd d MMMM yyyy", T)
-        : $"{_days[0]:d MMM} – {_days[^1]:d MMM yyyy}";
+        : $"{Formatting.Format(_days[0], "d MMM", T)} – {Formatting.Format(_days[^1], "d MMM yyyy", T)}";
 
     protected override async Task OnInitializedAsync()
     {
@@ -130,22 +211,47 @@
             return;
         }
 
-        _anchor = DateOnly.FromDateTime(DateTime.UtcNow);
-        _users = await RecordLookupsUsers();
+        _anchor = CalendarGrid.LocalDay(DateTime.UtcNow, _zone);
+        if (new Uri(Nav.Uri).Query.Contains("view=day", StringComparison.OrdinalIgnoreCase))
+        {
+            _view = "day";
+        }
+        else if (new Uri(Nav.Uri).Query.Contains("view=month", StringComparison.OrdinalIgnoreCase))
+        {
+            _view = "month";
+        }
+
+        var users = LoadUsersAsync();
+        var teams = LoadTeamsAsync();
+        await Task.WhenAll(users, teams);
         Rebuild();
         await LoadAsync();
     }
 
-    private async Task<List<UserListItem>> RecordLookupsUsers()
+    private async Task LoadUsersAsync()
     {
         try
         {
             var page = await Http.GetFromJsonAsync<PagedResult<UserListItem>>("api/v1/users?pageSize=200");
-            return page?.Items.Where(u => u.IsActive).ToList() ?? [];
+            _users = page?.Items.Where(u => u.IsActive).ToList() ?? [];
         }
         catch (HttpRequestException)
         {
-            return [];
+            _users = [];
+        }
+    }
+
+    /// <summary>Teams for the "Show" list. People who cannot see the team list (most staff) simply do not get team choices.</summary>
+    private async Task LoadTeamsAsync()
+    {
+        try
+        {
+            var response = await Http.GetAsync("api/v1/teams");
+            _teams = response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<List<TeamDto>>() ?? [] : [];
+        }
+        catch (HttpRequestException)
+        {
+            _teams = [];
         }
     }
 
@@ -161,7 +267,7 @@
 
     private async Task Today()
     {
-        _anchor = DateOnly.FromDateTime(DateTime.UtcNow);
+        _anchor = CalendarGrid.LocalDay(DateTime.UtcNow, _zone);
         Rebuild();
         await LoadAsync();
     }
@@ -171,6 +277,12 @@
         _anchor = CalendarGrid.Shift(_view, _anchor, step);
         Rebuild();
         await LoadAsync();
+    }
+
+    private async Task OpenDayAsync(DateOnly day)
+    {
+        _anchor = day;
+        await SetViewAsync("day");
     }
 
     private async Task WhoChangedAsync(string value)
@@ -185,13 +297,15 @@
         _error = null;
         try
         {
-            var (fromUtc, toUtc) = CalendarGrid.Range(_days);
-            var from = Formatting.Format(fromUtc, "yyyy-MM-ddTHH:mm:ssZ", T);
-            var to = Formatting.Format(toUtc, "yyyy-MM-ddTHH:mm:ssZ", T);
-            var url = $"api/v1/calendar/events?from={from}&to={to}";
+            var (fromUtc, toUtc) = CalendarGrid.Range(_days, _zone);
+            var url = $"api/v1/calendar/events?from={fromUtc.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture)}&to={toUtc.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture)}";
             if (_who == "everyone")
             {
                 url += string.Concat(_users.Select(u => $"&userIds={u.Id}"));
+            }
+            else if (_who.StartsWith(TeamPrefix, StringComparison.Ordinal))
+            {
+                url += $"&teamId={_who[TeamPrefix.Length..]}";
             }
             else if (_who == "me")
             {
@@ -205,7 +319,14 @@
                 url += $"&userIds={_who}";
             }
 
-            _events = await Http.GetFromJsonAsync<List<CalendarEventDto>>(url) ?? [];
+            var response = await Http.GetAsync(url);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await ProblemText.FromAsync(response, T["We could not load the calendar. Try again."]);
+                return;
+            }
+
+            _events = await response.Content.ReadFromJsonAsync<List<CalendarEventDto>>() ?? [];
         }
         catch (HttpRequestException)
         {
@@ -218,36 +339,129 @@
     }
 
     private IEnumerable<CalendarEventDto> EventsOn(DateOnly day)
-        => _events.Where(e => DateOnly.FromDateTime(e.StartUtc) == day).OrderBy(e => e.StartUtc);
+        => _events.Where(e => CalendarGrid.LocalDay(e.StartUtc, _zone) == day).OrderBy(e => e.StartUtc);
 
-    /// <summary>Drop a dragged meeting or task on a day: it moves to that day and keeps its time of day.</summary>
-    private async Task DropAsync(DateOnly day)
+    /// <summary>The items that start in an hour row. Items before the first row or after the last are kept in those rows.</summary>
+    private IEnumerable<CalendarEventDto> EventsAt(DateOnly day, int hour) => EventsOn(day).Where(e =>
+    {
+        var start = CalendarGrid.Local(e.StartUtc, _zone).Hour;
+        return Math.Clamp(start, Hours[0], Hours[^1]) == hour;
+    });
+
+    private string LocalTime(DateTime utc) => CalendarGrid.Local(utc, _zone).ToString("HH:mm", CultureInfo.InvariantCulture);
+
+    private static string HourLabel(int hour) => $"{hour:00}:00";
+
+    private bool Movable(CalendarEventDto entry) => entry.Kind != "booking" && entry.Status == "Open" && CanEdit;
+
+    private Task DropOnDayAsync(DateOnly day)
     {
         var entry = _dragging;
-        _dragging = null;
-        if (entry is null || entry.Kind == "booking" || DateOnly.FromDateTime(entry.StartUtc) == day)
-        {
-            if (entry?.Kind == "booking")
-            {
-                Snackbar.Add(T["A booking moves from its meeting; move the meeting instead."], Severity.Info);
-            }
+        return entry is null ? Task.CompletedTask : MoveAsync(entry, CalendarGrid.Moved(entry.StartUtc, day, _zone));
+    }
 
+    private Task DropOnHourAsync(DateOnly day, int hour)
+    {
+        var entry = _dragging;
+        return entry is null ? Task.CompletedTask : MoveAsync(entry, CalendarGrid.MovedToHour(entry.StartUtc, day, hour, _zone));
+    }
+
+    /// <summary>Moves a dragged meeting or task. It keeps its length; a booking moves with its meeting.</summary>
+    private async Task MoveAsync(CalendarEventDto entry, DateTime newStartUtc)
+    {
+        _dragging = null;
+        if (entry.Kind == "booking")
+        {
+            Snackbar.Add(T["A booking moves from its meeting; move the meeting instead."], Severity.Info);
             return;
         }
 
-        var newStart = CalendarGrid.Moved(entry.StartUtc, day);
-        var response = await Http.PatchAsJsonAsync($"api/v1/activities/{entry.Id}/schedule", new { StartAt = newStart, EndAt = (DateTime?)null });
+        if (newStartUtc == entry.StartUtc)
+        {
+            return;
+        }
+
+        var response = await Http.PatchAsJsonAsync($"api/v1/activities/{entry.Id}/schedule", new ScheduleActivityRequest(newStartUtc, null));
         if (!response.IsSuccessStatusCode)
         {
             Snackbar.Add(await ProblemText.FromAsync(response, T["We could not move this item."]), Severity.Error);
             return;
         }
 
-        Snackbar.Add($"Moved to {day:d MMM}", Severity.Success);
+        var local = CalendarGrid.Local(newStartUtc, _zone);
+        Snackbar.Add(T["Moved to {0}", Formatting.Format(local, "ddd d MMM HH:mm", T)], Severity.Success);
+        await LoadAsync();
+    }
+
+    private async Task OpenCardAsync(CalendarEventDto entry)
+    {
+        _card = entry;
+        _cardDetail = null;
+        _cardOpen = true;
+        if (entry.Kind == "booking")
+        {
+            return;
+        }
+
+        try
+        {
+            var response = await Http.GetAsync($"api/v1/activities/{entry.Id}");
+            if (response.IsSuccessStatusCode)
+            {
+                _cardDetail = await response.Content.ReadFromJsonAsync<ActivityDto>();
+            }
+        }
+        catch (HttpRequestException)
+        {
+            // The card still shows what the calendar already knows.
+        }
+    }
+
+    private string CardTime(CalendarEventDto entry)
+    {
+        var start = CalendarGrid.Local(entry.StartUtc, _zone);
+        var end = CalendarGrid.Local(entry.EndUtc, _zone);
+        var day = Formatting.Format(start, "dddd d MMMM", T);
+        return start.Date == end.Date
+            ? $"{day}, {start:HH:mm}–{end:HH:mm}"
+            : $"{day}, {start:HH:mm} – {Formatting.Format(end, "d MMM HH:mm", T)}";
+    }
+
+    private string KindLabel(string kind) => kind switch
+    {
+        "booking" => T["Booking"],
+        "task" => T["Task"],
+        _ => T["Meeting"],
+    };
+
+    private void EditCard()
+    {
+        if (_cardDetail is null)
+        {
+            return;
+        }
+
+        _cardOpen = false;
+        _form?.OpenEdit(_cardDetail);
+        _drawer = true;
+    }
+
+    private void NewMeeting()
+    {
+        _form?.OpenNew(ActivityTypes.Meeting);
+        _drawer = true;
+    }
+
+    private async Task OnSavedAsync()
+    {
+        Snackbar.Add(T["Saved"], Severity.Success);
         await LoadAsync();
     }
 
     private string MonthCellClass(DateOnly day) => "ml-month__cell" + (CalendarGrid.IsOtherMonth(day, _anchor) ? " ml-month__cell--other" : string.Empty);
+
+    private string DayHeadClass(DateOnly day)
+        => "ml-timegrid__day" + (day == CalendarGrid.LocalDay(DateTime.UtcNow, _zone) ? " ml-timegrid__day--today" : string.Empty);
 
     private static string EventClass(CalendarEventDto e) => e.Kind switch
     {

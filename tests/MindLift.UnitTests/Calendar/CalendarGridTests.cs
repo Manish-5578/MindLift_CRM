@@ -131,4 +131,76 @@ public sealed class CalendarGridTests
         CalendarGrid.IsOtherMonth(new DateOnly(2026, 11, 2), anchor).ShouldBeTrue();
         CalendarGrid.IsOtherMonth(new DateOnly(2026, 12, 31), new DateOnly(2027, 1, 10)).ShouldBeTrue();
     }
+
+    // ---- In a time zone ----
+
+    private static readonly TimeZoneInfo Dubai = TimeZoneInfo.FindSystemTimeZoneById("Asia/Dubai");       // UTC+4, no daylight saving
+    private static readonly TimeZoneInfo Kolkata = TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");   // UTC+5:30
+    private static readonly TimeZoneInfo London = TimeZoneInfo.FindSystemTimeZoneById("Europe/London");   // daylight saving
+
+    [Fact]
+    public void A_week_in_Dubai_loads_from_local_midnight_not_UTC_midnight()
+    {
+        var (from, to) = CalendarGrid.Range(CalendarGrid.Days(CalendarGrid.Week, new DateOnly(2026, 10, 14)), Dubai);
+
+        from.ShouldBe(new DateTime(2026, 10, 11, 20, 0, 0, DateTimeKind.Utc));
+        to.ShouldBe(new DateTime(2026, 10, 18, 20, 0, 0, DateTimeKind.Utc));
+    }
+
+    [Fact]
+    public void A_meeting_late_in_the_UTC_evening_is_on_the_next_day_in_Dubai()
+    {
+        var utc = new DateTime(2026, 10, 14, 21, 30, 0, DateTimeKind.Utc);
+
+        CalendarGrid.LocalDay(utc, Dubai).ShouldBe(new DateOnly(2026, 10, 15));
+        CalendarGrid.Local(utc, Dubai).ShouldBe(new DateTime(2026, 10, 15, 1, 30, 0));
+    }
+
+    [Fact]
+    public void Moving_to_another_day_keeps_the_local_time_of_day()
+    {
+        // 09:15 in Kolkata is 03:45 UTC.
+        var start = new DateTime(2026, 10, 14, 3, 45, 0, DateTimeKind.Utc);
+
+        var moved = CalendarGrid.Moved(start, new DateOnly(2026, 10, 20), Kolkata);
+
+        CalendarGrid.Local(moved, Kolkata).ShouldBe(new DateTime(2026, 10, 20, 9, 15, 0));
+    }
+
+    [Fact]
+    public void Dropping_on_an_hour_moves_to_that_hour_and_keeps_the_minutes()
+    {
+        var start = new DateTime(2026, 10, 14, 5, 15, 0, DateTimeKind.Utc); // 09:15 Dubai
+
+        var moved = CalendarGrid.MovedToHour(start, new DateOnly(2026, 10, 16), 14, Dubai);
+
+        moved.ShouldBe(new DateTime(2026, 10, 16, 10, 15, 0, DateTimeKind.Utc)); // 14:15 Dubai
+    }
+
+    [Fact]
+    public void Moving_across_a_clock_change_keeps_the_wall_clock_time()
+    {
+        // 10:00 in London is 09:00 UTC in summer and 10:00 UTC in winter; clocks went back on 25 October 2026.
+        var summer = new DateTime(2026, 10, 20, 9, 0, 0, DateTimeKind.Utc);
+
+        var winter = CalendarGrid.Moved(summer, new DateOnly(2026, 10, 27), London);
+
+        winter.ShouldBe(new DateTime(2026, 10, 27, 10, 0, 0, DateTimeKind.Utc));
+    }
+
+    [Fact]
+    public void A_time_skipped_when_clocks_go_forward_moves_on_by_the_gap()
+    {
+        // In London, 01:00 to 02:00 does not exist on 28 March 2027.
+        CalendarGrid.ToUtc(new DateOnly(2027, 3, 28), new TimeOnly(1, 30), London)
+            .ShouldBe(new DateTime(2027, 3, 28, 1, 30, 0, DateTimeKind.Utc)); // 02:30 BST
+    }
+
+    [Fact]
+    public void A_time_that_happens_twice_when_clocks_go_back_is_the_first_one()
+    {
+        // In London, 01:30 happens twice on 25 October 2026: first at 00:30 UTC (BST), then at 01:30 UTC.
+        CalendarGrid.ToUtc(new DateOnly(2026, 10, 25), new TimeOnly(1, 30), London)
+            .ShouldBe(new DateTime(2026, 10, 25, 0, 30, 0, DateTimeKind.Utc));
+    }
 }

@@ -161,6 +161,9 @@ html[dir="rtl"] .ml-nav .mud-nav-link.active { box-shadow:inset -3px 0 0 var(--m
 .ml-table .ml-table__check { width:44px; padding-inline-end:0; }
 .ml-table .ml-table__menu { width:48px; text-align:end; }
 .ml-table tbody tr.ml-row-selected { background:var(--ml-primary-soft); }
+.ml-views-strip { max-width:100%; min-width:0; overflow-x:auto; }
+.ml-views-strip .mud-button-group-root { flex-wrap:nowrap; }
+.ml-views-strip .mud-button-root { white-space:nowrap; }
 .ml-visually-hidden { position:absolute !important; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
 @media (min-width: 600px) and (max-width: 959.98px) { .ml-hide-tablet { display:none !important; } }
 
@@ -209,6 +212,18 @@ html[dir="rtl"] .ml-nav .mud-nav-link.active { box-shadow:inset -3px 0 0 var(--m
 .ml-month__date { font-size:12px; font-weight:600; }
 .ml-month .ml-week__event { padding:2px 6px; font-size:12px; }
 @media (max-width: 959px) { .ml-month__cell { min-height:64px; } }
+/* Day and week views laid out by hour: one column per day, one row per hour; each cell takes a dropped item. */
+.ml-timegrid-scroll { overflow-x:auto; }
+.ml-timegrid { display:grid; grid-template-columns:56px repeat(var(--ml-days), minmax(120px, 1fr)); border:1px solid var(--ml-border); border-radius:10px; overflow:hidden; min-width:min-content; }
+.ml-timegrid__corner, .ml-timegrid__day { background:var(--ml-surface-2); padding:8px; border-bottom:1px solid var(--ml-border); }
+.ml-timegrid__day { display:flex; align-items:baseline; gap:6px; border-inline-start:1px solid var(--ml-border); }
+.ml-timegrid__day--today { box-shadow:inset 0 -2px 0 var(--ml-primary); }
+.ml-timegrid__hour { font-size:12px; color:var(--ml-text-2); padding:4px 8px; border-top:1px solid var(--ml-border); text-align:end; }
+.ml-timegrid__slot { min-height:48px; padding:3px; display:flex; flex-direction:column; gap:3px; border-top:1px solid var(--ml-border); border-inline-start:1px solid var(--ml-border); min-width:0; }
+.ml-timegrid__slot:hover { background:var(--ml-surface-2); }
+.ml-timegrid .ml-week__event, .ml-month .ml-week__event { font:inherit; text-align:start; align-items:flex-start; border-top:0; border-bottom:0; border-inline-end:0; cursor:pointer; width:100%; }
+.ml-link-button { all:unset; cursor:pointer; font-size:12px; }
+.ml-link-button:focus-visible, .ml-week__event:focus-visible { outline:2px solid var(--ml-primary); outline-offset:1px; }
 
 /* Wraps a screen so a language change redraws it. It adds no box of its own. */
 .ml-lang-root { display: contents; }

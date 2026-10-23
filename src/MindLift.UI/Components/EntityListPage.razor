@@ -14,6 +14,8 @@
     @if (AllViews.Count > 0 || OnSaveView.HasDelegate)
     {
         <div class="ml-row ml-row--wrap" style="padding:12px 20px 0" data-testid="list-views">
+            @* Many views, or long labels in Arabic, scroll inside this strip on a phone rather than widening the page. *@
+            <div class="ml-views-strip">
             <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small">
                 @foreach (var view in AllViews)
                 {
@@ -21,6 +23,7 @@
                     <MudButton Color="@ViewColor(current)" OnClick="() => SelectViewAsync(current)" data-testid="@ViewTestId(current)">@(current.SavedId is null ? T[current.Label] : current.Label)</MudButton>
                 }
             </MudButtonGroup>
+            </div>
             @if (CurrentView is { SavedId: { } savedId, CanDelete: true } && OnDeleteView.HasDelegate)
             {
                 <MudIconButton Icon="@Icons.Material.Outlined.DeleteOutline" Size="Size.Small" OnClick="() => DeleteViewAsync(savedId)" aria-label="@T["Delete this view"]" data-testid="delete-view" />

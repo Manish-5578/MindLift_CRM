@@ -127,13 +127,14 @@ public sealed class E2EHost : IAsyncLifetime
     }
 
     /// <summary>A new page at a given screen size with its own cookies and storage, so tests never share a session.</summary>
-    public async Task<IPage> NewPageAsync(int width = 1440, int height = 900, string locale = "en-US")
+    public async Task<IPage> NewPageAsync(int width = 1440, int height = 900, string locale = "en-US", string? timezoneId = null)
     {
         var context = await Browser.NewContextAsync(new BrowserNewContextOptions
         {
             BaseURL = BaseUrl,
             ViewportSize = new ViewportSize { Width = width, Height = height },
             Locale = locale,
+            TimezoneId = timezoneId,
             AcceptDownloads = true,
         });
         context.SetDefaultTimeout(45_000);

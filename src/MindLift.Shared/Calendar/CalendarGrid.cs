@@ -45,6 +45,49 @@ public static class CalendarGrid
     public static DateTime Moved(DateTime startUtc, DateOnly day)
         => day.ToDateTime(TimeOnly.FromDateTime(startUtc), DateTimeKind.Utc);
 
+    // ---- In a time zone: the calendar shows each person's own clock, not UTC ----
+
+    /// <summary>The UTC range to load for days in <paramref name="zone"/>: from local midnight of the first day up to local midnight after the last.</summary>
+    public static (DateTime FromUtc, DateTime ToUtc) Range(IReadOnlyList<DateOnly> days, TimeZoneInfo zone)
+        => (ToUtc(days[0], TimeOnly.MinValue, zone), ToUtc(days[^1].AddDays(1), TimeOnly.MinValue, zone));
+
+    /// <summary>The wall-clock time in <paramref name="zone"/> of a UTC instant.</summary>
+    public static DateTime Local(DateTime utc, TimeZoneInfo zone)
+        => TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), zone);
+
+    /// <summary>The day in <paramref name="zone"/> a UTC instant falls on.</summary>
+    public static DateOnly LocalDay(DateTime utc, TimeZoneInfo zone) => DateOnly.FromDateTime(Local(utc, zone));
+
+    /// <summary>Where an item lands when it is dropped on a day: that day, at the same local time of day it had.</summary>
+    public static DateTime Moved(DateTime startUtc, DateOnly day, TimeZoneInfo zone)
+        => ToUtc(day, TimeOnly.FromDateTime(Local(startUtc, zone)), zone);
+
+    /// <summary>Where an item lands when it is dropped on an hour of a day: that hour, keeping its minutes past the hour.</summary>
+    public static DateTime MovedToHour(DateTime startUtc, DateOnly day, int hour, TimeZoneInfo zone)
+        => ToUtc(day, new TimeOnly(Math.Clamp(hour, 0, 23), Local(startUtc, zone).Minute), zone);
+
+    /// <summary>
+    /// The UTC instant of a local day and time. A time skipped when clocks go forward is moved on by the gap (02:30 on such a night becomes 03:30);
+    /// a time that happens twice when clocks go back is taken as the first.
+    /// </summary>
+    public static DateTime ToUtc(DateOnly day, TimeOnly time, TimeZoneInfo zone)
+    {
+        var local = day.ToDateTime(time, DateTimeKind.Unspecified);
+        if (zone.IsInvalidTime(local))
+        {
+            local = local.AddHours(1);
+        }
+
+        if (zone.IsAmbiguousTime(local))
+        {
+            // The earlier of the two moments carries the larger (daylight) offset.
+            var offset = zone.GetAmbiguousTimeOffsets(local).Max();
+            return DateTime.SpecifyKind(local - offset, DateTimeKind.Utc);
+        }
+
+        return TimeZoneInfo.ConvertTimeToUtc(local, zone);
+    }
+
     /// <summary>True for a day in the month grid that belongs to the previous or the next month, which the screen shows dimmed.</summary>
     public static bool IsOtherMonth(DateOnly day, DateOnly anchor) => day.Month != anchor.Month || day.Year != anchor.Year;
 
