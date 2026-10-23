@@ -117,7 +117,8 @@ public sealed class DocumentTypeTests(MindLiftApiFactory factory) : IClassFixtur
         })).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         (await admin.Client.PostAsJsonAsync(url, LicenceType() with
         {
-            Fields = [new("no_rule", "No rule", DocumentValueTypes.Text, null, null, false, false)],
+            // Read by patterns only, with no anchor and no pattern: nothing could ever be found. (A field with only a name is fine when AI may read it.)
+            Fields = [new("no_rule", "No rule", DocumentValueTypes.Text, null, null, false, false, Mode: DocumentFieldModes.Rules)],
         })).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         (await admin.Client.PostAsJsonAsync(url, LicenceType() with
         {

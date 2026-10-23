@@ -52,7 +52,7 @@ public interface IDocumentOcrService
         CancellationToken ct = default);
 
     Task<OcrResultDto> ProcessOcrAsync(Guid documentId, CancellationToken ct = default);
-    Task<IReadOnlyList<BusinessDocumentDto>> GetDocumentsAsync(Guid? accountId = null, Guid? dealId = null, CancellationToken ct = default);
+    Task<IReadOnlyList<BusinessDocumentDto>> GetDocumentsAsync(Guid? accountId = null, Guid? dealId = null, Guid? contactId = null, CancellationToken ct = default);
     Task<BusinessDocumentDto?> GetDocumentByIdAsync(Guid id, CancellationToken ct = default);
     Task<(Stream Stream, string ContentType, string FileName)?> GetDocumentStreamAsync(Guid id, CancellationToken ct = default);
 
@@ -65,5 +65,12 @@ public interface IDocumentOcrService
     Task<BusinessDocumentDto> ReviewDocumentAsync(Guid id, ReviewDocumentRequest request, Guid reviewerUserId, CancellationToken ct = default);
     Task<bool> UpdateExtractedFieldsAsync(Guid id, UpdateExtractedFieldsRequest request, CancellationToken ct = default);
     Task<BusinessDocumentDto> ReprocessAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>Queues the document to be read in the background (optionally as the given document type) and returns at once.</summary>
+    Task<BusinessDocumentDto> QueueReadAsync(Guid id, string? documentType, CancellationToken ct = default);
+
+    Task MarkReadFailedAsync(Guid id, string note, CancellationToken ct = default);
+
+    Task<BusinessDocumentDto> LinkAsync(Guid id, LinkDocumentRequest request, CancellationToken ct = default);
     Task<int> RunExpiryChecksAsync(CancellationToken ct = default);
 }

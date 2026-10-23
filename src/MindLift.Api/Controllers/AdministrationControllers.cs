@@ -180,12 +180,110 @@ public sealed class AuditLogsController(AuditLogQuery audit) : ControllerBase
         => Ok(await audit.ListAsync(entityType, entityId, page, pageSize, cancellationToken));
 }
 
-/// <summary>Cross-tenant platform administration (plan 6.10). Requires a platform-admin token.</summary>
+/// <summary>
+/// The platform console (plan 6.10): every company, what each uses, which modules each has, plans and the history of changes.
+/// Requires a platform-admin token. A platform token does not grant a company's own data.
+/// </summary>
 [ApiController]
 [Route("api/v1/platform")]
 [Authorize(Policy = "PlatformAdmin")]
-public sealed class PlatformController(PlatformService platform) : ControllerBase
+public sealed class PlatformController(PlatformService platform, MindLift.Infrastructure.Platform.PlatformConsole console) : ControllerBase
 {
+    /// <summary>The numbers for the whole platform: companies by status and plan, signups, usage, what needs attention.</summary>
+    [HttpGet("overview")]
+    public async Task<ActionResult<PlatformOverviewDto>> Overview(CancellationToken cancellationToken)
+        => Ok(await console.OverviewAsync(cancellationToken));
+
+    [HttpGet("companies")]
+    public async Task<ActionResult<PlatformCompanyListDto>> Companies(
+        [FromQuery] string? search, [FromQuery] string? status, [FromQuery] string? plan, [FromQuery] string? sort,
+        [FromQuery] int page = 1, [FromQuery] int pageSize = 50, CancellationToken cancellationToken = default, [FromQuery] string? activity = null)
+        => Ok(await console.ListCompaniesAsync(search, status, plan, sort, page, pageSize, cancellationToken, activity));
+
+    /// <summary>Onboards a new company with its owner, plan and modules.</summary>
+    [HttpPost("companies")]
+    public async Task<ActionResult<PlatformCompanyDetailDto>> CreateCompany([FromBody] CreateCompanyRequest request, CancellationToken cancellationToken)
+    {
+        var created = await console.CreateCompanyAsync(request, cancellationToken);
+        return CreatedAtAction(nameof(Company), new { id = created.Company.Id }, created);
+    }
+
+    [HttpGet("companies/{id:guid}")]
+    public async Task<ActionResult<PlatformCompanyDetailDto>> Company(Guid id, CancellationToken cancellationToken)
+        => Ok(await console.GetCompanyAsync(id, cancellationToken));
+
+    /// <summary>Sets which modules are switched off for a company. Everything not listed stays available.</summary>
+    [HttpPut("companies/{id:guid}/modules")]
+    public async Task<ActionResult<PlatformCompanyDetailDto>> SetModules(Guid id, [FromBody] SetCompanyModulesRequest request, CancellationToken cancellationToken)
+        => Ok(await console.SetModulesAsync(id, request, cancellationToken));
+
+    [HttpPut("companies/{id:guid}/limits")]
+    public async Task<ActionResult<PlatformCompanyDetailDto>> SetLimits(Guid id, [FromBody] SetCompanyLimitsRequest request, CancellationToken cancellationToken)
+        => Ok(await console.SetLimitsAsync(id, request, cancellationToken));
+
+    [HttpPatch("companies/{id:guid}/status")]
+    public async Task<IActionResult> CompanyStatus(Guid id, [FromBody] ChangeTenantStatusRequest request, CancellationToken cancellationToken)
+    {
+        await console.ChangeStatusAsync(id, request.Status, cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPatch("companies/{id:guid}/plan")]
+    public async Task<IActionResult> CompanyPlan(Guid id, [FromBody] ChangeTenantPlanRequest request, CancellationToken cancellationToken)
+    {
+        await console.ChangePlanAsync(id, request.PlanKey, cancellationToken);
+        return NoContent();
+    }
+
+    /// <summary>Every module with how many companies have it.</summary>
+    [HttpGet("modules")]
+    public async Task<ActionResult<IReadOnlyList<PlatformModuleDto>>> Modules(CancellationToken cancellationToken)
+        => Ok(await console.ModulesAsync(cancellationToken));
+
+    /// <summary>The ready-made choices of modules.</summary>
+    [HttpGet("module-presets")]
+    public ActionResult<IReadOnlyList<ModulePresetDto>> ModulePresets()
+        => Ok(ModuleCatalog.Presets.Select(p => new ModulePresetDto(p.Key, p.Name, p.Description, p.Modules.Select(m => m.ToString()).ToList())).ToList());
+
+    [HttpGet("plans")]
+    public async Task<ActionResult<IReadOnlyList<PlatformPlanDto>>> Plans(CancellationToken cancellationToken)
+        => Ok(await console.PlansAsync(cancellationToken));
+
+    [HttpPost("plans")]
+    public async Task<ActionResult<PlatformPlanDto>> CreatePlan([FromBody] SavePlanRequest request, CancellationToken cancellationToken)
+        => Ok(await console.CreatePlanAsync(request, cancellationToken));
+
+    [HttpDelete("plans/{id:guid}")]
+    public async Task<IActionResult> DeletePlan(Guid id, CancellationToken cancellationToken)
+    {
+        await console.DeletePlanAsync(id, cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPut("plans/{id:guid}")]
+    public async Task<ActionResult<PlatformPlanDto>> SavePlan(Guid id, [FromBody] SavePlanRequest request, CancellationToken cancellationToken)
+        => Ok(await console.SavePlanAsync(id, request, cancellationToken));
+
+    /// <summary>The history of what the platform owner changed.</summary>
+    [HttpGet("activity")]
+    public async Task<ActionResult<PagedResult<PlatformAuditDto>>> Activity(
+        [FromQuery] int page = 1, [FromQuery] int pageSize = 30, [FromQuery] Guid? company = null, [FromQuery] string? kind = null,
+        [FromQuery] string? search = null, [FromQuery] DateTime? from = null, [FromQuery] DateTime? to = null, CancellationToken cancellationToken = default)
+        => Ok(await console.ActivityAsync(page, pageSize, cancellationToken, company, kind, search, from, to));
+
+    /// <summary>The audit trail as a CSV file.</summary>
+    [HttpGet("activity/export")]
+    public async Task<IActionResult> ExportActivity(
+        [FromQuery] Guid? company = null, [FromQuery] string? kind = null, [FromQuery] string? search = null,
+        [FromQuery] DateTime? from = null, [FromQuery] DateTime? to = null, CancellationToken cancellationToken = default)
+        => File(System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(await console.ExportActivityAsync(company, kind, search, from, to, cancellationToken))).ToArray(), "text/csv", "platform-audit-trail.csv");
+
+    /// <summary>New companies and companies that need a look.</summary>
+    [HttpGet("notifications")]
+    public async Task<ActionResult<IReadOnlyList<PlatformNotificationDto>>> Notifications(CancellationToken cancellationToken)
+        => Ok(await console.NotificationsAsync(cancellationToken));
+
+    // The first version of the platform API, kept for existing callers.
     [HttpGet("tenants")]
     public async Task<ActionResult<PagedResult<PlatformTenantDto>>> ListTenants([FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 50, CancellationToken cancellationToken = default)
         => Ok(await platform.ListTenantsAsync(search, page, pageSize, cancellationToken));
@@ -193,14 +291,14 @@ public sealed class PlatformController(PlatformService platform) : ControllerBas
     [HttpPatch("tenants/{id:guid}/status")]
     public async Task<IActionResult> ChangeStatus(Guid id, [FromBody] ChangeTenantStatusRequest request, CancellationToken cancellationToken)
     {
-        await platform.ChangeStatusAsync(id, request.Status, cancellationToken);
+        await console.ChangeStatusAsync(id, request.Status, cancellationToken);
         return NoContent();
     }
 
     [HttpPatch("tenants/{id:guid}/plan")]
     public async Task<IActionResult> ChangePlan(Guid id, [FromBody] ChangeTenantPlanRequest request, CancellationToken cancellationToken)
     {
-        await platform.ChangePlanAsync(id, request.PlanKey, cancellationToken);
+        await console.ChangePlanAsync(id, request.PlanKey, cancellationToken);
         return NoContent();
     }
 }

@@ -1,0 +1,295 @@
+@page "/platform/companies"
+@layout PlatformLayout
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>Companies · MindLift platform</PageTitle>
+
+<div class="pc-head pc-rise">
+    <div>
+        <div class="pc-eyebrow">Customers</div>
+        <h1 class="pc-title">Companies</h1>
+        <div class="pc-sub">Every company on MindLift: who they are, what they use and how healthy the account is. Open one to choose its modules and limits.</div>
+    </div>
+    <div class="d-flex align-center" style="gap:12px;flex-wrap:wrap">
+    <button class="pc-btn pc-btn--primary" @onclick="OpenNew" data-testid="new-company"><MudIcon Icon="@Icons.Material.Filled.AddBusiness" Size="Size.Small" />New company</button>
+    <div class="pc-seg" role="group" aria-label="Layout">
+        <button class="@(_cards ? "is-on" : "")" @onclick="() => _cards = true" data-testid="view-cards"><MudIcon Icon="@Icons.Material.Filled.GridView" Size="Size.Small" />Cards</button>
+        <button class="@(!_cards ? "is-on" : "")" @onclick="() => _cards = false" data-testid="view-table"><MudIcon Icon="@Icons.Material.Filled.TableRows" Size="Size.Small" />Table</button>
+    </div>
+    </div>
+</div>
+
+<div class="d-flex align-center flex-wrap pc-rise" style="gap:14px;margin-bottom:22px;--i:1">
+    <div class="pc-seg" data-testid="status-filter">
+        <button class="@(_status == "" ? "is-on" : "")" @onclick='() => SetStatus("")'>All <span class="n">@(_list?.Statuses.Sum(s => s.Value) ?? 0)</span></button>
+        @foreach (var s in _list?.Statuses ?? [])
+        {
+            var key = s.Key;
+            <button class="@(_status == key ? "is-on" : "")" @onclick="() => SetStatus(key)" data-testid="status-@key">@Pc.StatusLabel(s.Key) <span class="n">@s.Value</span></button>
+        }
+    </div>
+    <div class="pc-seg" data-testid="activity-filter" title="Signed in during the last 30 days">
+        <button class="@(_activity == "" ? "is-on" : "")" @onclick='() => SetActivity("")'>Any activity</button>
+        <button class="@(_activity == "active" ? "is-on" : "")" @onclick='() => SetActivity("active")' data-testid="activity-active">Active <span class="n">@(_list?.ActiveCount ?? 0)</span></button>
+        <button class="@(_activity == "inactive" ? "is-on" : "")" @onclick='() => SetActivity("inactive")' data-testid="activity-inactive">Inactive <span class="n">@(_list?.InactiveCount ?? 0)</span></button>
+    </div>
+    <select class="pc-select" @onchange="OnPlan" data-testid="plan-filter" aria-label="Plan">
+        <option value="">Any plan</option>
+        @foreach (var p in _list?.Plans ?? [])
+        {
+            <option value="@p.Key" selected="@(_plan == p.Key)">@p.Label (@p.Value)</option>
+        }
+    </select>
+    <select class="pc-select" @onchange="OnSort" data-testid="sort" aria-label="Sort">
+        <option value="name">Sort: Name</option>
+        <option value="newest">Sort: Newest</option>
+        <option value="active">Sort: Last active</option>
+        <option value="users">Sort: Most users</option>
+        <option value="records">Sort: Most records</option>
+        <option value="health">Sort: Needs care first</option>
+    </select>
+    <input class="pc-input" style="min-width:240px" placeholder="Filter by name" data-testid="company-filter" @bind="Search" @bind:event="oninput" />
+</div>
+
+@if (_error is not null)
+{
+    <div class="pc-card pc-empty"><h3>@_error</h3><button class="pc-btn" @onclick="LoadAsync">Try again</button></div>
+}
+else if (_list is null)
+{
+    <div class="pc-companies">@for (var i = 0; i < 6; i++) { <div class="pc-skel" style="height:270px"></div> }</div>
+}
+else if (_list.Items.Count == 0)
+{
+    <div class="pc-card pc-empty" data-testid="no-companies">
+        <div class="pc-empty__art"><MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" /></div>
+        <h3 style="margin:0 0 6px">No company matches</h3>
+        <div>Try another word or clear the filters.</div>
+    </div>
+}
+else if (_cards)
+{
+    <div class="pc-companies" data-testid="company-cards">
+        @{ var n = 0; }
+        @foreach (var c in _list.Items)
+        {
+            var company = c;
+            <div class="pc-card pc-co pc-interactive" style="animation-delay:@(Math.Min(n++, 12) * 40)ms" @onclick="() => Open(company.Id)" data-testid="company-card" data-company="@company.Slug">
+                <div class="pc-co__banner" style="background:@Pc.Gradient(company.Name)"></div>
+                <div class="pc-co__avatar"><PcAvatar Name="@company.Name" Size="64" /></div>
+                <div class="pc-co__body">
+                    <div class="pc-co__row">
+                        <div style="min-width:0">
+                            <div class="pc-co__name">@company.Name</div>
+                            <div class="pc-co__slug">@company.Slug@(company.Industry is { Length: > 0 } ? " · " + company.Industry : "")</div>
+                        </div>
+                        <PcRing Value="company.Health" Size="46" Title="@($"Health {company.Health} of 100")" />
+                    </div>
+                    <div class="d-flex align-center" style="gap:8px;margin-top:12px;flex-wrap:wrap">
+                        <PcStatusPill Status="@company.Status" />
+                        <span class="pc-chip pc-chip--plan-@company.PlanKey">@company.PlanName</span>
+                        @if (!company.AiAllowed) { <span class="pc-chip">No AI</span> }
+                    </div>
+                    <div class="pc-co__stats">
+                        <div class="pc-co__stat"><b class="pc-num">@company.Users</b><span>Users</span></div>
+                        <div class="pc-co__stat"><b class="pc-num">@Pc.Num(company.Leads + company.Contacts + company.Accounts + company.Deals)</b><span>Records</span></div>
+                        <div class="pc-co__stat"><b class="pc-num">@company.Documents</b><span>Documents</span></div>
+                    </div>
+                    <div class="pc-co__foot">
+                        <div class="pc-dots" title="@company.ModulesEnabled of @company.ModulesTotal modules">
+                            @for (var i = 0; i < company.ModulesTotal; i++) { <i class="@(i < company.ModulesEnabled ? "" : "off")"></i> }
+                        </div>
+                        <span>@company.ModulesEnabled/@company.ModulesTotal modules · @Pc.Ago(company.LastActiveAt)</span>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+else
+{
+    <div class="pc-card pc-card--flush" style="overflow-x:auto">
+        <table class="pc-table" data-testid="company-table">
+            <thead><tr><th>Company</th><th>Status</th><th>Plan</th><th>Users</th><th>Records</th><th>Modules</th><th>Last active</th><th class="end">Health</th></tr></thead>
+            <tbody>
+            @foreach (var c in _list.Items)
+            {
+                var company = c;
+                <tr @onclick="() => Open(company.Id)" data-testid="company-row" data-company="@company.Slug">
+                    <td><div class="d-flex align-center" style="gap:12px"><PcAvatar Name="@company.Name" Size="36" /><div><div style="font-weight:700">@company.Name</div><div class="pc-card__hint">@company.Slug</div></div></div></td>
+                    <td><PcStatusPill Status="@company.Status" /></td>
+                    <td><span class="pc-chip pc-chip--plan-@company.PlanKey">@company.PlanName</span></td>
+                    <td class="pc-num">@company.Users</td>
+                    <td class="pc-num">@Pc.Num(company.Leads + company.Contacts + company.Accounts + company.Deals)</td>
+                    <td class="pc-num">@company.ModulesEnabled/@company.ModulesTotal</td>
+                    <td>@Pc.Ago(company.LastActiveAt)</td>
+                    <td class="end"><PcRing Value="company.Health" Size="38" /></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (_list is not null && _list.Total > _list.Items.Count)
+{
+    <div style="text-align:center;margin-top:26px">
+        <button class="pc-btn" @onclick="MoreAsync" data-testid="load-more">Show more (@(_list.Total - _list.Items.Count) left)</button>
+    </div>
+}
+
+@if (_new is not null)
+{
+    <div class="pc-slide" data-testid="new-company-panel">
+        <div class="pc-slide__scrim" @onclick="() => _new = null"></div>
+        <div class="pc-slide__panel">
+            <div class="pc-slide__head"><div class="pc-card__title" style="font-size:18px">Onboard a company</div><button class="pc-btn pc-btn--icon pc-btn--ghost" @onclick="() => _new = null" aria-label="Close"><MudIcon Icon="@Icons.Material.Filled.Close" /></button></div>
+            <div class="pc-slide__body">
+                <div class="pc-field"><label for="nc-name">Company name</label><input id="nc-name" class="pc-input" @bind="_new.CompanyName" data-testid="nc-name" /></div>
+                <div class="d-flex" style="gap:12px">
+                    <div class="pc-field" style="flex:1"><label for="nc-first">Owner first name</label><input id="nc-first" class="pc-input" @bind="_new.First" data-testid="nc-first" /></div>
+                    <div class="pc-field" style="flex:1"><label for="nc-last">Owner last name</label><input id="nc-last" class="pc-input" @bind="_new.Last" data-testid="nc-last" /></div>
+                </div>
+                <div class="pc-field"><label for="nc-email">Owner email (their sign-in)</label><input id="nc-email" type="email" class="pc-input" @bind="_new.Email" data-testid="nc-email" /></div>
+                <div class="pc-field">
+                    <label for="nc-password">First password</label>
+                    <div class="d-flex" style="gap:8px"><input id="nc-password" class="pc-input" style="flex:1" @bind="_new.Password" data-testid="nc-password" /><button class="pc-btn" type="button" @onclick="GeneratePassword" data-testid="nc-generate">Generate</button></div>
+                    <small>Share it with them. They can change it after signing in. At least 8 characters.</small>
+                </div>
+                <div class="d-flex" style="gap:12px">
+                    <div class="pc-field" style="flex:1"><label for="nc-plan">Plan</label>
+                        <select id="nc-plan" class="pc-select" @bind="_new.Plan" data-testid="nc-plan">@foreach (var p in _list?.Plans ?? []) { <option value="@p.Key">@p.Label</option> }</select></div>
+                    <div class="pc-field" style="flex:1"><label for="nc-status">Starts as</label>
+                        <select id="nc-status" class="pc-select" @bind="_new.Status" data-testid="nc-status"><option value="Trial">On trial (14 days)</option><option value="Active">Active</option></select></div>
+                </div>
+                <div class="d-flex" style="gap:12px">
+                    <div class="pc-field" style="flex:1"><label for="nc-country">Country (2 letters)</label><input id="nc-country" class="pc-input" maxlength="2" @bind="_new.Country" data-testid="nc-country" /></div>
+                    <div class="pc-field" style="flex:1"><label for="nc-preset">Modules</label>
+                        <select id="nc-preset" class="pc-select" @bind="_new.Preset" data-testid="nc-preset"><option value="">Full suite</option><option value="sales">Sales CRM</option><option value="sales-billing">Sales &amp; billing</option><option value="documents">Document operations</option><option value="minimal">Minimal</option></select>
+                        <small>You can fine-tune each module on the company page afterwards.</small></div>
+                </div>
+                @if (_newError is not null) { <div style="color:var(--pc-bad);font-weight:600" data-testid="nc-error">@_newError</div> }
+            </div>
+            <div class="pc-slide__foot">
+                <button class="pc-btn" @onclick="() => _new = null">Cancel</button>
+                <button class="pc-btn pc-btn--primary" @onclick="CreateAsync" disabled="@_creating" data-testid="nc-save"><MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />@(_creating ? "Creating" : "Create company")</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private const int PageSize = 24;
+    private PlatformCompanyListDto? _list;
+    private string? _error;
+    private bool _cards = true;
+    private string _status = "";
+    private string _plan = "";
+    private string _activity = "";
+    private string _sort = "name";
+    private string _search = "";
+    private int _shown = PageSize;
+    private CancellationTokenSource? _cts;
+
+    private string Search
+    {
+        get => _search;
+        set { _search = value; _ = DebouncedAsync(); }
+    }
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task DebouncedAsync()
+    {
+        _cts?.Cancel();
+        _cts = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(250, _cts.Token);
+            _shown = PageSize;
+            await LoadAsync();
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        try
+        {
+            var url = $"api/v1/platform/companies?pageSize={_shown}&sort={_sort}"
+                + (_status != "" ? $"&status={_status}" : "") + (_plan != "" ? $"&plan={_plan}" : "") + (_activity != "" ? $"&activity={_activity}" : "")
+                + (_search.Trim() != "" ? $"&search={Uri.EscapeDataString(_search.Trim())}" : "");
+            _list = await Http.GetFromJsonAsync<PlatformCompanyListDto>(url);
+        }
+        catch (HttpRequestException) { _error = "The companies could not be loaded."; }
+    }
+
+    private async Task SetStatus(string s) { _status = s; _shown = PageSize; await LoadAsync(); }
+    private async Task SetActivity(string a) { _activity = a; _shown = PageSize; await LoadAsync(); }
+    private async Task OnPlan(ChangeEventArgs e) { _plan = e.Value?.ToString() ?? ""; _shown = PageSize; await LoadAsync(); }
+    private async Task OnSort(ChangeEventArgs e) { _sort = e.Value?.ToString() ?? "name"; await LoadAsync(); }
+    private async Task MoreAsync() { _shown += PageSize; await LoadAsync(); }
+    private void Open(Guid id) => Nav.NavigateTo($"/platform/companies/{id}");
+
+    private sealed class NewCompany
+    {
+        public string CompanyName { get; set; } = "";
+        public string First { get; set; } = "";
+        public string Last { get; set; } = "";
+        public string Email { get; set; } = "";
+        public string Password { get; set; } = "";
+        public string Plan { get; set; } = "pro";
+        public string Status { get; set; } = "Trial";
+        public string Country { get; set; } = "AE";
+        public string Preset { get; set; } = "";
+    }
+
+    private NewCompany? _new;
+    private string? _newError;
+    private bool _creating;
+
+    private void OpenNew() { _new = new NewCompany { Password = RandomPassword() }; _newError = null; }
+    private void GeneratePassword() { if (_new is not null) _new.Password = RandomPassword(); }
+
+    private static string RandomPassword()
+    {
+        const string chars = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        var bytes = new byte[12];
+        System.Security.Cryptography.RandomNumberGenerator.Fill(bytes);
+        return new string(bytes.Select(b => chars[b % chars.Length]).ToArray()) + "#7";
+    }
+
+    private async Task CreateAsync()
+    {
+        _creating = true;
+        _newError = null;
+        try
+        {
+            var n = _new!;
+            var response = await Http.PostAsJsonAsync("api/v1/platform/companies",
+                new CreateCompanyRequest(n.CompanyName, n.First, n.Last, n.Email, n.Password, n.Country, n.Plan, n.Status, 14, string.IsNullOrEmpty(n.Preset) ? null : n.Preset));
+            if (response.IsSuccessStatusCode)
+            {
+                var created = await response.Content.ReadFromJsonAsync<PlatformCompanyDetailDto>();
+                Snackbar.Add($"{n.CompanyName} is onboarded. Share the sign-in with {n.Email}.", Severity.Success);
+                _new = null;
+                Nav.NavigateTo($"/platform/companies/{created!.Company.Id}");
+                return;
+            }
+
+            try
+            {
+                using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+                _newError = doc.RootElement.TryGetProperty("detail", out var d) && d.GetString() is { Length: > 0 } text ? text : "Check the details and try again.";
+                if (doc.RootElement.TryGetProperty("errors", out var errors) && errors.ValueKind == JsonValueKind.Object)
+                    _newError = string.Join(" ", errors.EnumerateObject().SelectMany(p => p.Value.EnumerateArray().Select(v => v.GetString())));
+            }
+            catch (JsonException) { _newError = "Check the details and try again."; }
+        }
+        finally { _creating = false; }
+    }
+}

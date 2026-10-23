@@ -1,0 +1,418 @@
+@page "/platform/companies/{Id:guid}"
+@layout PlatformLayout
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>@(_d?.Company.Name ?? "Company") · MindLift platform</PageTitle>
+
+<a class="pc-back" href="/platform/companies"><MudIcon Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Small" />All companies</a>
+
+@if (_notFound)
+{
+    <div class="pc-card pc-empty" data-testid="company-missing">
+        <div class="pc-empty__art"><MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" /></div>
+        <h3 style="margin:0">That company does not exist</h3>
+    </div>
+}
+else if (_d is null)
+{
+    <div class="pc-skel" style="height:170px;margin-bottom:24px"></div>
+    <div class="pc-skel" style="height:360px"></div>
+}
+else
+{
+    var c = _d.Company;
+    <section class="pc-hero pc-rise" data-testid="company-hero">
+        <div class="pc-hero__bg" style="background:@Pc.Gradient(c.Name)"></div>
+        <div class="pc-hero__in">
+            <PcAvatar Name="@c.Name" Size="84" />
+            <div style="min-width:0">
+                <h1 data-testid="company-name">@c.Name</h1>
+                <div class="pc-hero__meta">
+                    <PcStatusPill Status="@c.Status" />
+                    <span class="pc-chip">@c.PlanName plan</span>
+                    <span class="pc-chip">@c.Slug</span>
+                    @if (c.Country is { Length: > 0 }) { <span class="pc-chip">@c.Country</span> }
+                    @if (c.Industry is { Length: > 0 }) { <span class="pc-chip">@c.Industry</span> }
+                </div>
+            </div>
+            <div class="pc-hero__right">
+                <div style="text-align:center">
+                    <PcRing Value="c.Health" Size="72" Color="#fff" Title="Health score" />
+                    <div style="font-size:11px;opacity:.85;margin-top:4px;font-weight:650">HEALTH</div>
+                </div>
+                <div style="position:relative">
+                    <button class="pc-btn" @onclick="() => _statusOpen = !_statusOpen" data-testid="status-menu"><MudIcon Icon="@Icons.Material.Filled.Tune" Size="Size.Small" />Status</button>
+                    @if (_statusOpen)
+                    {
+                        <div class="pc-search__panel" style="inset-inline-start:auto;inset-inline-end:0;min-width:190px;top:46px;color:var(--pc-text)">
+                            @foreach (var status in Statuses)
+                            {
+                                var st = status;
+                                <div class="pc-search__item" style="@(st == c.Status ? "opacity:.45;pointer-events:none" : "")" @onclick="() => ChangeStatusAsync(st)" data-testid="set-status-@st">@Pc.StatusLabel(st)</div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="pc-tabs" role="tablist" data-testid="company-tabs">
+        <button role="tab" class="@Tab("overview")" @onclick='() => _tab = "overview"' data-testid="tab-overview"><MudIcon Icon="@Icons.Material.Filled.Dashboard" Size="Size.Small" />Overview</button>
+        <button role="tab" class="@Tab("modules")" @onclick='() => _tab = "modules"' data-testid="tab-modules"><MudIcon Icon="@Icons.Material.Filled.Widgets" Size="Size.Small" />Modules <span class="pc-chip pc-chip--brand">@(ModulesOn)/@(Switchable.Count + CoreCount)</span></button>
+        <button role="tab" class="@Tab("plan")" @onclick='() => _tab = "plan"' data-testid="tab-plan"><MudIcon Icon="@Icons.Material.Filled.Diamond" Size="Size.Small" />Plan &amp; limits</button>
+        <button role="tab" class="@Tab("history")" @onclick='() => _tab = "history"' data-testid="tab-history"><MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small" />History</button>
+    </div>
+
+    @if (_tab == "overview")
+    {
+        <div class="pc-grid pc-grid--kpi">
+            <PcKpi Index="0" Label="Users" Value="c.Users" Icon="@Icons.Material.Filled.Groups" Solid="#6366F1"><Foot>@c.ActiveUsers7d signed in this week</Foot></PcKpi>
+            <PcKpi Index="1" Label="Leads and contacts" Value="c.Leads + c.Contacts" Icon="@Icons.Material.Filled.Contacts" Solid="#06B6D4"><Foot>@c.Leads leads · @c.Contacts contacts</Foot></PcKpi>
+            <PcKpi Index="2" Label="Accounts and deals" Value="c.Accounts + c.Deals" Icon="@Icons.Material.Filled.Handshake" Solid="#10B981"><Foot>@c.Accounts accounts · @c.Deals deals</Foot></PcKpi>
+            <PcKpi Index="3" Label="Documents" Value="c.Documents" Icon="@Icons.Material.Filled.DocumentScanner" Solid="#F59E0B"><Foot>@(c.AiAllowed ? (c.AiEnabled ? "AI reading is on" : "AI reading is allowed") : "AI reading is off")</Foot></PcKpi>
+        </div>
+        <div class="pc-grid pc-grid--two">
+            <div class="pc-card pc-rise">
+                <div class="pc-card__head"><div class="pc-card__title">Usage against the plan</div></div>
+                <div class="pc-meter" style="margin-bottom:26px">
+                    <div class="pc-meter__top"><span class="pc-card__hint">People</span><b class="pc-num">@c.Users <small style="font-size:14px;color:var(--pc-text-3)">of @_d.MaxUsers</small></b></div>
+                    <div class="pc-bar @(Pct(c.Users, _d.MaxUsers) >= 90 ? "pc-bar--warn" : "")"><i style="width:@Pct(c.Users, _d.MaxUsers)%"></i></div>
+                </div>
+                <div class="pc-meter">
+                    <div class="pc-meter__top"><span class="pc-card__hint">Records</span><b class="pc-num">@Pc.Num(_d.Records) <small style="font-size:14px;color:var(--pc-text-3)">of @Pc.Num(_d.MaxRecords)</small></b></div>
+                    <div class="pc-bar @(Pct(_d.Records, _d.MaxRecords) >= 90 ? "pc-bar--warn" : "")"><i style="width:@Pct(_d.Records, _d.MaxRecords)%"></i></div>
+                </div>
+            </div>
+            <div class="pc-card pc-rise" style="--i:1">
+                <div class="pc-card__head"><div class="pc-card__title">About this company</div></div>
+                <div class="pc-kv"><span>Owner</span><span>@(_d.OwnerName ?? "-")@(_d.OwnerEmail is null ? "" : " · " + _d.OwnerEmail)</span></div>
+                <div class="pc-kv"><span>Joined</span><span>@Pc.Date(c.CreatedAt)</span></div>
+                <div class="pc-kv"><span>Last signed in</span><span>@Pc.Ago(c.LastActiveAt)</span></div>
+                @if (c.Status == "Trial") { <div class="pc-kv"><span>Trial ends</span><span>@Pc.Date(c.TrialEndsAt)</span></div> }
+                <div class="pc-kv"><span>Modules</span><span>@c.ModulesEnabled of @c.ModulesTotal available to them</span></div>
+                @if (_d.TenantDisabledModules.Count > 0)
+                {
+                    <div class="pc-kv"><span>Hidden by their own admin</span><span>@string.Join(", ", _d.TenantDisabledModules)</span></div>
+                }
+            </div>
+        </div>
+    }
+    else if (_tab == "modules")
+    {
+        <div class="pc-card pc-rise" style="margin-bottom:22px">
+            <div class="pc-mods__head">
+                <PcRing Value="ModulesPct" Size="76" Color="#6366F1" Title="Share of modules switched on" />
+                <div style="flex:1;min-width:220px">
+                    <div class="pc-card__title" style="font-size:18px" data-testid="modules-summary">@ModulesOn of @(Switchable.Count + CoreCount) modules are on for @c.Name</div>
+                    <div class="pc-card__hint" style="margin-top:4px">A module you switch off disappears from this company and its API refuses it straight away. Core modules are always on. A module left out of the plan can only be added by changing the plan.</div>
+                </div>
+                <input class="pc-input" style="min-width:220px" placeholder="Find a module" @bind="_find" @bind:event="oninput" data-testid="module-find" />
+            </div>
+            <div class="pc-presets" data-testid="presets">
+                <span class="pc-card__hint" style="align-self:center;margin-inline-end:4px">Start from</span>
+                @foreach (var p in _presets)
+                {
+                    var preset = p;
+                    <button class="pc-preset" title="@preset.Description" @onclick="() => ApplyPreset(preset)" data-testid="preset-@preset.Key">@preset.Name</button>
+                }
+            </div>
+        </div>
+
+        @foreach (var group in ModuleCatalogGroups())
+        {
+            <div class="pc-mods__cat">@group.Key</div>
+            <div class="pc-mods__grid">
+                @foreach (var m in group)
+                {
+                    var module = m;
+                    var on = IsOn(module);
+                    var changed = Changed(module);
+                    var planOff = PlanOff(module);
+                    var locked = module.Core || planOff;
+                    var soon = !module.Available;
+                    <button type="button" class="pc-mod @(on ? "is-on" : "") @(changed ? "is-changed" : "") @(locked ? "is-locked" : "") @(soon ? "is-soon" : "")"
+                            disabled="@(locked || soon)" @onclick="() => Toggle(module)" data-testid="module-@module.Key" aria-pressed="@(on ? "true" : "false")">
+                        <span class="pc-mod__icon"><MudIcon Icon="@Pc.Icon(module.Icon)" /></span>
+                        <span style="min-width:0;flex:1">
+                            <span class="pc-mod__name" style="display:block">@module.Name</span>
+                            <span class="pc-mod__desc" style="display:block">@module.Description</span>
+                            @if (soon) { <span class="pc-mod__tag">Coming soon</span> }
+                            else if (planOff) { <span class="pc-mod__tag pc-mod__tag--warn">Not in the @c.PlanName plan</span> }
+                            else if (locked) { <span class="pc-mod__tag">Always on</span> }
+                            else if (TenantOff(module)) { <span class="pc-mod__tag pc-mod__tag--warn">Hidden by their admin</span> }
+                        </span>
+                        @if (!locked && !soon) { <span class="pc-switch"></span> }
+                    </button>
+                }
+            </div>
+        }
+
+        @if (Dirty)
+        {
+            <div class="pc-savebar" data-testid="save-bar" role="status">
+                <div class="pc-savebar__text">
+                    <b>@(_off.Except(_savedOff).Count() + _savedOff.Except(_off).Count()) unsaved change@(_off.Except(_savedOff).Count() + _savedOff.Except(_off).Count() == 1 ? "" : "s")</b>
+                    <div>@DiffText</div>
+                </div>
+                <button class="pc-btn pc-btn--ghost" @onclick="Discard" data-testid="discard">Discard</button>
+                <button class="pc-btn pc-btn--primary" @onclick="SaveModulesAsync" disabled="@_saving" data-testid="save-modules"><MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />@(_saving ? "Saving" : "Save modules")</button>
+            </div>
+        }
+    }
+    else if (_tab == "plan")
+    {
+        <div class="pc-plans" style="margin-bottom:24px" data-testid="plan-cards">
+            @foreach (var p in _plans.Where(p => p.IsActive || p.Key == c.PlanKey))
+            {
+                var plan = p;
+                <div class="pc-card pc-plan pc-interactive @(plan.Key == c.PlanKey ? "is-current" : "")" @onclick="() => ChangePlanAsync(plan)" data-testid="plan-@plan.Key">
+                    @if (plan.Key == c.PlanKey) { <div class="pc-plan__ribbon">Current</div> }
+                    <div class="pc-card__title" style="font-size:18px">@plan.Name</div>
+                    <div class="pc-plan__price pc-num">@Pc.Money(plan.PriceMonthly)<small> / month</small></div>
+                    <ul>
+                        <li><MudIcon Icon="@Icons.Material.Filled.CheckCircle" />@plan.MaxUsers users</li>
+                        <li><MudIcon Icon="@Icons.Material.Filled.CheckCircle" />@Pc.Num(plan.MaxRecords) records</li>
+                        <li><MudIcon Icon="@Icons.Material.Filled.CheckCircle" />@plan.Companies companies on it</li>
+                    </ul>
+                </div>
+            }
+        </div>
+
+        <div class="pc-grid pc-grid--two">
+            <div class="pc-card pc-rise">
+                <div class="pc-card__head"><div class="pc-card__title">Limits</div></div>
+                <div class="pc-field" style="margin-bottom:20px">
+                    <label for="max-users">User limit</label>
+                    <input id="max-users" class="pc-input" type="number" min="1" max="100000" placeholder="@($"Plan default: {_d.PlanMaxUsers}")" @bind="_maxUsers" data-testid="max-users" />
+                    <small>Leave empty to use the plan's limit of @_d.PlanMaxUsers. Set a number to give this company more or fewer seats than its plan.</small>
+                </div>
+                <div class="pc-field" style="margin-bottom:20px">
+                    <label>AI document reading</label>
+                    <label class="d-flex align-center" style="gap:12px;cursor:pointer;font-weight:500;font-size:14px;color:var(--pc-text)">
+                        <input type="checkbox" @bind="_aiAllowed" data-testid="ai-allowed" style="width:18px;height:18px;accent-color:#6366F1" />
+                        This company may use AI to read its documents
+                    </label>
+                    <small>When off, its own AI switch is turned off too and nothing is sent to the local language model.</small>
+                </div>
+                @if (c.Status == "Trial")
+                {
+                    <div class="pc-field">
+                        <label>Trial ends on @Pc.Date(_trialEnds)</label>
+                        <div class="d-flex" style="gap:8px;flex-wrap:wrap">
+                            <button class="pc-btn pc-btn--sm" @onclick="() => ExtendTrial(7)" data-testid="trial-7">+ 7 days</button>
+                            <button class="pc-btn pc-btn--sm" @onclick="() => ExtendTrial(14)" data-testid="trial-14">+ 14 days</button>
+                            <button class="pc-btn pc-btn--sm" @onclick="() => ExtendTrial(30)" data-testid="trial-30">+ 30 days</button>
+                        </div>
+                    </div>
+                }
+            </div>
+            <div class="pc-card pc-rise" style="--i:1">
+                <div class="pc-card__head"><div class="pc-card__title">Private notes</div><span class="pc-card__hint">Only you see these</span></div>
+                <textarea class="pc-textarea" placeholder="Contract details, who to call, what was promised." @bind="_notes" data-testid="notes" maxlength="2000"></textarea>
+                <div style="margin-top:18px;display:flex;justify-content:flex-end">
+                    <button class="pc-btn pc-btn--primary" @onclick="SaveLimitsAsync" disabled="@_saving" data-testid="save-limits"><MudIcon Icon="@Icons.Material.Filled.Save" Size="Size.Small" />Save limits and notes</button>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="pc-card pc-rise" data-testid="history">
+            <div class="pc-card__head"><div class="pc-card__title">Everything changed for @c.Name</div></div>
+            @if (_d.History.Count == 0) { <div class="pc-card__hint">Nothing yet. Changes to modules, plan, limits and status will be listed here.</div> }
+            <div class="pc-timeline">
+                @foreach (var h in _d.History)
+                {
+                    <div class="pc-tl">
+                        <div class="pc-tl__dot"><MudIcon Icon="@HistoryIcon(h.Action)" Size="Size.Small" /></div>
+                        <div><div class="pc-tl__text">@h.Summary</div><div class="pc-tl__meta">@h.Actor · @Pc.Ago(h.At) · @h.At.ToString("d MMM yyyy HH:mm")</div></div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private static readonly string[] Statuses = ["Active", "Trial", "PastDue", "Suspended", "Cancelled"];
+
+    private PlatformCompanyDetailDto? _d;
+    private List<PlatformModuleDto> _catalog = [];
+    private List<ModulePresetDto> _presets = [];
+    private List<PlatformPlanDto> _plans = [];
+    private bool _notFound;
+    private string _tab = "overview";
+    private string _find = "";
+    private bool _saving;
+    private bool _statusOpen;
+
+    private HashSet<string> _off = [];
+    private HashSet<string> _savedOff = [];
+
+    private int? _maxUsers;
+    private bool _aiAllowed = true;
+    private string? _notes;
+    private DateTime? _trialEnds;
+
+    private string Tab(string key) => _tab == key ? "is-on" : "";
+    private IReadOnlyList<PlatformModuleDto> Switchable => _catalog.Where(m => m.Available && !m.Core).ToList();
+    private int CoreCount => _catalog.Count(m => m.Available && m.Core);
+    private int ModulesOn => Switchable.Count(m => !_off.Contains(m.Key) && !PlanOff(m)) + CoreCount;
+    private int ModulesPct => Switchable.Count + CoreCount == 0 ? 0 : 100 * ModulesOn / (Switchable.Count + CoreCount);
+    private bool Dirty => !_off.SetEquals(_savedOff);
+
+    private static int Pct(int value, int max) => max <= 0 ? 0 : Math.Min(100, 100 * value / max);
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            var response = await Http.GetAsync($"api/v1/platform/companies/{Id}");
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound) { _notFound = true; return; }
+            response.EnsureSuccessStatusCode();
+            Apply((await response.Content.ReadFromJsonAsync<PlatformCompanyDetailDto>())!);
+            if (_catalog.Count == 0)
+            {
+                _catalog = await Http.GetFromJsonAsync<List<PlatformModuleDto>>("api/v1/platform/modules") ?? [];
+                _presets = await Http.GetFromJsonAsync<List<ModulePresetDto>>("api/v1/platform/module-presets") ?? [];
+            }
+            _plans = await Http.GetFromJsonAsync<List<PlatformPlanDto>>("api/v1/platform/plans") ?? [];
+        }
+        catch (HttpRequestException) { Snackbar.Add("The company could not be loaded.", Severity.Error); }
+    }
+
+    private void Apply(PlatformCompanyDetailDto d)
+    {
+        _d = d;
+        _off = d.DisabledModules.ToHashSet();
+        _savedOff = d.DisabledModules.ToHashSet();
+        _maxUsers = d.MaxUsersOverride;
+        _aiAllowed = d.Company.AiAllowed;
+        _notes = d.Notes;
+        _trialEnds = d.Company.TrialEndsAt;
+    }
+
+    // ----- modules -----
+
+    private bool PlanOff(PlatformModuleDto m) => _d!.PlanExcludedModules?.Contains(m.Key) == true;
+    private bool IsOn(PlatformModuleDto m) => m.Core || (m.Available && !_off.Contains(m.Key) && !PlanOff(m));
+    private bool Changed(PlatformModuleDto m) => _off.Contains(m.Key) != _savedOff.Contains(m.Key);
+    private bool TenantOff(PlatformModuleDto m) => _d!.TenantDisabledModules.Contains(m.Key) && IsOn(m);
+
+    private IEnumerable<IGrouping<string, PlatformModuleDto>> ModuleCatalogGroups()
+    {
+        var q = _find.Trim();
+        var items = string.IsNullOrEmpty(q) ? _catalog : _catalog.Where(m => m.Name.Contains(q, StringComparison.OrdinalIgnoreCase) || m.Description.Contains(q, StringComparison.OrdinalIgnoreCase)).ToList();
+        return items.GroupBy(m => m.Category).OrderBy(g => MindLift.Shared.Enums.ModuleCatalog.Categories.ToList().IndexOf(g.Key));
+    }
+
+    private void Toggle(PlatformModuleDto m)
+    {
+        if (m.Core || !m.Available || PlanOff(m)) return;
+        if (!_off.Remove(m.Key)) _off.Add(m.Key);
+    }
+
+    private void ApplyPreset(ModulePresetDto p)
+    {
+        var allowed = p.Modules.ToHashSet();
+        _off = Switchable.Where(m => !allowed.Contains(m.Key) && !PlanOff(m)).Select(m => m.Key).ToHashSet();
+    }
+
+    private void Discard() => _off = _savedOff.ToHashSet();
+
+    private string DiffText
+    {
+        get
+        {
+            string Name(string k) => _catalog.FirstOrDefault(m => m.Key == k)?.Name ?? k;
+            var off = _off.Except(_savedOff).Select(Name).ToList();
+            var on = _savedOff.Except(_off).Select(Name).ToList();
+            var parts = new List<string>();
+            if (off.Count > 0) parts.Add("Switch off: " + string.Join(", ", off));
+            if (on.Count > 0) parts.Add("Switch on: " + string.Join(", ", on));
+            return string.Join(" · ", parts);
+        }
+    }
+
+    private async Task SaveModulesAsync()
+    {
+        _saving = true;
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"api/v1/platform/companies/{Id}/modules", new SetCompanyModulesRequest(_off.OrderBy(x => x).ToList()));
+            await Handle(response, "Modules saved. The company sees the change straight away.");
+        }
+        finally { _saving = false; }
+    }
+
+    // ----- plan and limits -----
+
+    private void ExtendTrial(int days) => _trialEnds = (_trialEnds is { } t && t > DateTime.UtcNow ? t : DateTime.UtcNow).AddDays(days);
+
+    private async Task SaveLimitsAsync()
+    {
+        _saving = true;
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"api/v1/platform/companies/{Id}/limits",
+                new SetCompanyLimitsRequest(_maxUsers, _aiAllowed, _notes, _d!.Company.Status == "Trial" ? _trialEnds : null));
+            await Handle(response, "Limits and notes saved.");
+        }
+        finally { _saving = false; }
+    }
+
+    private async Task ChangePlanAsync(PlatformPlanDto plan)
+    {
+        if (plan.Key == _d!.Company.PlanKey) return;
+        var response = await Http.PatchAsJsonAsync($"api/v1/platform/companies/{Id}/plan", new ChangeTenantPlanRequest(plan.Key));
+        if (response.IsSuccessStatusCode) { Snackbar.Add($"Moved to the {plan.Name} plan.", Severity.Success); await LoadAsync(); }
+        else Snackbar.Add(await Problem(response), Severity.Error);
+    }
+
+    private async Task ChangeStatusAsync(string status)
+    {
+        _statusOpen = false;
+        var response = await Http.PatchAsJsonAsync($"api/v1/platform/companies/{Id}/status", new ChangeTenantStatusRequest(status));
+        if (response.IsSuccessStatusCode) { Snackbar.Add($"Status is now {Pc.StatusLabel(status)}.", Severity.Success); await LoadAsync(); }
+        else Snackbar.Add(await Problem(response), Severity.Error);
+    }
+
+    private async Task Handle(HttpResponseMessage response, string success)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            Apply((await response.Content.ReadFromJsonAsync<PlatformCompanyDetailDto>())!);
+            Snackbar.Add(success, Severity.Success);
+        }
+        else Snackbar.Add(await Problem(response), Severity.Error);
+    }
+
+    private static async Task<string> Problem(HttpResponseMessage response)
+    {
+        try
+        {
+            var body = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty("detail", out var detail) && detail.ValueKind == JsonValueKind.String) return detail.GetString()!;
+            if (doc.RootElement.TryGetProperty("title", out var title)) return title.GetString() ?? "That did not work.";
+        }
+        catch { }
+        return "That did not work.";
+    }
+
+    private static string HistoryIcon(string action) => action switch
+    {
+        "modules.changed" => Icons.Material.Filled.Widgets,
+        "plan.changed" or "plan.edited" => Icons.Material.Filled.Diamond,
+        "status.changed" => Icons.Material.Filled.Tune,
+        "limits.changed" => Icons.Material.Filled.Speed,
+        _ => Icons.Material.Filled.Bolt
+    };
+}

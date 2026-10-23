@@ -233,13 +233,37 @@ public sealed class InvoicesController(ICpqService cpqService) : ControllerBase
 [ApiController]
 [Authorize]
 [Route("api/v1/documents")]
-public sealed class DocumentsController(IDocumentOcrService ocrService) : ControllerBase
+public sealed class DocumentsController(IDocumentOcrService ocrService, MindLift.Infrastructure.Documents.Extraction.DocumentTypeService documentTypes) : ControllerBase
 {
+    /// <summary>The active document types, to choose from when uploading or reviewing.</summary>
+    [HttpGet("types")]
+    [HasPermission(AppModule.Documents, PermissionAction.View)]
+    public async Task<ActionResult<IReadOnlyList<DocumentTypeChoiceDto>>> Types(CancellationToken ct = default)
+        => Ok(await documentTypes.ChoicesAsync(ct));
+
+    /// <summary>The contact, account and deal fields a document value can be saved to.</summary>
+    [HttpGet("targets")]
+    [HasPermission(AppModule.Documents, PermissionAction.View)]
+    public async Task<ActionResult<IReadOnlyList<RecordTargetDto>>> Targets(CancellationToken ct = default)
+        => Ok(await documentTypes.TargetsAsync(ct));
+
+    /// <summary>Queues the document to be read in the background and returns at once. The body may name a document type to read it as.</summary>
+    [HttpPost("{id:guid}/read")]
+    [HasPermission(AppModule.Documents, PermissionAction.Edit)]
+    public async Task<ActionResult<BusinessDocumentDto>> Read(Guid id, [FromBody] ReadDocumentRequest? request, CancellationToken ct = default)
+        => Accepted(await ocrService.QueueReadAsync(id, request?.DocumentType, ct));
+
+    /// <summary>Links the document to a contact, account and/or deal, so approved values can be saved to them.</summary>
+    [HttpPut("{id:guid}/links")]
+    [HasPermission(AppModule.Documents, PermissionAction.Edit)]
+    public async Task<ActionResult<BusinessDocumentDto>> Link(Guid id, [FromBody] LinkDocumentRequest request, CancellationToken ct = default)
+        => Ok(await ocrService.LinkAsync(id, request, ct));
+
     [HttpGet]
     [HasPermission(AppModule.Documents, PermissionAction.View)]
-    public async Task<ActionResult<IReadOnlyList<BusinessDocumentDto>>> List([FromQuery] Guid? accountId, [FromQuery] Guid? dealId, CancellationToken ct = default)
+    public async Task<ActionResult<IReadOnlyList<BusinessDocumentDto>>> List([FromQuery] Guid? accountId, [FromQuery] Guid? dealId, [FromQuery] Guid? contactId, CancellationToken ct = default)
     {
-        var docs = await ocrService.GetDocumentsAsync(accountId, dealId, ct);
+        var docs = await ocrService.GetDocumentsAsync(accountId, dealId, contactId, ct);
         return Ok(docs);
     }
 

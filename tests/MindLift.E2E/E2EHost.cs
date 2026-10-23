@@ -164,6 +164,35 @@ public sealed class E2EHost : IAsyncLifetime
         return new Workspace(email, password, tokens.AccessToken);
     }
 
+    /// <summary>The owner of the platform: created the way an operator creates one (the command line), and given the same kind of sign-in as a company user.</summary>
+    public async Task<Workspace> NewPlatformOwnerAsync()
+    {
+        var email = $"owner-{Guid.NewGuid():N}@platform.test";
+        const string password = "Pl4tformOwner!9";
+        var start = new ProcessStartInfo("dotnet", $"run --project \"{Path.Combine(RepoRoot(), "src", "MindLift.Api")}\" --no-build --no-launch-profile -- seed-platform-admin --email {email} --password {password} --first Priya --last Owner")
+        {
+            WorkingDirectory = RepoRoot(),
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        start.Environment["ASPNETCORE_ENVIRONMENT"] = "Development";
+        start.Environment["ConnectionStrings__Default"] = _postgres!.GetConnectionString();
+        using var seed = Process.Start(start) ?? throw new InvalidOperationException("The seed command did not start.");
+        var output = await seed.StandardOutput.ReadToEndAsync();
+        await seed.WaitForExitAsync();
+        if (seed.ExitCode != 0 || !output.Contains("created"))
+        {
+            throw new InvalidOperationException("The platform owner could not be created: " + output);
+        }
+
+        using var http = new HttpClient { BaseAddress = new Uri(BaseUrl) };
+        http.DefaultRequestHeaders.Add("X-Client", "mobile");
+        var login = await http.PostAsJsonAsync("/api/v1/auth/login", new LoginRequest(email, password));
+        login.EnsureSuccessStatusCode();
+        return new Workspace(email, password, (await login.Content.ReadFromJsonAsync<TokenResponse>())!.AccessToken);
+    }
+
     /// <summary>An HTTP client that is signed in as the workspace owner, for setting up data a test needs.</summary>
     public HttpClient ApiFor(Workspace workspace)
     {
@@ -261,6 +290,41 @@ public sealed class E2EFactAttribute : FactAttribute
         if (!E2EHost.Enabled)
         {
             Skip = $"Browser tests are off. Set {E2EHost.EnableVariable}=1 to run them (needs Docker and Microsoft Edge).";
+        }
+    }
+}
+
+/// <summary>
+/// A test that needs the real language model: it runs when MINDLIFT_E2E=1 and Ollama on this computer has the model the app is set to use.
+/// Otherwise it is skipped with the reason, so a machine without the model still runs every other browser test.
+/// </summary>
+public sealed class E2ELlmFactAttribute : FactAttribute
+{
+    public const string Model = "qwen2.5:7b-instruct";
+
+    public E2ELlmFactAttribute()
+    {
+        if (!E2EHost.Enabled)
+        {
+            Skip = $"Browser tests are off. Set {E2EHost.EnableVariable}=1 to run them (needs Docker and Microsoft Edge).";
+        }
+        else if (!ModelInstalled())
+        {
+            Skip = $"The AI model is not available. Start Ollama and run: ollama pull {Model}";
+        }
+    }
+
+    private static bool ModelInstalled()
+    {
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+            var tags = http.GetStringAsync("http://localhost:11434/api/tags").GetAwaiter().GetResult();
+            return tags.Contains($"\"{Model}\"", StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            return false;
         }
     }
 }

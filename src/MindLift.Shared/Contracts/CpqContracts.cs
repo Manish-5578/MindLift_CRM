@@ -304,6 +304,30 @@ public sealed class OcrExtractedFieldDto
     public string FieldName { get; set; } = string.Empty;
     public string Value { get; set; } = string.Empty;
     public double Confidence { get; set; } = 1.0;
+
+    /// <summary>The document type's field key (for example "date_of_birth"). Empty for values read by the built-in rules.</summary>
+    public string? Key { get; set; }
+
+    /// <summary>The name shown for the field. Falls back to <see cref="FieldName"/>.</summary>
+    public string? Label { get; set; }
+
+    /// <summary>How the value was found: "ai", "pattern", "anchor", "builtin" or "edited".</summary>
+    public string? Method { get; set; }
+
+    /// <summary>The text around the value in the document, so a person can see where it came from.</summary>
+    public string? Snippet { get; set; }
+
+    public int? Page { get; set; }
+
+    /// <summary>True when the value was found in the document's own text; false when the AI gave a value that could not be found there.</summary>
+    public bool? Verified { get; set; }
+
+    /// <summary>The record field an approved value is written to, such as "contacts.first_name". Empty when it stays on the document.</summary>
+    public string? SaveTo { get; set; }
+
+    public string? ValueType { get; set; }
+
+    public bool Required { get; set; }
 }
 
 public sealed class OcrResultDto
@@ -324,6 +348,12 @@ public sealed class OcrResultDto
 
     /// <summary>Pages that scored low even after every way of reading them was tried. A person should check these against the original.</summary>
     public List<int> LowConfidencePages { get; set; } = [];
+
+    /// <summary>"ai" when a language model read the fields, "rules" when patterns did, "mixed" when both were used.</summary>
+    public string? ExtractionMethod { get; set; }
+
+    /// <summary>Why AI was not used or did not finish, in words a person can act on. Empty when nothing went wrong.</summary>
+    public string? ExtractionNote { get; set; }
 }
 
 public sealed class BusinessDocumentDto
@@ -355,6 +385,12 @@ public sealed class BusinessDocumentDto
 }
 
 public sealed record ApplyFieldToRecordItem(string FieldName, string TargetField, string Value);
+
+/// <summary>Read a document in the background. <c>DocumentType</c> is a type key from Settings > Document types; empty text lets the words in the document decide, and null leaves the type as it is.</summary>
+public sealed record ReadDocumentRequest(string? DocumentType);
+
+/// <summary>The contact, account and deal a document is linked to. Null clears a link.</summary>
+public sealed record LinkDocumentRequest(Guid? ContactId, Guid? AccountId, Guid? DealId);
 
 public sealed record ReviewDocumentRequest(string Action, string? Reason = null, List<ApplyFieldToRecordItem>? ApplyFields = null);
 

@@ -1,0 +1,6 @@
+<div class="pc-avatar" style="width:@(Size)px;height:@(Size)px;border-radius:@((int)(Size * .32))px;font-size:@((int)(Size * .38))px;background:@Pc.Gradient(Name)">@Pc.Initials(Name)</div>
+
+@code {
+    [Parameter, EditorRequired] public string Name { get; set; } = "";
+    [Parameter] public int Size { get; set; } = 40;
+}

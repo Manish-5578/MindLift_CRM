@@ -111,7 +111,31 @@ To launch the production stack with PostgreSQL, Hangfire workers, and the web/AP
 | `Ocr__MinPageConfidence` | No | `70` | A page that still scores below this after every attempt is marked low-confidence for a person to check. |
 | `Ocr__MaxAttemptsPerPage` | No | `6` | The most readings of one page (original, denoised, sharpened and de-specked, black-and-white, other layouts) while its score stays low. A page that reads like noise is also tried turned, up to three more readings. |
 | `Ocr__SecondEngine` | No | `true` | Ask a second engine (PaddleOCR models, run inside the app, no download at run time) to read a page that is still weak after every attempt. Its reading is kept only if it scores better. It reads Latin script only and is never given a page where Arabic was found. Set `false` to save the memory its models take once loaded. |
+| `Llm__Provider` | No | `Ollama` | The language model that reads document fields for workspaces that switch AI reading on. `Ollama` runs on your own computer or network; `None` turns AI reading off everywhere. Nothing is sent to a cloud service. |
+| `Llm__BaseUrl` | No | `http://localhost:11434` | Where Ollama listens. From inside a container use `http://host.docker.internal:11434`. |
+| `Llm__Model` | No | `qwen2.5:7b-instruct` | The model name as `ollama list` shows it. An instruction-tuned model of 7B or more reads fields reliably; install it with `ollama pull qwen2.5:7b-instruct` (about 4.7 GB). |
+| `Llm__TimeoutSeconds` | No | `300` | The longest one model call may take. A 7B model on a CPU needs about a minute per page of text. |
+| `Llm__MaxInputChars` | No | `9000` | The most characters of a document sent to the model in one call; a longer document is cut after this many. |
+| `Llm__NumCtx` | No | `6144` | The model's context window in tokens. It must hold the instructions, the document text and the answer. |
+| `Llm__KeepAlive` | No | `30m` | How long Ollama keeps the model in memory after a call, so the next document does not wait for it to load. |
 | `Hangfire__WorkerCount` | No | `20` | Number of concurrent background job worker threads. |
+
+---
+
+## 3b. Reading documents with AI
+
+Each workspace defines, under **Settings > Document types**, the fields it wants from each kind of document (a name, a description in plain words, the kind of value, and optionally the contact, account or deal field an approved value is saved to). **Add ready-made types** creates a starting set (invoice, receipt, trade licence, Emirates ID, passport, appointment receipt, CV, contract) to edit.
+
+AI reading is **off for every workspace until its administrator switches it on** (the card at the top of Document types). It needs a model on the server:
+
+1. Install [Ollama](https://ollama.com) on the machine that runs MindLift, or on one it can reach.
+2. If the system drive is short of space, point Ollama's model folder elsewhere first: set the user environment variable `OLLAMA_MODELS` (for example `D:\ollama\models`) and restart Ollama.
+3. Install the model: `ollama pull qwen2.5:7b-instruct`.
+4. Open Document types. The card says whether the model is ready. Switch AI reading on.
+
+How a document is read: the text comes from the PDF itself or from Tesseract (unchanged); the model is then asked for exactly the fields the document type defines. Each value is looked up in the document's own text afterwards, and a value that cannot be found there is marked *not found in the document text* for a person to check. Nothing is saved to a record until a person approves the document. Documents are read in the background (the list shows *Waiting to be read*, then *Reading*), so an upload never waits for the model. If the model is off, not reachable, too slow or answers badly, the document is still read with each field's anchor or pattern and a note says why.
+
+On a CPU-only computer a 7B model needs roughly a minute per document; the first document after a restart also waits for the model to load. Only one document is read by the model at a time.
 
 ---
 
@@ -190,3 +214,16 @@ The OCR pipeline extracts structured information from uploaded receipts, trade l
 ## 9. Running Behind a Reverse Proxy
 
 By default the app uses the address the connection comes from. Behind a proxy that is the proxy, so every customer would share one rate limit. Set `ForwardedHeaders__Enabled=true` and name the proxy with `ForwardedHeaders__KnownProxies__0` (or a range in `ForwardedHeaders__KnownNetworks__0`). The app then reads the client address and scheme from `X-Forwarded-For` and `X-Forwarded-Proto`, but only from the proxies you named. With none named, only a proxy on the same machine is trusted. An address that is not valid stops the app at startup with a message saying which one.
+
+## Platform console (for the owner of the product)
+
+The platform owner signs in at the normal sign-in page and lands on `/platform`. Create the owner once:
+
+```
+dotnet run --project src/MindLift.Api -- seed-platform-admin --email you@example.com --password "…"
+```
+
+- **Overview**: company and revenue numbers, signups, what needs attention.
+- **Companies**: every company with its usage and health. Open one to choose its **modules** (each feature is a module; core modules are always on), its **plan and limits** (user limit, trial, AI reading), and to keep private notes.
+- A module switched off disappears from that company's menu and its API refuses it straight away.
+- The console shows company-level numbers only; it never opens a company's own records. Every change is listed under **Activity**.

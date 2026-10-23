@@ -29,6 +29,14 @@ public sealed class AppState(HttpClient http, AuthSession session, Translator tr
         var response = await http.GetAsync("api/v1/app/bootstrap");
         if (!response.IsSuccessStatusCode)
         {
+            // The platform owner has no company workspace to bootstrap, but still needs to be recognised as the owner.
+            var me = await http.GetAsync("api/v1/auth/me");
+            if (me.IsSuccessStatusCode && await me.Content.ReadFromJsonAsync<MeResponse>() is { IsPlatformAdmin: true } owner)
+            {
+                session.SetMe(owner);
+                Changed?.Invoke();
+            }
+
             return false;
         }
 

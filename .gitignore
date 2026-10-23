@@ -488,3 +488,6 @@ $RECYCLE.BIN/
 # Local file storage (uploads) and OCR temp files
 App_Data/
 
+
+# local dev logins
+.claude/*.local.txt

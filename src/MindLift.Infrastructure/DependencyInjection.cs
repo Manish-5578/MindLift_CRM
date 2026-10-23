@@ -83,6 +83,8 @@ public static class DependencyInjection
         services.AddScoped<TeamBranchService>();
         services.AddScoped<AuditLogQuery>();
         services.AddScoped<PlatformService>();
+        services.AddScoped<MindLift.Application.Abstractions.IPlatformEntitlements, MindLift.Infrastructure.Platform.PlatformEntitlements>();
+        services.AddScoped<MindLift.Infrastructure.Platform.PlatformConsole>();
 
         // Settings and configuration (M3).
         services.AddScoped<SettingsVersion>();
@@ -195,9 +197,19 @@ public static class DependencyInjection
 
         // CPQ & Documents (M16).
         services.Configure<MindLift.Infrastructure.Cpq.OcrOptions>(configuration.GetSection("Ocr"));
-        services.AddSingleton<MindLift.Infrastructure.Cpq.IOcrEngine, MindLift.Infrastructure.Cpq.TesseractCliOcrEngine>();
-        // Registered second, so it is asked only for pages Tesseract still reads poorly.
+
+        // AI reading of document fields: a local model (Ollama). Off for a workspace until its administrator switches it on.
+        services.Configure<MindLift.Infrastructure.Documents.Ai.LlmOptions>(configuration.GetSection("Llm"));
+        services.AddHttpClient(MindLift.Infrastructure.Documents.Ai.OllamaLlmClient.HttpClientName, client => client.Timeout = Timeout.InfiniteTimeSpan);
+        services.AddSingleton<MindLift.Infrastructure.Documents.Ai.ILlmClient, MindLift.Infrastructure.Documents.Ai.OllamaLlmClient>();
+        services.AddSingleton<MindLift.Infrastructure.Documents.Ai.AiFieldExtractor>();
+        services.AddScoped<MindLift.Infrastructure.Documents.Extraction.DocumentFieldReader>();
+        services.AddScoped<MindLift.Infrastructure.Documents.Extraction.DocumentRecordApplier>();
+        services.AddScoped<MindLift.Infrastructure.Cpq.DocumentReadJob>();
+        // A single IOcrEngine resolves to the LAST registration, so Tesseract (the primary reader) must be registered last.
+        // The PaddleOCR engine is registered first: it is only asked for pages Tesseract still reads poorly.
         services.AddSingleton<MindLift.Infrastructure.Cpq.IOcrEngine, MindLift.Infrastructure.Cpq.RapidOcrEngine>();
+        services.AddSingleton<MindLift.Infrastructure.Cpq.IOcrEngine, MindLift.Infrastructure.Cpq.TesseractCliOcrEngine>();
         services.AddScoped<ICpqService, MindLift.Infrastructure.Cpq.CpqService>();
         services.AddScoped<IDocumentOcrService, MindLift.Infrastructure.Cpq.DocumentOcrService>();
         services.AddSingleton<MindLift.Infrastructure.Documents.Text.OcrGate>();

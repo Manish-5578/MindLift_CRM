@@ -1,0 +1,28 @@
+<svg class="pc-spark" viewBox="0 0 100 34" preserveAspectRatio="none" aria-hidden="true">
+    <defs>
+        <linearGradient id="@_id" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0" stop-color="@Color" stop-opacity=".35" />
+            <stop offset="1" stop-color="@Color" stop-opacity="0" />
+        </linearGradient>
+    </defs>
+    <path d="@Area" fill="url(#@_id)" class="pc-area-fade" />
+    <path d="@Line" fill="none" stroke="@Color" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" class="pc-line-draw" />
+</svg>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<int> Values { get; set; } = [];
+    [Parameter] public string Color { get; set; } = "#6366F1";
+
+    private readonly string _id = "sp" + Guid.NewGuid().ToString("N")[..8];
+
+    private IEnumerable<(double x, double y)> Points()
+    {
+        var max = Math.Max(1, Values.Max());
+        for (var i = 0; i < Values.Count; i++)
+            yield return (100.0 * i / Math.Max(1, Values.Count - 1), 30 - 26.0 * Values[i] / max);
+    }
+
+    private static string F(double v) => v.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+    private string Line => string.Join(" ", Points().Select((p, i) => $"{(i == 0 ? "M" : "L")}{F(p.x)} {F(p.y)}"));
+    private string Area => Line + " L100 34 L0 34 Z";
+}

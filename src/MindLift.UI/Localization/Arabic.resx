@@ -4724,4 +4724,232 @@
   <data name="Moved to {0}" xml:space="preserve">
     <value>تم النقل إلى {0}</value>
   </data>
+  <data name="A language model on your own computer finds the values you define, from the words you describe them in. Nothing is sent outside." xml:space="preserve">
+    <value>يعثر نموذج لغوي على جهازك على القيم التي تحددها، اعتمادًا على الكلمات التي تصفها بها. لا يُرسل أي شيء إلى الخارج.</value>
+  </data>
+  <data name="AI" xml:space="preserve">
+    <value>الذكاء الاصطناعي</value>
+  </data>
+  <data name="AI and patterns" xml:space="preserve">
+    <value>الذكاء الاصطناعي والأنماط</value>
+  </data>
+  <data name="AI only" xml:space="preserve">
+    <value>الذكاء الاصطناعي فقط</value>
+  </data>
+  <data name="AI reading is off" xml:space="preserve">
+    <value>القراءة بالذكاء الاصطناعي متوقفة</value>
+  </data>
+  <data name="AI reading is on" xml:space="preserve">
+    <value>القراءة بالذكاء الاصطناعي مفعّلة</value>
+  </data>
+  <data name="Add a field to this document type" xml:space="preserve">
+    <value>إضافة حقل إلى نوع المستند هذا</value>
+  </data>
+  <data name="Add and read again" xml:space="preserve">
+    <value>إضافة وإعادة القراءة</value>
+  </data>
+  <data name="Add ready-made types" xml:space="preserve">
+    <value>إضافة أنواع جاهزة</value>
+  </data>
+  <data name="Add the ready-made types to start from, or create your own and choose the values you need from your documents." xml:space="preserve">
+    <value>أضف الأنواع الجاهزة للبدء بها، أو أنشئ نوعك الخاص واختر القيم التي تحتاجها من مستنداتك.</value>
+  </data>
+  <data name="Added {0} document types." xml:space="preserve">
+    <value>تمت إضافة {0} من أنواع المستندات.</value>
+  </data>
+  <data name="Added {0} suggested fields. Check them and save." xml:space="preserve">
+    <value>تمت إضافة {0} من الحقول المقترحة. راجعها ثم احفظ.</value>
+  </data>
+  <data name="Allowed values, separated by commas (leave empty for any)" xml:space="preserve">
+    <value>القيم المسموح بها، مفصولة بفواصل (اتركها فارغة لأي قيمة)</value>
+  </data>
+  <data name="Automatic (AI, then patterns)" xml:space="preserve">
+    <value>تلقائي (الذكاء الاصطناعي ثم الأنماط)</value>
+  </data>
+  <data name="Check again" xml:space="preserve">
+    <value>تحقق مرة أخرى</value>
+  </data>
+  <data name="Choose a contact, account or deal field. Without one, the value stays on the document." xml:space="preserve">
+    <value>اختر حقلًا من جهة اتصال أو حساب أو صفقة. بدونه تبقى القيمة في المستند فقط.</value>
+  </data>
+  <data name="Decide from the document" xml:space="preserve">
+    <value>يُحدد من المستند</value>
+  </data>
+  <data name="Describe each value in plain words. The AI finds it from the name and description; an anchor or pattern is optional." xml:space="preserve">
+    <value>صف كل قيمة بكلمات بسيطة. يعثر عليها الذكاء الاصطناعي من الاسم والوصف؛ والمرساة أو النمط اختياريان.</value>
+  </data>
+  <data name="Document '{0}' uploaded, but reading it could not be started. Open it and use Read again." xml:space="preserve">
+    <value>تم رفع المستند '{0}' لكن تعذّر بدء قراءته. افتحه واستخدم «قراءة مرة أخرى».</value>
+  </data>
+  <data name="Document '{0}' uploaded. It is being read." xml:space="preserve">
+    <value>تم رفع المستند '{0}'. جارٍ قراءته.</value>
+  </data>
+  <data name="Document approved and values saved." xml:space="preserve">
+    <value>تم اعتماد المستند وحفظ القيم.</value>
+  </data>
+  <data name="Document type" xml:space="preserve">
+    <value>نوع المستند</value>
+  </data>
+  <data name="Documents are read in the background. Reading can take a minute or more on an ordinary computer. If the model is not available, the anchors and patterns below are used." xml:space="preserve">
+    <value>تُقرأ المستندات في الخلفية. قد تستغرق القراءة دقيقة أو أكثر على حاسوب عادي. إذا لم يكن النموذج متاحًا فستُستخدم المراسي والأنماط أدناه.</value>
+  </data>
+  <data name="Edited" xml:space="preserve">
+    <value>معدّل</value>
+  </data>
+  <data name="Example value" xml:space="preserve">
+    <value>قيمة مثال</value>
+  </data>
+  <data name="Fewer options" xml:space="preserve">
+    <value>خيارات أقل</value>
+  </data>
+  <data name="For example: the applicant's date of birth, not the issue date." xml:space="preserve">
+    <value>مثال: تاريخ ميلاد مقدّم الطلب، وليس تاريخ الإصدار.</value>
+  </data>
+  <data name="Helps the AI know what kind of document this is." xml:space="preserve">
+    <value>يساعد الذكاء الاصطناعي على معرفة نوع هذا المستند.</value>
+  </data>
+  <data name="In the document" xml:space="preserve">
+    <value>في المستند</value>
+  </data>
+  <data name="Keep on the document only" xml:space="preserve">
+    <value>الإبقاء في المستند فقط</value>
+  </data>
+  <data name="Kept on the document:" xml:space="preserve">
+    <value>تبقى في المستند:</value>
+  </data>
+  <data name="Link a {0} above to save this." xml:space="preserve">
+    <value>اربط {0} أعلاه لحفظ هذه القيمة.</value>
+  </data>
+  <data name="Linked record" xml:space="preserve">
+    <value>سجل مرتبط</value>
+  </data>
+  <data name="Linked records" xml:space="preserve">
+    <value>السجلات المرتبطة</value>
+  </data>
+  <data name="More options" xml:space="preserve">
+    <value>خيارات أكثر</value>
+  </data>
+  <data name="Name of the field *" xml:space="preserve">
+    <value>اسم الحقل *</value>
+  </data>
+  <data name="Needs review" xml:space="preserve">
+    <value>تحتاج إلى مراجعة</value>
+  </data>
+  <data name="No text extracted yet." xml:space="preserve">
+    <value>لم يُستخرج أي نص بعد.</value>
+  </data>
+  <data name="Not found in the document text" xml:space="preserve">
+    <value>غير موجود في نص المستند</value>
+  </data>
+  <data name="Not found. Type the value if the document has it." xml:space="preserve">
+    <value>لم يُعثر عليه. اكتب القيمة إن كانت موجودة في المستند.</value>
+  </data>
+  <data name="Pattern" xml:space="preserve">
+    <value>نمط</value>
+  </data>
+  <data name="Patterns only" xml:space="preserve">
+    <value>الأنماط فقط</value>
+  </data>
+  <data name="Read again" xml:space="preserve">
+    <value>قراءة مرة أخرى</value>
+  </data>
+  <data name="Read as" xml:space="preserve">
+    <value>القراءة بوصفه</value>
+  </data>
+  <data name="Read by AI" xml:space="preserve">
+    <value>قُرئ بالذكاء الاصطناعي</value>
+  </data>
+  <data name="Read by patterns" xml:space="preserve">
+    <value>قُرئ بالأنماط</value>
+  </data>
+  <data name="Read documents with AI" xml:space="preserve">
+    <value>قراءة المستندات بالذكاء الاصطناعي</value>
+  </data>
+  <data name="Read with" xml:space="preserve">
+    <value>طريقة القراءة</value>
+  </data>
+  <data name="Reading started. This page updates when it is done." xml:space="preserve">
+    <value>بدأت القراءة. تتحدث هذه الصفحة عند الانتهاء.</value>
+  </data>
+  <data name="Reading the sample…" xml:space="preserve">
+    <value>جارٍ قراءة العينة…</value>
+  </data>
+  <data name="Reading this document. This can take a minute. This page updates by itself." xml:space="preserve">
+    <value>جارٍ قراءة هذا المستند. قد يستغرق ذلك دقيقة. تتحدث هذه الصفحة تلقائيًا.</value>
+  </data>
+  <data name="Reading…" xml:space="preserve">
+    <value>جارٍ القراءة…</value>
+  </data>
+  <data name="Save to a record when approved" xml:space="preserve">
+    <value>الحفظ في سجل عند الاعتماد</value>
+  </data>
+  <data name="Save to {0}" xml:space="preserve">
+    <value>حفظ في {0}</value>
+  </data>
+  <data name="Save your changes first, then upload a file to see what this type reads. Nothing is saved." xml:space="preserve">
+    <value>احفظ تغييراتك أولًا، ثم ارفع ملفًا لترى ما يقرؤه هذا النوع. لا يُحفظ أي شيء.</value>
+  </data>
+  <data name="Some values could not be found in the document text. Check them before approving." xml:space="preserve">
+    <value>تعذّر العثور على بعض القيم في نص المستند. تحقق منها قبل الاعتماد.</value>
+  </data>
+  <data name="Suggest from a sample" xml:space="preserve">
+    <value>اقتراح من عيّنة</value>
+  </data>
+  <data name="The field is added to the document type, so every document of this type is read for it. This document is read again." xml:space="preserve">
+    <value>يُضاف الحقل إلى نوع المستند، فتُقرأ كل مستندات هذا النوع بحثًا عنه. ويُعاد قراءة هذا المستند.</value>
+  </data>
+  <data name="The model {0} is ready." xml:space="preserve">
+    <value>النموذج {0} جاهز.</value>
+  </data>
+  <data name="The sample suggested nothing new." xml:space="preserve">
+    <value>لم تقترح العيّنة أي جديد.</value>
+  </data>
+  <data name="Values you approve are saved into these records." xml:space="preserve">
+    <value>القيم التي تعتمدها تُحفظ في هذه السجلات.</value>
+  </data>
+  <data name="Waiting to be read" xml:space="preserve">
+    <value>في انتظار القراءة</value>
+  </data>
+  <data name="Waiting to be read. This page updates by itself." xml:space="preserve">
+    <value>في انتظار القراءة. تتحدث هذه الصفحة تلقائيًا.</value>
+  </data>
+  <data name="We could not add the ready-made types." xml:space="preserve">
+    <value>تعذّرت إضافة الأنواع الجاهزة.</value>
+  </data>
+  <data name="We could not change this setting." xml:space="preserve">
+    <value>تعذّر تغيير هذا الإعداد.</value>
+  </data>
+  <data name="We could not link this record." xml:space="preserve">
+    <value>تعذّر ربط هذا السجل.</value>
+  </data>
+  <data name="We could not read this sample." xml:space="preserve">
+    <value>تعذّرت قراءة هذه العيّنة.</value>
+  </data>
+  <data name="What to look for" xml:space="preserve">
+    <value>ما الذي يُبحث عنه</value>
+  </data>
+  <data name="What to look for (helps the AI)" xml:space="preserve">
+    <value>ما الذي يُبحث عنه (يساعد الذكاء الاصطناعي)</value>
+  </data>
+  <data name="Will be saved to the linked records:" xml:space="preserve">
+    <value>سيُحفظ في السجلات المرتبطة:</value>
+  </data>
+  <data name="You already have all the ready-made types." xml:space="preserve">
+    <value>لديك بالفعل جميع الأنواع الجاهزة.</value>
+  </data>
+  <data name="page" xml:space="preserve">
+    <value>صفحة</value>
+  </data>
+  <data name="Uploading…" xml:space="preserve">
+    <value>جارٍ الرفع…</value>
+  </data>
+  <data name="Upload and read" xml:space="preserve">
+    <value>رفع وقراءة</value>
+  </data>
+  <data name="No documents yet." xml:space="preserve">
+    <value>لا توجد مستندات بعد.</value>
+  </data>
+  <data name="We could not upload this document." xml:space="preserve">
+    <value>تعذّر رفع هذا المستند.</value>
+  </data>
 </root>

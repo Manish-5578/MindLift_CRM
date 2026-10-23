@@ -1,0 +1,234 @@
+@* Documents on a contact, account or deal page (plan 19): upload one here and it is linked to this record, read in the background, and once a person approves it
+   its values are saved into this record. The list shows each document's state and what was read. *@
+@implements IDisposable
+@inject HttpClient Http
+@inject AppState App
+@inject ISnackbar Snackbar
+@inject Translator T
+
+@if (CanView)
+{
+    <MlCard Title="Documents" TestId="record-documents">
+        <div class="ml-stack">
+            @if (CanCreate)
+            {
+                <div class="ml-row ml-row--wrap">
+                    <MudSelect T="string" Value="_type" ValueChanged="v => _type = v ?? string.Empty" Label="@T["Read as"]" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined"
+                               Style="min-width:200px" Class="ml-grow" data-testid="record-doc-type">
+                        <MudSelectItem T="string" Value="@string.Empty">@T["Decide from the document"]</MudSelectItem>
+                        @foreach (var type in _types)
+                        {
+                            <MudSelectItem T="string" Value="@type.Key">@type.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudButton Variant="Variant.Outlined" Size="Size.Medium" HtmlTag="label" for="@_inputId" StartIcon="@Icons.Material.Outlined.CloudUpload" Disabled="_busy" data-testid="record-doc-upload">
+                        @(_busy ? T["Uploading…"] : T["Upload and read"])
+                    </MudButton>
+                    <InputFile id="@_inputId" OnChange="UploadAsync" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.webp,.bmp,.txt" style="display:none" data-testid="record-doc-file" />
+                </div>
+            }
+
+            @if (_loading)
+            {
+                <MudProgressLinear Indeterminate="true" />
+            }
+            else if (_documents.Count == 0)
+            {
+                <MudText Typo="Typo.body2" Class="ml-muted" data-testid="no-record-documents">@T["No documents yet."]</MudText>
+            }
+
+            @foreach (var doc in _documents)
+            {
+                var current = doc;
+                <div class="ml-row" style="padding:6px 0;border-bottom:1px solid var(--ml-border)" data-testid="record-document">
+                    <MudIcon Icon="@Icons.Material.Outlined.Description" Class="ml-muted" />
+                    <div class="ml-grow" style="min-width:0">
+                        <MudLink Href="@($"/documents/review/{current.Id}")" Typo="Typo.body2" Class="ml-truncate" data-testid="record-document-link">@current.FileName</MudLink>
+                        <MudText Typo="Typo.caption" Class="ml-muted">
+                            @TypeName(current.Category)
+                            @foreach (var field in KeyFields(current))
+                            {
+                                <span> · @(string.IsNullOrWhiteSpace(field.Label) ? field.FieldName : field.Label): @field.Value</span>
+                            }
+                        </MudText>
+                    </div>
+                    <MudChip T="string" Size="Size.Small" Color="@StatusColor(current)" Variant="Variant.Filled" data-testid="record-document-status">@StatusText(current)</MudChip>
+                </div>
+            }
+        </div>
+    </MlCard>
+}
+
+@code {
+    /// <summary>The kind of record: contacts, accounts or deals.</summary>
+    [Parameter, EditorRequired] public string EntityType { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired] public Guid EntityId { get; set; }
+
+    private List<BusinessDocumentDto> _documents = [];
+    private List<DocumentTypeChoiceDto> _types = [];
+    private string _type = string.Empty;
+    private bool _loading = true;
+    private bool _busy;
+    private bool _polling;
+    private Guid _loadedFor;
+    private CancellationTokenSource? _cts;
+
+    private string _inputId => "record-doc-" + EntityId.ToString("N");
+
+    private bool Has(Func<ModulePermissionDto, bool> check) => App.Bootstrap?.Permissions.Any(p => p.Module == "Documents" && check(p)) == true;
+
+    private bool CanView => Has(p => p.CanView);
+
+    private bool CanCreate => Has(p => p.CanCreate) && Has(p => p.CanEdit);
+
+    private bool AnyReading => _documents.Any(d => d.Status is "Queued" or "Processing");
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedFor == EntityId || !CanView)
+        {
+            return;
+        }
+
+        _loadedFor = EntityId;
+        _cts ??= new CancellationTokenSource();
+        _loading = true;
+        try
+        {
+            _types = await Http.GetFromJsonAsync<List<DocumentTypeChoiceDto>>("api/v1/documents/types") ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            _types = [];
+        }
+
+        await LoadAsync();
+        StartPolling();
+    }
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+
+    private string Filter => EntityType switch { "contacts" => "contactId", "accounts" => "accountId", _ => "dealId" };
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _documents = await Http.GetFromJsonAsync<List<BusinessDocumentDto>>($"api/v1/documents?{Filter}={EntityId}") ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            _documents = [];
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    /// <summary>While a document waits or is being read, the list asks again every few seconds, so its state and values appear by themselves.</summary>
+    private void StartPolling()
+    {
+        if (_polling || !AnyReading)
+        {
+            return;
+        }
+
+        _polling = true;
+        var token = _cts?.Token ?? CancellationToken.None;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (!token.IsCancellationRequested)
+                {
+                    await Task.Delay(4000, token);
+                    await InvokeAsync(async () =>
+                    {
+                        await LoadAsync();
+                        StateHasChanged();
+                    });
+                    if (!AnyReading)
+                    {
+                        return;
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // The page was left.
+            }
+            finally
+            {
+                _polling = false;
+            }
+        }, token);
+    }
+
+    private async Task UploadAsync(InputFileChangeEventArgs args)
+    {
+        _busy = true;
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            var file = args.File;
+            var stream = new StreamContent(file.OpenReadStream(25L * 1024 * 1024));
+            stream.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType);
+            content.Add(stream, "file", file.Name);
+            content.Add(new StringContent(string.IsNullOrEmpty(_type) ? "General" : _type), "category");
+            content.Add(new StringContent(EntityId.ToString()), Filter);
+
+            var response = await Http.PostAsync("api/v1/documents/upload", content);
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add(await ProblemText.FromAsync(response, T["We could not upload this document."]), Severity.Error);
+                return;
+            }
+
+            var doc = await response.Content.ReadFromJsonAsync<BusinessDocumentDto>();
+            var queued = doc is null ? null : await Http.PostAsJsonAsync($"api/v1/documents/{doc.Id}/read", new ReadDocumentRequest(null));
+            Snackbar.Add(queued is { IsSuccessStatusCode: true }
+                ? string.Format(T["Document '{0}' uploaded. It is being read."], file.Name)
+                : string.Format(T["Document '{0}' uploaded, but reading it could not be started. Open it and use Read again."], file.Name),
+                queued is { IsSuccessStatusCode: true } ? Severity.Success : Severity.Warning);
+
+            await LoadAsync();
+            StartPolling();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidOperationException)
+        {
+            Snackbar.Add(T["We could not upload this document."], Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private string TypeName(string category) => _types.FirstOrDefault(t => t.Key == category)?.Name ?? category;
+
+    private static List<OcrExtractedFieldDto> KeyFields(BusinessDocumentDto doc)
+        => doc.OcrResult?.ExtractedFields.Where(f => !string.IsNullOrWhiteSpace(f.Value) && !string.IsNullOrWhiteSpace(f.Key)).Take(2).ToList() ?? [];
+
+    private string StatusText(BusinessDocumentDto doc) => doc.Status switch
+    {
+        "Queued" => T["Waiting to be read"],
+        "Processing" => T["Reading…"],
+        "NeedsReview" => T["Needs review"],
+        _ => doc.Status,
+    };
+
+    private static Color StatusColor(BusinessDocumentDto doc) => doc.Status switch
+    {
+        "Approved" => Color.Success,
+        "NeedsReview" => Color.Warning,
+        "Processing" or "Queued" => Color.Info,
+        "Rejected" or "Failed" => Color.Error,
+        _ => Color.Default,
+    };
+}

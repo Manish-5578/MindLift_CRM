@@ -92,6 +92,7 @@
 
                 <RecordActivities AccountId="Id" OnChanged="ReloadTimelineAsync" />
                 <RecordTimeline @ref="_timeline" EntityType="accounts" EntityId="Id" />
+                <RecordDocuments EntityType="accounts" EntityId="Id" />
                 <RecordFiles EntityType="accounts" EntityId="Id" />
             </ChildContent>
             <Aside>

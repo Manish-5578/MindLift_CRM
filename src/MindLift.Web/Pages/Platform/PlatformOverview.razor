@@ -1,0 +1,173 @@
+@page "/platform"
+@layout PlatformLayout
+@inject HttpClient Http
+@inject NavigationManager Nav
+
+<PageTitle>Overview · MindLift platform</PageTitle>
+
+<div class="pc-head pc-rise">
+    <div>
+        <div class="pc-eyebrow">Command centre</div>
+        <h1 class="pc-title">Every company, <span class="pc-grad">one view.</span></h1>
+        <div class="pc-sub">How many companies use MindLift, how much they use it, and what needs your attention today.</div>
+    </div>
+    <div class="d-flex" style="gap:10px">
+        <button class="pc-btn" @onclick="LoadAsync" data-testid="refresh"><MudIcon Icon="@Icons.Material.Filled.Refresh" Size="Size.Small" />Refresh</button>
+        <a class="pc-btn pc-btn--primary" href="/platform/companies"><MudIcon Icon="@Icons.Material.Filled.Apartment" Size="Size.Small" />All companies</a>
+    </div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="pc-card pc-empty"><h3>@_error</h3><button class="pc-btn" @onclick="LoadAsync">Try again</button></div>
+}
+else if (_o is null)
+{
+    <div class="pc-grid pc-grid--kpi">
+        @for (var i = 0; i < 4; i++) { <div class="pc-skel" style="height:170px"></div> }
+    </div>
+    <div class="pc-skel" style="height:340px"></div>
+}
+else
+{
+    var o = _o;
+    var spark = o.Signups.Select(s => s.Value).ToList();
+    <div class="pc-grid pc-grid--kpi" data-testid="kpis">
+        <PcKpi Index="0" TestId="kpi-companies" Label="Companies" Value="o.Companies" Icon="@Icons.Material.Filled.Apartment" Solid="#6366F1" Trend="SignupTrend" Spark="spark">
+            <Foot>@o.SignupsLast30 joined in the last 30 days</Foot>
+        </PcKpi>
+        <PcKpi Index="1" TestId="kpi-active" Label="Paying and active" Value="o.Active" Icon="@Icons.Material.Filled.VerifiedUser" Solid="#10B981">
+            <Foot>@o.Trial on trial · @o.TrialEndingSoon ending soon</Foot>
+        </PcKpi>
+        <PcKpi Index="2" TestId="kpi-users" Label="People using it" Value="o.Users" Icon="@Icons.Material.Filled.Groups" Solid="#06B6D4">
+            <Foot>@o.ActiveUsers7d signed in this week</Foot>
+        </PcKpi>
+        <PcKpi Index="3" TestId="kpi-revenue" Label="Monthly revenue" Value="o.MonthlyRevenue" Money="true" Icon="@Icons.Material.Filled.Payments" Solid="#F59E0B">
+            <Foot>From active plans · @o.PastDue past due</Foot>
+        </PcKpi>
+    </div>
+
+    <div class="pc-grid pc-grid--main">
+        <div class="pc-card pc-rise" style="--i:4">
+            <div class="pc-card__head">
+                <div>
+                    <div class="pc-card__title">New companies</div>
+                    <div class="pc-card__hint">Signups per day over the last 30 days</div>
+                </div>
+                <span class="pc-chip pc-chip--brand">@o.SignupsLast30 in 30 days</span>
+            </div>
+            <PcAreaChart Data="o.Signups" Unit="signups" Title="New companies per day" />
+        </div>
+
+        <div class="pc-card pc-rise" style="--i:5">
+            <div class="pc-card__head">
+                <div>
+                    <div class="pc-card__title">Needs your attention</div>
+                    <div class="pc-card__hint">@(o.Attention.Count == 0 ? "All clear" : $"{o.Attention.Count} to look at")</div>
+                </div>
+            </div>
+            @if (o.Attention.Count == 0)
+            {
+                <div class="pc-empty" style="padding:30px 10px"><MudIcon Icon="@Icons.Material.Filled.CheckCircle" Style="color:#10B981;font-size:44px" /><div style="margin-top:10px;font-weight:650">Nothing needs you right now</div></div>
+            }
+            <div data-testid="attention">
+            @foreach (var a in o.Attention.Take(6))
+            {
+                <div class="pc-attn pc-attn--@a.Severity" @onclick="() => Open(a.TenantId)">
+                    <div class="pc-attn__icon"><MudIcon Icon="@AttentionIcon(a)" /></div>
+                    <div style="min-width:0">
+                        <div class="pc-attn__name">@a.Company</div>
+                        <div class="pc-attn__msg">@a.Message</div>
+                    </div>
+                </div>
+            }
+            </div>
+        </div>
+    </div>
+
+    <div class="pc-grid pc-grid--three">
+        <div class="pc-card pc-rise" style="--i:6">
+            <div class="pc-card__head"><div class="pc-card__title">Companies by status</div></div>
+            <PcDonut Slices="o.ByStatus" />
+        </div>
+        <div class="pc-card pc-rise" style="--i:7">
+            <div class="pc-card__head"><div class="pc-card__title">Companies by plan</div></div>
+            <PcDonut Slices="o.ByPlan" />
+        </div>
+        <div class="pc-card pc-rise" style="--i:8">
+            <div class="pc-card__head"><div class="pc-card__title">Which modules are used</div><a class="pc-card__hint" href="/platform/modules">See all</a></div>
+            @foreach (var m in o.ModuleAdoption.OrderByDescending(m => m.Companies).Take(7))
+            {
+                <div style="margin-bottom:13px">
+                    <div class="d-flex justify-space-between" style="font-size:13px;margin-bottom:6px"><span style="font-weight:600">@m.Name</span><span class="pc-card__hint">@m.Companies of @m.Total</span></div>
+                    <div class="pc-bar"><i style="width:@(m.Total == 0 ? 0 : 100 * m.Companies / m.Total)%"></i></div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="pc-grid pc-grid--main">
+        <div class="pc-card pc-card--flush pc-rise" style="--i:9">
+            <div class="pc-card__head" style="padding:22px 22px 0"><div class="pc-card__title">Newest companies</div><a class="pc-card__hint" href="/platform/companies">View all</a></div>
+            <table class="pc-table" data-testid="recent-companies">
+                <thead><tr><th>Company</th><th>Plan</th><th>Status</th><th>Users</th><th class="end">Health</th></tr></thead>
+                <tbody>
+                @foreach (var c in o.RecentCompanies)
+                {
+                    <tr @onclick="() => Open(c.Id)">
+                        <td><div class="d-flex align-center" style="gap:12px"><PcAvatar Name="@c.Name" Size="36" /><div><div style="font-weight:700">@c.Name</div><div class="pc-card__hint">Joined @Pc.Ago(c.CreatedAt)</div></div></div></td>
+                        <td><span class="pc-chip pc-chip--plan-@c.PlanKey">@c.PlanName</span></td>
+                        <td><PcStatusPill Status="@c.Status" /></td>
+                        <td class="pc-num">@c.Users</td>
+                        <td class="end"><PcRing Value="c.Health" Size="40" /></td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="pc-card pc-rise" style="--i:10">
+            <div class="pc-card__head"><div class="pc-card__title">What changed</div><a class="pc-card__hint" href="/platform/activity">History</a></div>
+            @if (o.Activity.Count == 0) { <div class="pc-card__hint">No changes yet. Anything you change for a company shows here.</div> }
+            <div class="pc-timeline">
+                @foreach (var a in o.Activity.Take(6))
+                {
+                    <div class="pc-tl">
+                        <div class="pc-tl__dot"><MudIcon Icon="@Icons.Material.Filled.Bolt" Size="Size.Small" /></div>
+                        <div><div class="pc-tl__text">@a.Summary</div><div class="pc-tl__meta">@a.Actor · @Pc.Ago(a.At)</div></div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private PlatformOverviewDto? _o;
+    private string? _error;
+
+    private int? SignupTrend => _o is null ? null
+        : _o.SignupsPrevious30 == 0 ? (_o.SignupsLast30 > 0 ? 100 : 0)
+        : (int)Math.Round(100.0 * (_o.SignupsLast30 - _o.SignupsPrevious30) / _o.SignupsPrevious30);
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        try { _o = await Http.GetFromJsonAsync<PlatformOverviewDto>("api/v1/platform/overview"); }
+        catch (HttpRequestException) { _error = "The platform numbers could not be loaded."; }
+    }
+
+    private void Open(Guid id) => Nav.NavigateTo($"/platform/companies/{id}");
+
+    private static string AttentionIcon(PlatformAttentionItem a) => a.Kind switch
+    {
+        "past-due" => Icons.Material.Filled.CreditCardOff,
+        "suspended" => Icons.Material.Filled.PauseCircle,
+        "trial-ending" or "trial-ended" => Icons.Material.Filled.HourglassBottom,
+        "inactive" => Icons.Material.Filled.Bedtime,
+        "seats" => Icons.Material.Filled.Chair,
+        _ => Icons.Material.Filled.Info
+    };
+}

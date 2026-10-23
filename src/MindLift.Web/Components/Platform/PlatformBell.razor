@@ -1,0 +1,89 @@
+@implements IDisposable
+@inject PlatformNotifier Notifier
+@inject NavigationManager Nav
+
+<div class="pc-bell">
+    <button class="pc-btn pc-btn--icon" @onclick="Toggle" aria-label="Notifications" data-testid="bell">
+        <MudIcon Icon="@(Notifier.Unread > 0 ? Icons.Material.Filled.NotificationsActive : Icons.Material.Filled.Notifications)" />
+    </button>
+    @if (Notifier.Unread > 0)
+    {
+        <span class="pc-bell__dot" data-testid="bell-count">@(Notifier.Unread > 99 ? "99+" : Notifier.Unread.ToString())</span>
+    }
+
+    @if (_open)
+    {
+        <div class="pc-pop" data-testid="bell-panel">
+            <div class="pc-pop__head">
+                <b>Notifications</b>
+                <div class="d-flex" style="gap:6px">
+                    <button class="pc-btn pc-btn--sm pc-btn--ghost" @onclick="Notifier.MarkAllReadAsync" data-testid="mark-all-read">Mark all read</button>
+                    <a class="pc-btn pc-btn--sm" href="/platform/notifications" @onclick="() => _open = false">See all</a>
+                </div>
+            </div>
+            @if (Notifier.Items.Count == 0)
+            {
+                <div class="pc-empty" style="padding:36px 16px"><MudIcon Icon="@Icons.Material.Filled.CheckCircle" Style="color:#10B981;font-size:40px" /><div style="margin-top:8px;font-weight:650">You are all caught up</div></div>
+            }
+            @foreach (var n in Notifier.Items.Take(8))
+            {
+                var note = n;
+                <div class="pc-note pc-note--@note.Severity @(Notifier.IsRead(note.Id) ? "" : "is-unread")" @onclick="() => OpenAsync(note)" data-testid="bell-item">
+                    <div class="pc-note__icon"><MudIcon Icon="@PlatformBell.IconFor(note.Kind)" Size="Size.Small" /></div>
+                    <div style="min-width:0">
+                        <div style="font-weight:700;font-size:13.5px">@note.Title</div>
+                        <div class="pc-card__hint" style="font-size:12.8px">@note.Message</div>
+                        <div class="pc-card__hint" style="font-size:11.5px;margin-top:2px">@Pc.Ago(note.At)</div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private bool _open;
+    private Timer? _timer;
+
+    public static string IconFor(string kind) => kind switch
+    {
+        "signup" => Icons.Material.Filled.AddBusiness,
+        "past-due" => Icons.Material.Filled.CreditCardOff,
+        "suspended" => Icons.Material.Filled.PauseCircle,
+        "trial-ending" or "trial-ended" => Icons.Material.Filled.HourglassBottom,
+        "inactive" => Icons.Material.Filled.Bedtime,
+        "seats" => Icons.Material.Filled.Chair,
+        _ => Icons.Material.Filled.Info
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        Notifier.Changed += OnChanged;
+        Nav.LocationChanged += OnLocation;
+        await Notifier.RefreshAsync();
+        _timer = new Timer(_ => _ = InvokeAsync(Notifier.RefreshAsync), null, TimeSpan.FromMinutes(2), TimeSpan.FromMinutes(2));
+    }
+
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+    private void OnLocation(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e) { _open = false; _ = InvokeAsync(Notifier.RefreshAsync); }
+
+    private async Task Toggle()
+    {
+        _open = !_open;
+        if (_open) await Notifier.RefreshAsync();
+    }
+
+    private async Task OpenAsync(PlatformNotificationDto n)
+    {
+        await Notifier.MarkReadAsync(n.Id);
+        _open = false;
+        if (n.TenantId is { } id) Nav.NavigateTo($"/platform/companies/{id}");
+    }
+
+    public void Dispose()
+    {
+        Notifier.Changed -= OnChanged;
+        Nav.LocationChanged -= OnLocation;
+        _timer?.Dispose();
+    }
+}

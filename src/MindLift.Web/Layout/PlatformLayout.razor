@@ -1,0 +1,211 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject AuthSession Session
+@inject AppState App
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<MudThemeProvider Theme="_theme" @bind-IsDarkMode="_isDark" />
+<MudPopoverProvider />
+<MudDialogProvider MaxWidth="MaxWidth.Small" FullWidth="true" CloseButton="true" />
+<MudSnackbarProvider />
+
+<CascadingValue Value="_isDark" Name="IsDarkMode">
+<div class="pc" data-testid="platform-console">
+    @if (Session.Me is { IsPlatformAdmin: true } me)
+    {
+        <div class="pc-shell @(_collapsed ? "is-collapsed" : "")">
+            <aside class="pc-rail @(_navOpen ? "is-open" : "")" aria-label="Platform navigation">
+                <div class="pc-brand">
+                    <div class="pc-brand__mark">M</div>
+                    <div>
+                        <div class="pc-brand__name">MindLift</div>
+                        <div class="pc-brand__sub">Platform console</div>
+                    </div>
+                </div>
+
+                <div class="pc-rail__label">Command centre</div>
+                <nav class="pc-nav" @onclick="CloseNav">
+                    <NavLink href="/platform" Match="NavLinkMatch.All"><MudIcon Icon="@Icons.Material.Filled.AutoGraph" />Overview</NavLink>
+                    <NavLink href="/platform/companies"><MudIcon Icon="@Icons.Material.Filled.Apartment" />Companies</NavLink>
+                    <NavLink href="/platform/modules"><MudIcon Icon="@Icons.Material.Filled.Widgets" />Modules</NavLink>
+                    <NavLink href="/platform/plans"><MudIcon Icon="@Icons.Material.Filled.Diamond" />Plans</NavLink>
+                    <NavLink href="/platform/activity"><MudIcon Icon="@Icons.Material.Filled.History" />Audit trail</NavLink>
+                    <NavLink href="/platform/notifications"><MudIcon Icon="@Icons.Material.Filled.Notifications" />Notifications</NavLink>
+                </nav>
+
+                <div class="pc-rail__foot">
+                    <div class="pc-owner">
+                        <PcAvatar Name="@me.FullName" Size="38" />
+                        <div style="min-width:0">
+                            <div class="pc-owner__name">@me.FullName</div>
+                            <div class="pc-owner__role">Platform owner</div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            @if (_navOpen)
+            {
+                <div class="pc-scrim" @onclick="CloseNav"></div>
+            }
+
+            <div class="pc-main">
+                <header class="pc-top">
+                    <button class="pc-btn pc-btn--icon pc-btn--ghost pc-menu-btn" @onclick="ToggleNav" aria-label="Show or hide the menu" data-testid="platform-menu"><MudIcon Icon="@Icons.Material.Filled.Menu" /></button>
+
+                    <div class="pc-search">
+                        <MudIcon Icon="@Icons.Material.Filled.Search" Class="pc-search__icon" />
+                        <input type="search" placeholder="Search companies by name or address" data-testid="platform-search" autocomplete="off"
+                               @bind="Query" @bind:event="oninput" @onkeydown="OnSearchKey" @onfocus="() => _searchOpen = true" />
+                        @if (_searchOpen && !string.IsNullOrWhiteSpace(_query))
+                        {
+                            <div class="pc-search__panel" data-testid="platform-search-results">
+                                @if (_hits.Count == 0)
+                                {
+                                    <div class="pc-search__item" style="cursor:default;color:var(--pc-text-3)">No company matches "@_query"</div>
+                                }
+                                @foreach (var h in _hits)
+                                {
+                                    <div class="pc-search__item" @key="h.Id" @onclick="() => Open(h.Id)">
+                                        <PcAvatar Name="@h.Name" Size="34" />
+                                        <div style="min-width:0">
+                                            <div style="font-weight:700;font-size:14px">@h.Name</div>
+                                            <div style="font-size:12px;color:var(--pc-text-3)">@h.Slug · @h.PlanName</div>
+                                        </div>
+                                        <span style="margin-inline-start:auto"><PcStatusPill Status="@h.Status" /></span>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    <span style="flex:1"></span>
+                    <PlatformBell />
+                    <button class="pc-btn pc-btn--icon" @onclick="ToggleDark" aria-label="Switch light or dark" data-testid="platform-theme">
+                        <MudIcon Icon="@(_isDark ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)" />
+                    </button>
+                    <button class="pc-btn" @onclick="SignOut" data-testid="platform-signout"><MudIcon Icon="@Icons.Material.Filled.Logout" Size="Size.Small" />Sign out</button>
+                </header>
+
+                <main class="pc-content">@Body</main>
+            </div>
+        </div>
+    }
+    else if (Session.IsSignedIn)
+    {
+        <div class="pc-empty" style="padding-top:18vh" data-testid="platform-denied">
+            <div class="pc-empty__art"><MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Large" /></div>
+            <h2 style="margin:0 0 8px">This area is for the platform owner</h2>
+            <p>Your account manages a company, not the platform.</p>
+            <a class="pc-btn pc-btn--primary" href="/">Back to my workspace</a>
+        </div>
+    }
+    else
+    {
+        <div class="pc-empty" style="padding-top:18vh">
+            <div class="pc-empty__art"><MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Large" /></div>
+            <h2 style="margin:0 0 8px">Sign in to continue</h2>
+            <a class="pc-btn pc-btn--primary" href="/login">Sign in</a>
+        </div>
+    }
+</div>
+</CascadingValue>
+
+@code {
+    private readonly MudTheme _theme = MindLift.UI.Theme.MindLiftTheme.Create();
+    private bool _isDark = true;
+    private bool _navOpen;
+    private bool _collapsed;
+
+    // One button serves both: on a wide screen it hides or shows the side menu, on a phone it opens or closes the drawer.
+    private void ToggleNav() { _navOpen = !_navOpen; _collapsed = !_collapsed; }
+    private void CloseNav() { _navOpen = false; _collapsed = false; }
+    private bool _searchOpen;
+    private string _query = "";
+    private List<PlatformCompanyDto> _hits = [];
+    private CancellationTokenSource? _searchCts;
+
+    private string Query
+    {
+        get => _query;
+        set { _query = value; _ = SearchAsync(); }
+    }
+
+    protected override void OnInitialized()
+    {
+        Session.Changed += StateHasChanged;
+        Nav.LocationChanged += OnLocation;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        // The console remembers whether its owner prefers light or dark; it opens dark the first time.
+        var saved = await Safe(() => JS.InvokeAsync<string?>("localStorage.getItem", "pc.theme").AsTask());
+        _isDark = saved != "light";
+        await JS.InvokeVoidAsync("mindlift.setTheme", _isDark ? "dark" : "light");
+        StateHasChanged();
+    }
+
+    private static async Task<string?> Safe(Func<Task<string?>> read)
+    {
+        try { return await read(); } catch { return null; }
+    }
+
+    private void OnLocation(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        _searchOpen = false;
+        _query = "";
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task SearchAsync()
+    {
+        _searchCts?.Cancel();
+        _searchCts = new CancellationTokenSource();
+        var token = _searchCts.Token;
+        _searchOpen = true;
+        if (string.IsNullOrWhiteSpace(_query)) { _hits = []; return; }
+        try
+        {
+            await Task.Delay(220, token);
+            var result = await Http.GetFromJsonAsync<PlatformCompanyListDto>($"api/v1/platform/companies?search={Uri.EscapeDataString(_query)}&pageSize=6", token);
+            _hits = result?.Items.ToList() ?? [];
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (OperationCanceledException) { }
+        catch (HttpRequestException) { _hits = []; }
+    }
+
+    private void OnSearchKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && _hits.Count > 0) Open(_hits[0].Id);
+        if (e.Key == "Escape") _searchOpen = false;
+    }
+
+    private void Open(Guid id) => Nav.NavigateTo($"/platform/companies/{id}");
+
+    private async Task ToggleDark()
+    {
+        _isDark = !_isDark;
+        await JS.InvokeVoidAsync("mindlift.setTheme", _isDark ? "dark" : "light");
+        try { await JS.InvokeVoidAsync("localStorage.setItem", "pc.theme", _isDark ? "dark" : "light"); } catch { }
+    }
+
+    private async Task SignOut()
+    {
+        await Http.PostAsync("api/v1/auth/logout", null);
+        Session.Clear();
+        App.Reset();
+        Nav.NavigateTo("/login", forceLoad: true);
+    }
+
+    public void Dispose()
+    {
+        Session.Changed -= StateHasChanged;
+        Nav.LocationChanged -= OnLocation;
+        _searchCts?.Cancel();
+    }
+}

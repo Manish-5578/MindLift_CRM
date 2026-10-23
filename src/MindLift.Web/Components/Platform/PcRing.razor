@@ -1,0 +1,23 @@
+@* A score as a ring that fills in. *@
+@using System.Globalization
+<div class="pc-ring" style="width:@(Size)px;height:@(Size)px" title="@(Title ?? Value.ToString())">
+    <svg width="@Size" height="@Size" viewBox="0 0 @Size @Size">
+        <circle cx="@F(Size / 2.0)" cy="@F(Size / 2.0)" r="@F(R)" fill="none" stroke="var(--pc-surface-3)" stroke-width="@F(Stroke)" />
+        <circle cx="@F(Size / 2.0)" cy="@F(Size / 2.0)" r="@F(R)" fill="none" stroke="@(Color ?? Pc.HealthColor(Value))" stroke-width="@F(Stroke)" stroke-linecap="round"
+                stroke-dasharray="@F(Dash) @F(C)" style="transition:stroke-dasharray 1s cubic-bezier(.2,.8,.2,1)" />
+    </svg>
+    <span class="pc-ring__v" style="font-size:@((int)(Size * .3))px">@Value</span>
+</div>
+
+@code {
+    [Parameter] public int Value { get; set; }
+    [Parameter] public int Size { get; set; } = 48;
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? Color { get; set; }
+
+    private double Stroke => Math.Max(4, Size / 11.0);
+    private double R => (Size - Stroke) / 2;
+    private double C => 2 * Math.PI * R;
+    private double Dash => C * Math.Clamp(Value, 0, 100) / 100.0;
+    private static string F(double v) => v.ToString("0.##", CultureInfo.InvariantCulture);
+}

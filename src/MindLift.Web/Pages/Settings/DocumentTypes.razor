@@ -9,10 +9,56 @@
 <div class="ml-page ml-page--form">
     <PageHeader Title="Document types" Subtitle="Choose the kind of document, the words that identify it, and the values to read from it.">
         <Actions>
+            <MudButton Variant="Variant.Outlined" OnClick="AddStartersAsync" Disabled="_busy" data-testid="add-starters">@T["Add ready-made types"]</MudButton>
             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => OpenForm(null)" data-testid="primary-action">@T["New document type"]</MudButton>
         </Actions>
     </PageHeader>
     <SettingsNav Current="/settings/document-types" />
+
+    <!-- AI reading: off until switched on; says whether the model can be reached -->
+    <MlCard Title="Read documents with AI" Subtitle="A language model on your own computer finds the values you define, from the words you describe them in. Nothing is sent outside." Class="mb-4" TestId="ai-card">
+        @if (_ai is null)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else
+        {
+            <div class="ml-stack-sm">
+                <div class="ml-row">
+                    <MudSwitch T="bool" Value="_ai.Enabled" ValueChanged="SetAiAsync" Color="Color.Primary" Disabled="_busy || !_ai.Allowed || (!_ai.Enabled && !_ai.Configured)"
+                               Label="@(_ai.Enabled ? T["AI reading is on"] : T["AI reading is off"])" data-testid="ai-toggle" />
+                    <span class="ml-grow"></span>
+                    <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="LoadAiAsync" data-testid="ai-recheck">@T["Check again"]</MudButton>
+                </div>
+                <div data-testid="ai-status">
+                    @if (!_ai.Allowed)
+                    {
+                        <MudAlert Severity="Severity.Info" Dense="true">@T["AI reading is not included for your company."]</MudAlert>
+                    }
+                    else if (!_ai.Configured)
+                    {
+                        <MudAlert Severity="Severity.Warning" Dense="true">@_ai.Message</MudAlert>
+                    }
+                    else if (!_ai.Reachable)
+                    {
+                        <MudAlert Severity="Severity.Warning" Dense="true">@_ai.Message</MudAlert>
+                    }
+                    else if (!_ai.ModelInstalled)
+                    {
+                        <MudAlert Severity="Severity.Warning" Dense="true">@_ai.Message</MudAlert>
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Success" Dense="true">@T["The model {0} is ready.", _ai.Model]</MudAlert>
+                    }
+                </div>
+                @if (_ai.Enabled)
+                {
+                    <MudText Typo="Typo.caption" Class="ml-muted">@T["Documents are read in the background. Reading can take a minute or more on an ordinary computer. If the model is not available, the anchors and patterns below are used."]</MudText>
+                }
+            </div>
+        }
+    </MlCard>
 
     @if (_loading)
     {
@@ -20,7 +66,11 @@
     }
     else if (_types.Count == 0)
     {
-        <EmptyState Icon="@Icons.Material.Outlined.Description" Title="No document types yet" Message="Add one to choose the values you need from your documents." />
+        <EmptyState Icon="@Icons.Material.Outlined.Description" Title="No document types yet" Message="Add the ready-made types to start from, or create your own and choose the values you need from your documents.">
+            <Actions>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddStartersAsync" Disabled="_busy" data-testid="empty-add-starters">@T["Add ready-made types"]</MudButton>
+            </Actions>
+        </EmptyState>
     }
     else
     {
@@ -31,7 +81,22 @@
                 <div class="ml-stack-sm">
                     @foreach (var field in current.Fields)
                     {
-                        <div class="ml-row"><span class="ml-grow">@field.Label</span><span class="ml-muted">@field.ValueType@(field.Required ? " · required" : "")</span></div>
+                        <div class="ml-row" data-testid="doctype-field-row">
+                            <span class="ml-grow">
+                                @field.Label
+                                @if (!string.IsNullOrWhiteSpace(field.Description))
+                                {
+                                    <span class="ml-muted"> — @field.Description</span>
+                                }
+                            </span>
+                            <span class="ml-muted">
+                                @field.ValueType@(field.Required ? " · required" : "")
+                                @if (!string.IsNullOrWhiteSpace(field.SaveTo))
+                                {
+                                    <span> · → @TargetLabel(field.SaveTo)</span>
+                                }
+                            </span>
+                        </div>
                     }
                     <div class="ml-row" style="justify-content:flex-end">
                         <MudButton Size="Size.Small" OnClick="() => OpenForm(current)" data-testid="edit-doctype">@T["Edit"]</MudButton>
@@ -50,57 +115,115 @@
     }
 
     <div class="ml-stack">
-        <MudTextField @bind-Value="_key" Label="@T["Key (for example trade_licence) *"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="dt-key" />
-        <MudTextField @bind-Value="_name" Label="@T["Name *"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="dt-name" />
-        <MudTextField @bind-Value="_description" Label="@T["Description"]" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudTextField T="string" Value="_name" ValueChanged="OnNameChanged" Immediate="true" Label="@T["Name *"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="dt-name" />
+        <MudTextField @bind-Value="_key" Label="@T["Key (for example trade_licence) *"]" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@(_editing is not null)" data-testid="dt-key" />
+        <MudTextField @bind-Value="_description" Label="@T["Description"]" Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="@T["Helps the AI know what kind of document this is."]" data-testid="dt-description" />
         <MudTextField @bind-Value="_keywordsText" Label="@T["Words that identify it, one per line as text|weight"]" Lines="4" Variant="Variant.Outlined" Margin="Margin.Dense"
                       HelperText="@T["Example: Trade License|3 — a document scores the weights of the words it contains."]" data-testid="dt-keywords" />
         <MudNumericField T="int" @bind-Value="_minScore" Label="@T["Minimum score to match"]" Min="1" Max="1000" Variant="Variant.Outlined" Margin="Margin.Dense" />
         <MudCheckBox @bind-Value="_active" Label="@T["Type is on"]" Color="Color.Primary" />
 
-        <MudText Typo="Typo.subtitle2">@T["Values to read"]</MudText>
+        <div class="ml-row">
+            <MudText Typo="Typo.subtitle2" Class="ml-grow">@T["Values to read"]</MudText>
+            <MudButton Size="Size.Small" Variant="Variant.Outlined" HtmlTag="label" for="suggest-file" Disabled="@(_ai is not { Enabled: true, Reachable: true } || _suggesting)" data-testid="suggest-fields">
+                @(_suggesting ? T["Reading the sample…"] : T["Suggest from a sample"])
+            </MudButton>
+            <InputFile id="suggest-file" OnChange="SuggestAsync" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp,.txt,.csv" style="display:none" data-testid="suggest-file" />
+        </div>
+        <MudText Typo="Typo.caption" Class="ml-muted">@T["Describe each value in plain words. The AI finds it from the name and description; an anchor or pattern is optional."]</MudText>
+
         @for (var i = 0; i < _fields.Count; i++)
         {
             var index = i;
             var field = _fields[index];
             <div class="ml-stack-sm" style="padding:12px;border:1px solid var(--ml-border);border-radius:var(--ml-radius)" data-testid="dt-field">
                 <div class="ml-row">
-                    <MudTextField T="string" Value="field.Label" ValueChanged="v => field.Label = v ?? string.Empty" Label="@T["Name shown (for example Licence number) *"]" Variant="Variant.Outlined" Margin="Margin.Dense" Class="ml-grow" data-testid="dt-field-label" />
-                    <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small" OnClick="() => _fields.RemoveAt(index)" aria-label="@T["Remove field"]" />
+                    <MudTextField T="string" Value="field.Label" ValueChanged="v => OnFieldLabelChanged(field, v)" Immediate="true" Label="@T["Name shown (for example Licence number) *"]" Variant="Variant.Outlined" Margin="Margin.Dense" Class="ml-grow" data-testid="dt-field-label" />
+                    <MudIconButton Icon="@Icons.Material.Outlined.Close" Size="Size.Small" OnClick="() => _fields.RemoveAt(index)" aria-label="@T["Remove field"]" data-testid="dt-field-remove" />
                 </div>
-                <MudTextField T="string" Value="field.Key" ValueChanged="v => field.Key = v ?? string.Empty" Label="@T["Key (for example license_number) *"]" Variant="Variant.Outlined" Margin="Margin.Dense" />
-                <MudSelect T="string" Value="field.ValueType" ValueChanged="v => field.ValueType = v ?? DocumentValueTypes.Text" Label="@T["Kind of value"]" Variant="Variant.Outlined" Margin="Margin.Dense">
-                    <MudSelectItem T="string" Value="@DocumentValueTypes.Text">@T["Text"]</MudSelectItem>
-                    <MudSelectItem T="string" Value="@DocumentValueTypes.Id">@T["Number or code"]</MudSelectItem>
-                    <MudSelectItem T="string" Value="@DocumentValueTypes.Number">@T["Number"]</MudSelectItem>
-                    <MudSelectItem T="string" Value="@DocumentValueTypes.Amount">@T["Amount of money"]</MudSelectItem>
-                    <MudSelectItem T="string" Value="@DocumentValueTypes.Date">@T["Date"]</MudSelectItem>
+                <MudTextField T="string" Value="field.Description" ValueChanged="v => field.Description = string.IsNullOrWhiteSpace(v) ? null : v" Label="@T["What to look for"]" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" MaxLength="300"
+                              HelperText="@T["For example: the applicant's date of birth, not the issue date."]" data-testid="dt-field-description" />
+                <div class="ml-row ml-row--wrap">
+                    <MudSelect T="string" Value="field.ValueType" ValueChanged="v => OnTypeChanged(field, v)" Label="@T["Kind of value"]" Variant="Variant.Outlined" Margin="Margin.Dense" Class="ml-grow" data-testid="dt-field-type">
+                        <MudSelectItem T="string" Value="@DocumentValueTypes.Text">@T["Text"]</MudSelectItem>
+                        <MudSelectItem T="string" Value="@DocumentValueTypes.Id">@T["Number or code"]</MudSelectItem>
+                        <MudSelectItem T="string" Value="@DocumentValueTypes.Number">@T["Number"]</MudSelectItem>
+                        <MudSelectItem T="string" Value="@DocumentValueTypes.Amount">@T["Amount of money"]</MudSelectItem>
+                        <MudSelectItem T="string" Value="@DocumentValueTypes.Date">@T["Date"]</MudSelectItem>
+                        <MudSelectItem T="string" Value="@DocumentValueTypes.Email">@T["Email"]</MudSelectItem>
+                        <MudSelectItem T="string" Value="@DocumentValueTypes.Phone">@T["Phone"]</MudSelectItem>
+                    </MudSelect>
+                    <MudSelect T="string" Value="field.Mode" ValueChanged="v => field.Mode = v ?? DocumentFieldModes.Auto" Label="@T["Read with"]" Variant="Variant.Outlined" Margin="Margin.Dense" Class="ml-grow" data-testid="dt-field-mode">
+                        <MudSelectItem T="string" Value="@DocumentFieldModes.Auto">@T["Automatic (AI, then patterns)"]</MudSelectItem>
+                        <MudSelectItem T="string" Value="@DocumentFieldModes.Ai">@T["AI only"]</MudSelectItem>
+                        <MudSelectItem T="string" Value="@DocumentFieldModes.Rules">@T["Patterns only"]</MudSelectItem>
+                    </MudSelect>
+                </div>
+                <MudSelect T="string" Value="field.SaveTo ?? string.Empty" ValueChanged="v => field.SaveTo = string.IsNullOrEmpty(v) ? null : v" Label="@T["Save to a record when approved"]" Variant="Variant.Outlined" Margin="Margin.Dense"
+                           HelperText="@T["Choose a contact, account or deal field. Without one, the value stays on the document."]" data-testid="dt-field-saveto">
+                    <MudSelectItem T="string" Value="@string.Empty">@T["Keep on the document only"]</MudSelectItem>
+                    @foreach (var target in TargetsFor(field))
+                    {
+                        <MudSelectItem T="string" Value="@($"{target.Entity}.{target.Key}")">@TargetText(target)</MudSelectItem>
+                    }
                 </MudSelect>
-                <MudTextField T="string" Value="field.Anchor" ValueChanged="v => field.Anchor = string.IsNullOrWhiteSpace(v) ? null : v" Label="@T["Label written before the value (for example Expiry Date:)"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="dt-field-anchor" />
-                <MudTextField T="string" Value="field.Pattern" ValueChanged="v => field.Pattern = string.IsNullOrWhiteSpace(v) ? null : v" Label="@T["Or a pattern (advanced, regular expression; first group is the value)"]" Variant="Variant.Outlined" Margin="Margin.Dense" />
                 <div class="ml-row">
                     <MudCheckBox T="bool" Value="field.Required" ValueChanged="v => field.Required = v" Label="@T["Required"]" Color="Color.Primary" />
                     <MudCheckBox T="bool" Value="field.IsMetric" ValueChanged="v => field.IsMetric = v" Label="@T["Number to report on"]" Color="Color.Primary" />
+                    <span class="ml-grow"></span>
+                    <MudButton Size="Size.Small" Variant="Variant.Text" Style="white-space:nowrap" OnClick="() => field.ShowMore = !field.ShowMore" data-testid="dt-field-more">@(field.ShowMore ? T["Fewer options"] : T["More options"])</MudButton>
                 </div>
+                @if (field.ShowMore)
+                {
+                    <MudTextField T="string" Value="field.Key" ValueChanged="v => { field.Key = v ?? string.Empty; field.KeyAuto = false; }" Label="@T["Key (for example license_number) *"]" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@field.Existing" data-testid="dt-field-key" />
+                    <MudTextField T="string" Value="field.Example" ValueChanged="v => field.Example = string.IsNullOrWhiteSpace(v) ? null : v" Label="@T["Example value"]" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="150" data-testid="dt-field-example" />
+                    <MudTextField T="string" @bind-Value="field.AllowedText" Label="@T["Allowed values, separated by commas (leave empty for any)"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="dt-field-allowed" />
+                    <MudTextField T="string" Value="field.Anchor" ValueChanged="v => field.Anchor = string.IsNullOrWhiteSpace(v) ? null : v" Label="@T["Label written before the value (for example Expiry Date:)"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="dt-field-anchor" />
+                    <MudTextField T="string" Value="field.Pattern" ValueChanged="v => field.Pattern = string.IsNullOrWhiteSpace(v) ? null : v" Label="@T["Or a pattern (advanced, regular expression; first group is the value)"]" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                }
             </div>
         }
-        <div><MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Outlined.Add" OnClick="() => _fields.Add(new FieldRow())" data-testid="add-dt-field">@T["Add a value"]</MudButton></div>
+        <div><MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Outlined.Add" OnClick="AddField" data-testid="add-dt-field">@T["Add a value"]</MudButton></div>
 
         @if (_editing is not null)
         {
             <MudText Typo="Typo.subtitle2">@T["Test on a sample file"]</MudText>
-            <MudText Typo="Typo.caption" Class="ml-muted">@T["Upload a file to see what this type reads. Nothing is saved."]</MudText>
+            <MudText Typo="Typo.caption" Class="ml-muted">@T["Save your changes first, then upload a file to see what this type reads. Nothing is saved."]</MudText>
             <InputFile OnChange="TestFileAsync" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp,.txt,.csv" data-testid="dt-test-file" />
+            @if (_testing)
+            {
+                <MudProgressLinear Indeterminate="true" />
+            }
+
             @if (_testResult is not null)
             {
                 <MudAlert Severity="@(_testResult.Matched ? Severity.Success : Severity.Warning)" Dense="true" data-testid="dt-test-summary">
                     @(_testResult.Matched ? $"Matched with score {_testResult.Score} (read from {_testResult.TextSource})." : $"Did not match (score {_testResult.Score}). Check the words that identify it.")
                 </MudAlert>
+                @if (!string.IsNullOrWhiteSpace(_testResult.Note))
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true" data-testid="dt-test-note">@_testResult.Note</MudAlert>
+                }
+
                 @foreach (var found in _testResult.Fields)
                 {
-                    <div class="ml-row" data-testid="dt-test-field">
-                        <span class="ml-grow">@found.Label</span>
-                        <span>@(found.Found ? found.Value : "not found")</span>
+                    <div class="ml-stack-sm" data-testid="dt-test-field">
+                        <div class="ml-row">
+                            <span class="ml-grow">@found.Label</span>
+                            <span>@(found.Found ? found.Value : "not found")</span>
+                            @if (found.Found && found.Method is not null)
+                            {
+                                <span class="ml-muted">@MethodText(found.Method)</span>
+                            }
+                            @if (found.Found && found.Verified == false)
+                            {
+                                <MudIcon Icon="@Icons.Material.Outlined.WarningAmber" Size="Size.Small" Color="Color.Warning" Title="@T["Not found in the document text"]" />
+                            }
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(found.Snippet))
+                        {
+                            <MudText Typo="Typo.caption" Class="ml-muted">…@found.Snippet…</MudText>
+                        }
                     </div>
                 }
             }
@@ -118,12 +241,28 @@
         public string? Pattern { get; set; }
         public bool Required { get; set; }
         public bool IsMetric { get; set; }
+        public string? Description { get; set; }
+        public string? Example { get; set; }
+        public string AllowedText { get; set; } = string.Empty;
+        public string Mode { get; set; } = DocumentFieldModes.Auto;
+        public string? SaveTo { get; set; }
+        public bool ShowMore { get; set; }
+
+        /// <summary>True while the key follows the name. It stops following once the key is typed by hand or the field already exists (its key is fixed).</summary>
+        public bool KeyAuto { get; set; } = true;
+
+        /// <summary>A field that was saved before: its key does not change, so values already read keep their meaning.</summary>
+        public bool Existing { get; set; }
     }
 
     private List<DocumentTypeDto> _types = [];
+    private List<RecordTargetDto> _targets = [];
+    private DocumentAiStatusDto? _ai;
     private bool _loading = true;
     private bool _drawer;
     private bool _busy;
+    private bool _testing;
+    private bool _suggesting;
     private string? _error;
     private DocumentTypeDto? _editing;
     private string _key = string.Empty;
@@ -132,10 +271,14 @@
     private string _keywordsText = string.Empty;
     private int _minScore = 3;
     private bool _active = true;
+    private bool _keyAuto = true;
     private List<FieldRow> _fields = [];
     private DocumentTypeTestResultDto? _testResult;
 
-    protected override async Task OnInitializedAsync() => await LoadAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(LoadAsync(), LoadAiAsync(), LoadTargetsAsync());
+    }
 
     private async Task LoadAsync()
     {
@@ -154,12 +297,82 @@
         }
     }
 
+    private async Task LoadTargetsAsync()
+    {
+        try
+        {
+            _targets = await Http.GetFromJsonAsync<List<RecordTargetDto>>("api/v1/documents/targets") ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            _targets = [];
+        }
+    }
+
+    private async Task LoadAiAsync()
+    {
+        try
+        {
+            _ai = await Http.GetFromJsonAsync<DocumentAiStatusDto>("api/v1/settings/document-types/ai");
+        }
+        catch (HttpRequestException)
+        {
+            _ai = null;
+        }
+    }
+
+    private async Task SetAiAsync(bool enabled)
+    {
+        _busy = true;
+        try
+        {
+            var response = await Http.PutAsJsonAsync("api/v1/settings/document-types/ai", new SaveDocumentAiRequest(enabled));
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add(await ProblemText.FromAsync(response, T["We could not change this setting."]), Severity.Error);
+                return;
+            }
+
+            _ai = await response.Content.ReadFromJsonAsync<DocumentAiStatusDto>();
+            Snackbar.Add(enabled ? T["AI reading is on"] : T["AI reading is off"], Severity.Success);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task AddStartersAsync()
+    {
+        _busy = true;
+        try
+        {
+            var response = await Http.PostAsync("api/v1/settings/document-types/starters", null);
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add(await ProblemText.FromAsync(response, T["We could not add the ready-made types."]), Severity.Error);
+                return;
+            }
+
+            var added = await response.Content.ReadFromJsonAsync<List<DocumentTypeDto>>() ?? [];
+            Snackbar.Add(added.Count == 0 ? T["You already have all the ready-made types."] : T["Added {0} document types.", added.Count], Severity.Success);
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    // ---- the form ----
+
     private void OpenForm(DocumentTypeDto? type)
     {
         _editing = type;
         _error = null;
         _testResult = null;
         _key = type?.Key ?? string.Empty;
+        _keyAuto = type is null;
         _name = type?.Name ?? string.Empty;
         _description = type?.Description;
         _keywordsText = type is null ? string.Empty : string.Join("\n", type.Keywords.Select(k => $"{k.Text}|{k.Weight}"));
@@ -167,8 +380,80 @@
         _active = type?.IsActive ?? true;
         _fields = type is null
             ? [new FieldRow { ValueType = DocumentValueTypes.Text }]
-            : type.Fields.Select(f => new FieldRow { Key = f.Key, Label = f.Label, ValueType = f.ValueType, Anchor = f.Anchor, Pattern = f.Pattern, Required = f.Required, IsMetric = f.IsMetric }).ToList();
+            : type.Fields.Select(f => new FieldRow
+            {
+                Key = f.Key, Label = f.Label, ValueType = f.ValueType, Anchor = f.Anchor, Pattern = f.Pattern, Required = f.Required, IsMetric = f.IsMetric,
+                Description = f.Description, Example = f.Example, AllowedText = f.AllowedValues is { Count: > 0 } a ? string.Join(", ", a) : string.Empty,
+                Mode = string.IsNullOrWhiteSpace(f.Mode) ? DocumentFieldModes.Auto : f.Mode, SaveTo = f.SaveTo, KeyAuto = false, Existing = true,
+            }).ToList();
         _drawer = true;
+    }
+
+    private void OnNameChanged(string? name)
+    {
+        _name = name ?? string.Empty;
+        if (_keyAuto)
+        {
+            _key = Slug(_name);
+        }
+    }
+
+    private void OnFieldLabelChanged(FieldRow field, string? label)
+    {
+        field.Label = label ?? string.Empty;
+        if (field.KeyAuto)
+        {
+            field.Key = Slug(field.Label);
+        }
+    }
+
+    private void AddField() => _fields.Add(new FieldRow { ValueType = DocumentValueTypes.Text });
+
+    /// <summary>Changing the kind of value drops a "Save to" choice that can no longer hold it.</summary>
+    private void OnTypeChanged(FieldRow field, string? type)
+    {
+        field.ValueType = type ?? DocumentValueTypes.Text;
+        if (field.SaveTo is not null && TargetsFor(field).All(t => $"{t.Entity}.{t.Key}" != field.SaveTo))
+        {
+            field.SaveTo = null;
+        }
+    }
+
+    /// <summary>The record fields a value of this field's kind can be saved to.</summary>
+    private IEnumerable<RecordTargetDto> TargetsFor(FieldRow field)
+        => _targets.Where(t => DocumentValueTypes.Compatible(field.ValueType, t.ValueType));
+
+    private string TargetText(RecordTargetDto target)
+        => $"{T[target.Entity switch { "contacts" => "Contact", "accounts" => "Account", _ => "Deal" }]} › {target.Label}{(target.IsCustom ? " (custom)" : string.Empty)}";
+
+    private string TargetLabel(string saveTo)
+    {
+        var target = _targets.FirstOrDefault(t => $"{t.Entity}.{t.Key}" == saveTo);
+        return target is null ? saveTo : TargetText(target);
+    }
+
+    private string MethodText(string method) => method switch
+    {
+        "ai" => T["AI"],
+        "pattern" or "anchor" => T["Pattern"],
+        _ => method,
+    };
+
+    /// <summary>A key from a name: lowercase letters, digits and underscores, starting with a letter.</summary>
+    private static string Slug(string text)
+    {
+        var slug = System.Text.RegularExpressions.Regex.Replace(text.Trim().ToLowerInvariant(), "[^a-z0-9]+", "_").Trim('_');
+        if (slug.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        if (!char.IsLetter(slug[0]))
+        {
+            slug = "f_" + slug;
+        }
+
+        return slug.Length > 50 ? slug[..50].TrimEnd('_') : slug;
     }
 
     private List<DocumentKeywordDto> ParseKeywords()
@@ -187,7 +472,8 @@
         try
         {
             var request = new SaveDocumentTypeRequest(_key, _name, _description, _active, _minScore, ParseKeywords(),
-                _fields.Select(f => new DocumentFieldRuleDto(f.Key, f.Label, f.ValueType, f.Anchor, f.Pattern, f.Required, f.IsMetric)).ToList());
+                _fields.Select(f => new DocumentFieldRuleDto(f.Key, f.Label, f.ValueType, f.Anchor, f.Pattern, f.Required, f.IsMetric, f.Description, f.Example,
+                    f.AllowedText.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList(), f.Mode, f.SaveTo)).ToList());
             var response = _editing is null
                 ? await Http.PostAsJsonAsync("api/v1/settings/document-types", request)
                 : await Http.PutAsJsonAsync($"api/v1/settings/document-types/{_editing.Id}", request);
@@ -212,6 +498,45 @@
         }
     }
 
+    /// <summary>Reads a sample with the AI and adds the fields it proposes (skipping keys already in the list), for the administrator to edit.</summary>
+    private async Task SuggestAsync(InputFileChangeEventArgs args)
+    {
+        _suggesting = true;
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            content.Add(new StreamContent(args.File.OpenReadStream(25L * 1024 * 1024)), "file", args.File.Name);
+            var response = await Http.PostAsync($"api/v1/settings/document-types/suggest-fields?typeName={Uri.EscapeDataString(_name)}", content);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await ProblemText.FromAsync(response, T["We could not read this sample."]);
+                return;
+            }
+
+            var result = (await response.Content.ReadFromJsonAsync<SuggestFieldsResultDto>())!;
+            var taken = _fields.Select(f => f.Key).ToHashSet();
+
+            // A list that is only the empty starter row is replaced; otherwise the suggestions are added after what is there.
+            _fields.RemoveAll(f => string.IsNullOrWhiteSpace(f.Label) && string.IsNullOrWhiteSpace(f.Key));
+            var added = 0;
+            foreach (var s in result.Fields.Where(s => !taken.Contains(s.Key)))
+            {
+                _fields.Add(new FieldRow { Key = s.Key, Label = s.Label, ValueType = s.ValueType, Description = s.Description, Example = s.Example, KeyAuto = false });
+                added++;
+            }
+
+            Snackbar.Add(added == 0 ? T["The sample suggested nothing new."] : T["Added {0} suggested fields. Check them and save.", added], Severity.Success);
+        }
+        catch (HttpRequestException)
+        {
+            _error = T["We could not reach MindLift. Check your connection and try again."];
+        }
+        finally
+        {
+            _suggesting = false;
+        }
+    }
+
     private async Task TestFileAsync(InputFileChangeEventArgs args)
     {
         if (_editing is null)
@@ -219,17 +544,25 @@
             return;
         }
 
-        using var content = new MultipartFormDataContent();
-        var stream = args.File.OpenReadStream(25L * 1024 * 1024);
-        content.Add(new StreamContent(stream), "file", args.File.Name);
-        var response = await Http.PostAsync($"api/v1/settings/document-types/{_editing.Id}/test", content);
-        if (!response.IsSuccessStatusCode)
+        _testing = true;
+        try
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not test this file."]), Severity.Error);
-            return;
-        }
+            using var content = new MultipartFormDataContent();
+            var stream = args.File.OpenReadStream(25L * 1024 * 1024);
+            content.Add(new StreamContent(stream), "file", args.File.Name);
+            var response = await Http.PostAsync($"api/v1/settings/document-types/{_editing.Id}/test", content);
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add(await ProblemText.FromAsync(response, T["We could not test this file."]), Severity.Error);
+                return;
+            }
 
-        _testResult = await response.Content.ReadFromJsonAsync<DocumentTypeTestResultDto>();
+            _testResult = await response.Content.ReadFromJsonAsync<DocumentTypeTestResultDto>();
+        }
+        finally
+        {
+            _testing = false;
+        }
     }
 
     private async Task DeleteAsync(DocumentTypeDto type)

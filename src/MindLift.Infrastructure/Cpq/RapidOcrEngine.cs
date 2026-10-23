@@ -72,8 +72,13 @@ public sealed class RapidOcrEngine(IOptions<OcrOptions> options, ILogger<RapidOc
     private RapidOcr Load()
     {
         var started = DateTime.UtcNow;
+        // Absolute paths: the library otherwise looks for the models relative to the working directory, which is not the app folder.
         var ocr = new RapidOcr();
-        ocr.InitModels();
+        ocr.InitModels(
+            Path.Combine(ModelFolder, "ch_PP-OCRv5_mobile_det.onnx"),
+            Path.Combine(ModelFolder, "ch_PP-LCNet_x0_25_textline_ori_cls_mobile.onnx"),
+            Path.Combine(ModelFolder, "latin_PP-OCRv5_rec_mobile_infer.onnx"),
+            Path.Combine(ModelFolder, "ppocrv5_latin_dict.txt"));
         logger.LogInformation("Loaded the second OCR engine's models in {Ms} ms.", (DateTime.UtcNow - started).TotalMilliseconds);
         return ocr;
     }

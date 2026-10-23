@@ -99,6 +99,7 @@
 
                 <RecordActivities ContactId="Id" OnChanged="ReloadTimelineAsync" />
                 <RecordTimeline @ref="_timeline" EntityType="contacts" EntityId="Id" />
+                <RecordDocuments EntityType="contacts" EntityId="Id" />
                 <RecordFiles EntityType="contacts" EntityId="Id" />
             </ChildContent>
             <Aside>

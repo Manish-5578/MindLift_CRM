@@ -30,12 +30,12 @@
                 @foreach (var module in _modules)
                 {
                     <div class="ml-row" style="padding:12px 20px;border-bottom:1px solid var(--ml-border);min-height:56px">
-                        <MudSwitch T="bool" Value="module.IsEnabled" ValueChanged="v => ToggleAsync(module, v)" Color="Color.Primary" Disabled="IsCore(module.Module)" aria-label="@($"Enable {module.PluralLabel}")" />
+                        <MudSwitch T="bool" Value="module.IsEnabled" ValueChanged="v => ToggleAsync(module, v)" Color="Color.Primary" Disabled="IsCore(module.Module) || module.PlatformLocked" aria-label="@($"Enable {module.PluralLabel}")" />
                         <div class="ml-grow">
                             <MudText Typo="Typo.subtitle2">@module.PluralLabel</MudText>
-                            <MudText Typo="Typo.caption" Class="ml-muted">@T["Singular: {0} · Key: {1}", module.SingularLabel, module.Module]@(IsCore(module.Module) ? " · " + T["Always on"] : "")</MudText>
+                            <MudText Typo="Typo.caption" Class="ml-muted">@T["Singular: {0} · Key: {1}", module.SingularLabel, module.Module]@(module.PlatformLocked ? " · " + T["Not included for your company"] : IsCore(module.Module) ? " · " + T["Always on"] : "")</MudText>
                         </div>
-                        <MudChip T="string" Size="Size.Small" Color="@(module.IsEnabled ? Color.Success : Color.Default)">@(module.IsEnabled ? "On" : "Off")</MudChip>
+                        <MudChip T="string" Size="Size.Small" Color="@(module.IsEnabled ? Color.Success : Color.Default)">@(module.PlatformLocked ? "Not included" : module.IsEnabled ? "On" : "Off")</MudChip>
                     </div>
                 }
             </div>

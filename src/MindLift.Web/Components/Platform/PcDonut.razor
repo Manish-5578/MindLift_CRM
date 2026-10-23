@@ -1,0 +1,44 @@
+<div class="d-flex align-center flex-wrap" style="gap:28px" data-testid="donut">
+    <div class="pc-donut">
+        <svg viewBox="0 0 120 120">
+            <circle cx="60" cy="60" r="@F(R)" fill="none" stroke="var(--pc-surface-3)" stroke-width="16" />
+            @{ double offset = 0; var i = 0; }
+            @foreach (var s in Slices.Where(s => s.Value > 0))
+            {
+                var len = Total == 0 ? 0 : C * s.Value / Total;
+                <circle class="pc-donut__seg" cx="60" cy="60" r="@F(R)" fill="none" stroke="@ColorFor(s.Key, i)" stroke-width="16"
+                        stroke-dasharray="@F(Math.Max(0, len - 2)) @F(C)" stroke-dashoffset="@F(-offset)" style="animation-delay:@(i * 90)ms">
+                    <title>@s.Label: @s.Value</title>
+                </circle>
+                offset += len; i++;
+            }
+        </svg>
+        <div class="pc-donut__center"><b class="pc-num">@Total</b><span>@CenterLabel</span></div>
+    </div>
+    <div class="pc-legend">
+        @{ var j = 0; }
+        @foreach (var s in Slices)
+        {
+            <div class="pc-legend__row"><i class="pc-legend__dot" style="background:@ColorFor(s.Key, j)"></i><span>@s.Label</span><b>@s.Value</b></div>
+            j++;
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<PlatformSlice> Slices { get; set; } = [];
+    [Parameter] public string CenterLabel { get; set; } = "companies";
+
+    private const double R = 48;
+    private static readonly double C = 2 * Math.PI * R;
+    private int Total => Slices.Sum(s => s.Value);
+    private static string F(double v) => v.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+
+    private static readonly string[] Palette = ["#6366F1", "#06B6D4", "#F59E0B", "#EC4899", "#10B981", "#8B5CF6"];
+
+    public static string ColorFor(string key, int index) => key switch
+    {
+        "Active" => "#10B981", "Trial" => "#3B82F6", "PastDue" => "#F59E0B", "Suspended" => "#F43F5E", "Cancelled" => "#94A3B8",
+        _ => Palette[index % Palette.Length]
+    };
+}

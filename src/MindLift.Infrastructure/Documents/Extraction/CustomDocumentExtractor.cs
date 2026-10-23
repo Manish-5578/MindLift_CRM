@@ -94,8 +94,28 @@ public static class CustomDocumentExtractor
         DocumentValueTypes.Amount => AmountNormalizer.Parse(raw) is { Amount: { } amount } ? amount.ToString("F2", CultureInfo.InvariantCulture) : null,
         DocumentValueTypes.Number => decimal.TryParse(Normalize(raw), NumberStyles.Number, CultureInfo.InvariantCulture, out var number) ? number.ToString(CultureInfo.InvariantCulture) : null,
         DocumentValueTypes.Id => Regex.Replace(raw, @"\s+", " ").Trim(),
+        DocumentValueTypes.Email => NormalizeEmail(raw),
+        DocumentValueTypes.Phone => NormalizePhone(raw),
         _ => raw.Trim(),
     };
+
+    private static string? NormalizeEmail(string raw)
+    {
+        var email = raw.Trim().Trim('<', '>', '.', ',', ';').ToLowerInvariant();
+        return Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.None, TimeSpan.FromSeconds(1)) ? email : null;
+    }
+
+    /// <summary>Digits with a leading plus kept, so +971 50 123 4567 and 0501234567 are each one run of digits. Fewer than six digits is not a phone number.</summary>
+    private static string? NormalizePhone(string raw)
+    {
+        var digits = new string(Normalize(raw).Where(char.IsDigit).ToArray());
+        if (digits.Length < 6)
+        {
+            return null;
+        }
+
+        return raw.TrimStart().StartsWith('+') ? "+" + digits : digits;
+    }
 
     /// <summary>Digits and punctuation in the form Tesseract and people both write them (Arabic-Indic digits become 0–9).</summary>
     public static string Normalize(string? text) => TextNormalizer.NormalizeDigitsAndPunctuation(text);

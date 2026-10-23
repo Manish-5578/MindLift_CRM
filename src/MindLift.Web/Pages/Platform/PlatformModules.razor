@@ -1,0 +1,130 @@
+@page "/platform/modules"
+@layout PlatformLayout
+@inject HttpClient Http
+@inject NavigationManager Nav
+
+<PageTitle>Modules · MindLift platform</PageTitle>
+
+<div class="pc-head pc-rise">
+    <div>
+        <div class="pc-eyebrow">Product</div>
+        <h1 class="pc-title">Every feature is a <span class="pc-grad">module.</span></h1>
+        <div class="pc-sub">The full catalogue, how many companies have each module, and who has what. To choose modules for one company, open it and use its Modules tab.</div>
+    </div>
+    <div class="pc-seg" role="group" aria-label="View">
+        <button class="@(_view == "cards" ? "is-on" : "")" @onclick='() => _view = "cards"' data-testid="mod-view-cards"><MudIcon Icon="@Icons.Material.Filled.GridView" Size="Size.Small" />Cards</button>
+        <button class="@(_view == "table" ? "is-on" : "")" @onclick='() => _view = "table"' data-testid="mod-view-table"><MudIcon Icon="@Icons.Material.Filled.TableRows" Size="Size.Small" />Table</button>
+        <button class="@(_view == "matrix" ? "is-on" : "")" @onclick='() => _view = "matrix"' data-testid="mod-view-matrix"><MudIcon Icon="@Icons.Material.Filled.Grid4x4" Size="Size.Small" />Who has what</button>
+    </div>
+</div>
+
+@if (_modules is null)
+{
+    <div class="pc-mods__grid">@for (var i = 0; i < 8; i++) { <div class="pc-skel" style="height:130px"></div> }</div>
+}
+else if (_view == "table")
+{
+    <div class="pc-card pc-card--flush" style="overflow-x:auto">
+        <table class="pc-table" data-testid="module-table">
+            <thead><tr><th>Module</th><th>Group</th><th>Kind</th><th>Companies</th><th style="min-width:180px">Share</th><th>Description</th></tr></thead>
+            <tbody>
+            @foreach (var m in _modules)
+            {
+                var pct = m.Total == 0 ? 0 : 100 * m.Companies / m.Total;
+                <tr style="cursor:default" data-testid="module-row-@m.Key">
+                    <td><div class="d-flex align-center" style="gap:12px"><span class="pc-mod__icon" style="width:36px;height:36px;border-radius:11px"><MudIcon Icon="@Pc.Icon(m.Icon)" Size="Size.Small" /></span><b>@m.Name</b></div></td>
+                    <td>@m.Category</td>
+                    <td>@(!m.Available ? "Coming soon" : m.Core ? "Always on" : "Optional")</td>
+                    <td class="pc-num">@(m.Available ? $"{m.Companies} of {m.Total}" : "-")</td>
+                    <td>@if (m.Available) { <div class="d-flex align-center" style="gap:10px"><div class="pc-bar" style="flex:1"><i style="width:@pct%"></i></div><span class="pc-card__hint pc-num" style="width:38px">@pct%</span></div> }</td>
+                    <td class="pc-card__hint" style="max-width:360px">@m.Description</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}
+else if (_view == "matrix")
+{
+    @if (_companies is null)
+    {
+        <div class="pc-skel" style="height:300px"></div>
+    }
+    else if (_companies.Count == 0)
+    {
+        <div class="pc-card pc-empty">No companies yet.</div>
+    }
+    else
+    {
+        <div class="pc-card pc-card--flush pc-matrix" data-testid="module-matrix">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Company</th>
+                        @foreach (var m in Optional) { <th title="@m.Name"><div class="v">@m.Name</div></th> }
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var c in _companies)
+                {
+                    var company = c;
+                    <tr style="cursor:pointer" @onclick="() => OpenCompany(company.Id)" data-testid="matrix-row">
+                        <td><div class="d-flex align-center" style="gap:10px"><PcAvatar Name="@company.Name" Size="30" /><div><b>@company.Name</b><div class="pc-card__hint">@company.PlanName</div></div></div></td>
+                        @foreach (var m in Optional)
+                        {
+                            <td><span class="@(company.DisabledModules.Contains(m.Key) ? "pc-no" : "pc-yes")" title="@m.Name: @(company.DisabledModules.Contains(m.Key) ? "off" : "on")"></span></td>
+                        }
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+else
+{
+    @foreach (var group in _modules.GroupBy(m => m.Category).OrderBy(g => MindLift.Shared.Enums.ModuleCatalog.Categories.ToList().IndexOf(g.Key)))
+    {
+        <div class="pc-mods__cat">@group.Key</div>
+        <div class="pc-mods__grid" data-testid="module-catalogue">
+            @foreach (var m in group)
+            {
+                var pct = m.Total == 0 ? 0 : 100 * m.Companies / m.Total;
+                <div class="pc-mod @(m.Available ? "is-on" : "is-soon") is-locked" data-testid="catalogue-@m.Key">
+                    <span class="pc-mod__icon"><MudIcon Icon="@Pc.Icon(m.Icon)" /></span>
+                    <span style="min-width:0;flex:1">
+                        <span class="pc-mod__name" style="display:block">@m.Name</span>
+                        <span class="pc-mod__desc" style="display:block">@m.Description</span>
+                        @if (!m.Available) { <span class="pc-mod__tag">Coming soon</span> }
+                        else
+                        {
+                            <span style="display:block;margin-top:12px">
+                                <span class="d-flex justify-space-between" style="font-size:12px;margin-bottom:6px"><b class="pc-num">@m.Companies of @m.Total companies</b><span class="pc-card__hint">@(m.Core ? "Always on" : pct + "%")</span></span>
+                                <span class="pc-bar" style="display:block"><i style="width:@pct%"></i></span>
+                            </span>
+                        }
+                    </span>
+                </div>
+            }
+        </div>
+    }
+}
+
+@code {
+    private List<PlatformModuleDto>? _modules;
+    private List<PlatformCompanyDto>? _companies;
+    private string _view = "cards";
+
+    private void OpenCompany(Guid id) => Nav.NavigateTo("/platform/companies/" + id);
+
+    private IEnumerable<PlatformModuleDto> Optional => _modules!.Where(m => m.Available && !m.Core);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _modules = await Http.GetFromJsonAsync<List<PlatformModuleDto>>("api/v1/platform/modules") ?? []; }
+        catch (HttpRequestException) { _modules = []; }
+
+        try { _companies = (await Http.GetFromJsonAsync<PlatformCompanyListDto>("api/v1/platform/companies?pageSize=200"))?.Items.ToList() ?? []; }
+        catch (HttpRequestException) { _companies = []; }
+    }
+}

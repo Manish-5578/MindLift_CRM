@@ -46,6 +46,12 @@ services:
       ForwardedHeaders__KnownProxies__0: "${FORWARDED_PROXY_ADDRESS:-127.0.0.1}"
       Ocr__TesseractPath: "/usr/bin/tesseract"
       Ocr__Languages: "eng+ara"
+      # AI reading of document fields (see docs/ADMIN_GUIDE.md, section 3b). Off until LLM_PROVIDER=Ollama and a model is installed.
+      Llm__Provider: "${LLM_PROVIDER:-None}"
+      Llm__BaseUrl: "${LLM_BASE_URL:-http://host.docker.internal:11434}"
+      Llm__Model: "${LLM_MODEL:-qwen2.5:7b-instruct}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8080:8080"
     healthcheck:

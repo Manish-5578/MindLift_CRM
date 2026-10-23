@@ -1,0 +1,62 @@
+@page "/platform/notifications"
+@layout PlatformLayout
+@implements IDisposable
+@inject PlatformNotifier Notifier
+@inject NavigationManager Nav
+
+<PageTitle>Notifications · MindLift platform</PageTitle>
+
+<div class="pc-head pc-rise">
+    <div>
+        <div class="pc-eyebrow">Inbox</div>
+        <h1 class="pc-title">Notifications</h1>
+        <div class="pc-sub">New companies from the last two weeks, and companies that need a look: overdue payments, trials ending, seats nearly used, accounts gone quiet.</div>
+    </div>
+    <div class="d-flex" style="gap:10px">
+        <div class="pc-seg">
+            <button class="@(!_unreadOnly ? "is-on" : "")" @onclick="() => _unreadOnly = false" data-testid="notes-all">All <span class="n">@Notifier.Items.Count</span></button>
+            <button class="@(_unreadOnly ? "is-on" : "")" @onclick="() => _unreadOnly = true" data-testid="notes-unread">Unread <span class="n">@Notifier.Unread</span></button>
+        </div>
+        <button class="pc-btn" @onclick="Notifier.MarkAllReadAsync" data-testid="notes-mark-all"><MudIcon Icon="@Icons.Material.Filled.DoneAll" Size="Size.Small" />Mark all read</button>
+    </div>
+</div>
+
+<div class="pc-card pc-card--flush pc-rise" data-testid="notes-list">
+    @if (Shown.Count == 0)
+    {
+        <div class="pc-empty"><div class="pc-empty__art"><MudIcon Icon="@Icons.Material.Filled.NotificationsNone" Size="Size.Large" /></div><h3 style="margin:0 0 6px">@(_unreadOnly ? "Nothing unread" : "Nothing yet")</h3><div>New companies and problems show up here.</div></div>
+    }
+    @foreach (var n in Shown)
+    {
+        var note = n;
+        <div class="pc-note pc-note--@note.Severity @(Notifier.IsRead(note.Id) ? "" : "is-unread")" style="padding-inline:26px" @onclick="() => OpenAsync(note)" data-testid="notes-item">
+            <div class="pc-note__icon"><MudIcon Icon="@PlatformBell.IconFor(note.Kind)" Size="Size.Small" /></div>
+            <div style="min-width:0;flex:1">
+                <div style="font-weight:700">@note.Title</div>
+                <div class="pc-card__hint" style="font-size:13.5px">@note.Message</div>
+            </div>
+            <div class="pc-card__hint" style="white-space:nowrap">@Pc.Ago(note.At)</div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _unreadOnly;
+    private List<PlatformNotificationDto> Shown => Notifier.Items.Where(n => !_unreadOnly || !Notifier.IsRead(n.Id)).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        Notifier.Changed += OnChanged;
+        await Notifier.RefreshAsync();
+    }
+
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private async Task OpenAsync(PlatformNotificationDto n)
+    {
+        await Notifier.MarkReadAsync(n.Id);
+        if (n.TenantId is { } id) Nav.NavigateTo($"/platform/companies/{id}");
+    }
+
+    public void Dispose() => Notifier.Changed -= OnChanged;
+}

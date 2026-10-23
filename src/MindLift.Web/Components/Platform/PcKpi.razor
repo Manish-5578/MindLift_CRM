@@ -1,0 +1,73 @@
+@implements IDisposable
+@* A headline number that counts up, with an optional trend and a small line. *@
+<div class="pc-card pc-kpi pc-rise @(OnClick.HasDelegate ? "pc-interactive" : "")" style="--kpi:@Gradient;--kpi-solid:@Solid;--i:@Index" @onclick="OnClick" data-testid="@TestId">
+    <div class="pc-kpi__top">
+        <div class="pc-kpi__icon"><MudIcon Icon="@Icon" Size="Size.Medium" /></div>
+        @if (Trend is not null)
+        {
+            <span class="pc-trend @(Trend > 0 ? "pc-trend--up" : Trend < 0 ? "pc-trend--down" : "pc-trend--flat")">
+                @(Trend > 0 ? "▲" : Trend < 0 ? "▼" : "•") @(Math.Abs(Trend.Value))%
+            </span>
+        }
+    </div>
+    <div class="pc-kpi__label">@Label</div>
+    <div class="pc-kpi__value pc-num"><span data-testid="@(TestId)-value">@Shown</span>@if (Suffix is not null){<small>@Suffix</small>}</div>
+    <div class="pc-kpi__foot">@Foot</div>
+    @if (Spark is { Count: > 1 })
+    {
+        <PcSparkline Values="Spark" Color="@Solid" />
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter] public decimal Value { get; set; }
+    [Parameter] public bool Money { get; set; }
+    [Parameter] public string? Suffix { get; set; }
+    [Parameter] public string Icon { get; set; } = Icons.Material.Filled.Insights;
+    [Parameter] public string Solid { get; set; } = "#6366F1";
+    [Parameter] public string? Accent { get; set; }
+    [Parameter] public int? Trend { get; set; }
+    [Parameter] public RenderFragment? Foot { get; set; }
+    [Parameter] public IReadOnlyList<int>? Spark { get; set; }
+    [Parameter] public int Index { get; set; }
+    [Parameter] public string? TestId { get; set; }
+    [Parameter] public EventCallback OnClick { get; set; }
+
+    private decimal _shown;
+    private decimal _from;
+    private CancellationTokenSource? _cts;
+    private string Gradient => Accent ?? $"linear-gradient(135deg, {Solid}, color-mix(in srgb, {Solid} 55%, #8B5CF6))";
+    private string Shown => Money ? Pc.Money(_shown) : Pc.Num((int)Math.Round(_shown));
+
+    protected override void OnParametersSet()
+    {
+        if (_shown == Value) return;
+        _from = _shown;
+        _cts?.Cancel();
+        _cts = new CancellationTokenSource();
+        _ = CountAsync(_cts.Token);
+    }
+
+    /// <summary>Counts from the old number to the new one so a change is seen, not just shown.</summary>
+    private async Task CountAsync(CancellationToken ct)
+    {
+        const int steps = 22;
+        try
+        {
+            for (var i = 1; i <= steps; i++)
+            {
+                var t = i / (double)steps;
+                var eased = 1 - Math.Pow(1 - t, 3);
+                _shown = _from + (Value - _from) * (decimal)eased;
+                await InvokeAsync(StateHasChanged);
+                await Task.Delay(22, ct);
+            }
+        }
+        catch (TaskCanceledException) { return; }
+        _shown = Value;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => _cts?.Cancel();
+}

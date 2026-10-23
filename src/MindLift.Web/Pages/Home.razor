@@ -209,6 +209,12 @@
             return;
         }
 
+        if (Session.Me?.IsPlatformAdmin == true)
+        {
+            Nav.NavigateTo("/platform", replace: true);
+            return;
+        }
+
         if (App.IsAdmin)
         {
             try

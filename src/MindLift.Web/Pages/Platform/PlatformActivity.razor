@@ -1,0 +1,179 @@
+@page "/platform/activity"
+@layout PlatformLayout
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Audit trail · MindLift platform</PageTitle>
+
+<div class="pc-head pc-rise">
+    <div>
+        <div class="pc-eyebrow">Audit trail</div>
+        <h1 class="pc-title">Every change, <span class="pc-grad">on record.</span></h1>
+        <div class="pc-sub">Who changed what, for which company and when. Nothing here can be edited or removed. Filter it, open a row for the detail, or export it.</div>
+    </div>
+    <button class="pc-btn" @onclick="ExportAsync" data-testid="audit-export"><MudIcon Icon="@Icons.Material.Filled.Download" Size="Size.Small" />Export CSV</button>
+</div>
+
+<div class="d-flex align-center flex-wrap pc-rise" style="gap:12px;margin-bottom:20px;--i:1">
+    <div class="pc-seg" data-testid="audit-kind">
+        @foreach (var k in Kinds)
+        {
+            var kind = k.Key;
+            <button class="@(_kind == kind ? "is-on" : "")" @onclick="() => SetKind(kind)" data-testid="audit-kind-@(kind == "" ? "all" : kind)">@k.Value</button>
+        }
+    </div>
+    <select class="pc-select" @onchange="OnCompany" data-testid="audit-company" aria-label="Company">
+        <option value="">All companies</option>
+        @foreach (var c in _companies)
+        {
+            <option value="@c.Id">@c.Name</option>
+        }
+    </select>
+    <input class="pc-input" type="date" @bind="From" data-testid="audit-from" aria-label="From date" />
+    <input class="pc-input" type="date" @bind="To" data-testid="audit-to" aria-label="To date" />
+    <input class="pc-input" style="min-width:220px" placeholder="Search who, what or which company" @bind="Search" @bind:event="oninput" data-testid="audit-search" />
+    @if (Filtered)
+    {
+        <button class="pc-btn pc-btn--ghost" @onclick="ClearAsync" data-testid="audit-clear"><MudIcon Icon="@Icons.Material.Filled.FilterAltOff" Size="Size.Small" />Clear</button>
+    }
+</div>
+
+<div class="pc-card pc-card--flush pc-rise" style="overflow-x:auto;--i:2" data-testid="activity-list">
+    @if (_page is null)
+    {
+        <div class="pc-skel" style="height:300px"></div>
+    }
+    else if (_page.Items.Count == 0)
+    {
+        <div class="pc-empty"><div class="pc-empty__art"><MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Large" /></div><h3 style="margin:0 0 6px">@(Filtered ? "Nothing matches these filters" : "Nothing yet")</h3><div>Changes to modules, plans, limits and status appear here.</div></div>
+    }
+    else
+    {
+        <table class="pc-table" data-testid="audit-table">
+            <thead><tr><th style="width:170px">When</th><th>Who</th><th>Action</th><th>Company</th><th>What changed</th><th style="width:40px"></th></tr></thead>
+            <tbody>
+            @foreach (var a in _page.Items)
+            {
+                var entry = a;
+                var open = _open == entry.Id;
+                <tr @onclick="() => _open = open ? null : entry.Id" data-testid="audit-row">
+                    <td><div style="font-weight:650">@Pc.Ago(entry.At)</div><div class="pc-card__hint">@entry.At.ToString("d MMM yyyy HH:mm")</div></td>
+                    <td><div class="d-flex align-center" style="gap:10px"><PcAvatar Name="@entry.Actor" Size="28" /><span>@entry.Actor</span></div></td>
+                    <td><span class="pc-act pc-act--@Group(entry.Action)">@Label(entry.Action)</span></td>
+                    <td>@if (entry.TenantId is not null) { <span>@entry.Company</span> } else { <span class="pc-card__hint">Platform</span> }</td>
+                    <td style="max-width:420px">@entry.Summary</td>
+                    <td><MudIcon Icon="@(open ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)" Size="Size.Small" /></td>
+                </tr>
+                @if (open)
+                {
+                    <tr class="pc-detail" data-testid="audit-detail">
+                        <td colspan="6">
+                            <div class="pc-detail__grid">
+                                <div><b>Exact time (UTC)</b>@entry.At.ToString("yyyy-MM-dd HH:mm:ss")</div>
+                                <div><b>Action code</b>@entry.Action</div>
+                                <div><b>Done by</b>@entry.Actor</div>
+                                <div><b>Company</b>@if (entry.TenantId is { } id) { <a style="color:var(--pc-brand);font-weight:650;cursor:pointer" @onclick="() => OpenCompany(id)" @onclick:stopPropagation="true">@entry.Company</a> } else { <span>Whole platform</span> }</div>
+                                <div style="grid-column:1/-1"><b>What changed</b>@entry.Summary</div>
+                                <div><b>Record id</b><span class="pc-num" style="font-size:12px">@entry.Id</span></div>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            }
+            </tbody>
+        </table>
+        <div class="d-flex align-center justify-space-between" style="padding:14px 18px;gap:12px;flex-wrap:wrap">
+            <span class="pc-card__hint" data-testid="audit-count">@Range of @_page.Total</span>
+            <div class="d-flex" style="gap:8px">
+                <button class="pc-btn pc-btn--sm" disabled="@(_pageNo <= 1)" @onclick="() => GoAsync(_pageNo - 1)" data-testid="audit-prev">Newer</button>
+                <button class="pc-btn pc-btn--sm" disabled="@(_pageNo * PageSize >= _page.Total)" @onclick="() => GoAsync(_pageNo + 1)" data-testid="audit-next">Older</button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private const int PageSize = 20;
+    private static readonly Dictionary<string, string> Kinds = new() { [""] = "Everything", ["company"] = "Companies", ["modules"] = "Modules", ["plan"] = "Plans", ["status"] = "Status", ["limits"] = "Limits" };
+
+    private PagedResult<PlatformAuditDto>? _page;
+    private List<PlatformCompanyDto> _companies = [];
+    private int _pageNo = 1;
+    private string _kind = "";
+    private string _companyId = "";
+    private DateTime? _from, _to;
+    private string _search = "";
+    private Guid? _open;
+    private CancellationTokenSource? _cts;
+
+    private DateTime? From { get => _from; set { _from = value; _ = ReloadAsync(); } }
+    private DateTime? To { get => _to; set { _to = value; _ = ReloadAsync(); } }
+    private string Search { get => _search; set { _search = value; _ = DebouncedAsync(); } }
+    private bool Filtered => _kind != "" || _companyId != "" || _from is not null || _to is not null || _search.Trim() != "";
+    private string Range => _page is null || _page.Total == 0 ? "0" : $"{(_pageNo - 1) * PageSize + 1}-{Math.Min(_pageNo * PageSize, _page.Total)}";
+
+    private static string Group(string action) => action.Split('.')[0] is var g && g is "modules" or "plan" or "status" or "limits" or "company" ? g : "company";
+
+    private static string Label(string action) => action switch
+    {
+        "modules.changed" => "Modules",
+        "plan.changed" => "Company plan",
+        "plan.edited" => "Plan edited",
+        "plan.created" => "Plan created",
+        "plan.deleted" => "Plan deleted",
+        "status.changed" => "Status",
+        "limits.changed" => "Limits",
+        "company.created" => "Company onboarded",
+        _ => action
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _companies = (await Http.GetFromJsonAsync<PlatformCompanyListDto>("api/v1/platform/companies?pageSize=200"))?.Items.ToList() ?? []; }
+        catch (HttpRequestException) { }
+
+        await LoadAsync();
+    }
+
+    private string Query(bool paged)
+    {
+        var q = new List<string>();
+        if (paged) { q.Add($"page={_pageNo}"); q.Add($"pageSize={PageSize}"); }
+        if (_kind != "") q.Add($"kind={_kind}");
+        if (_companyId != "") q.Add($"company={_companyId}");
+        if (_from is { } f) q.Add($"from={f:yyyy-MM-dd}");
+        if (_to is { } t) q.Add($"to={t:yyyy-MM-dd}");
+        if (_search.Trim() != "") q.Add($"search={Uri.EscapeDataString(_search.Trim())}");
+        return string.Join('&', q);
+    }
+
+    private async Task LoadAsync()
+    {
+        try { _page = await Http.GetFromJsonAsync<PagedResult<PlatformAuditDto>>("api/v1/platform/activity?" + Query(true)); }
+        catch (HttpRequestException) { _page = new PagedResult<PlatformAuditDto>([], 0, 1, PageSize); }
+    }
+
+    private async Task ReloadAsync() { _pageNo = 1; _open = null; await LoadAsync(); await InvokeAsync(StateHasChanged); }
+    private async Task SetKind(string k) { _kind = k; await ReloadAsync(); }
+    private async Task OnCompany(ChangeEventArgs e) { _companyId = e.Value?.ToString() ?? ""; await ReloadAsync(); }
+    private async Task GoAsync(int page) { _pageNo = page; _open = null; await LoadAsync(); }
+
+    private async Task DebouncedAsync()
+    {
+        _cts?.Cancel();
+        _cts = new CancellationTokenSource();
+        try { await Task.Delay(250, _cts.Token); await ReloadAsync(); }
+        catch (OperationCanceledException) { }
+    }
+
+    private async Task ClearAsync() { _kind = ""; _companyId = ""; _from = null; _to = null; _search = ""; await ReloadAsync(); }
+
+    private void OpenCompany(Guid id) => Nav.NavigateTo("/platform/companies/" + id);
+
+    private async Task ExportAsync()
+    {
+        var bytes = await Http.GetByteArrayAsync("api/v1/platform/activity/export?" + Query(false));
+        await JS.InvokeVoidAsync("mindlift.downloadFile", "platform-audit-trail.csv", "text/csv", Convert.ToBase64String(bytes));
+    }
+}

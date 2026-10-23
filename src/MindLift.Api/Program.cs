@@ -86,6 +86,7 @@ builder.Services.AddAuthorization(options =>
 });
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
 builder.Services.AddScoped<IAuthorizationHandler, PermissionHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, ModuleHandler>();
 
 // FluentValidation: register every AbstractValidator<T> in the API assembly.
 foreach (var type in typeof(Program).Assembly.GetTypes().Where(t =>

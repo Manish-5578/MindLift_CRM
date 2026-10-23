@@ -8,6 +8,7 @@ namespace MindLift.Api.Controllers;
 
 [ApiController]
 [Route("api/v1/automation")]
+[RequiresModule(AppModule.Automation)]
 public sealed class AutomationController(IAutomationEngine automation) : ControllerBase
 {
     [HasPermission(AppModule.Settings, PermissionAction.View)]

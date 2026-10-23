@@ -26,7 +26,8 @@ public sealed class AutomationEngine(
     IBackgroundJobClient backgroundJobs,
     IAutomationExecutionContext executionContext,
     IHttpClientFactory? httpClientFactory,
-    ILogger<AutomationEngine> logger
+    ILogger<AutomationEngine> logger,
+    IPlatformEntitlements? entitlements = null
 ) : IAutomationEngine
 {
     public Task ProcessTriggersAsync<T>(
@@ -46,6 +47,12 @@ public sealed class AutomationEngine(
         CancellationToken cancellationToken = default
     ) where T : TenantEntity
     {
+        // A company the platform owner took Automation away from has no rules run.
+        if (entitlements is not null && !await entitlements.IsModuleAllowedAsync(MindLift.Shared.Enums.AppModule.Automation, cancellationToken))
+        {
+            return;
+        }
+
         if (!executionContext.CanExecute())
         {
             logger.LogWarning("Automation loop protection triggered: max depth {Depth} or max executions {Total} reached. Skipping further rules for {EntityType} {Id}.",

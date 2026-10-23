@@ -21,11 +21,14 @@ public sealed class PlanLimitService(AppDbContext db, ITenantContext tenant, ICl
         var pending = await db.Invitations.AsNoTracking()
             .CountAsync(i => i.AcceptedAt == null && i.RevokedAt == null && i.ExpiresAt > now, cancellationToken);
 
-        if (activeUsers + pending >= plan.MaxUsers)
+        var limit = workspace.MaxUsersOverride ?? plan.MaxUsers;
+        if (activeUsers + pending >= limit)
         {
             throw new PlanLimitException(
                 "plan_limit_users",
-                $"Your {plan.Name} plan allows {plan.MaxUsers} users. Upgrade your plan to add more people.");
+                workspace.MaxUsersOverride is null
+                    ? $"Your {plan.Name} plan allows {limit} users. Upgrade your plan to add more people."
+                    : $"Your company is limited to {limit} users. Contact support to add more people.");
         }
     }
 }

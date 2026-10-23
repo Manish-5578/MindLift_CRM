@@ -1,0 +1,75 @@
+@* A smooth area chart with a hover read-out. *@
+<div class="pc-chart" @onmouseleave="() => _hot = -1" data-testid="area-chart">
+    <svg viewBox="0 0 @W @H" role="img" aria-label="@Title">
+        <defs>
+            <linearGradient id="@_id" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0" stop-color="#6366F1" stop-opacity=".42" />
+                <stop offset="1" stop-color="#06B6D4" stop-opacity="0" />
+            </linearGradient>
+            <linearGradient id="@(_id)s" x1="0" x2="1">
+                <stop offset="0" stop-color="#6366F1" />
+                <stop offset="1" stop-color="#06B6D4" />
+            </linearGradient>
+        </defs>
+        @for (var g = 0; g <= 3; g++)
+        {
+            var y = Top + (H - Top - Bottom) * g / 3.0;
+            <line class="pc-gridline" x1="@Left" x2="@(W - 8)" y1="@F(y)" y2="@F(y)" />
+            @((MarkupString)$"<text class=\"pc-axis\" x=\"{Left - 8}\" y=\"{F(y + 4)}\" text-anchor=\"end\">{Math.Round(Max * (3 - g) / 3.0)}</text>")
+        }
+        <path d="@AreaPath" fill="url(#@_id)" class="pc-area-fade" />
+        <path d="@LinePath" fill="none" stroke="url(#@(_id)s)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="pc-line-draw" />
+        @for (var i = 0; i < Pts.Count; i += Math.Max(1, Pts.Count / 6))
+        {
+            @((MarkupString)$"<text class=\"pc-axis\" x=\"{F(Pts[i].x)}\" y=\"{H - 6}\" text-anchor=\"middle\">{System.Net.WebUtility.HtmlEncode(Data[i].Label)}</text>")
+        }
+        @for (var i = 0; i < Pts.Count; i++)
+        {
+            var idx = i;
+            <rect x="@F(Pts[i].x - Step / 2)" y="@Top" width="@F(Step)" height="@(H - Top - Bottom)" fill="transparent" @onmouseenter="() => _hot = idx" />
+        }
+        @if (_hot >= 0 && _hot < Pts.Count)
+        {
+            <line x1="@F(Pts[_hot].x)" x2="@F(Pts[_hot].x)" y1="@Top" y2="@(H - Bottom)" stroke="#6366F1" stroke-opacity=".4" stroke-dasharray="3 4" />
+            <circle cx="@F(Pts[_hot].x)" cy="@F(Pts[_hot].y)" r="6" fill="var(--pc-surface)" stroke="#6366F1" stroke-width="3" />
+        }
+    </svg>
+    @if (_hot >= 0 && _hot < Pts.Count)
+    {
+        <div class="pc-chart__tip" style="left:@F(Pts[_hot].x / W * 100)%;top:@F(Pts[_hot].y / H * 100)%"><b>@Data[_hot].Value</b> @Unit<small>@Data[_hot].Label</small></div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<PlatformPoint> Data { get; set; } = [];
+    [Parameter] public string Unit { get; set; } = "";
+    [Parameter] public string Title { get; set; } = "";
+
+    private const int W = 720, H = 260, Left = 34, Top = 14, Bottom = 26;
+    private readonly string _id = "ac" + Guid.NewGuid().ToString("N")[..8];
+    private int _hot = -1;
+
+    private int Max => Math.Max(3, Data.Count == 0 ? 0 : Data.Max(d => d.Value));
+    private double Step => Data.Count < 2 ? W : (W - Left - 8) / (double)(Data.Count - 1);
+    private List<(double x, double y)> Pts => Data.Select((d, i) => (Left + i * Step, Top + (H - Top - Bottom) * (1 - d.Value / (double)Max))).ToList();
+    private static string F(double v) => v.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>A smooth curve through the points.</summary>
+    private string LinePath
+    {
+        get
+        {
+            var p = Pts;
+            if (p.Count == 0) return "";
+            var d = $"M{F(p[0].x)} {F(p[0].y)}";
+            for (var i = 1; i < p.Count; i++)
+            {
+                var cx = (p[i - 1].x + p[i].x) / 2;
+                d += $" C{F(cx)} {F(p[i - 1].y)} {F(cx)} {F(p[i].y)} {F(p[i].x)} {F(p[i].y)}";
+            }
+            return d;
+        }
+    }
+
+    private string AreaPath => Pts.Count == 0 ? "" : $"{LinePath} L{F(Pts[^1].x)} {H - Bottom} L{F(Pts[0].x)} {H - Bottom} Z";
+}

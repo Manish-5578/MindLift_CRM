@@ -7,8 +7,10 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using MindLift.Infrastructure.Documents.Ai;
 using MindLift.Infrastructure.Documents.Text;
 using MindLift.Infrastructure.Documents.Extraction;
 using MindLift.Application.Abstractions;
@@ -26,6 +28,10 @@ public sealed class DocumentOcrService(
     INotificationService notifications,
     DocumentPageReader pageReader,
     SearchablePdfService searchablePdf,
+    DocumentFieldReader fieldReader,
+    DocumentRecordApplier applier,
+    IBackgroundJobClient jobs,
+    IPlatformEntitlements entitlements,
     ILogger<DocumentOcrService> logger) : IDocumentOcrService
 {
     private Guid CurrentTenantId => tenant.TenantId ?? throw new UnauthorizedAccessException("Tenant context required.");
@@ -145,6 +151,8 @@ public sealed class DocumentOcrService(
 
         doc.OcrStatus = (int)DocumentOcrStatus.Processing;
         doc.Status = "Processing";
+        doc.ExtractionMethod = null;
+        doc.ExtractionNote = null;
         await db.SaveChangesAsync(ct);
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -201,6 +209,8 @@ public sealed class DocumentOcrService(
             doc.Status = "Failed";
             doc.OcrRawText = null;
             doc.OcrStructuredDataJson = "[]";
+            doc.ReadConfidence = null;
+            doc.LowConfidencePagesJson = null;
             await db.SaveChangesAsync(ct);
             return new OcrResultDto
             {
@@ -341,15 +351,6 @@ public sealed class DocumentOcrService(
                             extractedFields.Add(new OcrExtractedFieldDto { FieldName = "Total", Value = total.Value.ToString("F2", CultureInfo.InvariantCulture), Confidence = 0.99 });
                         }
                     }
-                    else
-                    {
-                        var (parsedTotal, curr) = AmountNormalizer.Parse(normalizedText);
-                        if (parsedTotal.HasValue)
-                        {
-                            total = parsedTotal.Value;
-                            extractedFields.Add(new OcrExtractedFieldDto { FieldName = "Total", Value = total.Value.ToString("F2", CultureInfo.InvariantCulture), Confidence = 0.99 });
-                        }
-                    }
 
                     var dateMatch = Regex.Match(normalizedText, @"(?:Date|Invoice\s*Date):\s*([^\r\n]+)", RegexOptions.IgnoreCase);
                     if (dateMatch.Success)
@@ -369,29 +370,96 @@ public sealed class DocumentOcrService(
         sw.Stop();
 
         // 4. Update and persist document
-        // B2. The workspace's own document types (Settings > Document types). The best match sets the category and adds its fields.
+        // B2. The workspace's own document types (Settings > Document types). A type already on the document (chosen on upload or review, or found
+        // last time) is used; otherwise the best keyword match. Its fields are read by AI and/or patterns, each as the field's mode says.
+        var aiAllowed = await db.Set<TenantSettings>().AsNoTracking().Select(t => t.AiReadingEnabled).FirstOrDefaultAsync(ct)
+            && await entitlements.IsAiAllowedAsync(ct);
         var customTypes = await db.Set<DocumentTypeDefinition>().AsNoTracking().Where(t => t.IsActive).ToListAsync(ct);
-        DocumentTypeDefinition? bestType = null;
-        var bestScore = 0;
-        foreach (var candidate in customTypes)
+        var bestType = customTypes.FirstOrDefault(t => string.Equals(t.Key, doc.Category, StringComparison.Ordinal));
+        if (bestType is null)
         {
-            var score = CustomDocumentExtractor.Score(CustomDocumentExtractor.Keywords(candidate.KeywordsJson), rawText);
-            if (score >= candidate.MinScore && score > bestScore)
+            var bestScore = 0;
+            foreach (var candidate in customTypes)
             {
-                bestType = candidate;
-                bestScore = score;
+                var score = CustomDocumentExtractor.Score(CustomDocumentExtractor.Keywords(candidate.KeywordsJson), rawText);
+                if (score >= candidate.MinScore && score > bestScore)
+                {
+                    bestType = candidate;
+                    bestScore = score;
+                }
             }
         }
 
+        string? extractionMethod = null;
+        string? extractionNote = null;
         if (bestType is not null)
         {
             detectedCategory = bestType.Key;
-            var read = CustomDocumentExtractor.Extract(CustomDocumentExtractor.Fields(bestType.FieldsJson), rawText);
-            foreach (var field in read.Where(f => f.Found && f.Value is not null))
+            var rules = CustomDocumentExtractor.Fields(bestType.FieldsJson);
+            var reading = await fieldReader.ReadAsync(bestType.Name, bestType.Description, rules, pages, aiAllowed, ct);
+            extractionMethod = reading.Method;
+            extractionNote = reading.Note;
+
+            // The type says which values are wanted, so the values the built-in rules read on their own (an invoice's total on a passport slip, say) are not listed beside them.
+            extractedFields.RemoveAll(f => string.IsNullOrEmpty(f.Key));
+            foreach (var field in reading.Fields)
             {
-                extractedFields.Add(new OcrExtractedFieldDto { FieldName = field.Key, Value = field.Value!, Confidence = field.Confidence / 100.0 });
+                var rule = rules.First(r => r.Key == field.Key);
+
+                // A value the built-in rules read for the same field (an invoice total, say) gives way to the type's own.
+                extractedFields.RemoveAll(f => string.Equals(f.FieldName, field.Key, StringComparison.OrdinalIgnoreCase));
+
+                // Every field the type defines is listed, found or not, so a person can fill in what could not be read.
+                extractedFields.Add(new OcrExtractedFieldDto
+                {
+                    FieldName = field.Key,
+                    Key = field.Key,
+                    Label = field.Label,
+                    Value = field.Found ? field.Value ?? string.Empty : string.Empty,
+                    Confidence = field.Found ? field.Confidence / 100.0 : 0,
+                    Method = field.Found ? field.Method : null,
+                    Snippet = field.Snippet,
+                    Page = field.Page,
+                    Verified = field.Found ? field.Verified : null,
+                    SaveTo = rule.SaveTo,
+                    ValueType = rule.ValueType,
+                    Required = rule.Required,
+                });
+
+                if (!field.Found || field.Value is null)
+                {
+                    continue;
+                }
+
                 if (field.Key == "expiry_date" && DateOnly.TryParse(field.Value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var expiry)) docExpiry = expiry;
                 if (field.Key == "issue_date" && DateOnly.TryParse(field.Value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var issue)) docIssue = issue;
+            }
+        }
+        else if (extractedFields.Count == 0 && aiAllowed)
+        {
+            // No type matched and the built-in rules found nothing: let the AI list the useful facts, so the document is not left empty.
+            var (details, note) = await fieldReader.ReadDetailsAsync(pages, aiAllowed, ct);
+            extractionNote = note;
+            if (details.Count > 0)
+            {
+                extractionMethod = DocumentFieldReader.MethodAi;
+            }
+
+            foreach (var detail in details)
+            {
+                extractedFields.Add(new OcrExtractedFieldDto
+                {
+                    FieldName = detail.Key,
+                    Key = detail.Key,
+                    Label = detail.Label,
+                    Value = detail.Value,
+                    Confidence = detail.Confidence,
+                    Method = "ai",
+                    Snippet = detail.Snippet,
+                    Page = detail.Page,
+                    Verified = true,
+                    ValueType = DocumentValueTypes.Text,
+                });
             }
         }
 
@@ -418,6 +486,10 @@ public sealed class DocumentOcrService(
         doc.IssueDate = docIssue;
         doc.Confidence = overallConfidence;
         doc.OcrStructuredDataJson = JsonSerializer.Serialize(extractedFields);
+        doc.ExtractionMethod = extractionMethod ?? DocumentFieldReader.MethodRules;
+        doc.ExtractionNote = extractionNote;
+        doc.ReadConfidence = Math.Round(readConfidence, 2);
+        doc.LowConfidencePagesJson = lowConfidencePages.Count > 0 ? JsonSerializer.Serialize(lowConfidencePages) : null;
 
         await db.SaveChangesAsync(ct);
 
@@ -434,7 +506,9 @@ public sealed class DocumentOcrService(
             DetectedDate = detectedDate,
             ProcessingDuration = sw.Elapsed,
             ReadConfidence = Math.Round(readConfidence, 2),
-            LowConfidencePages = lowConfidencePages
+            LowConfidencePages = lowConfidencePages,
+            ExtractionMethod = doc.ExtractionMethod,
+            ExtractionNote = doc.ExtractionNote,
         };
     }
 
@@ -451,32 +525,10 @@ public sealed class DocumentOcrService(
             doc.Status = "Approved";
             doc.RejectReason = null;
 
-            // Apply fields to target records if requested
+            // Save the chosen values into the linked contact, account or deal. All or none: if one record cannot take its value the document stays unapproved.
             if (request.ApplyFields is { Count: > 0 })
             {
-                foreach (var apply in request.ApplyFields)
-                {
-                    if (apply.TargetField.StartsWith("accounts.", StringComparison.OrdinalIgnoreCase) && doc.AssociatedAccountId.HasValue)
-                    {
-                        var account = await db.Set<Account>().FirstOrDefaultAsync(a => a.Id == doc.AssociatedAccountId.Value && !a.IsDeleted, ct);
-                        if (account != null)
-                        {
-                            if (apply.TargetField.EndsWith("trade_license_number", StringComparison.OrdinalIgnoreCase))
-                            {
-                                // Store license number in account custom field or notes if needed
-                                account.Description = (account.Description ?? "") + $" [License: {apply.Value}]";
-                            }
-                        }
-                    }
-                    else if (apply.TargetField.StartsWith("contacts.", StringComparison.OrdinalIgnoreCase) && doc.AssociatedContactId.HasValue)
-                    {
-                        var contact = await db.Set<Contact>().FirstOrDefaultAsync(c => c.Id == doc.AssociatedContactId.Value && !c.IsDeleted, ct);
-                        if (contact != null)
-                        {
-                            contact.Description = (contact.Description ?? "") + $" [{apply.FieldName}: {apply.Value}]";
-                        }
-                    }
-                }
+                await applier.ApplyAsync(doc, request.ApplyFields, ct);
             }
 
             // If document was uploaded for a document request, mark it completed
@@ -512,6 +564,38 @@ public sealed class DocumentOcrService(
         var doc = await db.Set<BusinessDocument>().FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted, ct)
             ?? throw new NotFoundException("Document", id);
 
+        var before = ReadFields(doc.OcrStructuredDataJson);
+        foreach (var field in request.Fields)
+        {
+            var old = before.FirstOrDefault(b => string.Equals(b.FieldName, field.FieldName, StringComparison.OrdinalIgnoreCase));
+            if (old is null)
+            {
+                // A field a person added by hand.
+                field.Method ??= "edited";
+                continue;
+            }
+
+            field.Key ??= old.Key;
+            field.Label ??= old.Label;
+            field.SaveTo ??= old.SaveTo;
+            field.ValueType ??= old.ValueType;
+            if (!string.Equals(old.Value, field.Value, StringComparison.Ordinal))
+            {
+                field.Method = "edited";
+                field.Verified = null;
+                field.Snippet = null;
+                field.Page = null;
+                field.Confidence = string.IsNullOrWhiteSpace(field.Value) ? 0 : 1.0;
+            }
+            else
+            {
+                field.Method ??= old.Method;
+                field.Snippet ??= old.Snippet;
+                field.Page ??= old.Page;
+                field.Verified ??= old.Verified;
+            }
+        }
+
         doc.OcrStructuredDataJson = JsonSerializer.Serialize(request.Fields);
 
         // Check if any standard fields were edited
@@ -537,6 +621,76 @@ public sealed class DocumentOcrService(
 
         await db.SaveChangesAsync(ct);
         return true;
+    }
+
+    /// <summary>
+    /// Puts the document in the queue to be read in the background and returns at once. Reading with AI can take a minute or more, so the person is not kept waiting:
+    /// the status moves from Queued to Processing to NeedsReview. A type chosen here is kept on the document and used when it is read.
+    /// </summary>
+    public async Task<BusinessDocumentDto> QueueReadAsync(Guid id, string? documentType, CancellationToken ct = default)
+    {
+        var doc = await db.Set<BusinessDocument>().FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted, ct)
+            ?? throw new NotFoundException("Document", id);
+
+        if (!string.IsNullOrWhiteSpace(documentType))
+        {
+            var key = documentType.Trim();
+            var exists = await db.Set<DocumentTypeDefinition>().AnyAsync(t => t.Key == key && t.IsActive, ct);
+            if (!exists)
+            {
+                throw new ValidationException("documentType", "Choose one of the document types set up in Settings > Document types.");
+            }
+
+            doc.Category = key;
+        }
+        else if (documentType is not null)
+        {
+            // An empty choice means "decide from the words in the document": the type is forgotten.
+            doc.Category = "General";
+        }
+
+        // A reading that has been going for longer than any reading can take was cut off (the app was stopped, say), so the document may be read again.
+        if (doc.Status == "Processing" && DateTime.UtcNow - (doc.UpdatedAt ?? doc.CreatedAt) < TimeSpan.FromMinutes(20))
+        {
+            throw new BusinessRuleException("already_reading", "This document is being read right now.");
+        }
+
+        doc.OcrStatus = (int)DocumentOcrStatus.Pending;
+        doc.Status = "Queued";
+        await db.SaveChangesAsync(ct);
+
+        var tenantId = CurrentTenantId;
+        jobs.Enqueue<DocumentReadJob>(job => job.RunAsync(tenantId, id, 0, CancellationToken.None));
+        return MapDocument(doc);
+    }
+
+    /// <summary>Marks a document whose reading stopped unexpectedly as Failed, with a note, so it is never left Queued or Processing.</summary>
+    public async Task MarkReadFailedAsync(Guid id, string note, CancellationToken ct = default)
+    {
+        var doc = await db.Set<BusinessDocument>().FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted, ct);
+        if (doc is null)
+        {
+            return;
+        }
+
+        doc.OcrStatus = (int)DocumentOcrStatus.Failed;
+        doc.Status = "Failed";
+        doc.ExtractionNote = note;
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Links the document to a contact, an account and/or a deal (each must be this workspace's own), or clears a link by passing null.</summary>
+    public async Task<BusinessDocumentDto> LinkAsync(Guid id, LinkDocumentRequest request, CancellationToken ct = default)
+    {
+        var doc = await db.Set<BusinessDocument>().FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted, ct)
+            ?? throw new NotFoundException("Document", id);
+
+        await EnsureLinkedRecordsExistAsync(request.AccountId, request.DealId, null, null, request.ContactId, ct);
+        doc.AssociatedContactId = request.ContactId;
+        doc.AssociatedAccountId = request.AccountId;
+        doc.AssociatedDealId = request.DealId;
+        await db.SaveChangesAsync(ct);
+        return MapDocument(doc);
     }
 
     public async Task<BusinessDocumentDto> ReprocessAsync(Guid id, CancellationToken ct = default)
@@ -615,11 +769,12 @@ public sealed class DocumentOcrService(
         return alertsSent;
     }
 
-    public async Task<IReadOnlyList<BusinessDocumentDto>> GetDocumentsAsync(Guid? accountId = null, Guid? dealId = null, CancellationToken ct = default)
+    public async Task<IReadOnlyList<BusinessDocumentDto>> GetDocumentsAsync(Guid? accountId = null, Guid? dealId = null, Guid? contactId = null, CancellationToken ct = default)
     {
         var q = db.Set<BusinessDocument>().AsNoTracking().Where(d => !d.IsDeleted);
         if (accountId.HasValue) q = q.Where(d => d.AssociatedAccountId == accountId.Value);
         if (dealId.HasValue) q = q.Where(d => d.AssociatedDealId == dealId.Value);
+        if (contactId.HasValue) q = q.Where(d => d.AssociatedContactId == contactId.Value);
 
         var list = await q.OrderByDescending(d => d.CreatedAt).ToListAsync(ct);
         return list.Select(MapDocument).ToList();
@@ -702,6 +857,40 @@ public sealed class DocumentOcrService(
         return true;
     }
 
+    private static List<OcrExtractedFieldDto> ReadFields(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return [];
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<OcrExtractedFieldDto>>(json) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    private static List<int> ReadPages(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return [];
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<int>>(json) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
     private static BusinessDocumentDto MapDocument(BusinessDocument d)
     {
         List<OcrExtractedFieldDto> fields = [];
@@ -749,7 +938,11 @@ public sealed class DocumentOcrService(
                 DetectedVendor = d.DetectedVendor,
                 DetectedInvoiceNumber = d.DetectedInvoiceNumber,
                 DetectedTotal = d.DetectedTotal,
-                DetectedDate = d.DetectedDate
+                DetectedDate = d.DetectedDate,
+                ReadConfidence = d.ReadConfidence,
+                LowConfidencePages = ReadPages(d.LowConfidencePagesJson),
+                ExtractionMethod = d.ExtractionMethod,
+                ExtractionNote = d.ExtractionNote,
             } : null
         };
     }

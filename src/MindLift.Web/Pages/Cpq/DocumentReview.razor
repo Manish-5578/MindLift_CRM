@@ -2,10 +2,12 @@
 @page "/documents/{Id:guid}/review"
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize]
+@implements IDisposable
 @inject HttpClient Http
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject NavigationManager Nav
+@inject AppState App
 @inject Translator T
 @inject IJSRuntime JS
 
@@ -27,15 +29,19 @@
             <div class="d-flex align-center gap-3">
                 <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Nav.NavigateTo("/documents"))" aria-label="@T["Back to documents"]" />
                 <div>
-                    <div class="d-flex align-center gap-2">
+                    <div class="d-flex align-center gap-2 flex-wrap">
                         <MudText Typo="Typo.h5" Class="font-weight-bold">@_document.FileName</MudText>
-                        <MudChip T="string" Color="Color.Primary" Size="Size.Small" Variant="Variant.Outlined">@_document.Category</MudChip>
-                        <MudChip T="string" Color="@GetStatusColor(_document.Status)" Size="Size.Small">@_document.Status</MudChip>
-                        @if (_document.Confidence.HasValue)
+                        <MudChip T="string" Color="Color.Primary" Size="Size.Small" Variant="Variant.Outlined" data-testid="doc-type-chip">@TypeName(_document.Category)</MudChip>
+                        <MudChip T="string" Color="@GetStatusColor(_document.Status)" Size="Size.Small" data-testid="doc-status">@StatusLabel(_document.Status)</MudChip>
+                        @if (_document.Confidence.HasValue && !IsReading)
                         {
                             <MudChip T="string" Color="@GetConfidenceColor(_document.Confidence.Value)" Size="Size.Small" Variant="Variant.Text">
                                 @($"{(_document.Confidence.Value * 100):F0}% confidence")
                             </MudChip>
+                        }
+                        @if (MethodLabel is not null && !IsReading)
+                        {
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Icon="@Icons.Material.Outlined.AutoAwesome" data-testid="doc-method">@MethodLabel</MudChip>
                         }
                     </div>
                     <MudText Typo="Typo.caption" Class="text-secondary">
@@ -49,21 +55,17 @@
             </div>
 
             <div class="d-flex align-center gap-2">
-                <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Refresh"
-                           OnClick="ReprocessAsync" Disabled="_processing">
-                    @T["Reprocess OCR"]
-                </MudButton>
                 @if (_document.Status != "Rejected")
                 {
                     <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Cancel"
-                               OnClick="OpenRejectDialog" Disabled="_processing">
+                               OnClick="OpenRejectDialog" Disabled="_processing || IsReading" data-testid="doc-reject">
                         @T["Reject"]
                     </MudButton>
                 }
                 @if (_document.Status != "Approved")
                 {
                     <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.CheckCircle"
-                               OnClick="OpenApproveDialog" Disabled="_processing">
+                               OnClick="OpenApproveDialog" Disabled="_processing || IsReading" data-testid="doc-approve">
                         @T["Approve & Apply"]
                     </MudButton>
                 }
@@ -73,7 +75,7 @@
         <!-- Two-Pane Work Area -->
         <div class="d-flex flex-grow-1 gap-4" style="min-height: 0;">
             <!-- Left Pane: Document Text / Viewer -->
-            <MudPaper Class="pa-4 flex-grow-1 d-flex flex-column" Elevation="1" Style="width: 55%; overflow: hidden;">
+            <MudPaper Class="pa-4 flex-grow-1 d-flex flex-column" Elevation="1" Style="width: 50%; overflow: hidden;">
                 <div class="d-flex justify-space-between align-center mb-2">
                     <MudText Typo="Typo.subtitle1" Class="font-weight-bold">@T["Document Content"]</MudText>
                     <div class="d-flex gap-2">
@@ -102,8 +104,8 @@
 
                 <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" Class="flex-grow-1 d-flex flex-column">
                     <MudTabPanel Text="Extracted Text" Icon="@Icons.Material.Filled.TextFields">
-                        <div class="pa-3 flex-grow-1" style="overflow-y: auto; max-height: calc(100vh - 280px); background-color: var(--mud-palette-background-grey); border-radius: 4px;">
-                            <pre style="white-space: pre-wrap; font-family: monospace; font-size: 0.875rem;">@(_document.OcrResult?.ExtractedText ?? "No text extracted yet.")</pre>
+                        <div class="pa-3 flex-grow-1" style="overflow-y: auto; max-height: calc(100vh - 280px); background-color: var(--mud-palette-background-grey); border-radius: 4px;" data-testid="doc-text">
+                            <pre style="white-space: pre-wrap; font-family: monospace; font-size: 0.875rem;">@(_document.OcrResult?.ExtractedText ?? T["No text extracted yet."])</pre>
                         </div>
                     </MudTabPanel>
                     <MudTabPanel Text="Raw OCR Payload" Icon="@Icons.Material.Filled.Code">
@@ -115,18 +117,61 @@
             </MudPaper>
 
             <!-- Right Pane: Extracted Fields Review & Apply -->
-            <MudPaper Class="pa-4 d-flex flex-column" Elevation="1" Style="width: 45%; overflow-y: auto;">
-                <div class="d-flex justify-space-between align-center mb-4">
+            <MudPaper Class="pa-4 d-flex flex-column" Elevation="1" Style="width: 50%; overflow-y: auto;" data-testid="doc-fields-pane">
+                <div class="d-flex justify-space-between align-center mb-3">
                     <div>
                         <MudText Typo="Typo.subtitle1" Class="font-weight-bold">@T["Intelligence & Key Information"]</MudText>
                         <MudText Typo="Typo.caption" Class="text-secondary">@T["Review and adjust extracted values before approval"]</MudText>
                     </div>
-                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" OnClick="SaveFieldsAsync">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" OnClick="SaveFieldsAsync" Disabled="IsReading" data-testid="doc-save-edits">
                         @T["Save Edits"]
                     </MudButton>
                 </div>
 
-                @if (_fields.Count == 0)
+                @if (IsReading)
+                {
+                    <MudAlert Severity="Severity.Info" Class="mb-3" data-testid="doc-reading">
+                        @(_document.Status == "Queued" ? T["Waiting to be read. This page updates by itself."] : T["Reading this document. This can take a minute. This page updates by itself."])
+                        <MudProgressLinear Indeterminate="true" Color="Color.Info" Class="mt-2" />
+                    </MudAlert>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(_document.OcrResult?.ExtractionNote) && !IsReading)
+                {
+                    <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3" data-testid="doc-extraction-note">@_document.OcrResult!.ExtractionNote</MudAlert>
+                }
+
+                <!-- Which kind of document this is, and read it again as that kind -->
+                <div class="d-flex align-center gap-2 mb-3 flex-wrap">
+                    <MudSelect T="string" Value="_typeChoice" ValueChanged="v => _typeChoice = v ?? string.Empty" Label="@T["Document type"]" Variant="Variant.Outlined" Margin="Margin.Dense"
+                               Style="min-width:220px;max-width:320px" Disabled="IsReading" data-testid="doc-type-select">
+                        <MudSelectItem T="string" Value="@string.Empty">@T["Decide from the document"]</MudSelectItem>
+                        @foreach (var type in _types)
+                        {
+                            <MudSelectItem T="string" Value="@type.Key">@type.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Refresh"
+                               OnClick="ReadAgainAsync" Disabled="_processing || IsReading" data-testid="doc-read-again">
+                        @T["Read again"]
+                    </MudButton>
+                </div>
+
+                <!-- Linked records: approved values are saved into these -->
+                <MudPaper Class="pa-3 mb-3" Outlined="true" data-testid="doc-links">
+                    <MudText Typo="Typo.subtitle2" Class="font-weight-bold mb-1">@T["Linked records"]</MudText>
+                    <MudText Typo="Typo.caption" Class="text-secondary mb-2">@T["Values you approve are saved into these records."]</MudText>
+                    <div class="d-flex flex-column gap-2">
+                        <RecordPicker Search="@((text, ct) => RecordLookups.ContactsAsync(Http, text, ct))" Label="@T["Contact"]" Value="_contactId" Text="@_contactName"
+                                      ValueChanged="LinkContactAsync" TestId="doc-link-contact" />
+                        <RecordPicker Search="@((text, ct) => RecordLookups.AccountsAsync(Http, text, ct))" Label="@T["Account"]" Value="_accountId" Text="@_accountName"
+                                      ValueChanged="LinkAccountAsync" TestId="doc-link-account" />
+                        <RecordPicker Search="@((text, ct) => RecordLookups.DealsAsync(Http, text, ct))" Label="@T["Deal"]" Value="_dealId" Text="@_dealName"
+                                      ValueChanged="LinkDealAsync" TestId="doc-link-deal" />
+                    </div>
+                </MudPaper>
+
+                @if (_fields.Count == 0 && !IsReading)
                 {
                     <MudAlert Severity="Severity.Info" Class="my-2">@T["No structured fields extracted from this document."]</MudAlert>
                 }
@@ -135,28 +180,57 @@
                     <div class="d-flex flex-column gap-3">
                         @foreach (var field in _fields)
                         {
-                            <MudPaper Class="pa-3" Outlined="true">
-                                <div class="d-flex justify-space-between align-center mb-1">
-                                    <MudText Typo="Typo.subtitle2" Class="font-weight-bold">@field.FieldName</MudText>
-                                    <MudChip T="string" Size="Size.Small" Color="@GetConfidenceColor(field.Confidence)" Variant="Variant.Text">
-                                        @($"{field.Confidence * 100:F0}%")
-                                    </MudChip>
+                            var current = field;
+                            <MudPaper Class="pa-3" Outlined="true" data-testid="doc-field" data-field="@current.FieldName">
+                                <div class="d-flex justify-space-between align-center mb-1 flex-wrap gap-1">
+                                    <MudText Typo="Typo.subtitle2" Class="font-weight-bold">@LabelOf(current)@(current.Required ? " *" : string.Empty)</MudText>
+                                    <div class="d-flex align-center gap-1">
+                                        @if (MethodChip(current) is { } method)
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" data-testid="field-method">@method</MudChip>
+                                        }
+                                        @if (current.Verified == false)
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Icon="@Icons.Material.Outlined.WarningAmber" data-testid="field-unverified">@T["Not found in the document text"]</MudChip>
+                                        }
+                                        @if (current.Confidence > 0)
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Color="@GetConfidenceColor(current.Confidence)" Variant="Variant.Text">@($"{current.Confidence * 100:F0}%")</MudChip>
+                                        }
+                                    </div>
                                 </div>
-                                <MudTextField @bind-Value="field.Value" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                <MudTextField @bind-Value="current.Value" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true"
+                                              Placeholder="@(string.IsNullOrEmpty(current.Value) ? T["Not found. Type the value if the document has it."] : null)"
+                                              Error="@(current.Required && string.IsNullOrWhiteSpace(current.Value))" data-testid="field-input" />
+                                @if (!string.IsNullOrWhiteSpace(current.Snippet))
+                                {
+                                    <MudText Typo="Typo.caption" Class="text-secondary" data-testid="field-snippet">
+                                        @SnippetCaption(current)
+                                    </MudText>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(current.SaveTo))
+                                {
+                                    var entity = EntityOf(current.SaveTo);
+                                    var linked = IsLinked(entity);
+                                    <div class="d-flex align-center gap-1 mt-1" data-testid="field-save-to">
+                                        <MudCheckBox T="bool" Value="IsApplied(current)" ValueChanged="v => _apply[current.FieldName] = v" Disabled="!linked" Dense="true" Size="Size.Small"
+                                                     Label="@T["Save to {0}", TargetLabel(current.SaveTo)]" data-testid="field-apply" />
+                                        @if (!linked)
+                                        {
+                                            <MudText Typo="Typo.caption" Class="text-secondary">@T["Link a {0} above to save this.", T[SingularOf(entity)]]</MudText>
+                                        }
+                                    </div>
+                                }
                             </MudPaper>
                         }
                     </div>
                 }
 
-                @if (_document.AssociatedAccountId.HasValue || _document.AssociatedContactId.HasValue)
+                @if (CanEditTypes && _typeDefinition is not null && !IsReading)
                 {
-                    <MudDivider Class="my-4" />
-                    <MudText Typo="Typo.subtitle2" Class="font-weight-bold mb-2">@T["Apply to Associated Record"]</MudText>
-                    <MudPaper Class="pa-3" Outlined="true" Style="background-color: var(--mud-palette-background-grey);">
-                        <MudText Typo="Typo.body2">
-                            @T["When approved, verified values can be synchronized to the linked {0} record.", T[_document.AssociatedAccountId.HasValue ? "Account" : "Contact"]]
-                        </MudText>
-                    </MudPaper>
+                    <div class="mt-3">
+                        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Outlined.Add" OnClick="OpenAddField" data-testid="doc-add-field">@T["Add a field to this document type"]</MudButton>
+                    </div>
                 }
             </MudPaper>
         </div>
@@ -179,20 +253,41 @@
 </MudDialog>
 
 <!-- Approve Dialog -->
-<MudDialog @bind-Visible="_approveDialogOpen">
+<MudDialog @bind-Visible="_approveDialogOpen" data-testid="approve-dialog">
     <TitleContent>
         <MudText Typo="Typo.h6">@T["Approve Document"]</MudText>
     </TitleContent>
     <DialogContent>
         <MudText Typo="Typo.body2" Class="mb-3">@T["Are you sure you want to approve this document and commit its extracted data?"]</MudText>
-        @if (_fields.Count > 0)
+        @if (ToApply().Count > 0)
         {
-            <MudText Typo="Typo.subtitle2" Class="font-weight-bold mb-1">@T["Fields to be approved:"]</MudText>
-            <MudList T="string" Dense="true">
-                @foreach (var f in _fields)
+            <MudText Typo="Typo.subtitle2" Class="font-weight-bold mb-1">@T["Will be saved to the linked records:"]</MudText>
+            <MudList T="string" Dense="true" data-testid="approve-apply-list">
+                @foreach (var f in ToApply())
                 {
                     <MudListItem T="string">
-                        <strong>@f.FieldName:</strong> @f.Value
+                        <strong>@TargetLabel(f.SaveTo!):</strong> @f.Value
+                        @if (f.Verified == false)
+                        {
+                            <MudIcon Icon="@Icons.Material.Outlined.WarningAmber" Size="Size.Small" Color="Color.Warning" Class="ml-1" />
+                        }
+                    </MudListItem>
+                }
+            </MudList>
+            @if (ToApply().Any(f => f.Verified == false))
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">@T["Some values could not be found in the document text. Check them before approving."]</MudAlert>
+            }
+        }
+
+        @if (_fields.Any(f => !string.IsNullOrWhiteSpace(f.Value)))
+        {
+            <MudText Typo="Typo.subtitle2" Class="font-weight-bold mt-3 mb-1">@T["Kept on the document:"]</MudText>
+            <MudList T="string" Dense="true">
+                @foreach (var f in _fields.Where(f => !string.IsNullOrWhiteSpace(f.Value)))
+                {
+                    <MudListItem T="string">
+                        <strong>@LabelOf(f):</strong> @f.Value
                     </MudListItem>
                 }
             </MudList>
@@ -200,7 +295,32 @@
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="@(() => _approveDialogOpen = false)">@T["Cancel"]</MudButton>
-        <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="ConfirmApproveAsync">@T["Approve & Save"]</MudButton>
+        <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="ConfirmApproveAsync" data-testid="approve-confirm">@T["Approve & Save"]</MudButton>
+    </DialogActions>
+</MudDialog>
+
+<!-- Add a field to the document type, then read again -->
+<MudDialog @bind-Visible="_addFieldOpen" data-testid="add-field-dialog">
+    <TitleContent><MudText Typo="Typo.h6">@T["Add a field to this document type"]</MudText></TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mb-3">@T["The field is added to the document type, so every document of this type is read for it. This document is read again."]</MudText>
+        <div class="d-flex flex-column gap-2">
+            <MudTextField @bind-Value="_newLabel" Label="@T["Name of the field *"]" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="100" data-testid="add-field-label" />
+            <MudTextField @bind-Value="_newDescription" Label="@T["What to look for (helps the AI)"]" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="300" Lines="2" data-testid="add-field-description" />
+            <MudSelect T="string" @bind-Value="_newType" Label="@T["Kind of value"]" Variant="Variant.Outlined" Margin="Margin.Dense">
+                <MudSelectItem T="string" Value="@DocumentValueTypes.Text">@T["Text"]</MudSelectItem>
+                <MudSelectItem T="string" Value="@DocumentValueTypes.Id">@T["Number or code"]</MudSelectItem>
+                <MudSelectItem T="string" Value="@DocumentValueTypes.Number">@T["Number"]</MudSelectItem>
+                <MudSelectItem T="string" Value="@DocumentValueTypes.Amount">@T["Amount of money"]</MudSelectItem>
+                <MudSelectItem T="string" Value="@DocumentValueTypes.Date">@T["Date"]</MudSelectItem>
+                <MudSelectItem T="string" Value="@DocumentValueTypes.Email">@T["Email"]</MudSelectItem>
+                <MudSelectItem T="string" Value="@DocumentValueTypes.Phone">@T["Phone"]</MudSelectItem>
+            </MudSelect>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _addFieldOpen = false)">@T["Cancel"]</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="AddFieldAsync" Disabled="@(string.IsNullOrWhiteSpace(_newLabel) || _processing)" data-testid="add-field-confirm">@T["Add and read again"]</MudButton>
     </DialogActions>
 </MudDialog>
 
@@ -211,35 +331,133 @@
     private bool _processing;
     private BusinessDocumentDto? _document;
     private List<OcrExtractedFieldDto> _fields = [];
+    private List<DocumentTypeChoiceDto> _types = [];
+    private List<RecordTargetDto> _targets = [];
+    private DocumentTypeDto? _typeDefinition;
+    private string _typeChoice = string.Empty;
+
+    // Which fields are ticked to be saved to a record when approved. A field is ticked unless the person unticks it.
+    private readonly Dictionary<string, bool> _apply = [];
+
+    private Guid? _contactId, _accountId, _dealId;
+    private string? _contactName, _accountName, _dealName;
 
     private bool _rejectDialogOpen;
     private string _rejectReason = string.Empty;
     private bool _approveDialogOpen;
+    private bool _addFieldOpen;
+    private string _newLabel = string.Empty;
+    private string _newDescription = string.Empty;
+    private string _newType = DocumentValueTypes.Text;
+
+    private CancellationTokenSource? _cts;
+
+    private bool IsReading => _document?.Status is "Queued" or "Processing";
+
+    private bool CanEditTypes => App.Bootstrap?.Permissions.Any(p => p.Module == "Settings" && p.CanEdit) == true;
 
     protected override async Task OnInitializedAsync()
     {
+        _cts = new CancellationTokenSource();
+
+        // The types come first: the type chooser and the "add a field" button depend on them when the document loads.
+        await LoadChoicesAsync();
         await LoadDocumentAsync();
+        StartPolling();
     }
 
-    private async Task LoadDocumentAsync()
+    public void Dispose()
     {
-        _loading = true;
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+
+    private async Task LoadChoicesAsync()
+    {
+        try
+        {
+            _types = await Http.GetFromJsonAsync<List<DocumentTypeChoiceDto>>("api/v1/documents/types") ?? [];
+            _targets = await Http.GetFromJsonAsync<List<RecordTargetDto>>("api/v1/documents/targets") ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            // The page still works without the lists: the type cannot be changed and targets show by their key.
+        }
+    }
+
+    /// <summary>While the document is being read the page asks every few seconds, and shows the result as soon as it is ready.</summary>
+    private void StartPolling()
+    {
+        var token = _cts?.Token ?? CancellationToken.None;
+        if (!IsReading)
+        {
+            return;
+        }
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (!token.IsCancellationRequested)
+                {
+                    await Task.Delay(3000, token);
+                    await InvokeAsync(async () =>
+                    {
+                        await LoadDocumentAsync(quiet: true);
+                        StateHasChanged();
+                    });
+                    if (!IsReading)
+                    {
+                        return;
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // The page was left.
+            }
+        }, token);
+    }
+
+    private async Task LoadDocumentAsync(bool quiet = false)
+    {
+        if (!quiet)
+        {
+            _loading = true;
+        }
+
         try
         {
             _document = await Http.GetFromJsonAsync<BusinessDocumentDto>($"/api/v1/documents/{Id}");
-            if (_document?.OcrResult?.ExtractedFields != null)
+            if (_document is null)
             {
-                _fields = _document.OcrResult.ExtractedFields.Select(f => new OcrExtractedFieldDto
-                {
-                    FieldName = f.FieldName,
-                    Value = f.Value,
-                    Confidence = f.Confidence
-                }).ToList();
+                return;
             }
+
+            _fields = (_document.OcrResult?.ExtractedFields ?? []).Select(f => new OcrExtractedFieldDto
+            {
+                FieldName = f.FieldName, Value = f.Value, Confidence = f.Confidence, Key = f.Key, Label = f.Label, Method = f.Method, Snippet = f.Snippet,
+                Page = f.Page, Verified = f.Verified, SaveTo = f.SaveTo, ValueType = f.ValueType, Required = f.Required,
+            }).ToList();
+
+            _typeChoice = _types.Any(t => t.Key == _document.Category) ? _document.Category : _typeChoice;
+            if (_document.AssociatedContactId != _contactId || _document.AssociatedAccountId != _accountId || _document.AssociatedDealId != _dealId)
+            {
+                _contactId = _document.AssociatedContactId;
+                _accountId = _document.AssociatedAccountId;
+                _dealId = _document.AssociatedDealId;
+                await LoadLinkNamesAsync();
+            }
+
+            await LoadTypeDefinitionAsync();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!quiet)
         {
             Snackbar.Add($"Failed to load document: {ex.Message}", Severity.Error);
+        }
+        catch (HttpRequestException)
+        {
+            // A poll that fails once is tried again on the next tick.
         }
         finally
         {
@@ -247,25 +465,69 @@
         }
     }
 
-    private async Task ReprocessAsync()
+    /// <summary>The names of the linked records, read through the normal record endpoints so a person only sees what their access allows.</summary>
+    private async Task LoadLinkNamesAsync()
+    {
+        _contactName = _contactId is { } c ? await NameAsync($"api/v1/contacts/{c}", j => $"{j.GetProperty("firstName").GetString()} {j.GetProperty("lastName").GetString()}".Trim()) : null;
+        _accountName = _accountId is { } a ? await NameAsync($"api/v1/accounts/{a}", j => j.GetProperty("name").GetString()) : null;
+        _dealName = _dealId is { } d ? await NameAsync($"api/v1/deals/{d}", j => j.GetProperty("name").GetString()) : null;
+    }
+
+    private async Task<string?> NameAsync(string url, Func<System.Text.Json.JsonElement, string?> pick)
+    {
+        try
+        {
+            var response = await Http.GetAsync(url);
+            return response.IsSuccessStatusCode ? pick(await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>()) : T["Linked record"];
+        }
+        catch (Exception ex) when (ex is HttpRequestException or KeyNotFoundException or System.Text.Json.JsonException)
+        {
+            return T["Linked record"];
+        }
+    }
+
+    /// <summary>The document type's definition, so a field can be added to it from here. Only people who may edit settings can read it.</summary>
+    private async Task LoadTypeDefinitionAsync()
+    {
+        _typeDefinition = null;
+        if (!CanEditTypes || _document is null || !_types.Any(t => t.Key == _document.Category))
+        {
+            return;
+        }
+
+        try
+        {
+            var all = await Http.GetFromJsonAsync<List<DocumentTypeDto>>("api/v1/settings/document-types") ?? [];
+            _typeDefinition = all.FirstOrDefault(t => t.Key == _document.Category);
+        }
+        catch (HttpRequestException)
+        {
+            _typeDefinition = null;
+        }
+    }
+
+    // ---- reading again, changing the type, linking ----
+
+    private async Task ReadAgainAsync()
     {
         _processing = true;
         try
         {
-            var res = await Http.PostAsync($"/api/v1/documents/{Id}/reprocess", null);
-            if (res.IsSuccessStatusCode)
+            // An empty choice tells the server to decide from the words in the document; a key reads the document as that type.
+            var response = await Http.PostAsJsonAsync($"/api/v1/documents/{Id}/read", new ReadDocumentRequest(_typeChoice));
+            if (!response.IsSuccessStatusCode)
             {
-                Snackbar.Add(T["Document reprocessed successfully."], Severity.Success);
-                await LoadDocumentAsync();
+                Snackbar.Add(await ProblemText.FromAsync(response, T["Failed to reprocess document."]), Severity.Error);
+                return;
             }
-            else
-            {
-                Snackbar.Add(T["Failed to reprocess document."], Severity.Error);
-            }
+
+            Snackbar.Add(T["Reading started. This page updates when it is done."], Severity.Info);
+            await LoadDocumentAsync(quiet: true);
+            StartPolling();
         }
-        catch (Exception ex)
+        catch (HttpRequestException)
         {
-            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+            Snackbar.Add(T["We could not reach MindLift. Check your connection and try again."], Severity.Error);
         }
         finally
         {
@@ -273,16 +535,44 @@
         }
     }
 
+    // Each picker changes only its own link; the other two keep what they have. Clearing a picker sends null for that one.
+    private Task LinkContactAsync(Guid? id) => SendLinkAsync(new LinkDocumentRequest(id, _accountId, _dealId));
+
+    private Task LinkAccountAsync(Guid? id) => SendLinkAsync(new LinkDocumentRequest(_contactId, id, _dealId));
+
+    private Task LinkDealAsync(Guid? id) => SendLinkAsync(new LinkDocumentRequest(_contactId, _accountId, id));
+
+    private async Task SendLinkAsync(LinkDocumentRequest request)
+    {
+        var response = await Http.PutAsJsonAsync($"/api/v1/documents/{Id}/links", request);
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not link this record."]), Severity.Error);
+            return;
+        }
+
+        _contactId = request.ContactId;
+        _accountId = request.AccountId;
+        _dealId = request.DealId;
+        await LoadLinkNamesAsync();
+    }
+
+    // ---- saving, approving, rejecting ----
+
+    private async Task<bool> PersistFieldsAsync()
+    {
+        var response = await Http.PutAsJsonAsync($"/api/v1/documents/{Id}/fields", new UpdateExtractedFieldsRequest(_fields));
+        return response.IsSuccessStatusCode;
+    }
+
     private async Task SaveFieldsAsync()
     {
         try
         {
-            var req = new UpdateExtractedFieldsRequest(_fields);
-            var res = await Http.PutAsJsonAsync($"/api/v1/documents/{Id}/fields", req);
-            if (res.IsSuccessStatusCode)
+            if (await PersistFieldsAsync())
             {
                 Snackbar.Add(T["Fields saved successfully."], Severity.Success);
-                await LoadDocumentAsync();
+                await LoadDocumentAsync(quiet: true);
             }
             else
             {
@@ -312,11 +602,11 @@
             if (res.IsSuccessStatusCode)
             {
                 Snackbar.Add(T["Document marked as Rejected."], Severity.Info);
-                await LoadDocumentAsync();
+                await LoadDocumentAsync(quiet: true);
             }
             else
             {
-                Snackbar.Add(T["Failed to reject document."], Severity.Error);
+                Snackbar.Add(await ProblemText.FromAsync(res, T["Failed to reject document."]), Severity.Error);
             }
         }
         catch (Exception ex)
@@ -329,10 +619,11 @@
         }
     }
 
-    private void OpenApproveDialog()
-    {
-        _approveDialogOpen = true;
-    }
+    private void OpenApproveDialog() => _approveDialogOpen = true;
+
+    /// <summary>The fields ticked to be saved to a record: they name a target, the matching record is linked, and they have a value.</summary>
+    private List<OcrExtractedFieldDto> ToApply()
+        => _fields.Where(f => !string.IsNullOrWhiteSpace(f.SaveTo) && !string.IsNullOrWhiteSpace(f.Value) && IsApplied(f) && IsLinked(EntityOf(f.SaveTo!))).ToList();
 
     private async Task ConfirmApproveAsync()
     {
@@ -340,29 +631,20 @@
         _processing = true;
         try
         {
-            var applyList = new List<ApplyFieldToRecordItem>();
-            foreach (var f in _fields)
-            {
-                if (_document?.AssociatedAccountId != null)
-                {
-                    applyList.Add(new ApplyFieldToRecordItem(f.FieldName, $"accounts.{f.FieldName.ToLowerInvariant()}", f.Value));
-                }
-                else if (_document?.AssociatedContactId != null)
-                {
-                    applyList.Add(new ApplyFieldToRecordItem(f.FieldName, $"contacts.{f.FieldName.ToLowerInvariant()}", f.Value));
-                }
-            }
+            // What was typed on this screen is kept first, so the approved values are the ones shown.
+            await PersistFieldsAsync();
 
-            var req = new ReviewDocumentRequest("Approve", null, applyList);
-            var res = await Http.PostAsJsonAsync($"/api/v1/documents/{Id}/review", req);
+            var applyList = ToApply().Select(f => new ApplyFieldToRecordItem(f.FieldName, f.SaveTo!, f.Value)).ToList();
+            var res = await Http.PostAsJsonAsync($"/api/v1/documents/{Id}/review", new ReviewDocumentRequest("Approve", null, applyList));
             if (res.IsSuccessStatusCode)
             {
-                Snackbar.Add(T["Document approved successfully."], Severity.Success);
-                await LoadDocumentAsync();
+                Snackbar.Add(applyList.Count > 0 ? T["Document approved and values saved."] : T["Document approved successfully."], Severity.Success);
+                await LoadDocumentAsync(quiet: true);
             }
             else
             {
-                Snackbar.Add(T["Failed to approve document."], Severity.Error);
+                // The server names the field that did not fit and nothing was changed.
+                Snackbar.Add(await ProblemText.FromAsync(res, T["Failed to approve document."]), Severity.Error);
             }
         }
         catch (Exception ex)
@@ -374,6 +656,128 @@
             _processing = false;
         }
     }
+
+    // ---- add a field to the type ----
+
+    private void OpenAddField()
+    {
+        _newLabel = string.Empty;
+        _newDescription = string.Empty;
+        _newType = DocumentValueTypes.Text;
+        _addFieldOpen = true;
+    }
+
+    private async Task AddFieldAsync()
+    {
+        if (_typeDefinition is null)
+        {
+            return;
+        }
+
+        _processing = true;
+        try
+        {
+            var key = KeyFrom(_newLabel, _typeDefinition.Fields.Select(f => f.Key).ToHashSet());
+            var fields = _typeDefinition.Fields.ToList();
+            fields.Add(new DocumentFieldRuleDto(key, _newLabel.Trim(), _newType, null, null, false, false,
+                string.IsNullOrWhiteSpace(_newDescription) ? null : _newDescription.Trim(), null, null, DocumentFieldModes.Auto, null));
+            var request = new SaveDocumentTypeRequest(_typeDefinition.Key, _typeDefinition.Name, _typeDefinition.Description, _typeDefinition.IsActive, _typeDefinition.MinScore, _typeDefinition.Keywords, fields);
+            var saved = await Http.PutAsJsonAsync($"api/v1/settings/document-types/{_typeDefinition.Id}", request);
+            if (!saved.IsSuccessStatusCode)
+            {
+                var errors = await ProblemText.FieldErrorsAsync(saved);
+                Snackbar.Add(errors.Count > 0 ? string.Join(" ", errors.Values) : await ProblemText.FromAsync(saved, T["We could not save this document type."]), Severity.Error);
+                return;
+            }
+
+            _addFieldOpen = false;
+            _typeChoice = _typeDefinition.Key;
+            await ReadAgainAsync();
+        }
+        finally
+        {
+            _processing = false;
+        }
+    }
+
+    /// <summary>A field key from its name: lowercase letters, digits and underscores, unique among the type's fields.</summary>
+    private static string KeyFrom(string label, HashSet<string> taken)
+    {
+        var slug = System.Text.RegularExpressions.Regex.Replace(label.Trim().ToLowerInvariant(), "[^a-z0-9]+", "_").Trim('_');
+        if (slug.Length == 0 || !char.IsLetter(slug[0]))
+        {
+            slug = "field_" + slug;
+        }
+
+        slug = slug.Length > 40 ? slug[..40].TrimEnd('_') : slug;
+        var key = slug;
+        for (var n = 2; taken.Contains(key); n++)
+        {
+            key = $"{slug}_{n}";
+        }
+
+        return key;
+    }
+
+    // ---- showing a field ----
+
+    /// <summary>"In the document (page 2): the text around the value", with the page only for a document of more than one page.</summary>
+    private string SnippetCaption(OcrExtractedFieldDto f)
+    {
+        var where = f.Page is > 1 ? $"{T["In the document"]} ({T["page"]} {f.Page})" : T["In the document"];
+        return $"{where}: “{f.Snippet}”";
+    }
+
+    private static string LabelOf(OcrExtractedFieldDto f) => string.IsNullOrWhiteSpace(f.Label) ? f.FieldName : f.Label;
+
+    private string TypeName(string category) => _types.FirstOrDefault(t => t.Key == category)?.Name ?? category;
+
+    private string? MethodChip(OcrExtractedFieldDto f) => f.Method switch
+    {
+        "ai" => T["AI"],
+        "pattern" or "anchor" => T["Pattern"],
+        "edited" => T["Edited"],
+        _ => null,
+    };
+
+    private string? MethodLabel => _document?.OcrResult?.ExtractionMethod switch
+    {
+        "ai" => T["Read by AI"],
+        "mixed" => T["AI and patterns"],
+        "rules" when _fields.Any(f => f.Method is "pattern" or "anchor") => T["Read by patterns"],
+        _ => null,
+    };
+
+    private static string EntityOf(string saveTo) => saveTo.Contains('.') ? saveTo[..saveTo.IndexOf('.')] : saveTo;
+
+    private static string SingularOf(string entity) => entity switch { "contacts" => "Contact", "accounts" => "Account", _ => "Deal" };
+
+    private bool IsLinked(string entity) => entity switch
+    {
+        "contacts" => _contactId.HasValue,
+        "accounts" => _accountId.HasValue,
+        "deals" => _dealId.HasValue,
+        _ => false,
+    };
+
+    private bool IsApplied(OcrExtractedFieldDto f) => _apply.TryGetValue(f.FieldName, out var on) ? on : true;
+
+    /// <summary>"Contact › First name": the record and field a value is saved to, from the list the server gave, or the key when that list is not available.</summary>
+    private string TargetLabel(string saveTo)
+    {
+        var dot = saveTo.IndexOf('.');
+        if (dot <= 0)
+        {
+            return saveTo;
+        }
+
+        var entity = saveTo[..dot];
+        var key = saveTo[(dot + 1)..];
+        var target = _targets.FirstOrDefault(t => t.Entity == entity && string.Equals(t.Key, key, StringComparison.OrdinalIgnoreCase));
+        return $"{T[SingularOf(entity)]} › {target?.Label ?? key}";
+    }
+
+    // ---- files ----
 
     private bool _downloading;
 
@@ -409,13 +813,21 @@
         }
     }
 
+    private string StatusLabel(string status) => status switch
+    {
+        "Queued" => T["Waiting to be read"],
+        "Processing" => T["Reading…"],
+        "NeedsReview" => T["Needs review"],
+        _ => status,
+    };
+
     private static Color GetStatusColor(string status) => status switch
     {
         "Approved" => Color.Success,
         "Ready" => Color.Info,
         "NeedsReview" => Color.Warning,
-        "Processing" => Color.Primary,
-        "Rejected" => Color.Error,
+        "Processing" or "Queued" => Color.Primary,
+        "Rejected" or "Failed" => Color.Error,
         _ => Color.Default
     };
 

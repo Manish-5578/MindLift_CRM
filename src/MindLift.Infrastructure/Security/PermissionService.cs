@@ -12,7 +12,7 @@ namespace MindLift.Infrastructure.Security;
 /// Role matrices are cached per tenant and invalidated when a role changes (plan 4.3).
 /// Module enablement is checked on every call, so disabling a module takes effect immediately.
 /// </summary>
-public sealed class PermissionService(IAppDbContext db, ITenantContext tenant, HybridCache cache, MindLift.Infrastructure.Settings.SettingsVersion settingsVersion) : IPermissionService
+public sealed class PermissionService(IAppDbContext db, ITenantContext tenant, HybridCache cache, MindLift.Infrastructure.Settings.SettingsVersion settingsVersion, IPlatformEntitlements entitlements) : IPermissionService
 {
     /// <summary>Cached form of one role's permissions.</summary>
     private sealed record RoleMatrix(bool IsAdmin, List<ModulePermission> Modules);
@@ -100,6 +100,12 @@ public sealed class PermissionService(IAppDbContext db, ITenantContext tenant, H
 
     private async Task<bool> IsModuleEnabledAsync(AppModule module, CancellationToken cancellationToken)
     {
+        // The platform owner's switch comes first: a module taken away from the company is unavailable whatever the company's own settings say.
+        if (!await entitlements.IsModuleAllowedAsync(module, cancellationToken))
+        {
+            return false;
+        }
+
         var setting = await db.Set<ModuleSetting>().AsNoTracking()
             .FirstOrDefaultAsync(m => m.Module == module, cancellationToken);
 

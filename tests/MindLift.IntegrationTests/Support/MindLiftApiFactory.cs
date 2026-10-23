@@ -50,6 +50,8 @@ public sealed class MindLiftApiFactory : WebApplicationFactory<Program>
 
     public RecordingEmailSender Emails => Services.GetRequiredService<RecordingEmailSender>();
 
+    public ScriptedLlm Llm => Services.GetRequiredService<ScriptedLlm>();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
@@ -67,6 +69,10 @@ public sealed class MindLiftApiFactory : WebApplicationFactory<Program>
             services.AddSingleton<RecordingEmailSender>();
             services.AddScoped<IEmailSender>(sp => sp.GetRequiredService<RecordingEmailSender>());
             services.AddSingleton<Hangfire.IBackgroundJobClient, InlineJobClient>();
+
+            // The language model is a script a test controls, never the real Ollama.
+            services.AddSingleton<ScriptedLlm>();
+            services.AddSingleton<MindLift.Infrastructure.Documents.Ai.ILlmClient>(sp => sp.GetRequiredService<ScriptedLlm>());
         });
     }
 }

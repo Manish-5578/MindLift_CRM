@@ -29,7 +29,7 @@ public sealed class SettingsVersion(HybridCache cache, ITenantContext tenant)
 }
 
 /// <summary>Company profile, currencies, exchange rates and module switches (plan 7.2).</summary>
-public sealed class CompanySettingsService(AppDbContext db, ITenantContext tenant, SettingsVersion version, IClock clock)
+public sealed class CompanySettingsService(AppDbContext db, ITenantContext tenant, SettingsVersion version, IClock clock, IPlatformEntitlements entitlements)
 {
     private static readonly string[] Languages = ["en", "ar"];
 
@@ -156,8 +156,11 @@ public sealed class CompanySettingsService(AppDbContext db, ITenantContext tenan
     }
 
     public async Task<IReadOnlyList<ModuleSettingDto>> ListModulesAsync(CancellationToken cancellationToken = default)
-        => (await db.ModuleSettings.AsNoTracking().OrderBy(m => m.SortOrder).ToListAsync(cancellationToken))
-            .Select(MapModule).ToList();
+    {
+        var locked = await entitlements.DisabledModulesAsync(cancellationToken);
+        return (await db.ModuleSettings.AsNoTracking().OrderBy(m => m.SortOrder).ToListAsync(cancellationToken))
+            .Select(m => MapModule(m) with { IsEnabled = m.IsEnabled && !locked.Contains(m.Module), PlatformLocked = locked.Contains(m.Module) }).ToList();
+    }
 
     public async Task<ModuleSettingDto> UpdateModuleAsync(string module, SaveModuleSettingRequest request, CancellationToken cancellationToken = default)
     {
@@ -180,7 +183,18 @@ public sealed class CompanySettingsService(AppDbContext db, ITenantContext tenan
             throw new BusinessRuleException("core_module", "Dashboard, Users and Settings are always on.");
         }
 
-        row.IsEnabled = request.IsEnabled;
+        // A module the platform owner took away cannot be switched on here. Its own switch is left as it was, so it returns as it was if the owner gives it back.
+        var allowed = await entitlements.IsModuleAllowedAsync(parsed, cancellationToken);
+        if (!allowed && request.IsEnabled)
+        {
+            throw new BusinessRuleException("module_not_in_plan", "This module is not included for your company. Contact support to add it.");
+        }
+
+        if (allowed)
+        {
+            row.IsEnabled = request.IsEnabled;
+        }
+
         row.SingularLabel = request.SingularLabel.Trim();
         row.PluralLabel = request.PluralLabel.Trim();
         row.SortOrder = request.SortOrder;

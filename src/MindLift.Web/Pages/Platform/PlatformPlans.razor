@@ -1,0 +1,180 @@
+@page "/platform/plans"
+@layout PlatformLayout
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<PageTitle>Plans · MindLift platform</PageTitle>
+
+<div class="pc-head pc-rise">
+    <div>
+        <div class="pc-eyebrow">Pricing</div>
+        <h1 class="pc-title">Plans</h1>
+        <div class="pc-sub">Shape what each plan costs, how much it allows and which modules it includes. A change reaches every company on the plan at once.</div>
+    </div>
+    <div class="d-flex align-center" style="gap:14px;flex-wrap:wrap">
+        @if (_plans is not null)
+        {
+            <div class="pc-card" style="padding:12px 20px"><div class="pc-card__hint">Monthly revenue from active companies</div><div class="pc-num" style="font-size:24px;font-weight:800" data-testid="mrr">@Pc.Money(Mrr)</div></div>
+        }
+        <button class="pc-btn pc-btn--primary" @onclick="OpenNew" data-testid="new-plan"><MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Small" />New plan</button>
+    </div>
+</div>
+
+@if (_plans is null)
+{
+    <div class="pc-plans">@for (var i = 0; i < 3; i++) { <div class="pc-skel" style="height:260px"></div> }</div>
+}
+else
+{
+    <div class="pc-plans" data-testid="plan-list">
+        @foreach (var p in _plans)
+        {
+            var plan = p;
+            var count = plan.IncludedModules?.Count ?? _switchable.Count;
+            <div class="pc-card pc-plan pc-interactive pc-rise @(_editId == plan.Id ? "is-current" : "")" @onclick="() => Edit(plan)" data-testid="plan-card-@plan.Key">
+                @if (!plan.IsActive) { <div class="pc-plan__ribbon" style="background:#94A3B8">Retired</div> }
+                <div class="pc-card__title" style="font-size:18px">@plan.Name</div>
+                @if (!string.IsNullOrWhiteSpace(plan.Description)) { <div class="pc-card__hint" style="margin-top:4px">@plan.Description</div> }
+                <div class="pc-plan__price pc-num">@Pc.Money(plan.PriceMonthly)<small> / month</small></div>
+                <ul>
+                    <li><MudIcon Icon="@Icons.Material.Filled.CheckCircle" />@plan.MaxUsers users</li>
+                    <li><MudIcon Icon="@Icons.Material.Filled.CheckCircle" />@Pc.Num(plan.MaxRecords) records</li>
+                    <li><MudIcon Icon="@Icons.Material.Filled.Widgets" /><span data-testid="plan-modules-@plan.Key">@(count >= _switchable.Count ? "Every module" : count + " of " + _switchable.Count + " modules")</span></li>
+                    <li><MudIcon Icon="@Icons.Material.Filled.Apartment" />@plan.Companies compan@(plan.Companies == 1 ? "y" : "ies")</li>
+                </ul>
+                <div style="margin-top:20px"><span class="pc-card__hint">Click to edit</span></div>
+            </div>
+        }
+    </div>
+}
+
+@if (_open)
+{
+    <div class="pc-slide" data-testid="plan-editor">
+        <div class="pc-slide__scrim" @onclick="Close"></div>
+        <div class="pc-slide__panel" style="width:min(560px,100vw)">
+            <div class="pc-slide__head"><div class="pc-card__title" style="font-size:18px">@(_editId is null ? "New plan" : "Edit " + _title)</div><button class="pc-btn pc-btn--icon pc-btn--ghost" @onclick="Close" aria-label="Close"><MudIcon Icon="@Icons.Material.Filled.Close" /></button></div>
+            <div class="pc-slide__body">
+                <div class="pc-field"><label for="plan-name">Name</label><input id="plan-name" class="pc-input" @bind="_name" data-testid="plan-name" /></div>
+                <div class="pc-field"><label for="plan-desc">Description</label><input id="plan-desc" class="pc-input" placeholder="Who this plan is for" @bind="_description" data-testid="plan-description" /></div>
+                <div class="d-flex" style="gap:12px">
+                    <div class="pc-field" style="flex:1"><label for="plan-users">Users allowed</label><input id="plan-users" class="pc-input" type="number" min="1" @bind="_users" data-testid="plan-users" /></div>
+                    <div class="pc-field" style="flex:1"><label for="plan-records">Records allowed</label><input id="plan-records" class="pc-input" type="number" min="1" @bind="_records" data-testid="plan-records" /></div>
+                    <div class="pc-field" style="flex:1"><label for="plan-price">Price / month</label><input id="plan-price" class="pc-input" type="number" min="0" step="1" @bind="_price" data-testid="plan-price" /></div>
+                </div>
+                <label class="d-flex align-center" style="gap:12px;cursor:pointer"><input type="checkbox" @bind="_active" style="width:18px;height:18px;accent-color:#6366F1" data-testid="plan-active" />Offer this plan to new companies</label>
+
+                <div>
+                    <div class="d-flex align-center justify-space-between" style="margin-bottom:10px">
+                        <div class="pc-card__title">Modules in this plan <span class="pc-chip pc-chip--brand" data-testid="plan-module-count">@_included.Count of @_switchable.Count</span></div>
+                        <div class="d-flex" style="gap:6px"><button class="pc-btn pc-btn--sm" @onclick="AllModules" data-testid="plan-all">All</button><button class="pc-btn pc-btn--sm" @onclick="NoModules" data-testid="plan-none">None</button></div>
+                    </div>
+                    <div class="pc-checks">
+                        @foreach (var m in _switchable)
+                        {
+                            var module = m;
+                            <label class="pc-check @(_included.Contains(module.Key) ? "is-on" : "")">
+                                <input type="checkbox" checked="@_included.Contains(module.Key)" @onchange="e => ToggleModule(module.Key, (bool)(e.Value ?? false))" data-testid="plan-mod-@module.Key" />
+                                <MudIcon Icon="@Pc.Icon(module.Icon)" Size="Size.Small" /><span>@module.Name</span>
+                            </label>
+                        }
+                    </div>
+                    <div class="pc-card__hint" style="margin-top:8px">Core modules (Dashboard, Users, Settings) are always included.</div>
+                </div>
+                @if (_error is not null) { <div style="color:var(--pc-bad);font-weight:600" data-testid="plan-error">@_error</div> }
+            </div>
+            <div class="pc-slide__foot">
+                @if (_editId is not null)
+                {
+                    <button class="pc-btn pc-btn--danger" style="margin-inline-end:auto" @onclick="DeleteAsync" data-testid="plan-delete"><MudIcon Icon="@Icons.Material.Filled.DeleteOutline" Size="Size.Small" />@(_confirmDelete ? "Really delete?" : "Delete")</button>
+                }
+                <button class="pc-btn" @onclick="Close">Cancel</button>
+                <button class="pc-btn pc-btn--primary" @onclick="SaveAsync" data-testid="plan-save">@(_editId is null ? "Create plan" : "Save plan")</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<PlatformPlanDto>? _plans;
+    private List<PlatformModuleDto> _switchable = [];
+    private bool _open;
+    private Guid? _editId;
+    private string _title = "";
+    private string _name = "", _description = "";
+    private int _users = 10, _records = 10000;
+    private decimal _price = 29;
+    private bool _active = true;
+    private bool _confirmDelete;
+    private HashSet<string> _included = [];
+    private string? _error;
+
+    private decimal Mrr => _plans is null ? 0 : _plans.Sum(p => p.PriceMonthly * p.Companies);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _switchable = (await Http.GetFromJsonAsync<List<PlatformModuleDto>>("api/v1/platform/modules") ?? []).Where(m => m.Available && !m.Core).ToList();
+        }
+        catch (HttpRequestException) { }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try { _plans = await Http.GetFromJsonAsync<List<PlatformPlanDto>>("api/v1/platform/plans") ?? []; }
+        catch (HttpRequestException) { _plans = []; }
+    }
+
+    private void OpenNew()
+    {
+        _editId = null; _title = ""; _name = ""; _description = ""; _users = 10; _records = 10000; _price = 29; _active = true;
+        _included = _switchable.Select(m => m.Key).ToHashSet(); _error = null; _confirmDelete = false; _open = true;
+    }
+
+    private void Edit(PlatformPlanDto p)
+    {
+        _editId = p.Id; _title = p.Name; _name = p.Name; _description = p.Description ?? ""; _users = p.MaxUsers; _records = p.MaxRecords; _price = p.PriceMonthly; _active = p.IsActive;
+        _included = (p.IncludedModules ?? _switchable.Select(m => m.Key).ToList()).ToHashSet(); _error = null; _confirmDelete = false; _open = true;
+    }
+
+    private void Close() { _open = false; _editId = null; }
+    private void AllModules() => _included = _switchable.Select(m => m.Key).ToHashSet();
+    private void NoModules() => _included = [];
+    private void ToggleModule(string key, bool on) { if (on) _included.Add(key); else _included.Remove(key); }
+
+    private async Task SaveAsync()
+    {
+        // Every module ticked is the same as no list: the plan includes everything. None ticked is not allowed, so a plan cannot be empty by accident.
+        if (_included.Count == 0) { _error = "Include at least one module."; return; }
+        var request = new SavePlanRequest(_name, _users, _records, _price, _active, _description, _included.ToList());
+        var response = _editId is { } id
+            ? await Http.PutAsJsonAsync($"api/v1/platform/plans/{id}", request)
+            : await Http.PostAsJsonAsync("api/v1/platform/plans", request);
+        if (await Done(response, $"{_name} saved.")) { Close(); await LoadAsync(); }
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (!_confirmDelete) { _confirmDelete = true; return; }
+        var response = await Http.DeleteAsync($"api/v1/platform/plans/{_editId}");
+        if (await Done(response, $"{_title} deleted.")) { Close(); await LoadAsync(); }
+        else _confirmDelete = false;
+    }
+
+    private async Task<bool> Done(HttpResponseMessage response, string success)
+    {
+        if (response.IsSuccessStatusCode) { Snackbar.Add(success, Severity.Success); return true; }
+        try
+        {
+            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            _error = doc.RootElement.TryGetProperty("errors", out var errors) && errors.ValueKind == JsonValueKind.Object
+                ? string.Join(" ", errors.EnumerateObject().SelectMany(p => p.Value.EnumerateArray().Select(v => v.GetString())))
+                : doc.RootElement.TryGetProperty("detail", out var d) ? d.GetString() : "That did not work.";
+        }
+        catch (JsonException) { _error = "That did not work."; }
+        return false;
+    }
+}

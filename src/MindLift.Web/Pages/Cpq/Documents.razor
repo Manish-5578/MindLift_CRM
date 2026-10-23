@@ -4,6 +4,7 @@
 @using MindLift.UI.Components
 @using System.Net.Http.Json
 @using Microsoft.AspNetCore.Components.Forms
+@implements IDisposable
 @inject HttpClient Http
 @inject ISnackbar Snackbar
 @inject IDialogService Dialogs
@@ -23,7 +24,15 @@
             <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Outlined.AssignmentReturn" OnClick="OpenNewRequestDialog" Size="Size.Small">
                 @T["Request Customer File"]
             </MudButton>
-            <MudFileUpload T="IBrowserFile" FilesChanged="UploadDocumentAsync" Accept=".pdf,.png,.jpg,.jpeg,.txt">
+            <MudSelect T="string" Value="_uploadType" ValueChanged="v => _uploadType = v ?? string.Empty" Label="@T["Read as"]" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined"
+                       Style="min-width:200px" data-testid="upload-type">
+                <MudSelectItem T="string" Value="@string.Empty">@T["Decide from the document"]</MudSelectItem>
+                @foreach (var type in _types)
+                {
+                    <MudSelectItem T="string" Value="@type.Key">@type.Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudFileUpload T="IBrowserFile" FilesChanged="UploadDocumentAsync" Accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.webp,.bmp,.txt">
                 <CustomContent Context="upload">
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.CloudUpload" Disabled="_uploading" Size="Size.Small"
                                OnClick="@(() => upload.OpenFilePickerAsync())" id="upload-document">
@@ -102,6 +111,10 @@
                     <MudSelectItem T="string" Value="@("Receipt")">@T["Receipt"]</MudSelectItem>
                     <MudSelectItem T="string" Value="@("Identity")">@T["Identity"]</MudSelectItem>
                     <MudSelectItem T="string" Value="@("General")">@T["General"]</MudSelectItem>
+                    @foreach (var type in _types)
+                    {
+                        <MudSelectItem T="string" Value="@type.Key">@type.Name</MudSelectItem>
+                    }
                 </MudSelect>
             </div>
         </MudPaper>
@@ -140,16 +153,25 @@
                     </MudTd>
                     <MudTd DataLabel="Category">
                         <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Default">
-                            @context.Category
+                            @TypeName(context.Category)
                         </MudChip>
                     </MudTd>
                     <MudTd DataLabel="OCR Status">
-                        <MudChip T="string" Size="Size.Small" Color="@GetOcrColor(context.OcrStatus)" Variant="Variant.Filled">
-                            @context.OcrStatus
+                        <MudChip T="string" Size="Size.Small" Color="@GetOcrColor(context)" Variant="Variant.Filled" data-testid="doc-ocr-status">
+                            @StatusText(context)
                         </MudChip>
                     </MudTd>
                     <MudTd DataLabel="Intelligence">
-                        @if (context.OcrResult != null && (!string.IsNullOrWhiteSpace(context.OcrResult.DetectedVendor) || !string.IsNullOrWhiteSpace(context.OcrResult.DetectedInvoiceNumber) || context.OcrResult.DetectedTotal.HasValue))
+                        @if (KeyFields(context).Count > 0)
+                        {
+                            <div class="d-flex flex-column gap-1" data-testid="doc-key-fields">
+                                @foreach (var f in KeyFields(context))
+                                {
+                                    <MudText Typo="Typo.caption"><span class="ml-muted">@(string.IsNullOrWhiteSpace(f.Label) ? f.FieldName : f.Label):</span> <strong>@f.Value</strong></MudText>
+                                }
+                            </div>
+                        }
+                        else if (context.OcrResult != null && (!string.IsNullOrWhiteSpace(context.OcrResult.DetectedVendor) || !string.IsNullOrWhiteSpace(context.OcrResult.DetectedInvoiceNumber) || context.OcrResult.DetectedTotal.HasValue))
                         {
                             <div class="d-flex flex-column gap-1">
                                 @if (!string.IsNullOrWhiteSpace(context.OcrResult.DetectedVendor))
@@ -376,6 +398,11 @@
     private bool _detailsDialogOpen = false;
     private BusinessDocumentDto? _activeDoc;
 
+    private List<DocumentTypeChoiceDto> _types = [];
+    private string _uploadType = string.Empty;
+    private CancellationTokenSource? _cts;
+    private bool _polling;
+
     // Document request dialog fields
     private bool _requestDialogOpen = false;
     private bool _submittingReq = false;
@@ -474,9 +501,106 @@
 
     protected override async Task OnInitializedAsync()
     {
+        _cts = new CancellationTokenSource();
+        await LoadTypesAsync();
         await LoadDocumentsAsync();
         await LoadRequestsAsync();
+        StartPolling();
     }
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+
+    private async Task LoadTypesAsync()
+    {
+        try
+        {
+            _types = await Http.GetFromJsonAsync<List<DocumentTypeChoiceDto>>("api/v1/documents/types") ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            _types = [];
+        }
+    }
+
+    private string TypeName(string category) => _types.FirstOrDefault(t => t.Key == category)?.Name ?? category;
+
+    private bool AnyReading => _documents.Any(d => d.Status is "Queued" or "Processing");
+
+    /// <summary>While any document is waiting or being read, the list asks again every few seconds so each one updates by itself.</summary>
+    private void StartPolling()
+    {
+        if (_polling || !AnyReading)
+        {
+            return;
+        }
+
+        _polling = true;
+        var token = _cts?.Token ?? CancellationToken.None;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (!token.IsCancellationRequested)
+                {
+                    await Task.Delay(4000, token);
+                    await InvokeAsync(async () =>
+                    {
+                        try
+                        {
+                            _documents = await Http.GetFromJsonAsync<List<BusinessDocumentDto>>("api/v1/documents") ?? _documents;
+                        }
+                        catch (HttpRequestException)
+                        {
+                            // Tried again on the next tick.
+                        }
+
+                        StateHasChanged();
+                    });
+                    if (!AnyReading)
+                    {
+                        return;
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // The page was left.
+            }
+            finally
+            {
+                _polling = false;
+            }
+        }, token);
+    }
+
+    private static List<OcrExtractedFieldDto> KeyFields(BusinessDocumentDto doc)
+        => doc.OcrResult?.ExtractedFields.Where(f => !string.IsNullOrWhiteSpace(f.Value) && !string.IsNullOrWhiteSpace(f.Key)).Take(3).ToList() ?? [];
+
+    private string StatusText(BusinessDocumentDto doc) => doc.Status switch
+    {
+        "Queued" => T["Waiting to be read"],
+        "Processing" => T["Reading…"],
+        "Failed" => T["Failed"],
+        _ => doc.OcrStatus.ToString(),
+    };
+
+    private static Color GetOcrColor(BusinessDocumentDto doc) => doc.Status switch
+    {
+        "Queued" => Color.Default,
+        "Processing" => Color.Info,
+        "Failed" => Color.Error,
+        _ => doc.OcrStatus switch
+        {
+            DocumentOcrStatus.Completed => Color.Success,
+            DocumentOcrStatus.Processing => Color.Info,
+            DocumentOcrStatus.Failed => Color.Error,
+            _ => Color.Default,
+        },
+    };
 
     private async Task LoadDocumentsAsync()
     {
@@ -559,7 +683,7 @@
         }
     }
 
-    private Color GetOcrColor(DocumentOcrStatus s) => s switch
+    private static Color GetOcrColor(DocumentOcrStatus s) => s switch
     {
         DocumentOcrStatus.Completed => Color.Success,
         DocumentOcrStatus.Processing => Color.Info,
@@ -606,14 +730,26 @@
             var streamContent = new StreamContent(file.OpenReadStream(10 * 1024 * 1024)); // 10MB limit
             streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType ?? "application/octet-stream");
             content.Add(streamContent, "file", file.Name);
-            content.Add(new StringContent("General"), "category");
+            content.Add(new StringContent(string.IsNullOrEmpty(_uploadType) ? "General" : _uploadType), "category");
 
             var resp = await Http.PostAsync("api/v1/documents/upload", content);
             if (resp.IsSuccessStatusCode)
             {
                 var doc = await resp.Content.ReadFromJsonAsync<BusinessDocumentDto>();
-                Snackbar.Add($"Document '{file.Name}' uploaded and OCR completed!", Severity.Success);
+
+                // Upload only stores the file. Reading it can take a minute with AI, so it is queued and happens in the background.
+                var queued = doc is null ? null : await Http.PostAsJsonAsync($"api/v1/documents/{doc.Id}/read", new ReadDocumentRequest(null));
+                if (queued is { IsSuccessStatusCode: true })
+                {
+                    Snackbar.Add(string.Format(T["Document '{0}' uploaded. It is being read."], file.Name), Severity.Success);
+                }
+                else
+                {
+                    Snackbar.Add(string.Format(T["Document '{0}' uploaded, but reading it could not be started. Open it and use Read again."], file.Name), Severity.Warning);
+                }
+
                 await LoadDocumentsAsync();
+                StartPolling();
             }
             else
             {
@@ -641,12 +777,17 @@
     {
         try
         {
-            var resp = await Http.PostAsync($"api/v1/documents/{id}/ocr", null);
+            var resp = await Http.PostAsJsonAsync($"api/v1/documents/{id}/read", new ReadDocumentRequest(null));
             if (resp.IsSuccessStatusCode)
             {
-                Snackbar.Add(T["OCR re-processed successfully!"], Severity.Success);
+                Snackbar.Add(T["Reading started. This page updates when it is done."], Severity.Info);
+                _detailsDialogOpen = false;
                 await LoadDocumentsAsync();
-                _activeDoc = _documents.FirstOrDefault(d => d.Id == id);
+                StartPolling();
+            }
+            else
+            {
+                Snackbar.Add(await ProblemText.FromAsync(resp, T["Failed to reprocess document."]), Severity.Error);
             }
         }
         catch (Exception ex)

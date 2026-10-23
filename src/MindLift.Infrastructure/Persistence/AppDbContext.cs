@@ -20,6 +20,7 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<AuditLog> AuditLogs { get; set; } = null!;
     public DbSet<StoredFile> Files { get; set; } = null!;
     public DbSet<Tenant> Tenants { get; set; } = null!;
+    public DbSet<PlatformAuditEntry> PlatformAudit { get; set; } = null!;
     public DbSet<Plan> Plans { get; set; } = null!;
     public DbSet<RefreshToken> RefreshTokens { get; set; } = null!;
     public DbSet<TenantSettings> TenantSettings { get; set; } = null!;

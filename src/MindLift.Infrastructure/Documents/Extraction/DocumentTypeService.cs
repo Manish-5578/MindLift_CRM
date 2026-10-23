@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using MindLift.Application.Abstractions;
 using MindLift.Application.Common.Exceptions;
 using MindLift.Domain.Entities;
+using MindLift.Infrastructure.Documents.Ai;
 using MindLift.Infrastructure.Documents.Text;
 using MindLift.Infrastructure.Persistence;
 using MindLift.Shared.Contracts;
@@ -10,11 +11,14 @@ using MindLift.Shared.Contracts;
 namespace MindLift.Infrastructure.Documents.Extraction;
 
 /// <summary>Document types a workspace defines in Settings: list, create, edit, delete, and a test run on a sample file.</summary>
-public sealed class DocumentTypeService(AppDbContext db, DocumentPageReader reader)
+public sealed class DocumentTypeService(
+    AppDbContext db, DocumentPageReader reader, DocumentFieldReader fieldReader, AiFieldExtractor ai, ILlmClient llm, DocumentRecordApplier applier,
+    IPlatformEntitlements entitlements)
 {
     private static readonly Regex KeyPattern = new("^[a-z][a-z0-9_]{1,49}$", RegexOptions.Compiled);
     private const int MaxFields = 40;
     private const int MaxKeywords = 30;
+    private const int MaxAllowedValues = 30;
 
     public async Task<IReadOnlyList<DocumentTypeDto>> ListAsync(CancellationToken cancellationToken = default)
         => (await db.DocumentTypeDefinitions.AsNoTracking().OrderBy(d => d.Name).ToListAsync(cancellationToken)).Select(Map).ToList();
@@ -39,6 +43,13 @@ public sealed class DocumentTypeService(AppDbContext db, DocumentPageReader read
             Label = f.Label.Trim(),
             Anchor = string.IsNullOrWhiteSpace(f.Anchor) ? null : f.Anchor.Trim(),
             Pattern = string.IsNullOrWhiteSpace(f.Pattern) ? null : f.Pattern.Trim(),
+            Description = string.IsNullOrWhiteSpace(f.Description) ? null : f.Description.Trim(),
+            Example = string.IsNullOrWhiteSpace(f.Example) ? null : f.Example.Trim(),
+            AllowedValues = f.AllowedValues is { Count: > 0 } allowed
+                ? allowed.Select(a => a?.Trim() ?? string.Empty).Where(a => a.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList()
+                : null,
+            Mode = string.IsNullOrWhiteSpace(f.Mode) ? DocumentFieldModes.Auto : f.Mode.Trim(),
+            SaveTo = string.IsNullOrWhiteSpace(f.SaveTo) ? null : f.SaveTo.Trim().ToLowerInvariant(),
         }).ToList());
 
         if (id is null)
@@ -65,9 +76,98 @@ public sealed class DocumentTypeService(AppDbContext db, DocumentPageReader read
         var text = string.Join("\n", pages.Select(p => p.Text));
         var keywords = CustomDocumentExtractor.Keywords(definition.KeywordsJson);
         var score = CustomDocumentExtractor.Score(keywords, text);
-        var fields = CustomDocumentExtractor.Extract(CustomDocumentExtractor.Fields(definition.FieldsJson), text);
+        var aiOn = await db.Set<TenantSettings>().AsNoTracking().Select(t => t.AiReadingEnabled).FirstOrDefaultAsync(cancellationToken)
+            && await entitlements.IsAiAllowedAsync(cancellationToken);
+        var reading = await fieldReader.ReadAsync(definition.Name, definition.Description, CustomDocumentExtractor.Fields(definition.FieldsJson), pages, aiOn, cancellationToken);
         var source = pages.Count == 0 ? "None" : pages.Select(p => p.Source).Distinct().Count() == 1 ? pages[0].Source : "Mixed";
-        return new DocumentTypeTestResultDto(score >= definition.MinScore, score, definition.Key, source, fields);
+        var note = reading.Note ?? (aiOn ? null : "AI reading is switched off, so only anchors and patterns were used.");
+        return new DocumentTypeTestResultDto(score >= definition.MinScore, score, definition.Key, source, reading.Fields, reading.Method, note);
+    }
+
+    /// <summary>The active document types, for choosing one when a document is uploaded or reviewed.</summary>
+    public async Task<IReadOnlyList<DocumentTypeChoiceDto>> ChoicesAsync(CancellationToken cancellationToken = default)
+        => await db.DocumentTypeDefinitions.AsNoTracking().Where(d => d.IsActive).OrderBy(d => d.Name)
+            .Select(d => new DocumentTypeChoiceDto(d.Key, d.Name)).ToListAsync(cancellationToken);
+
+    /// <summary>The record fields a document field can be saved to, for the "Save to" choice.</summary>
+    public Task<IReadOnlyList<RecordTargetDto>> TargetsAsync(CancellationToken cancellationToken = default) => applier.TargetsAsync(cancellationToken);
+
+    /// <summary>Whether AI reading is on for this workspace and whether the model can be reached right now.</summary>
+    public async Task<DocumentAiStatusDto> AiStatusAsync(CancellationToken cancellationToken = default)
+    {
+        var allowed = await entitlements.IsAiAllowedAsync(cancellationToken);
+        var enabled = allowed && await db.Set<TenantSettings>().AsNoTracking().Select(t => t.AiReadingEnabled).FirstOrDefaultAsync(cancellationToken);
+        if (!allowed)
+        {
+            return new DocumentAiStatusDto(false, llm.IsConfigured, false, false, llm.Provider, llm.Model, "AI reading is not included for your company. Contact support to add it.", false);
+        }
+
+        if (!llm.IsConfigured)
+        {
+            return new DocumentAiStatusDto(enabled, false, false, false, llm.Provider, llm.Model, "No AI model is set up on this server.");
+        }
+
+        var status = await llm.CheckAsync(cancellationToken);
+        return new DocumentAiStatusDto(enabled, true, status.Reachable, status.ModelInstalled, llm.Provider, llm.Model, status.Message);
+    }
+
+    /// <summary>Switches AI reading on or off for the workspace. It can only be switched on when a model is set up on the server.</summary>
+    public async Task<DocumentAiStatusDto> SetAiAsync(bool enabled, CancellationToken cancellationToken = default)
+    {
+        var settings = await db.Set<TenantSettings>().FirstOrDefaultAsync(cancellationToken)
+            ?? throw new BusinessRuleException("settings_missing", "The company settings could not be found.");
+        if (enabled && !await entitlements.IsAiAllowedAsync(cancellationToken))
+        {
+            throw new BusinessRuleException("ai_not_in_plan", "AI reading is not included for your company. Contact support to add it.");
+        }
+
+        if (enabled && !llm.IsConfigured)
+        {
+            throw new ValidationException("enabled", "No AI model is set up on this server, so AI reading cannot be switched on.");
+        }
+
+        settings.AiReadingEnabled = enabled;
+        await db.SaveChangesAsync(cancellationToken);
+        return await AiStatusAsync(cancellationToken);
+    }
+
+    /// <summary>Reads a sample document and proposes fields for a document type. Needs AI reading to be on.</summary>
+    public async Task<SuggestFieldsResultDto> SuggestFieldsAsync(string samplePath, string? typeName, CancellationToken cancellationToken)
+    {
+        var enabled = await db.Set<TenantSettings>().AsNoTracking().Select(t => t.AiReadingEnabled).FirstOrDefaultAsync(cancellationToken)
+            && await entitlements.IsAiAllowedAsync(cancellationToken);
+        if (!enabled || !llm.IsConfigured)
+        {
+            throw new BusinessRuleException("ai_off", "Switch on AI reading first. Suggesting fields needs it.");
+        }
+
+        var pages = await reader.ReadAsync(samplePath, cancellationToken);
+        if (pages.Count == 0 || pages.All(p => string.IsNullOrWhiteSpace(p.Text)))
+        {
+            throw new BusinessRuleException("no_text", "No text could be read from this file.");
+        }
+
+        try
+        {
+            return await ai.SuggestFieldsAsync(typeName, pages, cancellationToken);
+        }
+        catch (LlmException ex)
+        {
+            throw new BusinessRuleException("ai_unavailable", ex.Message);
+        }
+    }
+
+    /// <summary>Adds the ready-made document types that this workspace does not have yet (matched by key) and returns the ones added.</summary>
+    public async Task<IReadOnlyList<DocumentTypeDto>> AddStartersAsync(CancellationToken cancellationToken = default)
+    {
+        var existing = (await db.DocumentTypeDefinitions.AsNoTracking().Select(d => d.Key).ToListAsync(cancellationToken)).ToHashSet();
+        var added = new List<DocumentTypeDto>();
+        foreach (var starter in StarterDocumentTypes.All.Where(s => !existing.Contains(s.Key)))
+        {
+            added.Add(await SaveAsync(null, starter, cancellationToken));
+        }
+
+        return added;
     }
 
     private async Task ValidateAsync(Guid? id, SaveDocumentTypeRequest r, CancellationToken cancellationToken)
@@ -100,10 +200,11 @@ public sealed class DocumentTypeService(AppDbContext db, DocumentPageReader read
                 Fail("fields", "Each field needs its own key.");
             }
 
+            var targets = await applier.TargetsAsync(cancellationToken);
             for (var i = 0; i < fields.Count; i++)
             {
                 var f = fields[i];
-                var problem = FieldProblem(f);
+                var problem = FieldProblem(f, targets);
                 if (problem is not null)
                 {
                     Fail($"fields[{i}]", problem);
@@ -119,13 +220,28 @@ public sealed class DocumentTypeService(AppDbContext db, DocumentPageReader read
     }
 
     /// <summary>The first thing wrong with a field rule, or null when it is usable.</summary>
-    private static string? FieldProblem(DocumentFieldRuleDto f)
+    private static string? FieldProblem(DocumentFieldRuleDto f, IReadOnlyList<RecordTargetDto> targets)
     {
         if (string.IsNullOrWhiteSpace(f.Key) || !KeyPattern.IsMatch(f.Key.Trim())) return "A field key uses lowercase letters, numbers or underscores, starting with a letter.";
         if (string.IsNullOrWhiteSpace(f.Label) || f.Label.Trim().Length > 100) return "Each field needs a label of up to 100 characters.";
-        if (!DocumentValueTypes.All.Contains(f.ValueType)) return "Choose a value type: text, id, number, amount or date.";
-        if (string.IsNullOrWhiteSpace(f.Anchor) && string.IsNullOrWhiteSpace(f.Pattern)) return "Give each field an anchor (the label written before it) or a pattern.";
+        if (!DocumentValueTypes.All.Contains(f.ValueType)) return "Choose a value type: text, id, number, amount, date, email or phone.";
+        var mode = string.IsNullOrWhiteSpace(f.Mode) ? DocumentFieldModes.Auto : f.Mode.Trim();
+        if (!DocumentFieldModes.All.Contains(mode)) return "Choose how the field is read: automatic, patterns only or AI only.";
+
+        // A field read by patterns only has nothing to go on without an anchor or a pattern. Otherwise the AI can read it from its name and description.
+        if (mode == DocumentFieldModes.Rules && string.IsNullOrWhiteSpace(f.Anchor) && string.IsNullOrWhiteSpace(f.Pattern)) return "A field read by patterns only needs an anchor (the label written before it) or a pattern.";
         if (f.Anchor is { Length: > 100 }) return "An anchor is at most 100 characters.";
+        if (f.Description is { Length: > 300 }) return "A description is at most 300 characters.";
+        if (f.Example is { Length: > 150 }) return "An example is at most 150 characters.";
+        if (f.AllowedValues is { } allowed && (allowed.Count > MaxAllowedValues || allowed.Any(a => a is { Length: > 100 }))) return $"A list of allowed values has at most {MaxAllowedValues} values of up to 100 characters.";
+        if (!string.IsNullOrWhiteSpace(f.SaveTo))
+        {
+            var split = DocumentRecordApplier.Split(f.SaveTo);
+            var target = split is { } s ? targets.FirstOrDefault(t => t.Entity == s.Entity && string.Equals(t.Key, s.Key, StringComparison.OrdinalIgnoreCase)) : null;
+            if (target is null) return $"\"{f.SaveTo}\" is not a field a document value can be saved to.";
+            if (!DocumentRecordApplier.Compatible(f.ValueType, target.ValueType)) return $"{f.Label} is a {f.ValueType.ToLowerInvariant()} value and cannot be saved to {target.Label} on {target.Entity}, which holds {target.ValueType.ToLowerInvariant()}.";
+        }
+
         if (!string.IsNullOrWhiteSpace(f.Pattern))
         {
             if (f.Pattern.Length > 300) return "A pattern is at most 300 characters.";

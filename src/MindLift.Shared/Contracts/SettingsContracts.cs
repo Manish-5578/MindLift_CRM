@@ -50,7 +50,8 @@ public sealed record ModuleSettingDto(
     bool IsEnabled,
     string SingularLabel,
     string PluralLabel,
-    int SortOrder);
+    int SortOrder,
+    bool PlatformLocked = false);
 
 public sealed record SaveModuleSettingRequest(bool IsEnabled, string SingularLabel, string PluralLabel, int SortOrder);
 

@@ -179,4 +179,16 @@ public sealed class BusinessDocument : TenantEntity
     public DateTime? DetectedDate { get; set; }
     public string? RejectReason { get; set; }
     public string? ExpiryNotifiedOffsetsJson { get; set; }
+
+    /// <summary>How the fields were read: "ai", "rules" or "mixed".</summary>
+    public string? ExtractionMethod { get; set; }
+
+    /// <summary>Why AI was not used or did not finish.</summary>
+    public string? ExtractionNote { get; set; }
+
+    /// <summary>How well the pages were read, 0 to 1.</summary>
+    public double? ReadConfidence { get; set; }
+
+    /// <summary>JSON list of page numbers that read poorly.</summary>
+    public string? LowConfidencePagesJson { get; set; }
 }

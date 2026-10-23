@@ -71,6 +71,12 @@
     /// <summary>Owners and admins who have not finished setup are sent back to the wizard.</summary>
     private async Task GoHomeAsync()
     {
+        if (Session.Me?.IsPlatformAdmin == true)
+        {
+            Nav.NavigateTo("/platform");
+            return;
+        }
+
         if (App.IsAdmin)
         {
             var onboarding = await Http.GetAsync("api/v1/onboarding");

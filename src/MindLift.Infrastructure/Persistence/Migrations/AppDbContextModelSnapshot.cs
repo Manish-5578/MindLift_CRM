@@ -18,7 +18,7 @@ namespace MindLift.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.12")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
@@ -1188,6 +1188,14 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("expiry_notified_offsets_json");
 
+                    b.Property<string>("ExtractionMethod")
+                        .HasColumnType("text")
+                        .HasColumnName("extraction_method");
+
+                    b.Property<string>("ExtractionNote")
+                        .HasColumnType("text")
+                        .HasColumnName("extraction_note");
+
                     b.Property<string>("FileName")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -1206,6 +1214,10 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnType("date")
                         .HasColumnName("issue_date");
 
+                    b.Property<string>("LowConfidencePagesJson")
+                        .HasColumnType("text")
+                        .HasColumnName("low_confidence_pages_json");
+
                     b.Property<string>("OcrRawText")
                         .HasColumnType("text")
                         .HasColumnName("ocr_raw_text");
@@ -1221,6 +1233,10 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.Property<DateOnly?>("PeriodDate")
                         .HasColumnType("date")
                         .HasColumnName("period_date");
+
+                    b.Property<double?>("ReadConfidence")
+                        .HasColumnType("double precision")
+                        .HasColumnName("read_confidence");
 
                     b.Property<string>("RejectReason")
                         .HasColumnType("text")
@@ -3910,6 +3926,15 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("Description")
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
+                    b.PrimitiveCollection<string[]>("IncludedModules")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("included_modules");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
@@ -3945,6 +3970,50 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_plans_key");
 
                     b.ToTable("plans", (string)null);
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.PlatformAuditEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("action");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("actor");
+
+                    b.Property<Guid?>("ActorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_id");
+
+                    b.Property<string>("Company")
+                        .HasColumnType("text")
+                        .HasColumnName("company");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("summary");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_platform_audit");
+
+                    b.ToTable("platform_audit", (string)null);
                 });
 
             modelBuilder.Entity("MindLift.Domain.Entities.PortalSettings", b =>
@@ -5699,6 +5768,10 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<bool>("AiReadingAllowed")
+                        .HasColumnType("boolean")
+                        .HasColumnName("ai_reading_allowed");
+
                     b.Property<bool>("ChecklistDismissed")
                         .HasColumnType("boolean")
                         .HasColumnName("checklist_dismissed");
@@ -5716,6 +5789,10 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.Property<string>("IndustryKey")
                         .HasColumnType("text")
                         .HasColumnName("industry_key");
+
+                    b.Property<int?>("MaxUsersOverride")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_users_override");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -5744,6 +5821,15 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("PlanId")
                         .HasColumnType("uuid")
                         .HasColumnName("plan_id");
+
+                    b.PrimitiveCollection<string[]>("PlatformDisabledModules")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("platform_disabled_modules");
+
+                    b.Property<string>("PlatformNotes")
+                        .HasColumnType("text")
+                        .HasColumnName("platform_notes");
 
                     b.Property<string>("Slug")
                         .IsRequired()
@@ -5785,6 +5871,10 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<bool>("AiReadingEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("ai_reading_enabled");
 
                     b.Property<string>("BaseCurrency")
                         .IsRequired()

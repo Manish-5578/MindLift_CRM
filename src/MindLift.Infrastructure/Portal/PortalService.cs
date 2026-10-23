@@ -34,11 +34,22 @@ public sealed class PortalService(
 
     private static UnauthorizedException InvalidCredentials() => new("invalid_credentials", "Invalid email or password.");
 
+    /// <summary>The company behind a portal address, or null when there is none or the platform owner switched its customer portal off.</summary>
+    private async Task<Tenant?> FindTenantAsync(string tenantSlug, CancellationToken ct)
+    {
+        var t = await db.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Slug == tenantSlug, ct);
+        if (t is null)
+        {
+            return null;
+        }
+
+        var plan = await db.Plans.AsNoTracking().FirstOrDefaultAsync(p => p.Id == t.PlanId, ct);
+        return MindLift.Infrastructure.Platform.PlanModules.Disabled(t, plan).Contains(nameof(MindLift.Shared.Enums.AppModule.Portal)) ? null : t;
+    }
+
     public async Task<PortalBrandingDto> GetBrandingAsync(string tenantSlug, CancellationToken ct = default)
     {
-        var t = await db.Tenants
-            .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(x => x.Slug == tenantSlug, ct)
+        var t = await FindTenantAsync(tenantSlug, ct)
             ?? throw new NotFoundException("Tenant", tenantSlug);
 
         var tenantSettings = await db.TenantSettings
@@ -64,9 +75,7 @@ public sealed class PortalService(
 
     public async Task<PortalLoginResponse> LoginAsync(string tenantSlug, PortalLoginRequest req, CancellationToken ct = default)
     {
-        var t = await db.Tenants
-            .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(x => x.Slug == tenantSlug, ct)
+        var t = await FindTenantAsync(tenantSlug, ct)
             ?? throw new NotFoundException("Tenant", tenantSlug);
 
         using var scope = tenant.Use(t.Id);
@@ -105,9 +114,7 @@ public sealed class PortalService(
 
     public async Task SendMagicLinkAsync(string tenantSlug, PortalMagicLinkRequest req, CancellationToken ct = default)
     {
-        var t = await db.Tenants
-            .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(x => x.Slug == tenantSlug, ct);
+        var t = await FindTenantAsync(tenantSlug, ct);
 
         if (t == null) return; // Prevent tenant enumeration
 
@@ -154,9 +161,7 @@ public sealed class PortalService(
 
     public async Task<PortalLoginResponse> VerifyMagicLinkAsync(string tenantSlug, PortalMagicLinkVerifyRequest req, CancellationToken ct = default)
     {
-        var t = await db.Tenants
-            .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(x => x.Slug == tenantSlug, ct)
+        var t = await FindTenantAsync(tenantSlug, ct)
             ?? throw new NotFoundException("Tenant", tenantSlug);
 
         using var scope = tenant.Use(t.Id);
@@ -192,9 +197,7 @@ public sealed class PortalService(
 
     public async Task<PortalLoginResponse> AcceptInviteAsync(string tenantSlug, AcceptPortalInviteRequest req, CancellationToken ct = default)
     {
-        var t = await db.Tenants
-            .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(x => x.Slug == tenantSlug, ct)
+        var t = await FindTenantAsync(tenantSlug, ct)
             ?? throw new NotFoundException("Tenant", tenantSlug);
 
         using var scope = tenant.Use(t.Id);
@@ -231,7 +234,7 @@ public sealed class PortalService(
 
     public async Task<PortalLoginResponse> RefreshAsync(string tenantSlug, string refreshToken, CancellationToken ct = default)
     {
-        var t = await db.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Slug == tenantSlug, ct)
+        var t = await FindTenantAsync(tenantSlug, ct)
             ?? throw new UnauthorizedException("invalid_refresh_token", "Your session has ended. Please sign in again.");
 
         using var scope = tenant.Use(t.Id);
@@ -273,7 +276,7 @@ public sealed class PortalService(
 
     public async Task LogoutAsync(string tenantSlug, string refreshToken, CancellationToken ct = default)
     {
-        var t = await db.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Slug == tenantSlug, ct);
+        var t = await FindTenantAsync(tenantSlug, ct);
         if (t is null) return;
 
         using var scope = tenant.Use(t.Id);

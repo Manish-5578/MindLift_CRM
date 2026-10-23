@@ -47,6 +47,26 @@ public static class RecordLookups
         }
     }
 
+    /// <summary>Deals whose name or account matches the text, at most eight.</summary>
+    public static async Task<IReadOnlyList<LookupItem>> DealsAsync(HttpClient http, string text, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var response = await http.PostAsJsonAsync("api/v1/deals/query", new ListQuery(text, null, "name", "asc", 1, 8), cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return [];
+            }
+
+            var page = await response.Content.ReadFromJsonAsync<PagedResult<DealListItemDto>>(cancellationToken);
+            return page?.Items.Select(d => new LookupItem(d.Id, d.Name)).ToList() ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            return [];
+        }
+    }
+
     /// <summary>Active people for owner pickers. Staff without access to the user list get an empty list.</summary>
     public static async Task<List<UserListItem>> UsersAsync(HttpClient http)
     {

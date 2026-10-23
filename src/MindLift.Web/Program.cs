@@ -16,6 +16,7 @@ builder.Services.AddMindLiftLocalization();
 builder.Services.AddScoped<AuthSession>();
 builder.Services.AddScoped<AppState>();
 builder.Services.AddScoped<NotificationClient>();
+builder.Services.AddScoped<PlatformNotifier>();
 builder.Services.AddScoped(sp => new HttpClient(new AuthHandler(sp.GetRequiredService<AuthSession>(), apiBase)) { BaseAddress = apiBase });
 
 builder.Services.AddMudServices(config =>
