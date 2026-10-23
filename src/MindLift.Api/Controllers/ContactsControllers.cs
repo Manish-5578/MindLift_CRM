@@ -45,6 +45,17 @@ public sealed class ContactsController(ContactService contacts, ImportNotifier i
         return NoContent();
     }
 
+    /// <summary>Change many contacts at once (the list's bulk bar). Each one is checked and saved as if edited on its own page.</summary>
+    [HasPermission(AppModule.Contacts, PermissionAction.Edit)]
+    [HttpPost("bulk")]
+    public async Task<ActionResult<BulkActionResult>> Bulk([FromBody] BulkActionRequest request, CancellationToken cancellationToken)
+        => Ok(await contacts.BulkAsync(request, cancellationToken));
+
+    [HasPermission(AppModule.Contacts, PermissionAction.Delete)]
+    [HttpPost("bulk-delete")]
+    public async Task<ActionResult<BulkActionResult>> BulkDelete([FromBody] BulkDeleteRequest request, CancellationToken cancellationToken)
+        => Ok(await contacts.BulkDeleteAsync(request, cancellationToken));
+
     [HasPermission(AppModule.Contacts, PermissionAction.Create)]
     [HttpPost("check-duplicates")]
     public async Task<ActionResult<IReadOnlyList<DuplicateCandidateDto>>> CheckDuplicates([FromBody] CheckDuplicatesRequest request, CancellationToken cancellationToken)
@@ -111,6 +122,17 @@ public sealed class AccountsController(AccountService accounts, ImportNotifier i
         await accounts.DeleteAsync(id, cancellationToken);
         return NoContent();
     }
+
+    /// <summary>Change many accounts at once (the list's bulk bar). Each one is checked and saved as if edited on its own page.</summary>
+    [HasPermission(AppModule.Accounts, PermissionAction.Edit)]
+    [HttpPost("bulk")]
+    public async Task<ActionResult<BulkActionResult>> Bulk([FromBody] BulkActionRequest request, CancellationToken cancellationToken)
+        => Ok(await accounts.BulkAsync(request, cancellationToken));
+
+    [HasPermission(AppModule.Accounts, PermissionAction.Delete)]
+    [HttpPost("bulk-delete")]
+    public async Task<ActionResult<BulkActionResult>> BulkDelete([FromBody] BulkDeleteRequest request, CancellationToken cancellationToken)
+        => Ok(await accounts.BulkDeleteAsync(request, cancellationToken));
 
     [HasPermission(AppModule.Accounts, PermissionAction.Import)]
     [HttpPost("import")]

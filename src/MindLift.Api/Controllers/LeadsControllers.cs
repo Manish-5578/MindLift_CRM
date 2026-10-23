@@ -41,6 +41,17 @@ public sealed class LeadsController(LeadService leads, ImportNotifier imports) :
         return NoContent();
     }
 
+    /// <summary>Change many leads at once (the list's bulk bar). Each one is checked and saved as if edited on its own page.</summary>
+    [HasPermission(AppModule.Leads, PermissionAction.Edit)]
+    [HttpPost("bulk")]
+    public async Task<ActionResult<BulkActionResult>> Bulk([FromBody] BulkActionRequest request, CancellationToken cancellationToken)
+        => Ok(await leads.BulkAsync(request, cancellationToken));
+
+    [HasPermission(AppModule.Leads, PermissionAction.Delete)]
+    [HttpPost("bulk-delete")]
+    public async Task<ActionResult<BulkActionResult>> BulkDelete([FromBody] BulkDeleteRequest request, CancellationToken cancellationToken)
+        => Ok(await leads.BulkDeleteAsync(request, cancellationToken));
+
     [HasPermission(AppModule.Leads, PermissionAction.Edit)]
     [HttpPost("{id:guid}/disqualify")]
     public async Task<ActionResult<LeadDto>> Disqualify(Guid id, [FromBody] DisqualifyLeadRequest request, CancellationToken cancellationToken)

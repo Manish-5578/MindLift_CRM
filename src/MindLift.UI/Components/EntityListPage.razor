@@ -1,7 +1,9 @@
 @typeparam TItem
 @using MindLift.Shared.Filtering
+@using Microsoft.JSInterop
 @inject NavigationManager Nav
 @inject Translator T
+@inject IJSRuntime JS
 @implements IDisposable
 
 <PageHeader Title="@Title" Subtitle="@SubtitleText">
@@ -9,40 +11,76 @@
 </PageHeader>
 
 <MlCard Flush="true" TestId="entity-list">
-    @if (Views.Count > 0)
+    @if (AllViews.Count > 0 || OnSaveView.HasDelegate)
     {
         <div class="ml-row ml-row--wrap" style="padding:12px 20px 0" data-testid="list-views">
             <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small">
-                @foreach (var view in Views)
+                @foreach (var view in AllViews)
                 {
                     var current = view;
-                    <MudButton Color="@ViewColor(current)" OnClick="() => SelectViewAsync(current)" data-testid="@ViewTestId(current)">@T[current.Label]</MudButton>
+                    <MudButton Color="@ViewColor(current)" OnClick="() => SelectViewAsync(current)" data-testid="@ViewTestId(current)">@(current.SavedId is null ? T[current.Label] : current.Label)</MudButton>
                 }
             </MudButtonGroup>
+            @if (CurrentView is { SavedId: { } savedId, CanDelete: true } && OnDeleteView.HasDelegate)
+            {
+                <MudIconButton Icon="@Icons.Material.Outlined.DeleteOutline" Size="Size.Small" OnClick="() => DeleteViewAsync(savedId)" aria-label="@T["Delete this view"]" data-testid="delete-view" />
+            }
+            @if (OnSaveView.HasDelegate)
+            {
+                <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Add" OnClick="OpenSaveView" data-testid="save-view">@T["Save view"]</MudButton>
+            }
         </div>
     }
 
-    <div class="ml-row ml-row--wrap" style="padding:12px 20px;border-bottom:1px solid var(--ml-border)" data-testid="list-toolbar">
-        <MudTextField T="string" Value="_state.Search" ValueChanged="SearchAsync" Immediate="true" DebounceInterval="300" Placeholder="@T[SearchPlaceholder]"
-                      Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.Search"
-                      Class="ml-grow" Style="max-width:360px" data-testid="search" />
-
-        @if (Fields.Count > 0)
+    <div class="ml-row ml-row--wrap" style="padding:12px 20px;border-bottom:1px solid var(--ml-border);min-height:65px" data-testid="list-toolbar">
+        @if (SelectedCount > 0)
         {
-            <MudBadge Content="FilterCount" Visible="FilterCount > 0" Color="Color.Primary" Overlap="true">
-                <MudButton Variant="Variant.Outlined" Size="Size.Medium" StartIcon="@Icons.Material.Outlined.FilterList" OnClick="OpenFilters" data-testid="open-filters">@T["Filters"]</MudButton>
-            </MudBadge>
+            <div class="ml-row ml-row--wrap ml-grow" data-testid="bulk-bar">
+                <MudText Typo="Typo.subtitle2" data-testid="bulk-count">@T["{0} selected", SelectedCount.ToString("N0")]</MudText>
+                @BulkActions?.Invoke(Selection())
+                @if (!_allMatching && AllOnPageSelected && _result is not null && _result.Total > _result.Items.Count)
+                {
+                    <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Primary" OnClick="SelectAllMatching" data-testid="bulk-select-all">@T["Select all {0}", _result.Total.ToString("N0")]</MudButton>
+                }
+                <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="ClearSelection" data-testid="bulk-clear">@T["Clear"]</MudButton>
+            </div>
         }
-
-        @foreach (var chip in Chips())
+        else
         {
-            var condition = chip.Condition;
-            <MudChip T="string" Size="Size.Small" OnClose="() => RemoveConditionAsync(condition)" data-testid="filter-chip">@chip.Text</MudChip>
-        }
+            <MudTextField T="string" Value="_state.Search" ValueChanged="SearchAsync" Immediate="true" DebounceInterval="300" Placeholder="@T[SearchPlaceholder]"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.Search"
+                          Class="ml-grow" Style="max-width:360px" data-testid="search" />
 
-        @if (_state.IsNarrowed)
-        {
-            <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="ClearAsync" data-testid="clear-filters">@T["Clear"]</MudButton>
+            @if (Fields.Count > 0)
+            {
+                <MudBadge Content="FilterCount" Visible="FilterCount > 0" Color="Color.Primary" Overlap="true">
+                    <MudButton Variant="Variant.Outlined" Size="Size.Medium" StartIcon="@Icons.Material.Outlined.FilterList" OnClick="OpenFilters" data-testid="open-filters">@T["Filters"]</MudButton>
+                </MudBadge>
+            }
+
+            @foreach (var chip in Chips())
+            {
+                var condition = chip.Condition;
+                <MudChip T="string" Size="Size.Small" OnClose="() => RemoveConditionAsync(condition)" data-testid="filter-chip">@chip.Text</MudChip>
+            }
+
+            @if (_state.IsNarrowed)
+            {
+                <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="ClearAsync" data-testid="clear-filters">@T["Clear"]</MudButton>
+            }
+
+            @if (Columns.Count > 1)
+            {
+                <MudMenu Icon="@Icons.Material.Outlined.ViewColumn" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" Class="ml-hide-xs" Style="margin-inline-start:auto"
+                         aria-label="@T["Choose columns"]" data-testid="column-chooser">
+                    @foreach (var column in Columns.Skip(1))
+                    {
+                        var header = column.Header;
+                        <MudMenuItem AutoClose="false" OnClick="() => ToggleColumnAsync(header)" data-testid="@("column-" + header)"
+                                     Icon="@(_hiddenColumns.Contains(header) ? Icons.Material.Outlined.CheckBoxOutlineBlank : Icons.Material.Outlined.CheckBox)">@T[header]</MudMenuItem>
+                    }
+                </MudMenu>
+            }
         }
     </div>
 
@@ -78,7 +116,14 @@
             <table class="ml-table">
                 <thead>
                     <tr>
-                        @foreach (var column in Columns)
+                        @if (Selectable)
+                        {
+                            <th class="ml-table__check">
+                                <MudCheckBox T="bool" Value="AllOnPageSelected" ValueChanged="TogglePageAsync" Size="Size.Small" Dense="true"
+                                             aria-label="@T["Select all on this page"]" data-testid="select-page" />
+                            </th>
+                        }
+                        @foreach (var column in VisibleColumns)
                         {
                             var current = column;
                             <th class="@ColumnClass(current)" aria-sort="@SortAria(current)">
@@ -98,16 +143,37 @@
                                 }
                             </th>
                         }
+                        @if (RowMenu is not null)
+                        {
+                            <th class="ml-table__menu"><span class="ml-visually-hidden">@T["Actions"]</span></th>
+                        }
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var item in _result.Items)
                     {
                         var current = item;
-                        <tr class="@RowClass" @onclick="() => OpenAsync(current)" data-testid="row">
-                            @foreach (var column in Columns)
+                        var selected = IsSelected(current);
+                        <tr class="@RowClass @(selected ? "ml-row-selected" : null)" @onclick="() => OpenAsync(current)" data-testid="row" aria-selected="@(Selectable ? selected.ToString().ToLowerInvariant() : null)">
+                            @if (Selectable)
+                            {
+                                <td class="ml-table__check" @onclick:stopPropagation="true">
+                                    <MudCheckBox T="bool" Value="selected" ValueChanged="v => ToggleRow(current, v)" Size="Size.Small" Dense="true"
+                                                 aria-label="@T["Select row"]" data-testid="select-row" />
+                                </td>
+                            }
+                            @foreach (var column in VisibleColumns)
                             {
                                 <td class="@ColumnClass(column)">@column.Cell(current)</td>
+                            }
+                            @if (RowMenu is not null)
+                            {
+                                <td class="ml-table__menu" @onclick:stopPropagation="true">
+                                    <MudMenu Icon="@Icons.Material.Outlined.MoreVert" Size="Size.Small" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight"
+                                             aria-label="@T["More actions"]" data-testid="row-menu">
+                                        @RowMenu(current)
+                                    </MudMenu>
+                                </td>
                             }
                         </tr>
                     }
@@ -158,6 +224,19 @@
     </div>
 </MudDrawer>
 
+<MudDialog @bind-Visible="_saveViewOpen" Options="new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true }" data-testid="save-view-dialog">
+    <TitleContent><MudText Typo="Typo.h6">@T["Save view"]</MudText></TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="ml-muted mb-3">@T["Saves the current filters, sort and columns as a tab above the list."]</MudText>
+        <MudTextField @bind-Value="_viewName" Label="@T["Name"]" Variant="Variant.Outlined" MaxLength="80" Required="true" data-testid="save-view-name" />
+        <MudCheckBox @bind-Value="_viewShared" Label="@T["Share with everyone in the workspace"]" data-testid="save-view-shared" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _saveViewOpen = false">@T["Cancel"]</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="string.IsNullOrWhiteSpace(_viewName)" OnClick="SaveViewAsync" data-testid="save-view-confirm">@T["Save"]</MudButton>
+    </DialogActions>
+</MudDialog>
+
 @code {
     private ListState _state = new("");
     private PagedResult<TItem>? _result;
@@ -206,6 +285,177 @@
     [Parameter] public string? DefaultSortDir { get; set; }
     [Parameter] public int PageSize { get; set; } = 25;
 
+    /// <summary>The id of a row. With <see cref="BulkActions"/> it turns on row checkboxes and the bulk bar.</summary>
+    [Parameter] public Func<TItem, Guid>? ItemId { get; set; }
+
+    /// <summary>The buttons of the bulk bar shown while rows are ticked, for example Assign and Delete.</summary>
+    [Parameter] public RenderFragment<BulkSelection>? BulkActions { get; set; }
+
+    /// <summary>The items of each row's "⋮" menu, for example Open, Edit and Delete.</summary>
+    [Parameter] public RenderFragment<TItem>? RowMenu { get; set; }
+
+    /// <summary>Views the user or colleagues saved, shown as tabs after <see cref="Views"/>.</summary>
+    [Parameter] public IReadOnlyList<ListView> SavedViews { get; set; } = [];
+
+    /// <summary>Stores a new saved view. Without it there is no "Save view" button.</summary>
+    [Parameter] public EventCallback<SaveViewRequest> OnSaveView { get; set; }
+
+    [Parameter] public EventCallback<Guid> OnDeleteView { get; set; }
+
+    /// <summary>Where this list remembers the columns a user hid, in the browser (for example "leads").</summary>
+    [Parameter] public string? ColumnStorageKey { get; set; }
+
+    private readonly HashSet<Guid> _selected = [];
+    private bool _allMatching;
+    private HashSet<string> _hiddenColumns = [];
+    private IReadOnlyList<string>? _viewColumns;
+    private bool _saveViewOpen;
+    private string _viewName = string.Empty;
+    private bool _viewShared;
+
+    private IReadOnlyList<ListView> AllViews => SavedViews.Count == 0 ? Views : [.. Views, .. SavedViews];
+
+    private ListView? CurrentView => AllViews.FirstOrDefault(v => v.Key == _state.View);
+
+    private bool Selectable => ItemId is not null && BulkActions is not null;
+
+    private int SelectedCount => _allMatching ? _result?.Total ?? 0 : _selected.Count;
+
+    private bool AllOnPageSelected => Selectable && _result is { Items.Count: > 0 } && (_allMatching || _result.Items.All(i => _selected.Contains(ItemId!(i))));
+
+    /// <summary>The columns to draw: a saved view's own set when it has one, otherwise all but those the user hid. The first column always shows.</summary>
+    private IReadOnlyList<ListColumn<TItem>> VisibleColumns => Columns
+        .Where((c, i) => i == 0 || (_viewColumns is { Count: > 0 } chosen ? chosen.Contains(c.Header) : !_hiddenColumns.Contains(c.Header)))
+        .ToList();
+
+    private bool IsSelected(TItem item) => Selectable && (_allMatching || _selected.Contains(ItemId!(item)));
+
+    private void ToggleRow(TItem item, bool on)
+    {
+        if (_allMatching)
+        {
+            // Unticking one row after "Select all" goes back to ticking the rows on this page, less that one.
+            _allMatching = false;
+            _selected.Clear();
+            foreach (var row in _result?.Items ?? [])
+            {
+                _selected.Add(ItemId!(row));
+            }
+        }
+
+        if (on)
+        {
+            _selected.Add(ItemId!(item));
+        }
+        else
+        {
+            _selected.Remove(ItemId!(item));
+        }
+    }
+
+    private Task TogglePageAsync(bool on)
+    {
+        _allMatching = false;
+        foreach (var row in _result?.Items ?? [])
+        {
+            if (on)
+            {
+                _selected.Add(ItemId!(row));
+            }
+            else
+            {
+                _selected.Remove(ItemId!(row));
+            }
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private void SelectAllMatching() => _allMatching = true;
+
+    private void ClearSelection()
+    {
+        _allMatching = false;
+        _selected.Clear();
+    }
+
+    private BulkSelection Selection() => new(
+        _allMatching ? [] : _selected.ToList(),
+        _allMatching ? CurrentQuery with { Page = 1 } : null,
+        SelectedCount,
+        async () =>
+        {
+            ClearSelection();
+            await LoadAsync();
+        });
+
+    private async Task ToggleColumnAsync(string header)
+    {
+        if (!_hiddenColumns.Remove(header))
+        {
+            _hiddenColumns.Add(header);
+        }
+
+        // Changing columns by hand leaves a saved view's own column set.
+        _viewColumns = null;
+        if (ColumnStorageKey is not null)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("localStorage.setItem", ColumnsKey, string.Join('\n', _hiddenColumns));
+            }
+            catch (JSException)
+            {
+                // Browser storage is off; the choice lasts until the page is left.
+            }
+        }
+    }
+
+    private string ColumnsKey => "mindlift.columns." + ColumnStorageKey;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || ColumnStorageKey is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var stored = await JS.InvokeAsync<string?>("localStorage.getItem", ColumnsKey);
+            if (!string.IsNullOrEmpty(stored))
+            {
+                _hiddenColumns = stored.Split('\n', StringSplitOptions.RemoveEmptyEntries).ToHashSet();
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex) when (ex is JSException or InvalidOperationException or TaskCanceledException)
+        {
+            // No browser storage (or prerendering): every column shows.
+        }
+    }
+
+    private void OpenSaveView()
+    {
+        _viewName = string.Empty;
+        _viewShared = false;
+        _saveViewOpen = true;
+    }
+
+    private async Task SaveViewAsync()
+    {
+        _saveViewOpen = false;
+        await OnSaveView.InvokeAsync(new SaveViewRequest(
+            _viewName.Trim(), _viewShared, EffectiveFilter(), _state.SortField ?? DefaultSortField, _state.SortField is null ? DefaultSortDir : _state.SortDir,
+            VisibleColumns.Select(c => c.Header).ToList()));
+    }
+
+    private async Task DeleteViewAsync(Guid id)
+    {
+        await OnDeleteView.InvokeAsync(id);
+        await SetStateAsync(_state.Reset(view: DefaultViewKey));
+    }
+
     private string DefaultViewKey => DefaultView ?? Views.FirstOrDefault()?.Key ?? string.Empty;
 
     private string? SubtitleText => _result is null ? null : $"{_result.Total:N0} {T[ItemLabel]}";
@@ -223,7 +473,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _state = ListState.FromQuery(new Uri(Nav.Uri).Query, DefaultViewKey, Views.Select(v => v.Key).ToList());
+        _state = ListState.FromQuery(new Uri(Nav.Uri).Query, DefaultViewKey, AllViews.Select(v => v.Key).ToList());
         if (_state.SortField is null && DefaultSortField is not null)
         {
             _state = _state with { SortField = DefaultSortField, SortDir = DefaultSortDir ?? "asc" };
@@ -242,7 +492,7 @@
         }
 
         // Back and forward buttons: show whatever the address now says.
-        var parsed = ListState.FromQuery(new Uri(e.Location).Query, DefaultViewKey, Views.Select(v => v.Key).ToList());
+        var parsed = ListState.FromQuery(new Uri(e.Location).Query, DefaultViewKey, AllViews.Select(v => v.Key).ToList());
         if (parsed != _state)
         {
             _state = parsed;
@@ -259,6 +509,9 @@
 
         _state = next;
         _selfNavigating = true;
+
+        // A different search, filter, view or page shows different rows, so what was ticked no longer applies.
+        ClearSelection();
         var query = _state.ToQuery(DefaultViewKey).ToDictionary(kv => kv.Key, kv => (object?)kv.Value);
 
         // The default sort is not worth putting in the address. Only a sort the user chose is.
@@ -341,7 +594,7 @@
     /// <summary>The view's own filter and the user's filters together, so a view tab and extra filters both apply.</summary>
     private FilterGroup? EffectiveFilter()
     {
-        var view = Views.FirstOrDefault(v => v.Key == _state.View)?.Filter;
+        var view = AllViews.FirstOrDefault(v => v.Key == _state.View)?.Filter;
         var user = _state.HasFilter ? _state.Filter : null;
         if (view is null || user is null)
         {
@@ -355,7 +608,17 @@
 
     private static string ViewTestId(ListView view) => "view-" + view.Key;
 
-    private async Task SelectViewAsync(ListView view) => await SetStateAsync(_state.Reset(view: view.Key));
+    private async Task SelectViewAsync(ListView view)
+    {
+        _viewColumns = view.Columns.Count > 0 ? view.Columns : null;
+        var next = _state.Reset(view: view.Key);
+        if (view.SortField is not null)
+        {
+            next = next with { SortField = view.SortField, SortDir = view.SortDir ?? "asc" };
+        }
+
+        await SetStateAsync(next);
+    }
 
     private async Task SearchAsync(string? text) => await SetStateAsync(_state.Reset(search: text, clearSearch: string.IsNullOrWhiteSpace(text)));
 

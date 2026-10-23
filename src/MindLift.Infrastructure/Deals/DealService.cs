@@ -7,6 +7,7 @@ using MindLift.Application.Abstractions;
 using MindLift.Application.Common.Exceptions;
 using MindLift.Application.Common.Fields;
 using MindLift.Domain.Entities;
+using MindLift.Infrastructure.Common;
 using MindLift.Infrastructure.Contacts;
 using MindLift.Infrastructure.Persistence;
 using MindLift.Infrastructure.Settings;
@@ -44,7 +45,25 @@ public sealed class DealService(
     {
         var page = Math.Max(query.Page, 1);
         var pageSize = Math.Clamp(query.PageSize, 1, 200);
+        var source = await MatchingAsync(query, cancellationToken);
+
+        var total = await source.CountAsync(cancellationToken);
+        source = Sort(source, query.SortField, query.SortDir);
+        var rows = await source.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
+
+        var lookups = await LookupsAsync(rows, cancellationToken);
+        var items = rows.Select(d => ToListItem(d, lookups)).ToList();
+        return new PagedResult<DealListItemDto>(items, total, page, pageSize);
+    }
+
+    /// <summary>The deals a list query matches (the user's scope, filters, search and any chosen ids), before sorting and paging.</summary>
+    private async Task<IQueryable<Deal>> MatchingAsync(ListQuery query, CancellationToken cancellationToken)
+    {
         var source = await ScopedAsync(cancellationToken);
+        if (query.Ids is { Count: > 0 } ids)
+        {
+            source = source.Where(r => ids.Contains(r.Id));
+        }
 
         if (query.Filter is not null)
         {
@@ -59,14 +78,43 @@ public sealed class DealService(
                 || (d.AccountId != null && db.Accounts.Any(a => a.Id == d.AccountId && a.Name.ToLower().Contains(term))));
         }
 
-        var total = await source.CountAsync(cancellationToken);
-        source = Sort(source, query.SortField, query.SortDir);
-        var rows = await source.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
-
-        var lookups = await LookupsAsync(rows, cancellationToken);
-        var items = rows.Select(d => ToListItem(d, lookups)).ToList();
-        return new PagedResult<DealListItemDto>(items, total, page, pageSize);
+        return source;
     }
+
+    /// <summary>The ids of the deals a list query matches, at most <paramref name="limit"/>, for "select all" in bulk actions.</summary>
+    public async Task<IReadOnlyList<Guid>> MatchingIdsAsync(ListQuery query, int limit, CancellationToken cancellationToken = default)
+        => await (await MatchingAsync(query, cancellationToken)).OrderBy(r => r.Id).Select(r => r.Id).Take(limit).ToListAsync(cancellationToken);
+
+    /// <summary>Assign many deals to one owner. Each is saved as if edited on its own page.</summary>
+    public async Task<BulkActionResult> BulkAsync(BulkActionRequest request, CancellationToken cancellationToken = default)
+    {
+        if (request.Action != BulkActions.Assign)
+        {
+            throw new ValidationException("action", $"'{request.Action}' is not something that can be done to many deals at once.");
+        }
+
+        if (request.OwnerId is not { } owner)
+        {
+            throw new ValidationException("ownerId", "Choose who to assign the deals to.");
+        }
+
+        var ids = await BulkRunner.TargetsAsync(request.Ids, request.AllMatching, MatchingIdsAsync, cancellationToken);
+        return await BulkRunner.RunAsync(db, ids, async (id, ct) =>
+        {
+            var current = await GetAsync(id, ct);
+            await UpdateAsync(id, ToSave(current) with { OwnerId = owner }, ct);
+        }, cancellationToken);
+    }
+
+    public async Task<BulkActionResult> BulkDeleteAsync(BulkDeleteRequest request, CancellationToken cancellationToken = default)
+    {
+        var ids = await BulkRunner.TargetsAsync(request.Ids, request.AllMatching, MatchingIdsAsync, cancellationToken);
+        return await BulkRunner.RunAsync(db, ids, DeleteAsync, cancellationToken);
+    }
+
+    /// <summary>The record's current values as a save request, so a bulk change alters only the one thing it is about.</summary>
+    private static SaveDealRequest ToSave(DealDto d) => new(d.Name, d.PipelineId, d.StageId, d.Amount, d.Currency, d.ProbabilityOverridden ? d.Probability : null, d.ExpectedCloseDate,
+        d.AccountId, null, d.Description, d.OwnerId, d.CustomFields);
 
     public async Task<DealDto> GetAsync(Guid id, CancellationToken cancellationToken = default)
         => await MapAsync(await LoadScopedAsync(id, cancellationToken), cancellationToken);
@@ -377,6 +425,11 @@ public sealed class DealService(
             ?? (deal.PrimaryContactId is { } primary ? await db.Contacts.Where(c => c.Id == primary).Select(c => c.AccountId).FirstOrDefaultAsync(cancellationToken) : null);
         if (request.OwnerId is { } owner)
         {
+            if (owner != deal.OwnerId)
+            {
+                await RecordHelpers.EnsureOwnerAsync(db, owner, cancellationToken);
+            }
+
             deal.OwnerId = owner;
         }
 

@@ -56,6 +56,17 @@ public sealed class DealsController(DealService deals, ImportNotifier imports) :
         return NoContent();
     }
 
+    /// <summary>Change many deals at once (the list's bulk bar). Each one is checked and saved as if edited on its own page.</summary>
+    [HasPermission(AppModule.Deals, PermissionAction.Edit)]
+    [HttpPost("bulk")]
+    public async Task<ActionResult<BulkActionResult>> Bulk([FromBody] BulkActionRequest request, CancellationToken cancellationToken)
+        => Ok(await deals.BulkAsync(request, cancellationToken));
+
+    [HasPermission(AppModule.Deals, PermissionAction.Delete)]
+    [HttpPost("bulk-delete")]
+    public async Task<ActionResult<BulkActionResult>> BulkDelete([FromBody] BulkDeleteRequest request, CancellationToken cancellationToken)
+        => Ok(await deals.BulkDeleteAsync(request, cancellationToken));
+
     /// <summary>CSV body (text/csv). Max 5,000 rows.</summary>
     [HasPermission(AppModule.Deals, PermissionAction.Import)]
     [HttpPost("import")]

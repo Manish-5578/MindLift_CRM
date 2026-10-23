@@ -4601,4 +4601,112 @@
   <data name="We could not make a searchable copy of this document." xml:space="preserve">
     <value>تعذّر إنشاء نسخة قابلة للبحث من هذا المستند.</value>
   </data>
+  <data name="Save view" xml:space="preserve">
+    <value>حفظ العرض</value>
+  </data>
+  <data name="Delete this view" xml:space="preserve">
+    <value>حذف هذا العرض</value>
+  </data>
+  <data name="{0} selected" xml:space="preserve">
+    <value>تم تحديد {0}</value>
+  </data>
+  <data name="Select all {0}" xml:space="preserve">
+    <value>تحديد الكل ({0})</value>
+  </data>
+  <data name="Choose columns" xml:space="preserve">
+    <value>اختيار الأعمدة</value>
+  </data>
+  <data name="Select all on this page" xml:space="preserve">
+    <value>تحديد كل ما في هذه الصفحة</value>
+  </data>
+  <data name="Select row" xml:space="preserve">
+    <value>تحديد الصف</value>
+  </data>
+  <data name="More actions" xml:space="preserve">
+    <value>إجراءات أخرى</value>
+  </data>
+  <data name="Saves the current filters, sort and columns as a tab above the list." xml:space="preserve">
+    <value>يحفظ عوامل التصفية والترتيب والأعمدة الحالية كتبويب أعلى القائمة.</value>
+  </data>
+  <data name="Name" xml:space="preserve">
+    <value>الاسم</value>
+  </data>
+  <data name="Share with everyone in the workspace" xml:space="preserve">
+    <value>مشاركة مع كل من في مساحة العمل</value>
+  </data>
+  <data name="Assign" xml:space="preserve">
+    <value>تعيين</value>
+  </data>
+  <data name="Change status" xml:space="preserve">
+    <value>تغيير الحالة</value>
+  </data>
+  <data name="Add tags" xml:space="preserve">
+    <value>إضافة وسوم</value>
+  </data>
+  <data name="Assigned {0} {1} to {2}" xml:space="preserve">
+    <value>تم تعيين {0} من {1} إلى {2}</value>
+  </data>
+  <data name="Changed the status of {0} {1}" xml:space="preserve">
+    <value>تم تغيير حالة {0} من {1}</value>
+  </data>
+  <data name="Separate tags with commas. They are added to the tags each record already has." xml:space="preserve">
+    <value>افصل بين الوسوم بفواصل. تُضاف إلى الوسوم الموجودة في كل سجل.</value>
+  </data>
+  <data name="Tags *" xml:space="preserve">
+    <value>الوسوم *</value>
+  </data>
+  <data name="Tagged {0} {1}" xml:space="preserve">
+    <value>تمت إضافة وسوم إلى {0} من {1}</value>
+  </data>
+  <data name="Delete {0} {1}?" xml:space="preserve">
+    <value>حذف {0} من {1}؟</value>
+  </data>
+  <data name="This cannot be undone." xml:space="preserve">
+    <value>لا يمكن التراجع عن هذا.</value>
+  </data>
+  <data name="Deleted {0} {1}" xml:space="preserve">
+    <value>تم حذف {0} من {1}</value>
+  </data>
+  <data name="We could not export these records." xml:space="preserve">
+    <value>تعذّر تصدير هذه السجلات.</value>
+  </data>
+  <data name="We could not change these records." xml:space="preserve">
+    <value>تعذّر تغيير هذه السجلات.</value>
+  </data>
+  <data name="1 record was not changed: {0}" xml:space="preserve">
+    <value>لم يتم تغيير سجل واحد: {0}</value>
+  </data>
+  <data name="{0} records were not changed. The first reason: {1}" xml:space="preserve">
+    <value>لم يتم تغيير {0} من السجلات. السبب الأول: {1}</value>
+  </data>
+  <data name="We could not save this view." xml:space="preserve">
+    <value>تعذّر حفظ هذا العرض.</value>
+  </data>
+  <data name="View saved" xml:space="preserve">
+    <value>تم حفظ العرض</value>
+  </data>
+  <data name="Delete this view?" xml:space="preserve">
+    <value>حذف هذا العرض؟</value>
+  </data>
+  <data name="The tab is removed for everyone it was shared with." xml:space="preserve">
+    <value>تتم إزالة التبويب لكل من تمت مشاركته معهم.</value>
+  </data>
+  <data name="We could not delete this view." xml:space="preserve">
+    <value>تعذّر حذف هذا العرض.</value>
+  </data>
+  <data name="We could not open this record." xml:space="preserve">
+    <value>تعذّر فتح هذا السجل.</value>
+  </data>
+  <data name="Delete {0}?" xml:space="preserve">
+    <value>حذف {0}؟</value>
+  </data>
+  <data name="this record" xml:space="preserve">
+    <value>هذا السجل</value>
+  </data>
+  <data name="We could not delete this record." xml:space="preserve">
+    <value>تعذّر حذف هذا السجل.</value>
+  </data>
+  <data name="Deleted" xml:space="preserve">
+    <value>تم الحذف</value>
+  </data>
 </root>

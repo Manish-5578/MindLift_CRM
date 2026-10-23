@@ -142,12 +142,13 @@ public sealed class NotificationTests(MindLiftApiFactory factory) : IClassFixtur
     }
 
     [Fact]
-    public async Task A_deactivated_person_is_not_notified()
+    public async Task A_deactivated_person_cannot_be_given_a_record_and_is_not_notified()
     {
         var p = await PairAsync();
         (await p.Admin.Client.PostAsync($"/api/v1/users/{p.StaffId}/deactivate", null)).EnsureSuccessStatusCode();
 
-        await NewLeadAsync(p.Admin, "Nobody home", p.StaffId);
+        var response = await p.Admin.Client.PostAsJsonAsync("/api/v1/leads", new SaveLeadRequest("Nobody home", "Lead", null, null, "Acme", "new", "website", null, null, null, p.StaffId, null));
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
 
         await InScopeAsync(async sp =>
         {

@@ -157,6 +157,11 @@ html[dir="rtl"] .ml-nav .mud-nav-link.active { box-shadow:inset -3px 0 0 var(--m
 .ml-table tbody tr:hover { background:var(--ml-surface-2); }
 .ml-table .ml-end { text-align:end; }
 .ml-table th button { all:unset; cursor:pointer; display:inline-flex; align-items:center; gap:4px; }
+/* Bulk selection and row menus (plan 18.8.1) */
+.ml-table .ml-table__check { width:44px; padding-inline-end:0; }
+.ml-table .ml-table__menu { width:48px; text-align:end; }
+.ml-table tbody tr.ml-row-selected { background:var(--ml-primary-soft); }
+.ml-visually-hidden { position:absolute !important; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
 @media (min-width: 600px) and (max-width: 959.98px) { .ml-hide-tablet { display:none !important; } }
 
 /* Kanban board (plan 18.9.6) */

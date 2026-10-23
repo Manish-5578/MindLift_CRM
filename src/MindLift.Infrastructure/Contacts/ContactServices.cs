@@ -7,6 +7,7 @@ using MindLift.Application.Abstractions;
 using MindLift.Application.Common.Exceptions;
 using MindLift.Application.Common.Fields;
 using MindLift.Domain.Entities;
+using MindLift.Infrastructure.Common;
 using MindLift.Infrastructure.Leads;
 using MindLift.Infrastructure.Persistence;
 using MindLift.Infrastructure.Settings;
@@ -24,6 +25,19 @@ internal static class RecordHelpers
     {
         var settings = await db.TenantSettings.AsNoTracking().FirstAsync(cancellationToken);
         return new FilterContext(TimeZoneInfo.FindSystemTimeZoneById(settings.TimeZoneId), clock.UtcNow, (DayOfWeek)settings.WeekStartDay, settings.FiscalYearStartMonth, tenant.UserId);
+    }
+
+    /// <summary>
+    /// Refuses an owner who is not an active user of this workspace (users are filtered to the current workspace), so a record cannot be given
+    /// to a made-up id, a deactivated user, or someone in another company. Called only when the owner changes, so a record whose owner
+    /// has since been deactivated can still be edited.
+    /// </summary>
+    public static async Task EnsureOwnerAsync(AppDbContext db, Guid ownerId, CancellationToken cancellationToken)
+    {
+        if (!await db.Users.AsNoTracking().AnyAsync(u => u.Id == ownerId && u.IsActive, cancellationToken))
+        {
+            throw new ValidationException("ownerId", "Choose an active user in this workspace.");
+        }
     }
 
     public static async Task<Dictionary<Guid, string>> OwnerNamesAsync(AppDbContext db, IEnumerable<Guid> ids, CancellationToken cancellationToken)
@@ -116,7 +130,29 @@ public sealed class ContactService(AppDbContext db, ITenantContext tenant, ICloc
     {
         var page = Math.Max(query.Page, 1);
         var pageSize = Math.Clamp(query.PageSize, 1, 200);
+        var source = await MatchingAsync(query, cancellationToken);
+
+        var total = await source.CountAsync(cancellationToken);
+        source = Sort(source, query.SortField, query.SortDir);
+        var rows = await source.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
+
+        var owners = await RecordHelpers.OwnerNamesAsync(db, rows.Select(r => r.OwnerId).Distinct(), cancellationToken);
+        var accountIds = rows.Where(r => r.AccountId != null).Select(r => r.AccountId!.Value).Distinct().ToList();
+        var accounts = await db.Accounts.AsNoTracking().Where(a => accountIds.Contains(a.Id)).ToDictionaryAsync(a => a.Id, a => a.Name, cancellationToken);
+
+        var items = rows.Select(c => new ContactListItemDto(c.Id, $"{c.FirstName} {c.LastName}".Trim(), c.FirstName, c.LastName, c.Email, c.Phone, c.JobTitle,
+            c.AccountId, c.AccountId is { } a ? accounts.GetValueOrDefault(a) : null, c.Type, c.OwnerId, owners.GetValueOrDefault(c.OwnerId), c.CreatedAt)).ToList();
+        return new PagedResult<ContactListItemDto>(items, total, page, pageSize);
+    }
+
+    /// <summary>The contacts a list query matches (the user's scope, filters, search and any chosen ids), before sorting and paging.</summary>
+    private async Task<IQueryable<Contact>> MatchingAsync(ListQuery query, CancellationToken cancellationToken)
+    {
         var source = await ScopedAsync(cancellationToken);
+        if (query.Ids is { Count: > 0 } ids)
+        {
+            source = source.Where(r => ids.Contains(r.Id));
+        }
 
         if (query.Filter is not null)
         {
@@ -133,18 +169,42 @@ public sealed class ContactService(AppDbContext db, ITenantContext tenant, ICloc
                 || (c.JobTitle != null && c.JobTitle.ToLower().Contains(term)));
         }
 
-        var total = await source.CountAsync(cancellationToken);
-        source = Sort(source, query.SortField, query.SortDir);
-        var rows = await source.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
-
-        var owners = await RecordHelpers.OwnerNamesAsync(db, rows.Select(r => r.OwnerId).Distinct(), cancellationToken);
-        var accountIds = rows.Where(r => r.AccountId != null).Select(r => r.AccountId!.Value).Distinct().ToList();
-        var accounts = await db.Accounts.AsNoTracking().Where(a => accountIds.Contains(a.Id)).ToDictionaryAsync(a => a.Id, a => a.Name, cancellationToken);
-
-        var items = rows.Select(c => new ContactListItemDto(c.Id, $"{c.FirstName} {c.LastName}".Trim(), c.FirstName, c.LastName, c.Email, c.Phone, c.JobTitle,
-            c.AccountId, c.AccountId is { } a ? accounts.GetValueOrDefault(a) : null, c.Type, c.OwnerId, owners.GetValueOrDefault(c.OwnerId), c.CreatedAt)).ToList();
-        return new PagedResult<ContactListItemDto>(items, total, page, pageSize);
+        return source;
     }
+
+    /// <summary>The ids of the contacts a list query matches, at most <paramref name="limit"/>, for "select all" in bulk actions.</summary>
+    public async Task<IReadOnlyList<Guid>> MatchingIdsAsync(ListQuery query, int limit, CancellationToken cancellationToken = default)
+        => await (await MatchingAsync(query, cancellationToken)).OrderBy(r => r.Id).Select(r => r.Id).Take(limit).ToListAsync(cancellationToken);
+
+    /// <summary>Assign many contacts to one owner. Each is saved as if edited on its own page.</summary>
+    public async Task<BulkActionResult> BulkAsync(BulkActionRequest request, CancellationToken cancellationToken = default)
+    {
+        if (request.Action != BulkActions.Assign)
+        {
+            throw new ValidationException("action", $"'{request.Action}' is not something that can be done to many contacts at once.");
+        }
+
+        if (request.OwnerId is not { } owner)
+        {
+            throw new ValidationException("ownerId", "Choose who to assign the contacts to.");
+        }
+
+        var ids = await BulkRunner.TargetsAsync(request.Ids, request.AllMatching, MatchingIdsAsync, cancellationToken);
+        return await BulkRunner.RunAsync(db, ids, async (id, ct) =>
+        {
+            var current = await GetAsync(id, ct);
+            await UpdateAsync(id, ToSave(current) with { OwnerId = owner }, ct);
+        }, cancellationToken);
+    }
+
+    public async Task<BulkActionResult> BulkDeleteAsync(BulkDeleteRequest request, CancellationToken cancellationToken = default)
+    {
+        var ids = await BulkRunner.TargetsAsync(request.Ids, request.AllMatching, MatchingIdsAsync, cancellationToken);
+        return await BulkRunner.RunAsync(db, ids, DeleteAsync, cancellationToken);
+    }
+
+    /// <summary>The record's current values as a save request, so a bulk change alters only the one thing it is about.</summary>
+    private static SaveContactRequest ToSave(ContactDto c) => new(c.FirstName, c.LastName, c.Email, c.Phone, c.JobTitle, c.Description, c.AccountId, c.Type, c.OwnerId, c.CustomFields);
 
     public async Task<ContactDto> GetAsync(Guid id, CancellationToken cancellationToken = default)
         => await MapAsync(await LoadScopedAsync(id, cancellationToken), cancellationToken);
@@ -333,6 +393,11 @@ public sealed class ContactService(AppDbContext db, ITenantContext tenant, ICloc
         contact.Type = request.Type ?? contact.Type;
         if (request.OwnerId is { } owner)
         {
+            if (owner != contact.OwnerId)
+            {
+                await RecordHelpers.EnsureOwnerAsync(db, owner, cancellationToken);
+            }
+
             contact.OwnerId = owner;
         }
 
@@ -382,20 +447,7 @@ public sealed class AccountService(AppDbContext db, ITenantContext tenant, ICloc
     {
         var page = Math.Max(query.Page, 1);
         var pageSize = Math.Clamp(query.PageSize, 1, 200);
-        var source = await ScopedAsync(cancellationToken);
-
-        if (query.Filter is not null)
-        {
-            var registry = await fields.RegistryAsync("accounts", cancellationToken);
-            source = source.Where(FilterCompiler.Compile<Account>(query.Filter, registry, await RecordHelpers.FilterContextAsync(db, tenant, clock, cancellationToken)));
-        }
-
-        if (!string.IsNullOrWhiteSpace(query.Search))
-        {
-            var term = query.Search.Trim().ToLowerInvariant();
-            source = source.Where(a => a.Name.ToLower().Contains(term) || (a.Website != null && a.Website.ToLower().Contains(term))
-                || (a.Industry != null && a.Industry.ToLower().Contains(term)) || (a.Phone != null && a.Phone.Contains(term)));
-        }
+        var source = await MatchingAsync(query, cancellationToken);
 
         var total = await source.CountAsync(cancellationToken);
         var descending = !string.Equals(query.SortDir, "asc", StringComparison.OrdinalIgnoreCase);
@@ -414,6 +466,65 @@ public sealed class AccountService(AppDbContext db, ITenantContext tenant, ICloc
             a.ParentAccountId is { } p ? parents.GetValueOrDefault(p) : null, counts.GetValueOrDefault(a.Id), a.OwnerId, owners.GetValueOrDefault(a.OwnerId), a.CreatedAt)).ToList();
         return new PagedResult<AccountListItemDto>(items, total, page, pageSize);
     }
+
+    /// <summary>The accounts a list query matches (the user's scope, filters, search and any chosen ids), before sorting and paging.</summary>
+    private async Task<IQueryable<Account>> MatchingAsync(ListQuery query, CancellationToken cancellationToken)
+    {
+        var source = await ScopedAsync(cancellationToken);
+        if (query.Ids is { Count: > 0 } ids)
+        {
+            source = source.Where(r => ids.Contains(r.Id));
+        }
+
+        if (query.Filter is not null)
+        {
+            var registry = await fields.RegistryAsync("accounts", cancellationToken);
+            source = source.Where(FilterCompiler.Compile<Account>(query.Filter, registry, await RecordHelpers.FilterContextAsync(db, tenant, clock, cancellationToken)));
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var term = query.Search.Trim().ToLowerInvariant();
+            source = source.Where(a => a.Name.ToLower().Contains(term) || (a.Website != null && a.Website.ToLower().Contains(term))
+                || (a.Industry != null && a.Industry.ToLower().Contains(term)) || (a.Phone != null && a.Phone.Contains(term)));
+        }
+
+        return source;
+    }
+
+    /// <summary>The ids of the accounts a list query matches, at most <paramref name="limit"/>, for "select all" in bulk actions.</summary>
+    public async Task<IReadOnlyList<Guid>> MatchingIdsAsync(ListQuery query, int limit, CancellationToken cancellationToken = default)
+        => await (await MatchingAsync(query, cancellationToken)).OrderBy(r => r.Id).Select(r => r.Id).Take(limit).ToListAsync(cancellationToken);
+
+    /// <summary>Assign many accounts to one owner. Each is saved as if edited on its own page.</summary>
+    public async Task<BulkActionResult> BulkAsync(BulkActionRequest request, CancellationToken cancellationToken = default)
+    {
+        if (request.Action != BulkActions.Assign)
+        {
+            throw new ValidationException("action", $"'{request.Action}' is not something that can be done to many accounts at once.");
+        }
+
+        if (request.OwnerId is not { } owner)
+        {
+            throw new ValidationException("ownerId", "Choose who to assign the accounts to.");
+        }
+
+        var ids = await BulkRunner.TargetsAsync(request.Ids, request.AllMatching, MatchingIdsAsync, cancellationToken);
+        return await BulkRunner.RunAsync(db, ids, async (id, ct) =>
+        {
+            var current = await GetAsync(id, ct);
+            await UpdateAsync(id, ToSave(current) with { OwnerId = owner }, ct);
+        }, cancellationToken);
+    }
+
+    public async Task<BulkActionResult> BulkDeleteAsync(BulkDeleteRequest request, CancellationToken cancellationToken = default)
+    {
+        var ids = await BulkRunner.TargetsAsync(request.Ids, request.AllMatching, MatchingIdsAsync, cancellationToken);
+        return await BulkRunner.RunAsync(db, ids, DeleteAsync, cancellationToken);
+    }
+
+    /// <summary>The record's current values as a save request, so a bulk change alters only the one thing it is about.</summary>
+    private static SaveAccountRequest ToSave(AccountDto a) => new(a.Name, a.Website, a.Phone, a.Industry, a.Description, a.ParentAccountId, a.OwnerId, a.CustomFields);
 
     public async Task<AccountDto> GetAsync(Guid id, CancellationToken cancellationToken = default)
         => await MapAsync(await LoadScopedAsync(id, cancellationToken), cancellationToken);
@@ -580,6 +691,11 @@ public sealed class AccountService(AppDbContext db, ITenantContext tenant, ICloc
         account.ParentAccountId = request.ParentAccountId;
         if (request.OwnerId is { } owner)
         {
+            if (owner != account.OwnerId)
+            {
+                await RecordHelpers.EnsureOwnerAsync(db, owner, cancellationToken);
+            }
+
             account.OwnerId = owner;
         }
 

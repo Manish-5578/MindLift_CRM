@@ -3,7 +3,7 @@ using MindLift.Shared.Filtering;
 
 namespace MindLift.Shared.Contracts;
 
-/// <summary>Standard list query (plan 4.6.5). PageSize is capped at 200.</summary>
+/// <summary>Standard list query (plan 4.6.5). PageSize is capped at 200. <c>Ids</c>, when given, narrows the list to those records (an export of the rows a user ticked).</summary>
 public sealed record ListQuery(
     string? Search,
     FilterGroup? Filter,
@@ -11,7 +11,8 @@ public sealed record ListQuery(
     string? SortDir,
     int Page = 1,
     int PageSize = 50,
-    string? ViewId = null);
+    string? ViewId = null,
+    IReadOnlyList<Guid>? Ids = null);
 
 public sealed record LeadListItemDto(
     Guid Id,

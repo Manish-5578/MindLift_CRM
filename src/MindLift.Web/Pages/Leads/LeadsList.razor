@@ -8,6 +8,7 @@
 @inject ISnackbar Snackbar
 @inject IJSRuntime JS
 @inject Translator T
+@inject IDialogService Dialogs
 
 <PageTitle>@T[App.ModuleLabel(AppModule.Leads)] · MindLift</PageTitle>
 
@@ -17,6 +18,7 @@
         <EntityListPage @ref="_list" TItem="LeadListItemDto" Title="@App.ModuleLabel(AppModule.Leads)" ItemLabel="@ItemLabel"
                         Views="_views" DefaultView="@AllView" Columns="_columns" CardTemplate="_card" Loader="LoadAsync" RowHref="LeadHref"
                         Fields="LeadFields" Picklists="App.Bootstrap.Picklists" Users="_users"
+                        ItemId="r => r.Id" SavedViews="_savedViews" OnSaveView="SaveViewAsync" OnDeleteView="DeleteViewAsync" ColumnStorageKey="leads"
                         SearchPlaceholder="Search name, email, company or phone" EmptyIcon="@Icons.Material.Outlined.PersonSearch"
                         EmptyTitle="No leads yet" EmptyMessage="Leads from web forms, WhatsApp, email or imports appear here."
                         DefaultSortField="created_at" DefaultSortDir="desc">
@@ -44,6 +46,20 @@
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenNewLead">@T["New lead"]</MudButton>
                 }
             </EmptyActions>
+            <BulkActions Context="selection">
+                <ListBulkBar Selection="selection" Entity="leads" ItemLabel="@ItemLabel" Users="_users" Statuses="BulkStatuses" AllowTags="true" CanEdit="CanEditRecords" CanDelete="CanDeleteRecords" CanExport="CanExportRecords" />
+            </BulkActions>
+            <RowMenu Context="row">
+                <MudMenuItem Href="@("/leads/" + row.Id)" Icon="@Icons.Material.Outlined.OpenInNew" data-testid="row-open">@T["Open"]</MudMenuItem>
+                @if (CanEditRecords)
+                {
+                    <MudMenuItem OnClick="() => EditRowAsync(row.Id)" Icon="@Icons.Material.Outlined.Edit" data-testid="row-edit">@T["Edit"]</MudMenuItem>
+                }
+                @if (CanDeleteRecords)
+                {
+                    <MudMenuItem OnClick="() => DeleteRowAsync(row.Id, row.FullName)" Icon="@Icons.Material.Outlined.DeleteOutline" data-testid="row-delete">@T["Delete"]</MudMenuItem>
+                }
+            </RowMenu>
         </EntityListPage>
     }
 </div>
@@ -115,7 +131,7 @@
                 <StatusChip Text="@StatusLabel(lead.Status)" Color="@StatusColors.For(StatusCategory(lead.Status))" />
             </div>;
 
-        await LoadUsersAsync();
+        await Task.WhenAll(LoadUsersAsync(), LoadSavedViewsAsync());
     }
 
     /// <summary>People for the owner filter. Staff without access to the user list only get "Me".</summary>
@@ -234,4 +250,86 @@
         "converted" => "Won",
         _ => code,
     };
+
+    // ---- bulk actions, row menu and saved views (plan 18.8.1) ----
+
+    private IReadOnlyList<ListView> _savedViews = [];
+
+    private bool HasPermission(Func<ModulePermissionDto, bool> check) => App.Bootstrap?.Permissions.Any(p => p.Module == "Leads" && check(p)) == true;
+
+    private bool CanEditRecords => HasPermission(p => p.CanEdit);
+
+    private bool CanDeleteRecords => HasPermission(p => p.CanDelete);
+
+    private bool CanExportRecords => HasPermission(p => p.CanExport);
+
+    /// <summary>Statuses a lead can be moved to in bulk. Disqualifying needs a reason for each lead, and converting is its own step.</summary>
+    private IReadOnlyList<PicklistValueDto> BulkStatuses => App.Bootstrap?.Picklists.FirstOrDefault(p => p.Key == "lead_status")?.Values
+        .Where(v => v.IsActive && v.Value is not ("disqualified" or "converted")).ToList() ?? [];
+
+    private async Task LoadSavedViewsAsync() => _savedViews = await SavedViews.LoadAsync(Http, "leads", App.Bootstrap?.User.UserId);
+
+    private async Task SaveViewAsync(SaveViewRequest view)
+    {
+        var problem = await SavedViews.SaveAsync(Http, "leads", view, T["We could not save this view."]);
+        if (problem is not null)
+        {
+            Snackbar.Add(problem, Severity.Error);
+            return;
+        }
+
+        Snackbar.Add(T["View saved"], Severity.Success);
+        await LoadSavedViewsAsync();
+    }
+
+    private async Task DeleteViewAsync(Guid id)
+    {
+        if (!await Dialogs.ConfirmAsync(T["Delete this view?"], T["The tab is removed for everyone it was shared with."], T["Delete"], danger: true))
+        {
+            return;
+        }
+
+        var problem = await SavedViews.DeleteAsync(Http, id, T["We could not delete this view."]);
+        if (problem is not null)
+        {
+            Snackbar.Add(problem, Severity.Error);
+            return;
+        }
+
+        await LoadSavedViewsAsync();
+    }
+
+    private async Task EditRowAsync(Guid id)
+    {
+        var response = await Http.GetAsync($"api/v1/leads/{id}");
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not open this record."]), Severity.Error);
+            return;
+        }
+
+        _form?.OpenEdit((await response.Content.ReadFromJsonAsync<LeadDto>())!);
+        _drawer = true;
+    }
+
+    private async Task DeleteRowAsync(Guid id, string? name)
+    {
+        if (!await Dialogs.ConfirmAsync(T["Delete {0}?", name ?? T["this record"]], T["This cannot be undone."], T["Delete"], danger: true))
+        {
+            return;
+        }
+
+        var response = await Http.DeleteAsync($"api/v1/leads/{id}");
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not delete this record."]), Severity.Error);
+            return;
+        }
+
+        Snackbar.Add(T["Deleted"], Severity.Success);
+        if (_list is not null)
+        {
+            await _list.ReloadAsync();
+        }
+    }
 }

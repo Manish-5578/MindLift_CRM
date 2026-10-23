@@ -1,0 +1,156 @@
+@* The buttons of a list's bulk bar (plan 18.8.1): Assign, Change status, Add tags, Export and Delete, as the record type and the user's permissions allow.
+   Each sends one request for all the chosen records; the server checks every record as if it were edited on its own and reports any it could not change. *@
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+@inject IJSRuntime JS
+@inject Translator T
+
+@if (CanEdit && Users.Count > 0)
+{
+    <MudMenu Label="@T["Assign"]" Variant="Variant.Outlined" Size="Size.Small" EndIcon="@Icons.Material.Outlined.ArrowDropDown" Disabled="_busy" data-testid="bulk-assign">
+        @foreach (var user in Users)
+        {
+            var current = user;
+            <MudMenuItem OnClick="() => AssignAsync(current)" data-testid="@("bulk-assign-" + current.Id)">@current.FullName</MudMenuItem>
+        }
+    </MudMenu>
+}
+
+@if (CanEdit && Statuses.Count > 0)
+{
+    <MudMenu Label="@T["Change status"]" Variant="Variant.Outlined" Size="Size.Small" EndIcon="@Icons.Material.Outlined.ArrowDropDown" Disabled="_busy" data-testid="bulk-status">
+        @foreach (var status in Statuses)
+        {
+            var current = status;
+            <MudMenuItem OnClick="() => StatusAsync(current)" data-testid="@("bulk-status-" + current.Value)">@T.Pick(current.Label, current.LabelAr)</MudMenuItem>
+        }
+    </MudMenu>
+}
+
+@if (CanEdit && AllowTags)
+{
+    <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Outlined.LocalOffer" OnClick="TagsAsync" Disabled="_busy" data-testid="bulk-tags">@T["Add tags"]</MudButton>
+}
+
+@if (CanExport)
+{
+    <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Download" OnClick="ExportAsync" Disabled="_busy" data-testid="bulk-export">@T["Export"]</MudButton>
+}
+
+@if (CanDelete)
+{
+    <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Error" StartIcon="@Icons.Material.Outlined.DeleteOutline" OnClick="DeleteAsync" Disabled="_busy" data-testid="bulk-delete">@T["Delete"]</MudButton>
+}
+
+@code {
+    private bool _busy;
+
+    [Parameter, EditorRequired] public BulkSelection Selection { get; set; } = default!;
+
+    /// <summary>The API path of the record type, for example "leads".</summary>
+    [Parameter, EditorRequired] public string Entity { get; set; } = string.Empty;
+
+    /// <summary>The plural name shown in messages, for example "leads".</summary>
+    [Parameter] public string ItemLabel { get; set; } = "records";
+
+    [Parameter] public IReadOnlyList<UserListItem> Users { get; set; } = [];
+
+    /// <summary>The statuses offered by "Change status". Empty hides the button.</summary>
+    [Parameter] public IReadOnlyList<PicklistValueDto> Statuses { get; set; } = [];
+
+    [Parameter] public bool AllowTags { get; set; }
+    [Parameter] public bool CanEdit { get; set; }
+    [Parameter] public bool CanDelete { get; set; }
+    [Parameter] public bool CanExport { get; set; }
+
+    private Task AssignAsync(UserListItem user)
+        => RunAsync($"api/v1/{Entity}/bulk", new BulkActionRequest(BulkActions.Assign, Selection.Ids, Selection.AllMatching, OwnerId: user.Id),
+            n => T["Assigned {0} {1} to {2}", n, ItemLabel, user.FullName]);
+
+    private Task StatusAsync(PicklistValueDto status)
+        => RunAsync($"api/v1/{Entity}/bulk", new BulkActionRequest(BulkActions.ChangeStatus, Selection.Ids, Selection.AllMatching, Status: status.Value),
+            n => T["Changed the status of {0} {1}", n, ItemLabel]);
+
+    private async Task TagsAsync()
+    {
+        var text = await Dialogs.PromptReasonAsync(T["Add tags"], T["Separate tags with commas. They are added to the tags each record already has."], T["Tags *"], T["Add tags"]);
+        var tags = text?.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).ToList() ?? [];
+        if (tags.Count == 0)
+        {
+            return;
+        }
+
+        await RunAsync($"api/v1/{Entity}/bulk", new BulkActionRequest(BulkActions.AddTags, Selection.Ids, Selection.AllMatching, Tags: tags),
+            n => T["Tagged {0} {1}", n, ItemLabel]);
+    }
+
+    private async Task DeleteAsync()
+    {
+        var count = Selection.Count.ToString("N0");
+        if (!await Dialogs.ConfirmAsync(T["Delete {0} {1}?", count, ItemLabel], T["This cannot be undone."], T["Delete"], danger: true))
+        {
+            return;
+        }
+
+        await RunAsync($"api/v1/{Entity}/bulk-delete", new BulkDeleteRequest(Selection.Ids, Selection.AllMatching), n => T["Deleted {0} {1}", n, ItemLabel]);
+    }
+
+    private async Task ExportAsync()
+    {
+        _busy = true;
+        try
+        {
+            var query = Selection.AllMatching ?? new ListQuery(null, null, null, null, Ids: Selection.Ids);
+            var response = await Http.PostAsJsonAsync($"api/v1/{Entity}/export", query with { Page = 1, PageSize = 200 });
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add(await ProblemText.FromAsync(response, T["We could not export these records."]), Severity.Error);
+                return;
+            }
+
+            var bytes = await response.Content.ReadAsByteArrayAsync();
+            await JS.InvokeVoidAsync("mindlift.downloadFile", $"{Entity}.csv", "text/csv", Convert.ToBase64String(bytes));
+            Snackbar.Add(T["Export ready"], Severity.Success);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    /// <summary>Sends the request, says how many records changed and why any did not, then clears the selection and reloads the list.</summary>
+    private async Task RunAsync(string url, object request, Func<string, string> done)
+    {
+        _busy = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync(url, request);
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add(await ProblemText.FromAsync(response, T["We could not change these records."]), Severity.Error);
+                return;
+            }
+
+            var result = (await response.Content.ReadFromJsonAsync<BulkActionResult>())!;
+            if (result.Succeeded > 0)
+            {
+                Snackbar.Add(done(result.Succeeded.ToString("N0")), Severity.Success);
+            }
+
+            if (result.Failures.Count > 0)
+            {
+                var first = result.Failures[0].Message;
+                Snackbar.Add(result.Failures.Count == 1
+                    ? T["1 record was not changed: {0}", first]
+                    : T["{0} records were not changed. The first reason: {1}", result.Failures.Count, first], Severity.Warning);
+            }
+
+            await Selection.Done();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

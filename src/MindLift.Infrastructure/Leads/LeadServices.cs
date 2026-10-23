@@ -8,6 +8,8 @@ using MindLift.Application.Common.Exceptions;
 using MindLift.Application.Common.Fields;
 using MindLift.Application.Common.Time;
 using MindLift.Domain.Entities;
+using MindLift.Infrastructure.Common;
+using MindLift.Infrastructure.Contacts;
 using MindLift.Infrastructure.Persistence;
 using MindLift.Infrastructure.Settings;
 using MindLift.Shared.Contracts;
@@ -58,7 +60,29 @@ public sealed class LeadService(
     {
         var page = Math.Max(query.Page, 1);
         var pageSize = Math.Clamp(query.PageSize, 1, 200);
+        var source = await MatchingAsync(query, cancellationToken);
+
+        var total = await source.CountAsync(cancellationToken);
+        source = Sort(source, query.SortField, query.SortDir);
+        var rows = await source.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
+
+        var owners = await OwnerNamesAsync(rows.Select(r => r.OwnerId).Distinct(), cancellationToken);
+        var items = rows.Select(l => new LeadListItemDto(
+            l.Id, $"{l.FirstName} {l.LastName}".Trim(), l.Email, l.Phone, l.CompanyName, l.Status, l.Source, l.Rating,
+            l.OwnerId, owners.GetValueOrDefault(l.OwnerId), l.CreatedAt, l.FirstContactedAt,
+            l.ConvertedAt is not null, l.Status == "disqualified", l.FirstName, l.LastName)).ToList();
+
+        return new PagedResult<LeadListItemDto>(items, total, page, pageSize);
+    }
+
+    /// <summary>The leads a list query matches (the user's scope, filters, search and any chosen ids), before sorting and paging.</summary>
+    private async Task<IQueryable<Lead>> MatchingAsync(ListQuery query, CancellationToken cancellationToken)
+    {
         var source = await ScopedLeadsAsync(cancellationToken);
+        if (query.Ids is { Count: > 0 } ids)
+        {
+            source = source.Where(l => ids.Contains(l.Id));
+        }
 
         // Converted leads now live in contacts and deals, so the lead list leaves them out.
         source = source.Where(l => l.ConvertedAt == null);
@@ -79,18 +103,46 @@ public sealed class LeadService(
                 || (l.Phone != null && l.Phone.Contains(term)));
         }
 
-        var total = await source.CountAsync(cancellationToken);
-        source = Sort(source, query.SortField, query.SortDir);
-        var rows = await source.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
-
-        var owners = await OwnerNamesAsync(rows.Select(r => r.OwnerId).Distinct(), cancellationToken);
-        var items = rows.Select(l => new LeadListItemDto(
-            l.Id, $"{l.FirstName} {l.LastName}".Trim(), l.Email, l.Phone, l.CompanyName, l.Status, l.Source, l.Rating,
-            l.OwnerId, owners.GetValueOrDefault(l.OwnerId), l.CreatedAt, l.FirstContactedAt,
-            l.ConvertedAt is not null, l.Status == "disqualified", l.FirstName, l.LastName)).ToList();
-
-        return new PagedResult<LeadListItemDto>(items, total, page, pageSize);
+        return source;
     }
+
+    /// <summary>The ids of the leads a list query matches, at most <paramref name="limit"/>, for "select all" in bulk actions.</summary>
+    public async Task<IReadOnlyList<Guid>> MatchingIdsAsync(ListQuery query, int limit, CancellationToken cancellationToken = default)
+        => await (await MatchingAsync(query, cancellationToken)).OrderBy(l => l.Id).Select(l => l.Id).Take(limit).ToListAsync(cancellationToken);
+
+    /// <summary>Assign, change status or add tags on many leads. Each lead is saved as if edited on its own page.</summary>
+    public async Task<BulkActionResult> BulkAsync(BulkActionRequest request, CancellationToken cancellationToken = default)
+    {
+        Func<LeadDto, SaveLeadRequest, SaveLeadRequest> change = request.Action switch
+        {
+            BulkActions.Assign when request.OwnerId is { } owner => (_, save) => save with { OwnerId = owner },
+            BulkActions.Assign => throw new ValidationException("ownerId", "Choose who to assign the leads to."),
+            BulkActions.ChangeStatus when request.Status is "disqualified" => throw new ValidationException("status", "Disqualify leads one at a time, so each gets a reason."),
+            BulkActions.ChangeStatus when !string.IsNullOrWhiteSpace(request.Status) => (_, save) => save with { Status = request.Status },
+            BulkActions.ChangeStatus => throw new ValidationException("status", "Choose a status."),
+            BulkActions.AddTags when request.Tags?.Any(t => !string.IsNullOrWhiteSpace(t)) == true => (lead, save) => save with { Tags = lead.Tags.Concat(request.Tags).ToList() },
+            BulkActions.AddTags => throw new ValidationException("tags", "Enter at least one tag."),
+            _ => throw new ValidationException("action", $"'{request.Action}' is not something that can be done to many leads at once."),
+        };
+
+        var ids = await BulkRunner.TargetsAsync(request.Ids, request.AllMatching, MatchingIdsAsync, cancellationToken);
+        return await BulkRunner.RunAsync(db, ids, async (id, ct) =>
+        {
+            var lead = await GetAsync(id, ct);
+            await UpdateAsync(id, change(lead, ToSave(lead)), ct);
+        }, cancellationToken);
+    }
+
+    public async Task<BulkActionResult> BulkDeleteAsync(BulkDeleteRequest request, CancellationToken cancellationToken = default)
+    {
+        var ids = await BulkRunner.TargetsAsync(request.Ids, request.AllMatching, MatchingIdsAsync, cancellationToken);
+        return await BulkRunner.RunAsync(db, ids, DeleteAsync, cancellationToken);
+    }
+
+    /// <summary>The lead's current values as a save request, so a bulk change alters only the one thing it is about.</summary>
+    private static SaveLeadRequest ToSave(LeadDto lead) => new(
+        lead.FirstName, lead.LastName, lead.Email, lead.Phone, lead.CompanyName, lead.Status, lead.Source, lead.Rating, lead.Description,
+        lead.Tags, lead.OwnerId, lead.CustomFields);
 
     public async Task<LeadDto> GetAsync(Guid id, CancellationToken cancellationToken = default)
     {
@@ -546,6 +598,11 @@ public sealed class LeadService(
         lead.Tags = request.Tags?.Select(t => t.Trim()).Where(t => t.Length > 0).Distinct().ToArray() ?? lead.Tags;
         if (request.OwnerId is { } owner)
         {
+            if (owner != lead.OwnerId)
+            {
+                await RecordHelpers.EnsureOwnerAsync(db, owner, cancellationToken);
+            }
+
             lead.OwnerId = owner;
         }
 
