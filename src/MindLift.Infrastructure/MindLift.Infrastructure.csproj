@@ -18,6 +18,7 @@
     <PackageReference Include="SkiaSharp" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" />
     <PackageReference Include="UglyToad.PdfPig" />
+    <PackageReference Include="RapidOcrNet" GeneratePathProperty="true" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="MailKit" />
@@ -26,5 +27,9 @@
   <ItemGroup>
     <PackageReference Include="Bogus" />
     <EmbeddedResource Include="Templates\Industries\*.json" />
+  </ItemGroup>
+  <!-- The second OCR engine's models. The package copies them only into a project that references it directly, so they are passed on as content to the API and the tests. -->
+  <ItemGroup>
+    <None Include="$(PkgRapidOcrNet)\models\v5\*.*" Link="models\v5\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Visible="false" />
   </ItemGroup>
 </Project>

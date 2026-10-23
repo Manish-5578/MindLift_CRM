@@ -110,7 +110,7 @@ public static class ImageEnhancer
         using var canvas = new SKCanvas(result);
         canvas.Clear(SKColors.White);
         canvas.SetMatrix(OriginMatrix(codec.EncodedOrigin, decoded.Width, decoded.Height));
-        canvas.DrawBitmap(decoded, 0, 0);
+        canvas.DrawBitmap(decoded, 0, 0, new SKSamplingOptions(SKFilterMode.Nearest));
         return result;
     }
 
@@ -147,7 +147,7 @@ public static class ImageEnhancer
             2 => new SKMatrix(-1, 0, w, 0, -1, h, 0, 0, 1),
             _ => new SKMatrix(0, 1, 0, -1, 0, w, 0, 0, 1),
         });
-        canvas.DrawBitmap(source, 0, 0);
+        canvas.DrawBitmap(source, 0, 0, new SKSamplingOptions(SKFilterMode.Nearest));
         return result;
     }
 
@@ -565,6 +565,149 @@ public static class ImageEnhancer
                 }
 
                 result[(long)y * width + x] = window[4];
+            }
+        }
+
+        return new GrayImage(width, height, result);
+    }
+
+    /// <summary>
+    /// Makes blurred edges crisp again (an unsharp mask): the difference between each pixel and a blurred copy of the picture is added back, doubled.
+    /// Letters softened by a shaky hand or an out-of-focus lens get firm edges, so the black-and-white step keeps their shapes.
+    /// </summary>
+    public static GrayImage Sharpen(GrayImage image, double amount = 2.0)
+    {
+        var blurred = BoxBlur(BoxBlur(image, 2), 2);
+        var result = new byte[image.Pixels.Length];
+        for (var i = 0; i < result.Length; i++)
+        {
+            var value = image.Pixels[i] + amount * (image.Pixels[i] - blurred.Pixels[i]);
+            result[i] = (byte)Math.Clamp(Math.Round(value), 0, 255);
+        }
+
+        return new GrayImage(image.Width, image.Height, result);
+    }
+
+    /// <summary>
+    /// The page made crisp and black and white, then cleared of specks: any dark blot much smaller than a letter is painted white.
+    /// Meant for a blurred page with dirt on it, where a plain median filter is too small to catch the specks and too weak to undo the blur.
+    /// </summary>
+    public static GrayImage Restore(GrayImage image) => RemoveSpecks(Binarize(Sharpen(image)));
+
+    /// <summary>
+    /// Paints white each dark blot (in a black-and-white picture) whose box is small next to the page's letters: no wider or taller than
+    /// a sixth of the usual letter height. Letters are kept, and so are most full stops and the dots of i and j, which are larger than that.
+    /// </summary>
+    public static GrayImage RemoveSpecks(GrayImage binary)
+    {
+        var (width, height) = (binary.Width, binary.Height);
+        var pixels = (byte[])binary.Pixels.Clone();
+        var label = new int[pixels.Length];
+        var blots = new List<(int Size, int Left, int Top, int Right, int Bottom)>();
+        var stack = new Stack<int>();
+        for (var start = 0; start < pixels.Length; start++)
+        {
+            if (pixels[start] != 0 || label[start] != 0)
+            {
+                continue;
+            }
+
+            var id = blots.Count + 1;
+            int size = 0, left = int.MaxValue, top = int.MaxValue, right = -1, bottom = -1;
+            label[start] = id;
+            stack.Push(start);
+            while (stack.Count > 0)
+            {
+                var at = stack.Pop();
+                var (x, y) = (at % width, at / width);
+                size++;
+                (left, right, top, bottom) = (Math.Min(left, x), Math.Max(right, x), Math.Min(top, y), Math.Max(bottom, y));
+                for (var dy = -1; dy <= 1; dy++)
+                {
+                    for (var dx = -1; dx <= 1; dx++)
+                    {
+                        var (nx, ny) = (x + dx, y + dy);
+                        if (nx < 0 || ny < 0 || nx >= width || ny >= height)
+                        {
+                            continue;
+                        }
+
+                        var next = ny * width + nx;
+                        if (pixels[next] == 0 && label[next] == 0)
+                        {
+                            label[next] = id;
+                            stack.Push(next);
+                        }
+                    }
+                }
+            }
+
+            blots.Add((size, left, top, right, bottom));
+        }
+
+        // The usual letter height. Specks can far outnumber letters, so only blots at least a third as tall as the tallest line-sized blot count
+        // (anything taller than a tenth of the page is a picture or a ruled box, not a letter).
+        var heights = blots.Select(b => b.Bottom - b.Top + 1).Where(h => h <= height / 10).ToList();
+        if (heights.Count == 0)
+        {
+            return binary;
+        }
+
+        var tallest = heights.Max();
+        var letters = heights.Where(h => h * 3 >= tallest).Order().ToList();
+        if (letters.Count < 5)
+        {
+            return binary;
+        }
+
+        var letter = letters[letters.Count / 2];
+        var limit = Math.Max(2, letter / 6);
+        var speck = blots.Select(b => b.Right - b.Left + 1 <= limit && b.Bottom - b.Top + 1 <= limit).ToArray();
+        for (var i = 0; i < pixels.Length; i++)
+        {
+            if (label[i] != 0 && speck[label[i] - 1])
+            {
+                pixels[i] = 255;
+            }
+        }
+
+        return new GrayImage(width, height, pixels);
+    }
+
+    /// <summary>Each pixel becomes the average of the square around it, <paramref name="radius"/> pixels each way (a running sum along rows, then columns).</summary>
+    private static GrayImage BoxBlur(GrayImage image, int radius)
+    {
+        var (width, height) = (image.Width, image.Height);
+        var across = new byte[image.Pixels.Length];
+        for (var y = 0; y < height; y++)
+        {
+            var line = y * width;
+            var sum = 0;
+            for (var x = -radius; x <= radius; x++)
+            {
+                sum += image.Pixels[line + Math.Clamp(x, 0, width - 1)];
+            }
+
+            for (var x = 0; x < width; x++)
+            {
+                across[line + x] = (byte)(sum / (2 * radius + 1));
+                sum += image.Pixels[line + Math.Min(x + radius + 1, width - 1)] - image.Pixels[line + Math.Max(x - radius, 0)];
+            }
+        }
+
+        var result = new byte[across.Length];
+        for (var x = 0; x < width; x++)
+        {
+            var sum = 0;
+            for (var y = -radius; y <= radius; y++)
+            {
+                sum += across[Math.Clamp(y, 0, height - 1) * width + x];
+            }
+
+            for (var y = 0; y < height; y++)
+            {
+                result[y * width + x] = (byte)(sum / (2 * radius + 1));
+                sum += across[Math.Min(y + radius + 1, height - 1) * width + x] - across[Math.Max(y - radius, 0) * width + x];
             }
         }
 

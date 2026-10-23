@@ -109,7 +109,8 @@ To launch the production stack with PostgreSQL, Hangfire workers, and the web/AP
 | `Ocr__EnhanceMaxPixels` | No | `25000000` | Pictures with more pixels than this are read as they are, without cleaning, to bound memory. |
 | `Ocr__TargetPageConfidence` | No | `85` | A page that scores this (0–100) or more is accepted at once. |
 | `Ocr__MinPageConfidence` | No | `70` | A page that still scores below this after every attempt is marked low-confidence for a person to check. |
-| `Ocr__MaxAttemptsPerPage` | No | `5` | The most readings of one page (original, denoised, black-and-white, other layouts) while its score stays low. A page that reads like noise is also tried turned, up to three more readings. |
+| `Ocr__MaxAttemptsPerPage` | No | `6` | The most readings of one page (original, denoised, sharpened and de-specked, black-and-white, other layouts) while its score stays low. A page that reads like noise is also tried turned, up to three more readings. |
+| `Ocr__SecondEngine` | No | `true` | Ask a second engine (PaddleOCR models, run inside the app, no download at run time) to read a page that is still weak after every attempt. Its reading is kept only if it scores better. It reads Latin script only and is never given a page where Arabic was found. Set `false` to save the memory its models take once loaded. |
 | `Hangfire__WorkerCount` | No | `20` | Number of concurrent background job worker threads. |
 
 ---

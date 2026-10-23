@@ -186,4 +186,65 @@ public sealed class SearchablePdfTests : IDisposable
 
         await Should.ThrowAsync<NotSupportedException>(() => Service().CreateAsync(path, CancellationToken.None));
     }
+
+    [Fact]
+    public async Task Hidden_words_sit_over_their_place_on_the_page_and_the_page_keeps_its_printed_size()
+    {
+        var output = await Service().CreateAsync(ScannedPdf(1), CancellationToken.None);
+
+        output.ShouldNotBeNull();
+        try
+        {
+            using var pdf = PdfPig.PdfDocument.Open(output);
+            var page = pdf.GetPage(1);
+
+            // An A4 scan comes back as an A4 page, give or take the margin added when the page was straightened.
+            page.Width.ShouldBe(595, 15);
+            page.Height.ShouldBe(842, 15);
+
+            // The licence number is the second line, drawn about 205 of 3508 pixels down (6% of the page); PDF measures from the bottom.
+            var number = page.GetWords().First(w => w.Text.Contains("CN-1234567"));
+            (1 - number.BoundingBox.Bottom / page.Height).ShouldBe(0.06, 0.03);
+            number.BoundingBox.Left.ShouldBeLessThan(page.Width / 4);
+        }
+        finally
+        {
+            File.Delete(output);
+        }
+    }
+
+    [Fact]
+    public async Task A_crooked_faint_scan_gets_the_cleaned_reading_in_its_text_layer()
+    {
+        using var bitmap = TextBitmap();
+        using var crooked = ImageEnhancer.Rotate(bitmap, -6);
+        using (var canvas = new SKCanvas(crooked))
+        using (var veil = new SKPaint { Color = new SKColor(255, 255, 255, 150) })
+        {
+            canvas.DrawRect(0, 0, crooked.Width, crooked.Height, veil);
+        }
+
+        var output = await Service().CreateAsync(SavePicture(crooked), CancellationToken.None);
+
+        output.ShouldNotBeNull();
+        try
+        {
+            var text = TextOfEachPage(output).Single();
+            text.ShouldContain("CN-1234567");
+            text.ShouldContain("31/12/2027");
+        }
+        finally
+        {
+            File.Delete(output);
+        }
+    }
+
+    [Fact]
+    public void Words_outside_the_standard_font_are_left_to_the_engines_own_writer()
+    {
+        var picture = new GrayImage(10, 10, new byte[100]);
+        TextLayerPdfWriter.CanWrite([new TextLayerPage(picture, 300, [new PageWord("Invoice €12", 90, 0, 0, 5, 5)])]).ShouldBeTrue();
+        TextLayerPdfWriter.CanWrite([new TextLayerPage(picture, 300, [new PageWord("فاتورة", 90, 0, 0, 5, 5)])]).ShouldBeFalse();
+    }
+
 }

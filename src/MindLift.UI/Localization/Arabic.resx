@@ -4589,4 +4589,16 @@
   <data name="{0} days in {1}" xml:space="preserve">
     <value>{0} يومًا في {1}</value>
   </data>
+  <data name="Searchable PDF" xml:space="preserve">
+    <value>PDF قابل للبحث</value>
+  </data>
+  <data name="Page {0} was hard to read. Check it against the original." xml:space="preserve">
+    <value>كانت الصفحة {0} صعبة القراءة. قارنها بالأصل.</value>
+  </data>
+  <data name="Pages {0} were hard to read. Check them against the original." xml:space="preserve">
+    <value>كانت الصفحات {0} صعبة القراءة. قارنها بالأصل.</value>
+  </data>
+  <data name="We could not make a searchable copy of this document." xml:space="preserve">
+    <value>تعذّر إنشاء نسخة قابلة للبحث من هذا المستند.</value>
+  </data>
 </root>

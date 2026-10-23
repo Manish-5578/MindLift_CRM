@@ -11,6 +11,7 @@ public sealed class PreparedPage : IDisposable
     private readonly SKBitmap _straight;
     private GrayImage? _enhanced;
     private GrayImage? _binarized;
+    private GrayImage? _restored;
     private GrayImage? _denoised;
 
     private PreparedPage(SKBitmap oriented, SKBitmap straight, int originalWidth, int originalHeight, int quarterTurns, double skewDegrees, bool blank, bool orientationKnown, int? orientationHint)
@@ -58,6 +59,9 @@ public sealed class PreparedPage : IDisposable
 
     /// <summary>The same, as pure black and white.</summary>
     public GrayImage Binarized => _binarized ??= ImageEnhancer.Binarize(Enhanced);
+
+    /// <summary>The enhanced page sharpened, made black and white and cleared of specks, for pages that are both blurred and dirty.</summary>
+    public GrayImage Restored => _restored ??= ImageEnhancer.Restore(Enhanced);
 
     /// <summary>The straightened page in grays with the contrast raised, at its own size. Used for the picture inside a searchable PDF.</summary>
     public GrayImage StraightGray() => BuildEnhanced(enlarge: false);
@@ -174,7 +178,7 @@ public sealed record OcrPageReading(IReadOnlyList<PageWord> Words, string Text, 
 /// </summary>
 public sealed class OcrPagePipeline(IOcrEngine primary, IReadOnlyList<IOcrEngine> fallbacks, OcrOptions options, ILogger logger)
 {
-    private enum Variant { Enhanced, Original, Denoised, Binarized }
+    private enum Variant { Enhanced, Original, Denoised, Restored, Binarized }
 
     /// <summary><c>Vertical</c>: the words found are taller than wide, so the text runs up or down the picture and the page is lying on its side.</summary>
     private sealed record Attempt(PageQuality Quality, string Text, List<PageWord> Words, int QuarterTurns, bool Vertical);
@@ -211,6 +215,7 @@ public sealed class OcrPagePipeline(IOcrEngine primary, IReadOnlyList<IOcrEngine
                     case Variant.Enhanced: ImageEnhancer.SavePng(page.Enhanced, path); break;
                     case Variant.Denoised: ImageEnhancer.SavePng(page.Denoised, path); break;
                     case Variant.Binarized: ImageEnhancer.SavePng(page.Binarized, path); break;
+                    case Variant.Restored: ImageEnhancer.SavePng(page.Restored, path); break;
                     default: page.SaveOriented(path); break;
                 }
 
@@ -218,7 +223,7 @@ public sealed class OcrPagePipeline(IOcrEngine primary, IReadOnlyList<IOcrEngine
             }
 
             // Different looks at the page, cheapest and most likely first. Each is tried only while the score is still low.
-            (Variant Variant, int Layout)[] plan = [(Variant.Enhanced, 3), (Variant.Original, 3), (Variant.Denoised, 3), (Variant.Binarized, 3), (Variant.Enhanced, 6), (Variant.Binarized, 11)];
+            (Variant Variant, int Layout)[] plan = [(Variant.Enhanced, 3), (Variant.Original, 3), (Variant.Denoised, 3), (Variant.Restored, 3), (Variant.Binarized, 3), (Variant.Enhanced, 6), (Variant.Binarized, 11)];
             var attempts = new List<Attempt>();
             var paths = new Dictionary<Variant, string>();
             foreach (var (variant, layout) in plan.Take(Math.Max(1, options.MaxAttemptsPerPage)))
@@ -234,6 +239,7 @@ public sealed class OcrPagePipeline(IOcrEngine primary, IReadOnlyList<IOcrEngine
                     Variant.Enhanced => (page.StraightMap, page.Enhanced),
                     Variant.Denoised => (page.StraightMap, page.Denoised),
                     Variant.Binarized => (page.StraightMap, page.Binarized),
+                    Variant.Restored => (page.StraightMap, page.Restored),
                     _ => (page.OrientedMap, null),
                 };
                 var (pictureWidth, pictureHeight) = picture is null ? (map.StraightWidth, map.StraightHeight) : (picture.Width, picture.Height);
@@ -259,7 +265,7 @@ public sealed class OcrPagePipeline(IOcrEngine primary, IReadOnlyList<IOcrEngine
 
             if (best.Quality.Score < options.MinPageConfidence)
             {
-                var extra = await TryOtherEnginesAsync(paths.TryGetValue(Variant.Enhanced, out var enhancedPath) ? enhancedPath : PathFor(Variant.Enhanced), page, request, ct);
+                var extra = await TryOtherEnginesAsync(paths.TryGetValue(Variant.Enhanced, out var enhancedPath) ? enhancedPath : PathFor(Variant.Enhanced), page, request, HasNonLatinLetters(best.Text), ct);
                 attempts.AddRange(extra);
                 best = attempts[OcrQuality.Best(attempts.Select(a => a.Quality).ToList())];
             }
@@ -382,10 +388,13 @@ public sealed class OcrPagePipeline(IOcrEngine primary, IReadOnlyList<IOcrEngine
         return pool[OcrQuality.Best(pool.Select(a => a.Quality).ToList())].QuarterTurns;
     }
 
-    private async Task<List<Attempt>> TryOtherEnginesAsync(string enhancedPath, PreparedPage page, OcrRequest request, CancellationToken ct)
+    /// <summary>True when the text has letters from a script other than Latin, such as Arabic.</summary>
+    private static bool HasNonLatinLetters(string text) => text.Any(c => char.IsLetter(c) && c > 'ɏ');
+
+    private async Task<List<Attempt>> TryOtherEnginesAsync(string enhancedPath, PreparedPage page, OcrRequest request, bool nonLatin, CancellationToken ct)
     {
         var attempts = new List<Attempt>();
-        foreach (var engine in fallbacks.Where(e => !ReferenceEquals(e, primary) && e.IsAvailable()))
+        foreach (var engine in fallbacks.Where(e => !ReferenceEquals(e, primary) && !(nonLatin && e is ILatinOnlyOcrEngine) && e.IsAvailable()))
         {
             ct.ThrowIfCancellationRequested();
             try

@@ -426,6 +426,50 @@ public sealed class OcrPipelineTests : IDisposable
         other.Calls.ShouldBe(0);
     }
 
+    /// <summary>Stands in for an engine that finds Arabic, weakly.</summary>
+    private sealed class WeakArabicEngine : IOcrEngine
+    {
+        public bool IsAvailable() => true;
+
+        public Task<OcrPageResult> RecognizeAsync(string imagePath, OcrRequest request, CancellationToken ct)
+            => Task.FromResult(new OcrPageResult([new OcrWord("رخصة", 30, 10, 10, 100, 20, 1, 1, 1), new OcrWord("تجارية", 30, 120, 10, 100, 20, 1, 1, 1)], 0, 0));
+    }
+
+    private sealed class LatinOnlyEngine() : IOcrEngine, ILatinOnlyOcrEngine
+    {
+        public int Calls { get; private set; }
+        public bool IsAvailable() => true;
+
+        public Task<OcrPageResult> RecognizeAsync(string imagePath, OcrRequest request, CancellationToken ct)
+        {
+            Calls++;
+            return Task.FromResult(new OcrPageResult([new OcrWord("Latin", 95, 10, 10, 100, 20, 1, 1, 1), new OcrWord("guess", 95, 120, 10, 100, 20, 1, 1, 1)], 0, 0));
+        }
+    }
+
+    [Fact]
+    public async Task A_latin_only_engine_is_not_asked_about_a_page_where_arabic_was_found()
+    {
+        var latin = new LatinOnlyEngine();
+
+        var reading = await Pipeline(new WeakArabicEngine(), new OcrOptions { MaxAttemptsPerPage = 2, DetectOrientation = false }, latin).ReadAsync(InkedPicture(), 1000, 500, CancellationToken.None);
+
+        latin.Calls.ShouldBe(0);
+        reading.Text.ShouldContain("رخصة");
+        reading.LowConfidence.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task A_latin_only_engine_is_asked_about_a_weak_latin_page()
+    {
+        var latin = new LatinOnlyEngine();
+
+        var reading = await Pipeline(new ScriptedEngine(30), new OcrOptions { MaxAttemptsPerPage = 2, DetectOrientation = false }, latin).ReadAsync(InkedPicture(), 1000, 500, CancellationToken.None);
+
+        latin.Calls.ShouldBe(1);
+        reading.Text.ShouldContain("Latin");
+    }
+
     [Fact]
     public async Task With_cleaning_off_the_original_picture_is_read_once()
     {

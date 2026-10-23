@@ -66,7 +66,13 @@ public sealed class OcrOptions
     public double MinPageConfidence { get; set; } = 70;
 
     /// <summary>The most times one page is read, each with a different clean-up or layout setting, while the score stays low.</summary>
-    public int MaxAttemptsPerPage { get; set; } = 5;
+    public int MaxAttemptsPerPage { get; set; } = 6;
+
+    /// <summary>
+    /// Ask a second engine (PaddleOCR's models, run in the app) to read a page that is still weak after every attempt; its reading is kept only when it scores better.
+    /// Its models read Latin script only, so a page where Arabic was found is not given to it.
+    /// </summary>
+    public bool SecondEngine { get; set; } = true;
 }
 
 public sealed record OcrRequest(string Languages, int PageSegMode = 3, string? CharWhitelist = null, int? Dpi = null);

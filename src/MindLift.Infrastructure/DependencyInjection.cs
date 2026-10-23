@@ -196,6 +196,8 @@ public static class DependencyInjection
         // CPQ & Documents (M16).
         services.Configure<MindLift.Infrastructure.Cpq.OcrOptions>(configuration.GetSection("Ocr"));
         services.AddSingleton<MindLift.Infrastructure.Cpq.IOcrEngine, MindLift.Infrastructure.Cpq.TesseractCliOcrEngine>();
+        // Registered second, so it is asked only for pages Tesseract still reads poorly.
+        services.AddSingleton<MindLift.Infrastructure.Cpq.IOcrEngine, MindLift.Infrastructure.Cpq.RapidOcrEngine>();
         services.AddScoped<ICpqService, MindLift.Infrastructure.Cpq.CpqService>();
         services.AddScoped<IDocumentOcrService, MindLift.Infrastructure.Cpq.DocumentOcrService>();
         services.AddSingleton<MindLift.Infrastructure.Documents.Text.OcrGate>();

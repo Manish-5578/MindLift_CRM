@@ -7,6 +7,7 @@
 @inject IDialogService DialogService
 @inject NavigationManager Nav
 @inject Translator T
+@inject IJSRuntime JS
 
 <div class="pa-4 d-flex flex-column" style="height: calc(100vh - 80px);">
     @if (_loading)
@@ -77,11 +78,27 @@
                     <MudText Typo="Typo.subtitle1" Class="font-weight-bold">@T["Document Content"]</MudText>
                     <div class="d-flex gap-2">
                         <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Filled.Download"
-                                   Href="@($"/api/v1/documents/{_document.Id}/file")" Target="_blank">
+                                   OnClick="DownloadFileAsync" Disabled="_downloading" data-testid="document-download">
                             @T["Download File"]
                         </MudButton>
+                        @if (CanMakeSearchable)
+                        {
+                            <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Filled.ManageSearch"
+                                       OnClick="DownloadSearchablePdfAsync" Disabled="_downloading" data-testid="document-searchable-pdf">
+                                @T["Searchable PDF"]
+                            </MudButton>
+                        }
                     </div>
                 </div>
+
+                @if (_document.OcrResult is { LowConfidencePages.Count: > 0 } ocr)
+                {
+                    <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-2" data-testid="low-confidence-pages">
+                        @(ocr.LowConfidencePages.Count == 1
+                            ? T["Page {0} was hard to read. Check it against the original.", ocr.LowConfidencePages[0]]
+                            : T["Pages {0} were hard to read. Check them against the original.", string.Join(", ", ocr.LowConfidencePages)])
+                    </MudAlert>
+                }
 
                 <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" Class="flex-grow-1 d-flex flex-column">
                     <MudTabPanel Text="Extracted Text" Icon="@Icons.Material.Filled.TextFields">
@@ -355,6 +372,40 @@
         finally
         {
             _processing = false;
+        }
+    }
+
+    private bool _downloading;
+
+    // A searchable copy can be made of a PDF or a picture; other files have nothing to read.
+    private bool CanMakeSearchable => _document is not null
+        && (_document.ContentType == "application/pdf" || _document.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase));
+
+    // Files are fetched through HttpClient so the sign-in token goes with the request; a plain link would not carry it.
+    private Task DownloadFileAsync() =>
+        DownloadAsync($"api/v1/documents/{Id}/file", _document!.FileName, _document.ContentType, T["We could not download this file."]);
+
+    private Task DownloadSearchablePdfAsync() =>
+        DownloadAsync($"api/v1/documents/{Id}/searchable-pdf", Path.GetFileNameWithoutExtension(_document!.FileName) + "-searchable.pdf", "application/pdf",
+            T["We could not make a searchable copy of this document."]);
+
+    private async Task DownloadAsync(string url, string fileName, string contentType, string failure)
+    {
+        _downloading = true;
+        try
+        {
+            var response = await Http.GetAsync(url);
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add(await ProblemText.FromAsync(response, failure), Severity.Error);
+                return;
+            }
+
+            await JS.InvokeVoidAsync("mindlift.downloadFile", fileName, contentType, Convert.ToBase64String(await response.Content.ReadAsByteArrayAsync()));
+        }
+        finally
+        {
+            _downloading = false;
         }
     }
 

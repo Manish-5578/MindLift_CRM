@@ -23,7 +23,6 @@ public sealed class DocumentOcrService(
     IAppDbContext db,
     ITenantContext tenant,
     IFileStorage fileStorage,
-    IOcrEngine ocrEngine,
     INotificationService notifications,
     DocumentPageReader pageReader,
     SearchablePdfService searchablePdf,
