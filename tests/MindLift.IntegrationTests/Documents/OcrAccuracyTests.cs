@@ -252,4 +252,59 @@ public sealed class OcrAccuracyTests(ITestOutputHelper output) : IDisposable
         cleaned.Words.Count.ShouldBeGreaterThanOrEqualTo((int)(plain.Words.Count * 0.9));
         cleaned.Confidence!.Value.ShouldBeGreaterThanOrEqualTo(plain.Confidence!.Value - 3);
     }
+
+    private static SKBitmap Blur(SKBitmap source, float sigma)
+        => Redraw(source, (canvas, bitmap) =>
+        {
+            using var blur = new SKPaint { ImageFilter = SKImageFilter.CreateBlur(sigma, sigma) };
+            canvas.DrawBitmap(bitmap, 0, 0, blur);
+        });
+
+    [Fact]
+    public async Task The_second_engine_reads_pages_that_stay_weak_after_cleaning_at_least_as_well()
+    {
+        var truth = string.Join('\n', Lines);
+        using var clean = Document();
+        var cases = new List<(string Name, SKBitmap Picture)>
+        {
+            ("very blurred", Blur(clean, 3.2f)),
+            ("extremely blurred", Blur(clean, 5f)),
+            ("blurred + specks + faint", LowContrast(NoisyAndBlurred(Blur(clean, 1.5f)))),
+            ("tiny (25%) + heavy JPEG", HeavyJpeg(Downscale(clean, 0.25))),
+            ("tiny (15%) + heavy JPEG", HeavyJpeg(Downscale(clean, 0.15))),
+            ("blurred, small, JPEG", HeavyJpeg(Downscale(Blur(clean, 3.5f), 0.35))),
+        };
+
+        var tesseractOptions = Options.Create(new OcrOptions
+        {
+            TesseractPath = @"C:\Program Files\Tesseract-OCR\tesseract.exe",
+            TessdataPath = Path.Combine(FindRepoRoot(), "tools", "tessdata"),
+            Languages = "eng",
+        });
+        var tesseract = new TesseractCliOcrEngine(tesseractOptions, NullLogger<TesseractCliOcrEngine>.Instance);
+        using var paddle = new RapidOcrEngine(tesseractOptions, NullLogger<RapidOcrEngine>.Instance);
+        var alone = new DocumentPageReader(tesseract, tesseractOptions, NullLogger<DocumentPageReader>.Instance);
+        var withSecond = new DocumentPageReader(tesseract, tesseractOptions, NullLogger<DocumentPageReader>.Instance, otherEngines: [tesseract, paddle]);
+
+        double aloneTotal = 0, secondTotal = 0;
+        output.WriteLine($"{"case",-30} {"tesseract",10} {"+ second",10} {"paddle only",12}");
+        foreach (var (name, picture) in cases)
+        {
+            using (picture)
+            {
+                var path = Save(picture);
+                var a = (await alone.ReadAsync(path, CancellationToken.None)).Single();
+                var b = (await withSecond.ReadAsync(path, CancellationToken.None)).Single();
+                var (aScore, bScore) = (Accuracy(a.Text, truth), Accuracy(b.Text, truth));
+                var paddleOnly = await paddle.RecognizeAsync(path, new OcrRequest("eng"), CancellationToken.None);
+                var pScore = Accuracy(string.Join(' ', paddleOnly.Words.Select(w => w.Text)), truth);
+                aloneTotal += aScore;
+                secondTotal += bScore;
+                output.WriteLine($"{name,-30} {aScore,10:P1} {bScore,10:P1} {pScore,12:P1}   (confidence {a.Confidence:0} -> {b.Confidence:0}{(b.LowConfidence ? ", flagged" : string.Empty)})");
+            }
+        }
+
+        output.WriteLine($"{"average",-30} {aloneTotal / cases.Count,10:P1} {secondTotal / cases.Count,10:P1}");
+        secondTotal.ShouldBeGreaterThanOrEqualTo(aloneTotal - 0.02 * cases.Count, "the second engine should not make weak pages read worse");
+    }
 }
