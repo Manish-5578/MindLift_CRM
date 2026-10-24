@@ -24,7 +24,7 @@
             <MudItem xs="12" sm="6"><MudTextField @bind-Value="_last" Label="@T["Last name"]" Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" data-testid="signup-last" /></MudItem>
         </MudGrid>
         <MudTextField @bind-Value="_email" Label="@T["Work email"]" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Email" Required="true" Error="@(_errors.ContainsKey("email"))" ErrorText="@(Err("email"))" data-testid="signup-email" />
-        <MudTextField @bind-Value="_password" Label="@T["Password"]" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Password" Required="true" HelperText="@T["At least 8 characters, with upper and lower case letters and a digit."]" Error="@(_errors.ContainsKey("password"))" ErrorText="@(Err("password"))" data-testid="signup-password" />
+        <PasswordInput @bind-Value="_password" Label="@T["Password"]" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Password" Required="true" HelperText="@T["At least 8 characters, with upper and lower case letters and a digit."]" Error="@(_errors.ContainsKey("password"))" ErrorText="@(Err("password"))" data-testid="signup-password" />
         <MudTextField @bind-Value="_phone" Label="@T["Phone (optional)"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="signup-phone" />
         <MudSelect @bind-Value="_country" Label="@T["Country"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="signup-country">
             @foreach (var (iso, label) in Countries)

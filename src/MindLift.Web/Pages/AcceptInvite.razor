@@ -29,9 +29,9 @@
                 <MudAlert Severity="Severity.Error" Dense="true" data-testid="invite-error">@_error</MudAlert>
             }
 
-            <MudTextField @bind-Value="_password" Label="@T["Choose a password"]" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Password" Required="true"
+            <PasswordInput @bind-Value="_password" Label="@T["Choose a password"]" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Password" Required="true"
                           HelperText="@T["At least 8 characters, with upper and lower case letters and a digit."]" data-testid="invite-password" />
-            <MudTextField @bind-Value="_confirm" Label="@T["Repeat the password"]" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Password" Required="true" OnKeyDown="OnKey" data-testid="invite-confirm" />
+            <PasswordInput @bind-Value="_confirm" Label="@T["Repeat the password"]" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Password" Required="true" OnKeyDown="OnKey" data-testid="invite-confirm" />
             <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Size="Size.Large" Disabled="_busy" OnClick="AcceptAsync" data-testid="primary-action">@T["Join {0}", _preview.CompanyName]</MudButton>
         }
     </div>
