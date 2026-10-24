@@ -64,6 +64,7 @@ public sealed class AuthService(
         {
             // CheckPasswordAsync only verifies. Recording the failure is our job, and it may start the lockout.
             await users.AccessFailedAsync(user);
+            await AuditPlatformAsync(user, "auth.failed", "Wrong password at sign-in", cancellationToken);
             if (await users.IsLockedOutAsync(user))
             {
                 throw new UnauthorizedException("account_locked", "Too many attempts. Try again in 15 minutes.");
@@ -75,8 +76,29 @@ public sealed class AuthService(
         await users.ResetAccessFailedCountAsync(user);
         user.LastLoginAt = clock.UtcNow;
         await users.UpdateAsync(user);
+        await AuditPlatformAsync(user, "auth.signin", "Signed in to the platform console", cancellationToken);
 
         return await IssueForUserAsync(user, cancellationToken);
+    }
+
+    /// <summary>What the platform owner does is on record, sign-ins included. Company users are not part of that trail.</summary>
+    private async Task AuditPlatformAsync(AppUser user, string action, string summary, CancellationToken cancellationToken)
+    {
+        if (!user.IsPlatformAdmin)
+        {
+            return;
+        }
+
+        var name = $"{user.FirstName} {user.LastName}".Trim();
+        db.PlatformAudit.Add(new PlatformAuditEntry
+        {
+            ActorId = user.Id,
+            Actor = name.Length > 0 ? name : user.Email ?? "Platform",
+            Action = action,
+            Summary = summary,
+            CreatedAt = clock.UtcNow,
+        });
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<AuthResult> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default)

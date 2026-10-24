@@ -138,4 +138,27 @@ public sealed class PlatformPlansAndAuditTests(MindLiftApiFactory factory) : ICl
         notifications.Select(n => n.Id).Distinct().Count().ShouldBe(notifications.Count);
         (await company.Client.GetAsync("/api/v1/platform/notifications")).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
+
+    [Fact]
+    public async Task The_owners_sign_ins_and_exports_are_on_the_trail_and_company_users_are_not()
+    {
+        var email = $"platform-{Guid.NewGuid():N}@mindlift.test";
+        using (var scope = factory.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<PlatformAdminSeeder>().SeedAsync(email, Workspaces.Password, "Priya", "Owner");
+        }
+
+        var wrong = await factory.CreateClient().PostAsJsonAsync("/api/v1/auth/login", new LoginRequest(email, "Wrong-pass-1"));
+        wrong.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        var platform = await Workspaces.LoginAsync(factory, email, Workspaces.Password);
+        await Workspaces.SignupAsync(factory);   // a company user signing up and in must not appear
+
+        (await platform.Client.GetAsync("/api/v1/platform/activity/export")).EnsureSuccessStatusCode();
+        var trail = (await platform.Client.GetFromJsonAsync<PagedResult<PlatformAuditDto>>("/api/v1/platform/activity?search=Priya&pageSize=100"))!;
+        trail.Items.ShouldContain(a => a.Action == "auth.failed");
+        trail.Items.ShouldContain(a => a.Action == "auth.signin");
+        trail.Items.ShouldContain(a => a.Action == "audit.exported");
+        trail.Items.ShouldAllBe(a => a.Actor == "Priya Owner");
+        (await platform.Client.GetFromJsonAsync<PagedResult<PlatformAuditDto>>("/api/v1/platform/activity?kind=auth&pageSize=100"))!.Items.ShouldAllBe(a => a.Action.StartsWith("auth."));
+    }
 }

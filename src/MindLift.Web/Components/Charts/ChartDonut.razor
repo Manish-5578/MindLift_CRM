@@ -1,0 +1,61 @@
+@using System.Globalization
+@* A donut with a legend. Hover a slice or a legend row to look at it; click a legend row to leave it out. *@
+<div class="ch-donut-wrap" data-testid="donut-chart">
+    <div class="ch-donut">
+        <svg viewBox="0 0 120 120" role="img" aria-label="@Title">
+            <circle cx="60" cy="60" r="@F(R)" fill="none" stroke="var(--ml-border)" stroke-width="15" />
+            @{ double offset = 0; }
+            @for (var i = 0; i < Parts.Count; i++)
+            {
+                var idx = i;
+                var part = Parts[i];
+                var value = _off.Contains(i) ? 0 : part.Value;
+                var len = Total == 0 ? 0 : C * (double)value / Total;
+                if (len > 0)
+                {
+                    <circle class="ch-donut__seg @(_hot == idx ? "is-hot" : "")" cx="60" cy="60" r="@F(R)" fill="none" stroke="@Colour(i)" stroke-width="@(_hot == idx ? 19 : 15)"
+                            stroke-dasharray="@F(Math.Max(0, len - 1.5)) @F(C)" stroke-dashoffset="@F(-offset)" @onmouseenter="() => _hot = idx" @onmouseleave="() => _hot = -1" style="animation-delay:@(i * 80)ms">
+                        <title>@part.Label: @part.Value</title>
+                    </circle>
+                }
+                offset += len;
+            }
+        </svg>
+        <div class="ch-donut__center">
+            <b>@(_hot >= 0 && _hot < Parts.Count ? Center(Parts[_hot].Value) : CenterValue)</b>
+            <span>@(_hot >= 0 && _hot < Parts.Count ? Parts[_hot].Label : CenterLabel)</span>
+        </div>
+    </div>
+    <div class="ch-legend">
+        @for (var i = 0; i < Parts.Count; i++)
+        {
+            var idx = i;
+            var part = Parts[i];
+            <button type="button" class="ch-legend__row @(_off.Contains(i) ? "is-off" : "") @(_hot == idx ? "is-hot" : "")" @onmouseenter="() => _hot = idx" @onmouseleave="() => _hot = -1" @onclick="() => Toggle(idx)">
+                <i style="background:@Colour(i)"></i><span>@part.Label</span><b>@(Total == 0 || _off.Contains(i) ? "-" : Math.Round(100.0 * (double)part.Value / Total) + "%")</b>
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    public sealed record Part(string Label, decimal Value, string? Color = null);
+
+    [Parameter, EditorRequired] public IReadOnlyList<Part> Parts { get; set; } = [];
+    [Parameter] public string CenterLabel { get; set; } = "Total";
+    [Parameter] public Func<decimal, string> Format { get; set; } = v => v.ToString("N0", CultureInfo.InvariantCulture);
+    [Parameter] public string Title { get; set; } = "";
+
+    private const double R = 48;
+    private static readonly double C = 2 * Math.PI * R;
+    private static readonly string[] Palette = ["#4F46E5", "#06B6D4", "#F59E0B", "#EC4899", "#10B981", "#8B5CF6", "#F97316", "#3B82F6"];
+    private readonly HashSet<int> _off = [];
+    private int _hot = -1;
+
+    private double Total => (double)Parts.Where((_, i) => !_off.Contains(i)).Sum(p => p.Value);
+    private string CenterValue => Format((decimal)Total);
+    private string Center(decimal v) => Format(v);
+    private string Colour(int i) => Parts[i].Color is { Length: > 0 } c && c.StartsWith('#') ? c : Palette[i % Palette.Length];
+    private void Toggle(int i) { if (!_off.Remove(i)) _off.Add(i); }
+    private static string F(double v) => v.ToString("0.##", CultureInfo.InvariantCulture);
+}

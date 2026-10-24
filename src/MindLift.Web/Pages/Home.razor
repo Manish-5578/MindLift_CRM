@@ -78,21 +78,16 @@
         if (kpiWidget?.Data is { } kpiJson)
         {
             var tiles = Deserialize<List<KpiTileDto>>(kpiJson) ?? [];
-            <div class="d-flex flex-wrap gap-3 mb-4" data-testid="kpi-strip">
+            <div class="ch-kpis" data-testid="kpi-strip">
+                @{ var n = 0; }
                 @foreach (var tile in tiles)
                 {
-                    <div class="pa-4 rounded-lg flex-1" style="background:var(--ml-card-bg, #fff);border:1px solid var(--ml-border);min-width:180px;cursor:pointer" @onclick="() => NavigateTo(tile.DrillDownUrl)">
-                        <div class="d-flex justify-space-between align-center mb-1">
-                            <MudText Typo="Typo.caption" Class="ml-muted" Style="font-weight:600;text-transform:uppercase">@T[tile.Label]</MudText>
-                            @if (tile.ChangePct is not null)
-                            {
-                                <MudChip T="string" Size="Size.Small" Color="@(tile.Trend == tile.GoodWhen ? Color.Success : Color.Error)" Variant="Variant.Text" Class="pa-0">
-                                    <MudIcon Icon="@(tile.Trend == "up" ? Icons.Material.Filled.ArrowUpward : Icons.Material.Filled.ArrowDownward)" Size="Size.Small" />
-                                    @Math.Abs(tile.ChangePct.Value)%
-                                </MudChip>
-                            }
-                        </div>
-                        <MudText Typo="Typo.h5" Style="font-weight:700">@FormatValue(tile.Value, tile.Format)</MudText>
+                    var t = tile;
+                    var (icon, color) = KpiLook(t.Key);
+                    <div style="animation-delay:@(n++ * 60)ms;display:contents">
+                    <ChartKpi Label="@T[t.Label]" Value="@FormatValue(t.Value, t.Format)" Icon="@icon" Color="@color"
+                              Change="@t.ChangePct" Good="@(t.Trend == t.GoodWhen)" Hint="@(t.ChangePct is null ? null : T["vs last period"])"
+                              Ring="@KpiRing(t)" TestId="@($"kpi-{t.Key}")" OnClick="() => NavigateTo(t.DrillDownUrl)" />
                     </div>
                 }
             </div>
@@ -106,46 +101,46 @@
                     @switch (widget.Key)
                     {
                         case "my_day":
-                            RenderMyDay(widget);
+                            <text>@RenderMyDay(widget)</text>
                             break;
                         case "upcoming_meetings":
-                            RenderUpcomingMeetings(widget);
+                            <text>@RenderUpcomingMeetings(widget)</text>
                             break;
                         case "new_leads":
-                            RenderNewLeads(widget);
+                            <text>@RenderNewLeads(widget)</text>
                             break;
                         case "deals_in_progress":
-                            RenderDealsInProgress(widget);
+                            <text>@RenderDealsInProgress(widget)</text>
                             break;
                         case "deals_closing_soon":
-                            RenderDealsClosingSoon(widget);
+                            <text>@RenderDealsClosingSoon(widget)</text>
                             break;
                         case "target_progress":
-                            RenderTargetProgress(widget);
+                            <text>@RenderTargetProgress(widget)</text>
                             break;
                         case "sales_trend":
-                            RenderSalesTrend(widget);
+                            <text>@RenderSalesTrend(widget)</text>
                             break;
                         case "leads_by_source":
-                            RenderLeadsBySource(widget);
+                            <text>@RenderLeadsBySource(widget)</text>
                             break;
                         case "pipeline_funnel":
-                            RenderPipelineFunnel(widget);
+                            <text>@RenderPipelineFunnel(widget)</text>
                             break;
                         case "team_leaderboard":
-                            RenderTeamLeaderboard(widget);
+                            <text>@RenderTeamLeaderboard(widget)</text>
                             break;
                         case "team_overdue":
-                            RenderTeamOverdue(widget);
+                            <text>@RenderTeamOverdue(widget)</text>
                             break;
                         case "recent_wins":
-                            RenderRecentWins(widget);
+                            <text>@RenderRecentWins(widget)</text>
                             break;
                         case "activity_summary":
-                            RenderActivitySummary(widget);
+                            <text>@RenderActivitySummary(widget)</text>
                             break;
                         case "system_overview":
-                            RenderSystemOverview(widget);
+                            <text>@RenderSystemOverview(widget)</text>
                             break;
                         default:
                             <MlCard Title="@widget.Title">
@@ -198,6 +193,29 @@
             return hour < 12 ? $"Good morning, {first}" : hour < 17 ? $"Good afternoon, {first}" : $"Good evening, {first}";
         }
     }
+
+    private static (string Icon, string Color) KpiLook(string key) => key switch
+    {
+        "won_amount" => (Icons.Material.Filled.Payments, "#16A34A"),
+        "open_pipeline" => (Icons.Material.Filled.Layers, "#2563EB"),
+        "new_leads" => (Icons.Material.Filled.PersonAdd, "#EF4444"),
+        "win_rate" => (Icons.Material.Filled.EmojiEvents, "#F59E0B"),
+        "conversion_rate" => (Icons.Material.Filled.Autorenew, "#8B5CF6"),
+        "avg_deal_size" => (Icons.Material.Filled.Scale, "#06B6D4"),
+        "tasks_overdue" => (Icons.Material.Filled.EventBusy, "#DC2626"),
+        "activities_done" => (Icons.Material.Filled.TaskAlt, "#0D9488"),
+        _ => (Icons.Material.Filled.Insights, "#4F46E5")
+    };
+
+    /// <summary>A ring for a rate, or for how this period compares with the last one.</summary>
+    private static double? KpiRing(KpiTileDto t)
+        => t.Format == "percent" ? (double)Math.Clamp(t.Value, 0, 100)
+         : t.PreviousValue is > 0 ? (double)Math.Clamp(t.Value / t.PreviousValue.Value * 100m, 0, 100)
+         : null;
+
+    private static string WholeNumber(decimal v) => v.ToString("N0");
+    private static string CompactNumber(decimal v) => v >= 1000 ? (v / 1000).ToString("0.#") + "k" : v.ToString("N0");
+    private void OpenDeals(int _) => NavigateTo("/deals");
 
     private string DateLine => Formatting.Format(DateTime.Now, "dddd, dd MMMM yyyy", T);
 
@@ -468,22 +486,21 @@
     {
         if (widget.Data is null) return;
         var data = Deserialize<DealsInProgressData>(widget.Data.Value);
-        <MlCard Title="Deals In Progress" Subtitle="@($"{data?.Count ?? 0} active deals · Total: {data?.TotalInBase:N0} {App.Bootstrap?.Company.BaseCurrency}")">
+        var currency = App.Bootstrap?.Company.BaseCurrency;
+        var parts = (data?.ByStage ?? []).Where(x => x.TotalInBase > 0).Select(x => new ChartDonut.Part(x.Name, x.TotalInBase)).ToList();
+        <MlCard Title="Deals in progress" Subtitle="@($"{data?.Count ?? 0} open deals · weighted {data?.WeightedInBase:N0} {currency}")" TestId="deals-in-progress">
             @if (data?.RottingCount > 0)
             {
                 <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">@data.RottingCount deal(s) have been idle past stage rotting threshold.</MudAlert>
             }
 
-            @foreach (var stage in data?.ByStage ?? [])
+            @if (parts.Count == 0)
             {
-                var pct = data?.TotalInBase == 0m ? 0 : (int)(stage.TotalInBase / data!.TotalInBase * 100m);
-                <div class="mb-3">
-                    <div class="d-flex justify-space-between align-center mb-1">
-                        <MudText Typo="Typo.caption" Style="font-weight:600">@stage.Name (@stage.Count)</MudText>
-                        <MudText Typo="Typo.caption">@stage.TotalInBase.ToString("N0")</MudText>
-                    </div>
-                    <MudProgressLinear Value="@pct" Color="Color.Primary" Rounded="true" Size="Size.Small" />
-                </div>
+                <MudText Typo="Typo.body2" Class="ml-muted">@T["No open deals yet."]</MudText>
+            }
+            else
+            {
+                <ChartDonut Parts="parts" CenterLabel="@(currency ?? string.Empty)" Title="Open pipeline by stage" Format="CompactNumber" />
             }
         </MlCard>
     };
@@ -523,23 +540,19 @@
     {
         if (widget.Data is null) return;
         var targets = Deserialize<List<TargetProgressItem>>(widget.Data.Value) ?? [];
-        <MlCard Title="Target Progress">
-            @foreach (var t in targets)
-            {
-                <div class="mb-3">
-                    <div class="d-flex justify-space-between align-center mb-1">
-                        <MudText Typo="Typo.caption" Style="font-weight:600">@t.Metric</MudText>
-                        <MudChip T="string" Size="Size.Small" Color="@(t.Status == "ahead" ? Color.Success : t.Status == "on_track" ? Color.Info : Color.Warning)" Variant="Variant.Text">
-                            @t.Status.ToUpperInvariant()
-                        </MudChip>
+        <MlCard Title="Target progress" Subtitle="Actual against target for this period" TestId="target-progress">
+            <div class="ch-targets">
+                @foreach (var t in targets)
+                {
+                    var color = t.Status == "ahead" ? "#16A34A" : t.Status == "on_track" ? "#2563EB" : "#D97706";
+                    <div class="ch-target" title="@($"Expected by now: {t.ExpectedPct}%")">
+                        <ChartRing Value="(double)t.Pct" Size="92" Color="@color" />
+                        <b>@t.Metric</b>
+                        <small>@t.Actual.ToString("N0") of @t.Target.ToString("N0")</small>
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="@(t.Status == "ahead" ? Color.Success : t.Status == "on_track" ? Color.Info : Color.Warning)">@t.Status.Replace('_', ' ').ToUpperInvariant()</MudChip>
                     </div>
-                    <MudProgressLinear Value="@((double)t.Pct)" Color="@(t.Status == "ahead" ? Color.Success : Color.Primary)" Rounded="true" Size="Size.Medium" />
-                    <div class="d-flex justify-space-between mt-1">
-                        <MudText Typo="Typo.caption" Class="ml-muted">Actual: @t.Actual.ToString("N0")</MudText>
-                        <MudText Typo="Typo.caption" Class="ml-muted">Target: @t.Target.ToString("N0") (@t.Pct%)</MudText>
-                    </div>
-                </div>
-            }
+                }
+            </div>
         </MlCard>
     };
 
@@ -547,18 +560,14 @@
     {
         if (widget.Data is null) return;
         var months = Deserialize<List<MonthlySalesItem>>(widget.Data.Value) ?? [];
-        var max = months.Count == 0 ? 1m : Math.Max(1m, months.Max(m => m.WonAmount));
-        <MlCard Title="12-Month Sales Trend" Subtitle="Revenue closed-won by month">
-            <div class="d-flex align-end gap-2" style="height:140px;padding-top:20px">
-                @foreach (var m in months)
-                {
-                    var barHeight = Math.Max(4, (int)(m.WonAmount / max * 100));
-                    <div class="flex-1 d-flex flex-column align-center" style="height:100%;justify-content:flex-end">
-                        <div style="@($"width:100%;height:{barHeight}%;background:var(--mud-palette-primary);border-radius:4px 4px 0 0")" title="@($"{m.MonthLabel}: {m.WonAmount:N0}")"></div>
-                        <MudText Typo="Typo.caption" Style="font-size:10px;margin-top:4px" Class="ml-muted">@m.MonthLabel.Split(' ')[0]</MudText>
-                    </div>
-                }
-            </div>
+        var bars = months.Select(m => new ChartBars.Bar(m.MonthLabel.Split(' ')[0], m.WonAmount, m.TargetAmount)).ToList();
+        var total = months.Sum(m => m.WonAmount);
+        <MlCard Title="Sales trend" Subtitle="@($"Closed-won by month · {total:N0} in total")" TestId="sales-trend">
+            <ChartBars Data="bars" Title="Sales by month" Format="WholeNumber" Color="#4F46E5" OnPick="OpenDeals" />
+            @if (months.Any(m => m.TargetAmount > 0))
+            {
+                <div class="ch-key" style="margin-top:8px"><i style="background:var(--ml-warning)"></i>@T["Target"]</div>
+            }
         </MlCard>
     };
 
@@ -566,18 +575,16 @@
     {
         if (widget.Data is null) return;
         var sources = Deserialize<List<LeadSourceItem>>(widget.Data.Value) ?? [];
-        var total = sources.Sum(s => s.Count);
-        <MlCard Title="Leads By Source">
-            @foreach (var s in sources)
+        var parts = sources.Select(x => new ChartDonut.Part(x.Source, x.Count)).ToList();
+        var converted = sources.Sum(x => x.ConvertedCount);
+        <MlCard Title="Leads by source" Subtitle="@($"{converted} converted")" TestId="leads-by-source">
+            @if (parts.Count == 0)
             {
-                var pct = total == 0 ? 0 : (int)((decimal)s.Count / total * 100m);
-                <div class="mb-2">
-                    <div class="d-flex justify-space-between align-center mb-1">
-                        <MudText Typo="Typo.caption" Style="font-weight:600">@s.Source (@s.Count leads)</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Success">@s.ConvertedCount converted</MudText>
-                    </div>
-                    <MudProgressLinear Value="@pct" Color="Color.Info" Rounded="true" Size="Size.Small" />
-                </div>
+                <MudText Typo="Typo.body2" Class="ml-muted">@T["No leads yet."]</MudText>
+            }
+            else
+            {
+                <ChartDonut Parts="parts" CenterLabel="@T["leads"]" Title="Leads by source" />
             }
         </MlCard>
     };
@@ -586,17 +593,18 @@
     {
         if (widget.Data is null) return;
         var stages = Deserialize<List<FunnelStageItem>>(widget.Data.Value) ?? [];
-        <MlCard Title="Pipeline Funnel Velocity">
-            @foreach (var s in stages)
-            {
-                <div class="mb-2">
-                    <div class="d-flex justify-space-between align-center mb-1">
-                        <MudText Typo="Typo.caption" Style="font-weight:600">@s.StageName</MudText>
-                        <MudText Typo="Typo.caption">@s.ConversionRate% reached (@s.Count)</MudText>
+        <MlCard Title="Pipeline funnel" Subtitle="How many deals reach each stage" TestId="pipeline-funnel">
+            <div class="ch-funnel">
+                @foreach (var st in stages)
+                {
+                    var width = Math.Max(6, Math.Min(100, (double)st.ConversionRate));
+                    <div class="ch-funnel__row" title="@($"{st.StageName}: {st.Count} deals, {st.TotalInBase:N0}")">
+                        <span class="ch-funnel__name">@st.StageName</span>
+                        <div class="ch-funnel__track"><div class="ch-funnel__fill" style="width:@(width.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))%">@st.Count</div></div>
+                        <span class="ch-funnel__pct">@st.ConversionRate%</span>
                     </div>
-                    <MudProgressLinear Value="@((double)s.ConversionRate)" Color="Color.Primary" Rounded="true" Size="Size.Small" />
-                </div>
-            }
+                }
+            </div>
         </MlCard>
     };
 
@@ -676,17 +684,22 @@
     {
         if (widget.Data is null) return;
         var summary = Deserialize<List<ActivityTypeSummaryItem>>(widget.Data.Value) ?? [];
-        <MlCard Title="Activity Summary" Subtitle="Completed activities this period vs previous">
-            @foreach (var s in summary)
-            {
-                <div class="d-flex align-center justify-space-between py-2" style="border-bottom:1px solid var(--ml-border)">
-                    <MudText Typo="Typo.body2">@s.ActivityType</MudText>
-                    <div class="d-flex align-center gap-2">
-                        <MudText Typo="Typo.body2" Style="font-weight:700">@s.Count</MudText>
-                        <MudText Typo="Typo.caption" Class="ml-muted">(prev: @s.PreviousCount)</MudText>
+        var max = Math.Max(1, summary.Count == 0 ? 1 : summary.Max(x => Math.Max(x.Count, x.PreviousCount)));
+        <MlCard Title="Activity summary" Subtitle="Completed this period against the one before" TestId="activity-summary">
+            <div style="margin-bottom:12px"><span class="ch-key"><i></i>@T["This period"]</span><span class="ch-key"><i class="is-prev"></i>@T["Previous"]</span></div>
+            <div class="ch-pair">
+                @foreach (var x in summary)
+                {
+                    <div class="ch-pair__row" title="@($"{x.ActivityType}: {x.Count} now, {x.PreviousCount} before")">
+                        <span style="font-weight:600">@x.ActivityType</span>
+                        <div class="ch-pair__bars">
+                            <div class="ch-pair__bar" style="width:@((100.0 * x.Count / max).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))%"></div>
+                            <div class="ch-pair__bar is-prev" style="width:@((100.0 * x.PreviousCount / max).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))%"></div>
+                        </div>
+                        <b style="text-align:end">@x.Count</b>
                     </div>
-                </div>
-            }
+                }
+            </div>
         </MlCard>
     };
 

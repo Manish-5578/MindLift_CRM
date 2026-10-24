@@ -18,7 +18,7 @@
             <MudAlert Severity="Severity.Error" Dense="true" data-testid="login-error">@_error</MudAlert>
         }
 
-        <MudTextField @bind-Value="_email" Label="@T["Email"]" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Email" Required="true" data-testid="login-email" />
+        <MudTextField @bind-Value="_email" Immediate="true" Label="@T["Email"]" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Email" Required="true" data-testid="login-email" />
         <PasswordInput @bind-Value="_password" Label="@T["Password"]" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Password" Required="true" OnKeyDown="OnKey" data-testid="login-password" />
         <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Size="Size.Large" Disabled="_busy" OnClick="SignInAsync" data-testid="primary-action">
             @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }

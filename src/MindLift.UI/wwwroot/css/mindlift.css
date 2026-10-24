@@ -231,3 +231,6 @@ html[dir="rtl"] .ml-nav .mud-nav-link.active { box-shadow:inset -3px 0 0 var(--m
 /* The unread count sits on the bell, not beside it. */
 [data-testid="notification-bell"] .mud-badge.mud-badge-top.mud-badge-right { inset-inline-end: 6px; inset-inline-start: auto; top: 6px; transform: none; }
 [data-testid="notification-bell"] .mud-badge-root { display: inline-flex; }
+
+/* The router moves focus to the page heading on each navigation (for screen readers). It is not something to type in, so it draws no outline. */
+h1[tabindex="-1"]:focus, h1[tabindex="-1"]:focus-visible, [tabindex="-1"]:focus:not(input):not(textarea):not(select):not(button) { outline: none; box-shadow: none; }

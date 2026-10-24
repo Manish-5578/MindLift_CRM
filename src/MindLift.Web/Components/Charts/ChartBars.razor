@@ -1,0 +1,83 @@
+@using System.Globalization
+@* Bars with a hover read-out, and an optional target mark on each bar. *@
+<div class="ch-chart" @onmouseleave="() => _hot = -1" data-testid="bar-chart">
+    <svg viewBox="0 0 @W @H" role="img" aria-label="@Title">
+        <defs>
+            <linearGradient id="@_id" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0" stop-color="@Color" />
+                <stop offset="1" stop-color="@Color" stop-opacity=".45" />
+            </linearGradient>
+        </defs>
+        @for (var g = 0; g <= 4; g++)
+        {
+            var y = Top + (H - Top - Bottom) * g / 4.0;
+            <line class="ch-grid" x1="@Left" x2="@(W - 6)" y1="@F(y)" y2="@F(y)" />
+            @((MarkupString)$"<text class=\"ch-axis\" x=\"{Left - 8}\" y=\"{F(y + 4)}\" text-anchor=\"end\">{Short(Max * (4 - g) / 4m)}</text>")
+        }
+        @for (var i = 0; i < Data.Count; i++)
+        {
+            var idx = i;
+            var x = Left + SlotW * i + SlotW * .2;
+            var bw = SlotW * .6;
+            var h = (H - Top - Bottom) * (double)(Data[i].Value / Max);
+            var y = H - Bottom - h;
+            <g @onmouseenter="() => _hot = idx" @onclick="() => OnPick.InvokeAsync(idx)" style="cursor:@(OnPick.HasDelegate ? "pointer" : "default")">
+                <rect x="@F(Left + SlotW * i)" y="@Top" width="@F(SlotW)" height="@(H - Top - Bottom)" fill="transparent" />
+                <rect class="ch-bar @(_hot == idx ? "is-hot" : "")" x="@F(x)" y="@F(y)" width="@F(bw)" height="@F(Math.Max(h, 2))" rx="@F(Math.Min(8, bw / 2))" fill="url(#@_id)" style="animation-delay:@(i * 35)ms" />
+                @if (Data[i].Target is { } target && target > 0)
+                {
+                    var ty = H - Bottom - (H - Top - Bottom) * (double)Math.Min(1m, target / Max);
+                    <line x1="@F(x - 3)" x2="@F(x + bw + 3)" y1="@F(ty)" y2="@F(ty)" stroke="var(--ml-warning)" stroke-width="2.5" stroke-linecap="round" />
+                }
+            </g>
+            @((MarkupString)$"<text class=\"ch-axis\" x=\"{F(Left + SlotW * i + SlotW / 2)}\" y=\"{H - 6}\" text-anchor=\"middle\">{System.Net.WebUtility.HtmlEncode(Data[i].Label)}</text>")
+        }
+    </svg>
+    @if (_hot >= 0 && _hot < Data.Count)
+    {
+        var d = Data[_hot];
+        <div class="ch-tip" style="left:@F((Left + SlotW * _hot + SlotW / 2) / W * 100)%;top:@F((H - Bottom - (H - Top - Bottom) * (double)(d.Value / Max)) / H * 100)%">
+            <b>@Format(d.Value)</b><small>@d.Label@(d.Target is { } t && t > 0 ? $" · target {Format(t)}" : "")</small>
+        </div>
+    }
+</div>
+
+@code {
+    public sealed record Bar(string Label, decimal Value, decimal? Target = null);
+
+    [Parameter, EditorRequired] public IReadOnlyList<Bar> Data { get; set; } = [];
+    [Parameter] public Func<decimal, string> Format { get; set; } = v => v.ToString("N0", CultureInfo.InvariantCulture);
+    [Parameter] public string Color { get; set; } = "#4F46E5";
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public EventCallback<int> OnPick { get; set; }
+
+    private const int W = 720, H = 260, Left = 44, Top = 12, Bottom = 26;
+    private readonly string _id = "cb" + Guid.NewGuid().ToString("N")[..8];
+    private int _hot = -1;
+
+    private decimal Max
+    {
+        get
+        {
+            var m = Data.Count == 0 ? 0m : Data.Max(d => Math.Max(d.Value, d.Target ?? 0));
+            return m <= 0 ? 1 : Nice(m);
+        }
+    }
+
+    private double SlotW => Data.Count == 0 ? W : (W - Left - 6) / (double)Data.Count;
+
+    /// <summary>Rounds up to a tidy number so the grid lines read well.</summary>
+    private static decimal Nice(decimal v)
+    {
+        var mag = (decimal)Math.Pow(10, Math.Floor(Math.Log10((double)v)));
+        foreach (var step in new[] { 1m, 2m, 2.5m, 5m, 10m })
+        {
+            if (v <= step * mag) return step * mag;
+        }
+
+        return 10 * mag;
+    }
+
+    private static string Short(decimal v) => v >= 1_000_000 ? (v / 1_000_000).ToString("0.#", CultureInfo.InvariantCulture) + "M" : v >= 1000 ? (v / 1000).ToString("0.#", CultureInfo.InvariantCulture) + "k" : v.ToString("0.#", CultureInfo.InvariantCulture);
+    private static string F(double v) => v.ToString("0.##", CultureInfo.InvariantCulture);
+}

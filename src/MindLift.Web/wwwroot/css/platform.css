@@ -472,3 +472,6 @@
 .pc-note--warning .pc-note__icon { background: rgba(245, 158, 11, .17); color: var(--pc-warn); }
 .pc-field { min-width: 0; }
 .pc-field > .pc-input, .pc-field > .pc-select { width: 100%; min-width: 0; }
+
+.pc-act--auth { background: rgba(14, 165, 233, .15); color: #0284C7; }
+.pc-act--audit { background: rgba(139, 92, 246, .15); color: #7C3AED; }

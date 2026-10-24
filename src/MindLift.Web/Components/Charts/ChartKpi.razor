@@ -1,0 +1,38 @@
+@* One headline number with an icon, a ring and the change since the last period. *@
+<div class="ch-kpi @(OnClick.HasDelegate ? "is-click" : "")" style="--c:@Color" @onclick="OnClick" role="@(OnClick.HasDelegate ? "button" : null)" data-testid="@TestId">
+    <div class="ch-kpi__top">
+        <span class="ch-kpi__icon"><MudIcon Icon="@Icon" Size="Size.Small" /></span>
+        <span class="ch-kpi__label">@Label</span>
+    </div>
+    <div class="ch-kpi__row">
+        <div>
+            <div class="ch-kpi__value">@Value</div>
+            @if (Change is { } change)
+            {
+                <span class="ch-trend @(Good ? "is-good" : "is-bad")">@(change >= 0 ? "▲" : "▼") @Math.Abs(change)%</span>
+                <span class="ch-kpi__hint">@Hint</span>
+            }
+            else if (Hint is not null)
+            {
+                <span class="ch-kpi__hint">@Hint</span>
+            }
+        </div>
+        @if (Ring is { } ring)
+        {
+            <ChartRing Value="ring" Color="@Color" Size="58" />
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter, EditorRequired] public string Value { get; set; } = "";
+    [Parameter] public string Icon { get; set; } = Icons.Material.Filled.Insights;
+    [Parameter] public string Color { get; set; } = "#4F46E5";
+    [Parameter] public decimal? Change { get; set; }
+    [Parameter] public bool Good { get; set; } = true;
+    [Parameter] public string? Hint { get; set; }
+    [Parameter] public double? Ring { get; set; }
+    [Parameter] public string? TestId { get; set; }
+    [Parameter] public EventCallback OnClick { get; set; }
+}

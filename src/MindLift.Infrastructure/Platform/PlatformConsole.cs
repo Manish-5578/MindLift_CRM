@@ -261,6 +261,8 @@ public sealed class PlatformConsole(AppDbContext db, ITenantContext tenant, IClo
     public async Task<string> ExportActivityAsync(Guid? companyId, string? kind, string? search, DateTime? from, DateTime? to, CancellationToken cancellationToken = default)
     {
         var rows = await AuditQuery(companyId, kind, search, from, to).OrderByDescending(a => a.CreatedAt).Take(5000).ToListAsync(cancellationToken);
+        await RecordAsync(null, "audit.exported", $"Exported {rows.Count} audit trail row{(rows.Count == 1 ? "" : "s")} as CSV", cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
         static string Cell(string? v)
         {
             v ??= "";

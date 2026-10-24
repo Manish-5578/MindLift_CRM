@@ -10,7 +10,7 @@
     <div>
         <div class="pc-eyebrow">Audit trail</div>
         <h1 class="pc-title">Every change, <span class="pc-grad">on record.</span></h1>
-        <div class="pc-sub">Who changed what, for which company and when. Nothing here can be edited or removed. Filter it, open a row for the detail, or export it.</div>
+        <div class="pc-sub">Everything the platform owner does: sign-ins, onboarding companies, plans, modules, limits and status changes, and exports. Nothing here can be edited or removed.</div>
     </div>
     <button class="pc-btn" @onclick="ExportAsync" data-testid="audit-export"><MudIcon Icon="@Icons.Material.Filled.Download" Size="Size.Small" />Export CSV</button>
 </div>
@@ -95,7 +95,7 @@
 
 @code {
     private const int PageSize = 20;
-    private static readonly Dictionary<string, string> Kinds = new() { [""] = "Everything", ["company"] = "Companies", ["modules"] = "Modules", ["plan"] = "Plans", ["status"] = "Status", ["limits"] = "Limits" };
+    private static readonly Dictionary<string, string> Kinds = new() { [""] = "Everything", ["company"] = "Companies", ["modules"] = "Modules", ["plan"] = "Plans", ["status"] = "Status", ["limits"] = "Limits", ["auth"] = "Sign-ins", ["audit"] = "Exports" };
 
     private PagedResult<PlatformAuditDto>? _page;
     private List<PlatformCompanyDto> _companies = [];
@@ -113,7 +113,7 @@
     private bool Filtered => _kind != "" || _companyId != "" || _from is not null || _to is not null || _search.Trim() != "";
     private string Range => _page is null || _page.Total == 0 ? "0" : $"{(_pageNo - 1) * PageSize + 1}-{Math.Min(_pageNo * PageSize, _page.Total)}";
 
-    private static string Group(string action) => action.Split('.')[0] is var g && g is "modules" or "plan" or "status" or "limits" or "company" ? g : "company";
+    private static string Group(string action) => action.Split('.')[0] is var g && g is "modules" or "plan" or "status" or "limits" or "company" or "auth" or "audit" ? g : "company";
 
     private static string Label(string action) => action switch
     {
@@ -125,6 +125,9 @@
         "status.changed" => "Status",
         "limits.changed" => "Limits",
         "company.created" => "Company onboarded",
+        "auth.signin" => "Signed in",
+        "auth.failed" => "Failed sign-in",
+        "audit.exported" => "Exported trail",
         _ => action
     };
 
