@@ -111,6 +111,19 @@ public sealed class DocumentTypeService(
         return new DocumentAiStatusDto(enabled, true, status.Reachable, status.ModelInstalled, llm.Provider, llm.Model, status.Message);
     }
 
+    /// <summary>Whether the fixed built-in reading rules run before the company's own document types.</summary>
+    public async Task<DocumentBuiltInRulesDto> BuiltInRulesAsync(CancellationToken cancellationToken = default)
+        => new(await db.Set<TenantSettings>().AsNoTracking().Select(t => t.BuiltInDocumentRulesEnabled).FirstOrDefaultAsync(cancellationToken));
+
+    public async Task<DocumentBuiltInRulesDto> SetBuiltInRulesAsync(bool enabled, CancellationToken cancellationToken = default)
+    {
+        var settings = await db.Set<TenantSettings>().FirstOrDefaultAsync(cancellationToken)
+            ?? throw new BusinessRuleException("settings_missing", "The company settings could not be found.");
+        settings.BuiltInDocumentRulesEnabled = enabled;
+        await db.SaveChangesAsync(cancellationToken);
+        return new DocumentBuiltInRulesDto(enabled);
+    }
+
     /// <summary>Switches AI reading on or off for the workspace. It can only be switched on when a model is set up on the server.</summary>
     public async Task<DocumentAiStatusDto> SetAiAsync(bool enabled, CancellationToken cancellationToken = default)
     {

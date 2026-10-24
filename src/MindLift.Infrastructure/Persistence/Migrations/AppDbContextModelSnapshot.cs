@@ -6970,6 +6970,10 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("base_currency");
 
+                    b.Property<bool>("BuiltInDocumentRulesEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("built_in_document_rules_enabled");
+
                     b.Property<string>("CompanyName")
                         .IsRequired()
                         .HasColumnType("text")

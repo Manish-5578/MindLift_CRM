@@ -234,8 +234,12 @@ public sealed class DocumentOcrService(
         DateOnly? docExpiry = null;
         DateOnly? docIssue = null;
 
+        // The fixed rules below are optional: a company can switch them off (Settings > Document types) and read only with its own types.
+        var builtInRules = await db.Set<TenantSettings>().AsNoTracking().Select(t => t.BuiltInDocumentRulesEnabled).FirstOrDefaultAsync(ct);
+        var mrz = builtInRules ? MrzParser.Parse(rawText) : null;
+        if (builtInRules)
+        {
         // A. Check for Passport MRZ
-        var mrz = MrzParser.Parse(rawText);
         if (mrz != null)
         {
             detectedCategory = "Passport";
@@ -365,6 +369,7 @@ public sealed class DocumentOcrService(
                     }
                 }
             }
+        }
         }
 
         sw.Stop();

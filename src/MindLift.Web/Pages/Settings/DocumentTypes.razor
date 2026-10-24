@@ -15,6 +15,11 @@
     </PageHeader>
     <SettingsNav Current="/settings/document-types" />
 
+    <MlCard Title="Built-in reading rules" Subtitle="Fixed rules that recognise passports, trade licences, Emirates IDs and invoices before your document types are tried. Switch them off to read only with the types below.">
+        <MudSwitch T="bool" Value="_builtIn" ValueChanged="SetBuiltInAsync" Color="Color.Primary" Disabled="_busy"
+                   Label="@(_builtIn ? T["Built-in rules are on"] : T["Built-in rules are off"])" data-testid="builtin-toggle" />
+    </MlCard>
+
     <!-- AI reading: off until switched on; says whether the model can be reached -->
     <MlCard Title="Read documents with AI" Subtitle="A language model on your own computer finds the values you define, from the words you describe them in. Nothing is sent outside." Class="mb-4" TestId="ai-card">
         @if (_ai is null)
@@ -309,8 +314,38 @@
         }
     }
 
+    private bool _builtIn = true;
+
+    private async Task SetBuiltInAsync(bool enabled)
+    {
+        _busy = true;
+        try
+        {
+            var response = await Http.PutAsJsonAsync("api/v1/settings/document-types/built-in-rules", new DocumentBuiltInRulesDto(enabled));
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add(await ProblemText.FromAsync(response, T["We could not change this setting."]), Severity.Error);
+                return;
+            }
+
+            _builtIn = enabled;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
     private async Task LoadAiAsync()
     {
+        try
+        {
+            _builtIn = (await Http.GetFromJsonAsync<DocumentBuiltInRulesDto>("api/v1/settings/document-types/built-in-rules"))?.Enabled ?? true;
+        }
+        catch (HttpRequestException)
+        {
+        }
+
         try
         {
             _ai = await Http.GetFromJsonAsync<DocumentAiStatusDto>("api/v1/settings/document-types/ai");

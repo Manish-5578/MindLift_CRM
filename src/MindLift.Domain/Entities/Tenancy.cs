@@ -123,6 +123,9 @@ public sealed class TenantSettings : TenantEntity
     /// <summary>When true, documents are also read by a language model that finds the fields each document type defines. Off by default: the text is sent to the model.</summary>
     public bool AiReadingEnabled { get; set; }
 
+    /// <summary>When true (the default) the fixed reading rules for passports, trade licences, Emirates IDs and invoices run before the company's own document types. Switch off to read only with the types in Settings.</summary>
+    public bool BuiltInDocumentRulesEnabled { get; set; } = true;
+
     /// <summary>ISO 4217 codes the tenant can use besides the base currency.</summary>
     public string[] EnabledCurrencies { get; set; } = [];
 }

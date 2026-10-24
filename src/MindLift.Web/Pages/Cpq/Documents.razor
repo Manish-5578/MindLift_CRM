@@ -106,14 +106,14 @@
                 <MudTextField @bind-Value="_searchQuery" Placeholder="@T["Search by file name, vendor, invoice #..."]" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.Search" Immediate="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="min-width:280px" />
                 <MudSelect T="string" @bind-Value="_categoryFilter" Placeholder="@T["All Categories"]" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="min-width:160px">
                     <MudSelectItem T="string" Value="@("")">@T["All Categories"]</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Invoice")">@T["Invoice"]</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Contract")">@T["Contract"]</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Receipt")">@T["Receipt"]</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Identity")">@T["Identity"]</MudSelectItem>
                     <MudSelectItem T="string" Value="@("General")">@T["General"]</MudSelectItem>
                     @foreach (var type in _types)
                     {
                         <MudSelectItem T="string" Value="@type.Key">@type.Name</MudSelectItem>
+                    }
+                    @foreach (var other in OtherCategories)
+                    {
+                        <MudSelectItem T="string" Value="@other">@other</MudSelectItem>
                     }
                 </MudSelect>
             </div>
@@ -525,6 +525,9 @@
             _types = [];
         }
     }
+
+    // Categories on documents that are neither "General" nor one of the company's types (older documents, or a type since removed) stay filterable.
+    private IEnumerable<string> OtherCategories => _documents.Select(d => d.Category).Where(c => !string.IsNullOrWhiteSpace(c) && c != "General" && _types.All(t => t.Key != c)).Distinct().Order();
 
     private string TypeName(string category) => _types.FirstOrDefault(t => t.Key == category)?.Name ?? category;
 

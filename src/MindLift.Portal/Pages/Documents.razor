@@ -20,11 +20,10 @@
         <MudSelect T="string" @bind-Value="_category" Variant="Variant.Outlined" Margin="Margin.Dense"
                    Class="pt-filters__cat" SelectedValuesChanged="OnCategoryChanged" id="doc-category">
             <MudSelectItem Value='@("")'>@T["docs.allCategories"]</MudSelectItem>
-            <MudSelectItem Value='@("Contract")'>Contract</MudSelectItem>
-            <MudSelectItem Value='@("Invoice")'>Invoice</MudSelectItem>
-            <MudSelectItem Value='@("Receipt")'>Receipt</MudSelectItem>
-            <MudSelectItem Value='@("Identity")'>Identity</MudSelectItem>
-            <MudSelectItem Value='@("General")'>General</MudSelectItem>
+            @foreach (var category in _categories.Order())
+            {
+                <MudSelectItem Value='@category'>@category</MudSelectItem>
+            }
         </MudSelect>
     </div>
 
@@ -80,6 +79,7 @@
     private bool _loading = true;
     private string _search = string.Empty;
     private string _category = string.Empty;
+    private readonly HashSet<string> _categories = ["General"];
 
     protected override async Task LoadAsync()
     {
@@ -88,6 +88,10 @@
         {
             var q = $"documents?category={Uri.EscapeDataString(_category)}&search={Uri.EscapeDataString(_search)}";
             _docs = await Http.GetFromJsonAsync<List<BusinessDocumentDto>>(Api(q)) ?? [];
+            foreach (var doc in _docs)
+            {
+                if (!string.IsNullOrWhiteSpace(doc.Category)) _categories.Add(doc.Category);
+            }
         }
         catch (HttpRequestException)
         {

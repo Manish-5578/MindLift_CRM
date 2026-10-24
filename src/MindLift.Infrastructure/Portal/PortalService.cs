@@ -687,7 +687,7 @@ public sealed class PortalService(
             contentType,
             size,
             bytes,
-            "Identity",
+            "General",
             req.AccountId ?? accountId,
             req.DealId,
             null,

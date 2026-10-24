@@ -103,6 +103,8 @@ public sealed record DocumentAiStatusDto(bool Enabled, bool Configured, bool Rea
 
 public sealed record SaveDocumentAiRequest(bool Enabled);
 
+public sealed record DocumentBuiltInRulesDto(bool Enabled);
+
 /// <summary>An active document type as a choice on upload and review: its key and name.</summary>
 public sealed record DocumentTypeChoiceDto(string Key, string Name);
 

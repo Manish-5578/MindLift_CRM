@@ -34,6 +34,16 @@ public sealed class DocumentTypesController(DocumentTypeService types) : Control
     public async Task<ActionResult<DocumentTypeDto>> Update(Guid id, [FromBody] SaveDocumentTypeRequest request, CancellationToken cancellationToken)
         => Ok(await types.SaveAsync(id, request, cancellationToken));
 
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
+    [HttpGet("built-in-rules")]
+    public async Task<ActionResult<DocumentBuiltInRulesDto>> BuiltInRules(CancellationToken cancellationToken)
+        => Ok(await types.BuiltInRulesAsync(cancellationToken));
+
+    [HasPermission(AppModule.Settings, PermissionAction.Edit)]
+    [HttpPut("built-in-rules")]
+    public async Task<ActionResult<DocumentBuiltInRulesDto>> SetBuiltInRules([FromBody] DocumentBuiltInRulesDto request, CancellationToken cancellationToken)
+        => Ok(await types.SetBuiltInRulesAsync(request.Enabled, cancellationToken));
+
     /// <summary>Whether AI reading is on for this workspace and whether the model can be reached.</summary>
     [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("ai")]
