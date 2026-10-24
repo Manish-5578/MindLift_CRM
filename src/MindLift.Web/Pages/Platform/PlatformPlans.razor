@@ -1,5 +1,6 @@
 @page "/platform/plans"
 @layout PlatformLayout
+@inject Translator T
 @inject HttpClient Http
 @inject ISnackbar Snackbar
 
@@ -7,16 +8,16 @@
 
 <div class="pc-head pc-rise">
     <div>
-        <div class="pc-eyebrow">Pricing</div>
-        <h1 class="pc-title">Plans</h1>
-        <div class="pc-sub">Shape what each plan costs, how much it allows and which modules it includes. A change reaches every company on the plan at once.</div>
+        <div class="pc-eyebrow">@T["Pricing"]</div>
+        <h1 class="pc-title">@T["Plans"]</h1>
+        <div class="pc-sub">@T["Shape what each plan costs, how much it allows and which modules it includes. A change reaches every company on the plan at once."]</div>
     </div>
     <div class="d-flex align-center" style="gap:14px;flex-wrap:wrap">
         @if (_plans is not null)
         {
-            <div class="pc-card" style="padding:12px 20px"><div class="pc-card__hint">Monthly revenue from active companies</div><div class="pc-num" style="font-size:24px;font-weight:800" data-testid="mrr">@Pc.Money(Mrr)</div></div>
+            <div class="pc-card" style="padding:12px 20px"><div class="pc-card__hint">@T["Monthly revenue from active companies"]</div><div class="pc-num" style="font-size:24px;font-weight:800" data-testid="mrr">@Pc.Money(Mrr)</div></div>
         }
-        <button class="pc-btn pc-btn--primary" @onclick="OpenNew" data-testid="new-plan"><MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Small" />New plan</button>
+        <button class="pc-btn pc-btn--primary" @onclick="OpenNew" data-testid="new-plan"><MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Small" />@T["New plan"]</button>
     </div>
 </div>
 
@@ -32,7 +33,7 @@ else
             var plan = p;
             var count = plan.IncludedModules?.Count ?? _switchable.Count;
             <div class="pc-card pc-plan pc-interactive pc-rise @(_editId == plan.Id ? "is-current" : "")" @onclick="() => Edit(plan)" data-testid="plan-card-@plan.Key">
-                @if (!plan.IsActive) { <div class="pc-plan__ribbon" style="background:#94A3B8">Retired</div> }
+                @if (!plan.IsActive) { <div class="pc-plan__ribbon" style="background:#94A3B8">@T["Retired"]</div> }
                 <div class="pc-card__title" style="font-size:18px">@plan.Name</div>
                 @if (!string.IsNullOrWhiteSpace(plan.Description)) { <div class="pc-card__hint" style="margin-top:4px">@plan.Description</div> }
                 <div class="pc-plan__price pc-num">@(plan.Currency == "USD" ? Pc.Money(plan.PriceMonthly) : $"{plan.Currency} {plan.PriceMonthly:N0}")<small> / month</small></div>
@@ -43,7 +44,7 @@ else
                     <li><MudIcon Icon="@Icons.Material.Filled.Widgets" /><span data-testid="plan-modules-@plan.Key">@(count >= _switchable.Count ? "Every module" : count + " of " + _switchable.Count + " modules")</span></li>
                     <li><MudIcon Icon="@Icons.Material.Filled.Apartment" />@plan.Companies compan@(plan.Companies == 1 ? "y" : "ies")</li>
                 </ul>
-                <div style="margin-top:20px"><span class="pc-card__hint">Click to edit</span></div>
+                <div style="margin-top:20px"><span class="pc-card__hint">@T["Click to edit"]</span></div>
             </div>
         }
     </div>
@@ -54,25 +55,25 @@ else
     <div class="pc-slide" data-testid="plan-editor">
         <div class="pc-slide__scrim" @onclick="Close"></div>
         <div class="pc-slide__panel" style="width:min(560px,100vw)">
-            <div class="pc-slide__head"><div class="pc-card__title" style="font-size:18px">@(_editId is null ? "New plan" : "Edit " + _title)</div><button class="pc-btn pc-btn--icon pc-btn--ghost" @onclick="Close" aria-label="Close"><MudIcon Icon="@Icons.Material.Filled.Close" /></button></div>
+            <div class="pc-slide__head"><div class="pc-card__title" style="font-size:18px">@(_editId is null ? "New plan" : "Edit " + _title)</div><button class="pc-btn pc-btn--icon pc-btn--ghost" @onclick="Close" aria-label="@T["Close"]"><MudIcon Icon="@Icons.Material.Filled.Close" /></button></div>
             <div class="pc-slide__body">
-                <div class="pc-field"><label for="plan-name">Name</label><input id="plan-name" class="pc-input" @bind="_name" data-testid="plan-name" /></div>
-                <div class="pc-field"><label for="plan-desc">Description</label><input id="plan-desc" class="pc-input" placeholder="Who this plan is for" @bind="_description" data-testid="plan-description" /></div>
+                <div class="pc-field"><label for="plan-name">@T["Name"]</label><input id="plan-name" class="pc-input" @bind="_name" data-testid="plan-name" /></div>
+                <div class="pc-field"><label for="plan-desc">@T["Description"]</label><input id="plan-desc" class="pc-input" placeholder="@T["Who this plan is for"]" @bind="_description" data-testid="plan-description" /></div>
                 <div class="d-flex" style="gap:12px">
-                    <div class="pc-field" style="flex:1"><label for="plan-users">Users allowed</label><input id="plan-users" class="pc-input" type="number" min="1" @bind="_users" data-testid="plan-users" /></div>
-                    <div class="pc-field" style="flex:1"><label for="plan-records">Records allowed</label><input id="plan-records" class="pc-input" type="number" min="1" @bind="_records" data-testid="plan-records" /></div>
-                    <div class="pc-field" style="flex:1"><label for="plan-price">Price / month</label><input id="plan-price" class="pc-input" type="number" min="0" step="1" @bind="_price" data-testid="plan-price" /></div>
+                    <div class="pc-field" style="flex:1"><label for="plan-users">@T["Users allowed"]</label><input id="plan-users" class="pc-input" type="number" min="1" @bind="_users" data-testid="plan-users" /></div>
+                    <div class="pc-field" style="flex:1"><label for="plan-records">@T["Records allowed"]</label><input id="plan-records" class="pc-input" type="number" min="1" @bind="_records" data-testid="plan-records" /></div>
+                    <div class="pc-field" style="flex:1"><label for="plan-price">@T["Price / month"]</label><input id="plan-price" class="pc-input" type="number" min="0" step="1" @bind="_price" data-testid="plan-price" /></div>
                 </div>
                 <div class="d-flex" style="gap:12px">
-                    <div class="pc-field" style="flex:1"><label for="plan-yearly">Price / year</label><input id="plan-yearly" class="pc-input" type="number" min="0" step="1" placeholder="@($"Ten months: {_price * 10:N0}")" @bind="_priceYearly" data-testid="plan-yearly" /></div>
-                    <div class="pc-field" style="flex:1"><label for="plan-currency">Currency</label><input id="plan-currency" class="pc-input" maxlength="3" @bind="_currency" data-testid="plan-currency" /></div>
+                    <div class="pc-field" style="flex:1"><label for="plan-yearly">@T["Price / year"]</label><input id="plan-yearly" class="pc-input" type="number" min="0" step="1" placeholder="@($"Ten months: {_price * 10:N0}")" @bind="_priceYearly" data-testid="plan-yearly" /></div>
+                    <div class="pc-field" style="flex:1"><label for="plan-currency">@T["Currency"]</label><input id="plan-currency" class="pc-input" maxlength="3" @bind="_currency" data-testid="plan-currency" /></div>
                 </div>
-                <label class="d-flex align-center" style="gap:12px;cursor:pointer"><input type="checkbox" @bind="_active" style="width:18px;height:18px;accent-color:#6366F1" data-testid="plan-active" />Offer this plan to new companies</label>
+                <label class="d-flex align-center" style="gap:12px;cursor:pointer"><input type="checkbox" @bind="_active" style="width:18px;height:18px;accent-color:#6366F1" data-testid="plan-active" />@T["Offer this plan to new companies"]</label>
 
                 <div>
                     <div class="d-flex align-center justify-space-between" style="margin-bottom:10px">
-                        <div class="pc-card__title">Modules in this plan <span class="pc-chip pc-chip--brand" data-testid="plan-module-count">@_included.Count of @_switchable.Count</span></div>
-                        <div class="d-flex" style="gap:6px"><button class="pc-btn pc-btn--sm" @onclick="AllModules" data-testid="plan-all">All</button><button class="pc-btn pc-btn--sm" @onclick="NoModules" data-testid="plan-none">None</button></div>
+                        <div class="pc-card__title">@T["Modules in this plan"] <span class="pc-chip pc-chip--brand" data-testid="plan-module-count">@_included.Count of @_switchable.Count</span></div>
+                        <div class="d-flex" style="gap:6px"><button class="pc-btn pc-btn--sm" @onclick="AllModules" data-testid="plan-all">@T["All"]</button><button class="pc-btn pc-btn--sm" @onclick="NoModules" data-testid="plan-none">@T["None"]</button></div>
                     </div>
                     <div class="pc-checks">
                         @foreach (var m in _switchable)
@@ -84,7 +85,7 @@ else
                             </label>
                         }
                     </div>
-                    <div class="pc-card__hint" style="margin-top:8px">Core modules (Dashboard, Users, Settings) are always included.</div>
+                    <div class="pc-card__hint" style="margin-top:8px">@T["Core modules (Dashboard, Users, Settings) are always included."]</div>
                 </div>
                 @if (_error is not null) { <div style="color:var(--pc-bad);font-weight:600" data-testid="plan-error">@_error</div> }
             </div>
@@ -93,7 +94,7 @@ else
                 {
                     <button class="pc-btn pc-btn--danger" style="margin-inline-end:auto" @onclick="DeleteAsync" data-testid="plan-delete"><MudIcon Icon="@Icons.Material.Filled.DeleteOutline" Size="Size.Small" />@(_confirmDelete ? "Really delete?" : "Delete")</button>
                 }
-                <button class="pc-btn" @onclick="Close">Cancel</button>
+                <button class="pc-btn" @onclick="Close">@T["Cancel"]</button>
                 <button class="pc-btn pc-btn--primary" @onclick="SaveAsync" data-testid="plan-save">@(_editId is null ? "Create plan" : "Save plan")</button>
             </div>
         </div>

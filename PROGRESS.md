@@ -823,3 +823,12 @@ Test totals: 373 unit, 143 UI component, 231 integration (747 in all), all passi
 - [x] Company data export (ZIP, signed download link) and permanent removal by the platform owner.
 - [x] Read-only, time-limited, recorded support view for the platform owner.
 - See docs/OPERATIONS.md.
+
+## Product gaps closed (2026-10-24)
+
+- [x] Tickets: a help desk (numbers, priority and answer times, assign, reply or note, email the customer, resolve), list and conversation screens, summary numbers.
+- [x] Campaigns: audience from leads or contacts, merge fields, test send, send now or later, tracked opens and clicks, unsubscribes, results with charts.
+- [x] Calendar sync: Google and Microsoft (two way: meetings out, busy times in, which block booking), and a calendar feed (.ics). Needs each service's client id and secret.
+- [x] Arabic OCR: high-accuracy model, Arabic-only second reading, right-to-left word order, digits and direction marks cleaned. Measured: 89% of characters on a clean page, 92% on a poor scan (test pages in tests/.../Fixtures).
+- [x] Arabic for the platform console (right to left, language switch).
+- [x] Dashboard widgets draw again, with charts.

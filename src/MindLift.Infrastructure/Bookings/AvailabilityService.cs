@@ -112,7 +112,18 @@ public sealed class AvailabilityService(AppDbContext db, IClock clock)
                 && a.DueAt < to && (a.EndAt == null ? a.DueAt.Value.AddHours(1) > from : a.EndAt > from))
             .Select(a => new { a.OwnerId, Start = a.DueAt!.Value, a.EndAt })
             .ToListAsync(cancellationToken);
-        return meetings.GroupBy(m => m.OwnerId).ToDictionary(g => g.Key, g => g.Select(m => (m.Start, m.EndAt ?? m.Start + DefaultMeeting)).ToList());
+        var busy = meetings.GroupBy(m => m.OwnerId).ToDictionary(g => g.Key, g => g.Select(m => (m.Start, m.EndAt ?? m.Start + DefaultMeeting)).ToList());
+
+        // What is already taken in the person's connected Google or Microsoft calendar blocks the same times.
+        var external = await db.ExternalBusyBlocks.AsNoTracking()
+            .Where(b => people.Contains(b.UserId) && b.StartAt < to && b.EndAt > from).Select(b => new { b.UserId, b.StartAt, b.EndAt }).ToListAsync(cancellationToken);
+        foreach (var g in external.GroupBy(b => b.UserId))
+        {
+            if (!busy.TryGetValue(g.Key, out var list)) busy[g.Key] = list = [];
+            list.AddRange(g.Select(b => (b.StartAt, b.EndAt)));
+        }
+
+        return busy;
     }
 
     private static bool IsFree(Dictionary<Guid, List<(DateTime Start, DateTime End)>> busy, Guid person, DateTime from, DateTime to)

@@ -1,9 +1,10 @@
 @implements IDisposable
+@inject Translator T
 @inject PlatformNotifier Notifier
 @inject NavigationManager Nav
 
 <div class="pc-bell">
-    <button class="pc-btn pc-btn--icon" @onclick="Toggle" aria-label="Notifications" data-testid="bell">
+    <button class="pc-btn pc-btn--icon" @onclick="Toggle" aria-label="@T["Notifications"]" data-testid="bell">
         <MudIcon Icon="@(Notifier.Unread > 0 ? Icons.Material.Filled.NotificationsActive : Icons.Material.Filled.Notifications)" />
     </button>
     @if (Notifier.Unread > 0)
@@ -15,15 +16,15 @@
     {
         <div class="pc-pop" data-testid="bell-panel">
             <div class="pc-pop__head">
-                <b>Notifications</b>
+                <b>@T["Notifications"]</b>
                 <div class="d-flex" style="gap:6px">
-                    <button class="pc-btn pc-btn--sm pc-btn--ghost" @onclick="Notifier.MarkAllReadAsync" data-testid="mark-all-read">Mark all read</button>
-                    <a class="pc-btn pc-btn--sm" href="/platform/notifications" @onclick="() => _open = false">See all</a>
+                    <button class="pc-btn pc-btn--sm pc-btn--ghost" @onclick="Notifier.MarkAllReadAsync" data-testid="mark-all-read">@T["Mark all read"]</button>
+                    <a class="pc-btn pc-btn--sm" href="/platform/notifications" @onclick="() => _open = false">@T["See all"]</a>
                 </div>
             </div>
             @if (Notifier.Items.Count == 0)
             {
-                <div class="pc-empty" style="padding:36px 16px"><MudIcon Icon="@Icons.Material.Filled.CheckCircle" Style="color:#10B981;font-size:40px" /><div style="margin-top:8px;font-weight:650">You are all caught up</div></div>
+                <div class="pc-empty" style="padding:36px 16px"><MudIcon Icon="@Icons.Material.Filled.CheckCircle" Style="color:#10B981;font-size:40px" /><div style="margin-top:8px;font-weight:650">@T["You are all caught up"]</div></div>
             }
             @foreach (var n in Notifier.Items.Take(8))
             {

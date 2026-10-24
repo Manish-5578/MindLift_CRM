@@ -1,5 +1,6 @@
 @inherits LayoutComponentBase
 @implements IDisposable
+@inject Translator T
 @inject AuthSession Session
 @inject AppState App
 @inject HttpClient Http
@@ -12,27 +13,28 @@
 <MudSnackbarProvider />
 
 <CascadingValue Value="_isDark" Name="IsDarkMode">
-<div class="pc" data-testid="platform-console">
+<MudRTLProvider RightToLeft="T.IsArabic">
+<div class="pc" data-testid="platform-console" dir="@(T.IsArabic ? "rtl" : "ltr")">
     @if (Session.Me is { IsPlatformAdmin: true } me)
     {
         <div class="pc-shell @(_collapsed ? "is-collapsed" : "")">
-            <aside class="pc-rail @(_navOpen ? "is-open" : "")" aria-label="Platform navigation">
+            <aside class="pc-rail @(_navOpen ? "is-open" : "")" aria-label="@T["Platform navigation"]">
                 <div class="pc-brand">
                     <div class="pc-brand__mark">M</div>
                     <div>
-                        <div class="pc-brand__name">MindLift</div>
-                        <div class="pc-brand__sub">Platform console</div>
+                        <div class="pc-brand__name">@T["MindLift"]</div>
+                        <div class="pc-brand__sub">@T["Platform console"]</div>
                     </div>
                 </div>
 
-                <div class="pc-rail__label">Command centre</div>
+                <div class="pc-rail__label">@T["Command centre"]</div>
                 <nav class="pc-nav" @onclick="CloseNav">
-                    <NavLink href="/platform" Match="NavLinkMatch.All"><MudIcon Icon="@Icons.Material.Filled.AutoGraph" />Overview</NavLink>
-                    <NavLink href="/platform/companies"><MudIcon Icon="@Icons.Material.Filled.Apartment" />Companies</NavLink>
-                    <NavLink href="/platform/modules"><MudIcon Icon="@Icons.Material.Filled.Widgets" />Modules</NavLink>
-                    <NavLink href="/platform/plans"><MudIcon Icon="@Icons.Material.Filled.Diamond" />Plans</NavLink>
-                    <NavLink href="/platform/activity"><MudIcon Icon="@Icons.Material.Filled.History" />Audit trail</NavLink>
-                    <NavLink href="/platform/notifications"><MudIcon Icon="@Icons.Material.Filled.Notifications" />Notifications</NavLink>
+                    <NavLink href="/platform" Match="NavLinkMatch.All"><MudIcon Icon="@Icons.Material.Filled.AutoGraph" />@T["Overview"]</NavLink>
+                    <NavLink href="/platform/companies"><MudIcon Icon="@Icons.Material.Filled.Apartment" />@T["Companies"]</NavLink>
+                    <NavLink href="/platform/modules"><MudIcon Icon="@Icons.Material.Filled.Widgets" />@T["Modules"]</NavLink>
+                    <NavLink href="/platform/plans"><MudIcon Icon="@Icons.Material.Filled.Diamond" />@T["Plans"]</NavLink>
+                    <NavLink href="/platform/activity"><MudIcon Icon="@Icons.Material.Filled.History" />@T["Audit trail"]</NavLink>
+                    <NavLink href="/platform/notifications"><MudIcon Icon="@Icons.Material.Filled.Notifications" />@T["Notifications"]</NavLink>
                 </nav>
 
                 <div class="pc-rail__foot">
@@ -40,7 +42,7 @@
                         <PcAvatar Name="@me.FullName" Size="38" />
                         <div style="min-width:0">
                             <div class="pc-owner__name">@me.FullName</div>
-                            <div class="pc-owner__role">Platform owner</div>
+                            <div class="pc-owner__role">@T["Platform owner"]</div>
                         </div>
                     </div>
                 </div>
@@ -53,11 +55,11 @@
 
             <div class="pc-main">
                 <header class="pc-top">
-                    <button class="pc-btn pc-btn--icon pc-btn--ghost pc-menu-btn" @onclick="ToggleNav" aria-label="Show or hide the menu" data-testid="platform-menu"><MudIcon Icon="@Icons.Material.Filled.Menu" /></button>
+                    <button class="pc-btn pc-btn--icon pc-btn--ghost pc-menu-btn" @onclick="ToggleNav" aria-label="@T["Show or hide the menu"]" data-testid="platform-menu"><MudIcon Icon="@Icons.Material.Filled.Menu" /></button>
 
                     <div class="pc-search">
                         <MudIcon Icon="@Icons.Material.Filled.Search" Class="pc-search__icon" />
-                        <input type="search" placeholder="Search companies by name or address" data-testid="platform-search" autocomplete="off"
+                        <input type="search" placeholder="@T["Search companies by name or address"]" data-testid="platform-search" autocomplete="off"
                                @bind="Query" @bind:event="oninput" @onkeydown="OnSearchKey" @onfocus="() => _searchOpen = true" />
                         @if (_searchOpen && !string.IsNullOrWhiteSpace(_query))
                         {
@@ -83,13 +85,14 @@
 
                     <span style="flex:1"></span>
                     <PlatformBell />
-                    <button class="pc-btn pc-btn--icon" @onclick="ToggleDark" aria-label="Switch light or dark" data-testid="platform-theme">
+                    <button class="pc-btn" @onclick="ToggleLanguage" aria-label="Language" data-testid="platform-language">@(T.IsArabic ? "English" : "العربية")</button>
+                    <button class="pc-btn pc-btn--icon" @onclick="ToggleDark" aria-label="@T["Switch light or dark"]" data-testid="platform-theme">
                         <MudIcon Icon="@(_isDark ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)" />
                     </button>
-                    <button class="pc-btn" @onclick="SignOut" data-testid="platform-signout"><MudIcon Icon="@Icons.Material.Filled.Logout" Size="Size.Small" />Sign out</button>
+                    <button class="pc-btn" @onclick="SignOut" data-testid="platform-signout"><MudIcon Icon="@Icons.Material.Filled.Logout" Size="Size.Small" />@T["Sign out"]</button>
                 </header>
 
-                <main class="pc-content">@Body</main>
+                <main class="pc-content"><div @key="T.Language">@Body</div></main>
             </div>
         </div>
     }
@@ -97,20 +100,21 @@
     {
         <div class="pc-empty" style="padding-top:18vh" data-testid="platform-denied">
             <div class="pc-empty__art"><MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Large" /></div>
-            <h2 style="margin:0 0 8px">This area is for the platform owner</h2>
-            <p>Your account manages a company, not the platform.</p>
-            <a class="pc-btn pc-btn--primary" href="/">Back to my workspace</a>
+            <h2 style="margin:0 0 8px">@T["This area is for the platform owner"]</h2>
+            <p>@T["Your account manages a company, not the platform."]</p>
+            <a class="pc-btn pc-btn--primary" href="/">@T["Back to my workspace"]</a>
         </div>
     }
     else
     {
         <div class="pc-empty" style="padding-top:18vh">
             <div class="pc-empty__art"><MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Large" /></div>
-            <h2 style="margin:0 0 8px">Sign in to continue</h2>
-            <a class="pc-btn pc-btn--primary" href="/login">Sign in</a>
+            <h2 style="margin:0 0 8px">@T["Sign in to continue"]</h2>
+            <a class="pc-btn pc-btn--primary" href="/login">@T["Sign in"]</a>
         </div>
     }
 </div>
+</MudRTLProvider>
 </CascadingValue>
 
 @code {
@@ -135,6 +139,7 @@
 
     protected override void OnInitialized()
     {
+        T.Changed += OnLanguageChanged;
         Session.Changed += StateHasChanged;
         Nav.LocationChanged += OnLocation;
     }
@@ -144,6 +149,8 @@
         if (!firstRender) return;
         // The console remembers whether its owner prefers light or dark; it opens dark the first time.
         var saved = await Safe(() => JS.InvokeAsync<string?>("localStorage.getItem", "pc.theme").AsTask());
+        await LanguagePreference.ApplySavedAsync(JS, T);
+        await LanguagePreference.ApplyDirectionAsync(JS, T);
         _isDark = saved != "light";
         await JS.InvokeVoidAsync("mindlift.setTheme", _isDark ? "dark" : "light");
         StateHasChanged();
@@ -187,6 +194,19 @@
 
     private void Open(Guid id) => Nav.NavigateTo($"/platform/companies/{id}");
 
+    private void OnLanguageChanged()
+    {
+        _ = LanguagePreference.ApplyDirectionAsync(JS, T);
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ToggleLanguage()
+    {
+        var next = T.IsArabic ? "en" : "ar";
+        await JS.InvokeVoidAsync("mindlift.setLanguage", next);
+        T.Choose(next);
+    }
+
     private async Task ToggleDark()
     {
         _isDark = !_isDark;
@@ -204,6 +224,7 @@
 
     public void Dispose()
     {
+        T.Changed -= OnLanguageChanged;
         Session.Changed -= StateHasChanged;
         Nav.LocationChanged -= OnLocation;
         _searchCts?.Cancel();

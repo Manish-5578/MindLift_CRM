@@ -1,5 +1,6 @@
 @page "/platform/companies"
 @layout PlatformLayout
+@inject Translator T
 @inject HttpClient Http
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
@@ -8,54 +9,54 @@
 
 <div class="pc-head pc-rise">
     <div>
-        <div class="pc-eyebrow">Customers</div>
-        <h1 class="pc-title">Companies</h1>
-        <div class="pc-sub">Every company on MindLift: who they are, what they use and how healthy the account is. Open one to choose its modules and limits.</div>
+        <div class="pc-eyebrow">@T["Customers"]</div>
+        <h1 class="pc-title">@T["Companies"]</h1>
+        <div class="pc-sub">@T["Every company on MindLift: who they are, what they use and how healthy the account is. Open one to choose its modules and limits."]</div>
     </div>
     <div class="d-flex align-center" style="gap:12px;flex-wrap:wrap">
-    <button class="pc-btn pc-btn--primary" @onclick="OpenNew" data-testid="new-company"><MudIcon Icon="@Icons.Material.Filled.AddBusiness" Size="Size.Small" />New company</button>
-    <div class="pc-seg" role="group" aria-label="Layout">
-        <button class="@(_cards ? "is-on" : "")" @onclick="() => _cards = true" data-testid="view-cards"><MudIcon Icon="@Icons.Material.Filled.GridView" Size="Size.Small" />Cards</button>
-        <button class="@(!_cards ? "is-on" : "")" @onclick="() => _cards = false" data-testid="view-table"><MudIcon Icon="@Icons.Material.Filled.TableRows" Size="Size.Small" />Table</button>
+    <button class="pc-btn pc-btn--primary" @onclick="OpenNew" data-testid="new-company"><MudIcon Icon="@Icons.Material.Filled.AddBusiness" Size="Size.Small" />@T["New company"]</button>
+    <div class="pc-seg" role="group" aria-label="@T["Layout"]">
+        <button class="@(_cards ? "is-on" : "")" @onclick="() => _cards = true" data-testid="view-cards"><MudIcon Icon="@Icons.Material.Filled.GridView" Size="Size.Small" />@T["Cards"]</button>
+        <button class="@(!_cards ? "is-on" : "")" @onclick="() => _cards = false" data-testid="view-table"><MudIcon Icon="@Icons.Material.Filled.TableRows" Size="Size.Small" />@T["Table"]</button>
     </div>
     </div>
 </div>
 
 <div class="d-flex align-center flex-wrap pc-rise" style="gap:14px;margin-bottom:22px;--i:1">
     <div class="pc-seg" data-testid="status-filter">
-        <button class="@(_status == "" ? "is-on" : "")" @onclick='() => SetStatus("")'>All <span class="n">@(_list?.Statuses.Sum(s => s.Value) ?? 0)</span></button>
+        <button class="@(_status == "" ? "is-on" : "")" @onclick='() => SetStatus("")'>@T["All"] <span class="n">@(_list?.Statuses.Sum(s => s.Value) ?? 0)</span></button>
         @foreach (var s in _list?.Statuses ?? [])
         {
             var key = s.Key;
             <button class="@(_status == key ? "is-on" : "")" @onclick="() => SetStatus(key)" data-testid="status-@key">@Pc.StatusLabel(s.Key) <span class="n">@s.Value</span></button>
         }
     </div>
-    <div class="pc-seg" data-testid="activity-filter" title="Signed in during the last 30 days">
-        <button class="@(_activity == "" ? "is-on" : "")" @onclick='() => SetActivity("")'>Any activity</button>
-        <button class="@(_activity == "active" ? "is-on" : "")" @onclick='() => SetActivity("active")' data-testid="activity-active">Active <span class="n">@(_list?.ActiveCount ?? 0)</span></button>
-        <button class="@(_activity == "inactive" ? "is-on" : "")" @onclick='() => SetActivity("inactive")' data-testid="activity-inactive">Inactive <span class="n">@(_list?.InactiveCount ?? 0)</span></button>
+    <div class="pc-seg" data-testid="activity-filter" title="@T["Signed in during the last 30 days"]">
+        <button class="@(_activity == "" ? "is-on" : "")" @onclick='() => SetActivity("")'>@T["Any activity"]</button>
+        <button class="@(_activity == "active" ? "is-on" : "")" @onclick='() => SetActivity("active")' data-testid="activity-active">@T["Active"] <span class="n">@(_list?.ActiveCount ?? 0)</span></button>
+        <button class="@(_activity == "inactive" ? "is-on" : "")" @onclick='() => SetActivity("inactive")' data-testid="activity-inactive">@T["Inactive"] <span class="n">@(_list?.InactiveCount ?? 0)</span></button>
     </div>
-    <select class="pc-select" @onchange="OnPlan" data-testid="plan-filter" aria-label="Plan">
-        <option value="">Any plan</option>
+    <select class="pc-select" @onchange="OnPlan" data-testid="plan-filter" aria-label="@T["Plan"]">
+        <option value="">@T["Any plan"]</option>
         @foreach (var p in _list?.Plans ?? [])
         {
             <option value="@p.Key" selected="@(_plan == p.Key)">@p.Label (@p.Value)</option>
         }
     </select>
-    <select class="pc-select" @onchange="OnSort" data-testid="sort" aria-label="Sort">
-        <option value="name">Sort: Name</option>
-        <option value="newest">Sort: Newest</option>
-        <option value="active">Sort: Last active</option>
-        <option value="users">Sort: Most users</option>
-        <option value="records">Sort: Most records</option>
-        <option value="health">Sort: Needs care first</option>
+    <select class="pc-select" @onchange="OnSort" data-testid="sort" aria-label="@T["Sort"]">
+        <option value="name">@T["Sort: Name"]</option>
+        <option value="newest">@T["Sort: Newest"]</option>
+        <option value="active">@T["Sort: Last active"]</option>
+        <option value="users">@T["Sort: Most users"]</option>
+        <option value="records">@T["Sort: Most records"]</option>
+        <option value="health">@T["Sort: Needs care first"]</option>
     </select>
-    <input class="pc-input" style="min-width:240px" placeholder="Filter by name" data-testid="company-filter" @bind="Search" @bind:event="oninput" />
+    <input class="pc-input" style="min-width:240px" placeholder="@T["Filter by name"]" data-testid="company-filter" @bind="Search" @bind:event="oninput" />
 </div>
 
 @if (_error is not null)
 {
-    <div class="pc-card pc-empty"><h3>@_error</h3><button class="pc-btn" @onclick="LoadAsync">Try again</button></div>
+    <div class="pc-card pc-empty"><h3>@_error</h3><button class="pc-btn" @onclick="LoadAsync">@T["Try again"]</button></div>
 }
 else if (_list is null)
 {
@@ -65,8 +66,8 @@ else if (_list.Items.Count == 0)
 {
     <div class="pc-card pc-empty" data-testid="no-companies">
         <div class="pc-empty__art"><MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" /></div>
-        <h3 style="margin:0 0 6px">No company matches</h3>
-        <div>Try another word or clear the filters.</div>
+        <h3 style="margin:0 0 6px">@T["No company matches"]</h3>
+        <div>@T["Try another word or clear the filters."]</div>
     </div>
 }
 else if (_cards)
@@ -90,12 +91,12 @@ else if (_cards)
                     <div class="d-flex align-center" style="gap:8px;margin-top:12px;flex-wrap:wrap">
                         <PcStatusPill Status="@company.Status" />
                         <span class="pc-chip pc-chip--plan-@company.PlanKey">@company.PlanName</span>
-                        @if (!company.AiAllowed) { <span class="pc-chip">No AI</span> }
+                        @if (!company.AiAllowed) { <span class="pc-chip">@T["No AI"]</span> }
                     </div>
                     <div class="pc-co__stats">
-                        <div class="pc-co__stat"><b class="pc-num">@company.Users</b><span>Users</span></div>
-                        <div class="pc-co__stat"><b class="pc-num">@Pc.Num(company.Leads + company.Contacts + company.Accounts + company.Deals)</b><span>Records</span></div>
-                        <div class="pc-co__stat"><b class="pc-num">@company.Documents</b><span>Documents</span></div>
+                        <div class="pc-co__stat"><b class="pc-num">@company.Users</b><span>@T["Users"]</span></div>
+                        <div class="pc-co__stat"><b class="pc-num">@Pc.Num(company.Leads + company.Contacts + company.Accounts + company.Deals)</b><span>@T["Records"]</span></div>
+                        <div class="pc-co__stat"><b class="pc-num">@company.Documents</b><span>@T["Documents"]</span></div>
                     </div>
                     <div class="pc-co__foot">
                         <div class="pc-dots" title="@company.ModulesEnabled of @company.ModulesTotal modules">
@@ -112,7 +113,7 @@ else
 {
     <div class="pc-card pc-card--flush" style="overflow-x:auto">
         <table class="pc-table" data-testid="company-table">
-            <thead><tr><th>Company</th><th>Status</th><th>Plan</th><th>Users</th><th>Records</th><th>Modules</th><th>Last active</th><th class="end">Health</th></tr></thead>
+            <thead><tr><th>@T["Company"]</th><th>@T["Status"]</th><th>@T["Plan"]</th><th>@T["Users"]</th><th>@T["Records"]</th><th>@T["Modules"]</th><th>@T["Last active"]</th><th class="end">@T["Health"]</th></tr></thead>
             <tbody>
             @foreach (var c in _list.Items)
             {
@@ -145,35 +146,35 @@ else
     <div class="pc-slide" data-testid="new-company-panel">
         <div class="pc-slide__scrim" @onclick="() => _new = null"></div>
         <div class="pc-slide__panel">
-            <div class="pc-slide__head"><div class="pc-card__title" style="font-size:18px">Onboard a company</div><button class="pc-btn pc-btn--icon pc-btn--ghost" @onclick="() => _new = null" aria-label="Close"><MudIcon Icon="@Icons.Material.Filled.Close" /></button></div>
+            <div class="pc-slide__head"><div class="pc-card__title" style="font-size:18px">@T["Onboard a company"]</div><button class="pc-btn pc-btn--icon pc-btn--ghost" @onclick="() => _new = null" aria-label="@T["Close"]"><MudIcon Icon="@Icons.Material.Filled.Close" /></button></div>
             <div class="pc-slide__body">
-                <div class="pc-field"><label for="nc-name">Company name</label><input id="nc-name" class="pc-input" @bind="_new.CompanyName" data-testid="nc-name" /></div>
+                <div class="pc-field"><label for="nc-name">@T["Company name"]</label><input id="nc-name" class="pc-input" @bind="_new.CompanyName" data-testid="nc-name" /></div>
                 <div class="d-flex" style="gap:12px">
-                    <div class="pc-field" style="flex:1"><label for="nc-first">Owner first name</label><input id="nc-first" class="pc-input" @bind="_new.First" data-testid="nc-first" /></div>
-                    <div class="pc-field" style="flex:1"><label for="nc-last">Owner last name</label><input id="nc-last" class="pc-input" @bind="_new.Last" data-testid="nc-last" /></div>
+                    <div class="pc-field" style="flex:1"><label for="nc-first">@T["Owner first name"]</label><input id="nc-first" class="pc-input" @bind="_new.First" data-testid="nc-first" /></div>
+                    <div class="pc-field" style="flex:1"><label for="nc-last">@T["Owner last name"]</label><input id="nc-last" class="pc-input" @bind="_new.Last" data-testid="nc-last" /></div>
                 </div>
-                <div class="pc-field"><label for="nc-email">Owner email (their sign-in)</label><input id="nc-email" type="email" class="pc-input" @bind="_new.Email" data-testid="nc-email" /></div>
+                <div class="pc-field"><label for="nc-email">@T["Owner email (their sign-in)"]</label><input id="nc-email" type="email" class="pc-input" @bind="_new.Email" data-testid="nc-email" /></div>
                 <div class="pc-field">
-                    <label for="nc-password">First password</label>
-                    <div class="d-flex" style="gap:8px"><input id="nc-password" class="pc-input" style="flex:1" @bind="_new.Password" data-testid="nc-password" /><button class="pc-btn" type="button" @onclick="GeneratePassword" data-testid="nc-generate">Generate</button></div>
-                    <small>Share it with them. They can change it after signing in. At least 8 characters.</small>
+                    <label for="nc-password">@T["First password"]</label>
+                    <div class="d-flex" style="gap:8px"><input id="nc-password" class="pc-input" style="flex:1" @bind="_new.Password" data-testid="nc-password" /><button class="pc-btn" type="button" @onclick="GeneratePassword" data-testid="nc-generate">@T["Generate"]</button></div>
+                    <small>@T["Share it with them. They can change it after signing in. At least 8 characters."]</small>
                 </div>
                 <div class="d-flex" style="gap:12px">
-                    <div class="pc-field" style="flex:1"><label for="nc-plan">Plan</label>
+                    <div class="pc-field" style="flex:1"><label for="nc-plan">@T["Plan"]</label>
                         <select id="nc-plan" class="pc-select" @bind="_new.Plan" data-testid="nc-plan">@foreach (var p in _list?.Plans ?? []) { <option value="@p.Key">@p.Label</option> }</select></div>
-                    <div class="pc-field" style="flex:1"><label for="nc-status">Starts as</label>
-                        <select id="nc-status" class="pc-select" @bind="_new.Status" data-testid="nc-status"><option value="Trial">On trial (14 days)</option><option value="Active">Active</option></select></div>
+                    <div class="pc-field" style="flex:1"><label for="nc-status">@T["Starts as"]</label>
+                        <select id="nc-status" class="pc-select" @bind="_new.Status" data-testid="nc-status"><option value="Trial">@T["On trial (14 days)"]</option><option value="Active">@T["Active"]</option></select></div>
                 </div>
                 <div class="d-flex" style="gap:12px">
-                    <div class="pc-field" style="flex:1"><label for="nc-country">Country (2 letters)</label><input id="nc-country" class="pc-input" maxlength="2" @bind="_new.Country" data-testid="nc-country" /></div>
-                    <div class="pc-field" style="flex:1"><label for="nc-preset">Modules</label>
-                        <select id="nc-preset" class="pc-select" @bind="_new.Preset" data-testid="nc-preset"><option value="">Full suite</option><option value="sales">Sales CRM</option><option value="sales-billing">Sales &amp; billing</option><option value="documents">Document operations</option><option value="minimal">Minimal</option></select>
-                        <small>You can fine-tune each module on the company page afterwards.</small></div>
+                    <div class="pc-field" style="flex:1"><label for="nc-country">@T["Country (2 letters)"]</label><input id="nc-country" class="pc-input" maxlength="2" @bind="_new.Country" data-testid="nc-country" /></div>
+                    <div class="pc-field" style="flex:1"><label for="nc-preset">@T["Modules"]</label>
+                        <select id="nc-preset" class="pc-select" @bind="_new.Preset" data-testid="nc-preset"><option value="">@T["Full suite"]</option><option value="sales">@T["Sales CRM"]</option><option value="sales-billing">@T["Sales & billing"]</option><option value="documents">@T["Document operations"]</option><option value="minimal">@T["Minimal"]</option></select>
+                        <small>@T["You can fine-tune each module on the company page afterwards."]</small></div>
                 </div>
                 @if (_newError is not null) { <div style="color:var(--pc-bad);font-weight:600" data-testid="nc-error">@_newError</div> }
             </div>
             <div class="pc-slide__foot">
-                <button class="pc-btn" @onclick="() => _new = null">Cancel</button>
+                <button class="pc-btn" @onclick="() => _new = null">@T["Cancel"]</button>
                 <button class="pc-btn pc-btn--primary" @onclick="CreateAsync" disabled="@_creating" data-testid="nc-save"><MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />@(_creating ? "Creating" : "Create company")</button>
             </div>
         </div>

@@ -1,0 +1,164 @@
+@page "/tickets"
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject AppState App
+@inject Translator T
+
+<PageTitle>@T["Tickets"] · MindLift</PageTitle>
+
+<div class="ml-page">
+    <PageHeader Title="Support tickets" Subtitle="Customer requests, who looks after them, and how quickly they are answered.">
+        <Actions>
+            @if (App.CanCreate(AppModule.Tickets))
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenNew" data-testid="primary-action">@T["New ticket"]</MudButton>
+            }
+        </Actions>
+    </PageHeader>
+
+    @if (_summary is { } s)
+    {
+        <div class="ch-kpis" data-testid="ticket-summary">
+            <ChartKpi Label="@T["Open"]" Value="@s.Open.ToString("N0")" Icon="@Icons.Material.Filled.Inbox" Color="#2563EB" OnClick="@(() => Filter("open"))" TestId="kpi-open" />
+            <ChartKpi Label="@T["Waiting for customer"]" Value="@s.Pending.ToString("N0")" Icon="@Icons.Material.Filled.HourglassTop" Color="#F59E0B" OnClick="@(() => Filter("pending"))" />
+            <ChartKpi Label="@T["Late"]" Value="@s.Late.ToString("N0")" Icon="@Icons.Material.Filled.AlarmOn" Color="#DC2626" Hint="@T["past their answer time"]" OnClick="@(() => Filter("late"))" TestId="kpi-late" />
+            <ChartKpi Label="@T["Unassigned"]" Value="@s.Unassigned.ToString("N0")" Icon="@Icons.Material.Filled.PersonOff" Color="#8B5CF6" OnClick="@(() => Filter("unassigned"))" />
+            <ChartKpi Label="@T["Average first answer"]" Value="@(s.AverageFirstResponseHours is { } h ? $"{h:0.#} h" : "-")" Icon="@Icons.Material.Filled.Speed" Color="#10B981" Hint="@T["{0} resolved this week", s.ResolvedLast7Days]" />
+        </div>
+    }
+
+    <MlCard Flush="true" TestId="tickets-list">
+        <div class="d-flex flex-wrap align-center gap-2" style="padding:14px 16px;border-bottom:1px solid var(--ml-border)">
+            <MudChipSet T="string" SelectedValue="_filter" SelectedValueChanged="Filter" CheckMark="false">
+                @foreach (var f in Filters)
+                {
+                    <MudChip T="string" Value="@f.Key" Size="Size.Small" Color="Color.Primary" Variant="@(_filter == f.Key ? Variant.Filled : Variant.Outlined)" data-testid="@($"tf-{f.Key}")">@T[f.Value]</MudChip>
+                }
+            </MudChipSet>
+            <span style="flex:1"></span>
+            <MudTextField @bind-Value="_search" Immediate="true" DebounceInterval="300" OnDebounceIntervalElapsed="Reload" Placeholder="@T["Search tickets"]" Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Style="max-width:280px" data-testid="ticket-search" />
+        </div>
+
+        @if (_loading)
+        {
+            <div style="padding:16px"><SkeletonTable Rows="6" Columns="5" /></div>
+        }
+        else if (_page is null)
+        {
+            <ErrorState OnRetry="LoadAsync" />
+        }
+        else if (_page.Items.Count == 0)
+        {
+            <EmptyState Title="No tickets here" Message="Tickets you open or that are assigned to you appear here." />
+        }
+        else
+        {
+            <MudSimpleTable Hover="true" Dense="false" Style="background:transparent">
+                <thead><tr><th>@T["Ticket"]</th><th>@T["Customer"]</th><th>@T["Priority"]</th><th>@T["Status"]</th><th>@T["Assigned to"]</th><th>@T["Answer due"]</th></tr></thead>
+                <tbody>
+                    @foreach (var t in _page.Items)
+                    {
+                        var ticket = t;
+                        <tr style="cursor:pointer" @onclick="@(() => Nav.NavigateTo($"/tickets/{ticket.Id}"))" data-testid="ticket-row">
+                            <td><b>@ticket.Number</b> <span style="margin-inline-start:6px">@ticket.Subject</span></td>
+                            <td>@(ticket.ContactName ?? ticket.AccountName ?? "-")</td>
+                            <td><MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="@PriorityColor(ticket.Priority)">@T[ticket.Priority]</MudChip></td>
+                            <td>@T[ticket.Status]</td>
+                            <td>@(ticket.AssigneeName ?? "-")</td>
+                            <td>@if (ticket.DueAt is { } due && ticket.Status is "open" or "pending")
+                                {
+                                    <span style="@(ticket.IsLate ? "color:var(--ml-error);font-weight:700" : "")">@due.ToLocalTime().ToString("dd MMM HH:mm")@(ticket.IsLate ? " " + T["(late)"] : "")</span>
+                                }</td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+            <div class="d-flex justify-space-between align-center" style="padding:10px 16px">
+                <MudText Typo="Typo.caption" Class="ml-muted">@T["{0} tickets", _page.Total]</MudText>
+                <MudPagination Count="@((int)Math.Ceiling(_page.Total / (double)PageSize))" Selected="_pageNo" SelectedChanged="GoAsync" Size="Size.Small" />
+            </div>
+        }
+    </MlCard>
+</div>
+
+<FormDrawer Open="_open" OpenChanged="v => _open = v" Title="@T["New ticket"]" SubmitText="@T["Open ticket"]" Busy="_busy" OnSubmit="CreateAsync">
+    <div class="ml-stack">
+        <MudTextField @bind-Value="_subject" Label="@T["Subject *"]" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" data-testid="ticket-subject" />
+        <MudTextField @bind-Value="_description" Label="@T["What happened"]" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="4" Immediate="true" data-testid="ticket-description" />
+        <MudSelect T="string" @bind-Value="_priority" Label="@T["Priority"]" Variant="Variant.Outlined" Margin="Margin.Dense">
+            @foreach (var p in TicketPriorities.All) { <MudSelectItem T="string" Value="@p">@T[p]</MudSelectItem> }
+        </MudSelect>
+        <RecordPicker Search="@((text, ct) => RecordLookups.ContactsAsync(Http, text, ct))" Label="@T["Customer (contact)"]" Value="_contactId" Text="@_contactName" ValueChanged="v => _contactId = v" />
+        <MudSelect T="Guid?" @bind-Value="_assigneeId" Label="@T["Assign to"]" Variant="Variant.Outlined" Margin="Margin.Dense">
+            <MudSelectItem T="Guid?" Value="(Guid?)null">@T["Nobody yet"]</MudSelectItem>
+            @foreach (var u in _users) { <MudSelectItem T="Guid?" Value="@u.Id">@u.FullName</MudSelectItem> }
+        </MudSelect>
+        @if (_error is not null) { <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert> }
+    </div>
+</FormDrawer>
+
+@code {
+    private const int PageSize = 25;
+    private static readonly Dictionary<string, string> Filters = new() { ["all"] = "All", ["mine"] = "Mine", ["open"] = "Open", ["pending"] = "Waiting", ["late"] = "Late", ["unassigned"] = "Unassigned", ["resolved"] = "Resolved" };
+
+    private PagedResult<TicketListItemDto>? _page;
+    private TicketSummaryDto? _summary;
+    private List<UserListItem> _users = [];
+    private string _filter = "open";
+    private string _search = "";
+    private int _pageNo = 1;
+    private bool _loading = true, _open, _busy;
+    private string? _error, _subject, _description, _priority = "normal", _contactName;
+    private Guid? _contactId, _assigneeId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _users = await RecordLookups.UsersAsync(Http);
+        await LoadAsync();
+    }
+
+    private TicketQuery Query() => new(
+        Search: string.IsNullOrWhiteSpace(_search) ? null : _search.Trim(),
+        Status: _filter is "open" or "pending" or "resolved" ? _filter : null,
+        MineOnly: _filter == "mine",
+        LateOnly: _filter == "late",
+        UnassignedOnly: _filter == "unassigned",
+        Page: _pageNo, PageSize: PageSize);
+
+    private async Task LoadAsync()
+    {
+        _loading = _page is null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/v1/tickets/query", Query());
+            _page = response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<PagedResult<TicketListItemDto>>() : null;
+            _summary = await Http.GetFromJsonAsync<TicketSummaryDto>("api/v1/tickets/summary");
+        }
+        catch (HttpRequestException) { _page = null; }
+        finally { _loading = false; }
+    }
+
+    private async Task Filter(string key) { _filter = key ?? "all"; _pageNo = 1; await LoadAsync(); }
+    private async Task Reload() { _pageNo = 1; await LoadAsync(); }
+    private async Task GoAsync(int page) { _pageNo = page; await LoadAsync(); }
+
+    private void OpenNew() { _subject = _description = _error = _contactName = null; _priority = "normal"; _contactId = _assigneeId = null; _open = true; }
+
+    private async Task CreateAsync()
+    {
+        _busy = true; _error = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/v1/tickets", new SaveTicketRequest(_subject ?? "", _description, _priority, null, _contactId, null, _assigneeId));
+            if (!response.IsSuccessStatusCode) { _error = await ProblemText.FromAsync(response, T["We could not open the ticket."]); return; }
+            var ticket = (await response.Content.ReadFromJsonAsync<TicketDto>())!;
+            _open = false;
+            Nav.NavigateTo($"/tickets/{ticket.Id}");
+        }
+        finally { _busy = false; }
+    }
+
+    private static Color PriorityColor(string p) => p switch { "urgent" => Color.Error, "high" => Color.Warning, "low" => Color.Default, _ => Color.Info };
+}

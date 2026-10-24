@@ -17,7 +17,7 @@ public sealed class SystemSeedService(IAppDbContext db)
         AppModule.Dashboard, AppModule.Leads, AppModule.Contacts, AppModule.Accounts, AppModule.Deals,
         AppModule.Activities, AppModule.Calendar, AppModule.Communication, AppModule.Reports,
         AppModule.Notifications, AppModule.Users, AppModule.Settings, AppModule.Documents,
-        AppModule.Products, AppModule.Quotations, AppModule.Invoices,
+        AppModule.Products, AppModule.Quotations, AppModule.Invoices, AppModule.Tickets, AppModule.Campaigns,
     ];
 
     /// <summary>Record modules where Staff and Manager can create and edit.</summary>
@@ -25,7 +25,7 @@ public sealed class SystemSeedService(IAppDbContext db)
     [
         AppModule.Leads, AppModule.Contacts, AppModule.Accounts, AppModule.Deals,
         AppModule.Activities, AppModule.Calendar, AppModule.Communication, AppModule.Documents,
-        AppModule.Products, AppModule.Quotations, AppModule.Invoices,
+        AppModule.Products, AppModule.Quotations, AppModule.Invoices, AppModule.Tickets,
     ];
 
     public async Task SeedTenantAsync(Guid tenantId, CancellationToken cancellationToken = default)

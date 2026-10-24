@@ -210,7 +210,15 @@ public sealed class DocumentPageReader(IOcrEngine ocr, IOptions<OcrOptions> opti
             }
         }
 
-        return string.Join("\n", lines.Select(l => string.Join(" ", l.OrderBy(w => w.Left).Select(w => w.Text))));
+        // A line of Arabic (or Hebrew) is read from its right edge, so its words are put in that order. Latin lines run left to right as before.
+        // Direction marks and Arabic-Indic digits are cleaned, so the text can be searched and its numbers read.
+        return string.Join("\n", lines.Select(l =>
+        {
+            var rightToLeft = ArabicText.RunsRightToLeft(string.Join(" ", l.Select(w => w.Text)));
+            var ordered = (rightToLeft ? l.OrderByDescending(w => w.Left) : l.OrderBy(w => w.Left)).Select(w => ArabicText.Clean(w.Text));
+            var line = string.Join(" ", ordered);
+            return rightToLeft ? ArabicText.FixLine(line) : line;
+        }));
     }
 
     private static void TryDelete(string path)

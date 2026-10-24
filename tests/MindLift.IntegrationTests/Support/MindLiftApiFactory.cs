@@ -8,7 +8,7 @@ using MindLift.Application.Abstractions;
 namespace MindLift.IntegrationTests.Support;
 
 /// <summary>An email captured by the test host instead of being sent.</summary>
-public sealed record SentEmail(string To, string Subject, string Body, IReadOnlyList<EmailAttachment>? Attachments = null);
+public sealed record SentEmail(string To, string Subject, string Body, IReadOnlyList<EmailAttachment>? Attachments = null, string? Html = null);
 
 /// <summary>Records emails so tests can read invitation and reset links.</summary>
 public sealed class RecordingEmailSender : IEmailSender
@@ -18,6 +18,12 @@ public sealed class RecordingEmailSender : IEmailSender
     public Task SendAsync(string to, string subject, string textBody, CancellationToken cancellationToken = default)
     {
         Sent.Enqueue(new SentEmail(to, subject, textBody));
+        return Task.CompletedTask;
+    }
+
+    public Task SendHtmlAsync(string to, string subject, string textBody, string htmlBody, CancellationToken cancellationToken = default)
+    {
+        Sent.Enqueue(new SentEmail(to, subject, textBody, Html: htmlBody));
         return Task.CompletedTask;
     }
 

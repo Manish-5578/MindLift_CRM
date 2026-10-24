@@ -1,6 +1,7 @@
 @page "/platform/notifications"
 @layout PlatformLayout
 @implements IDisposable
+@inject Translator T
 @inject PlatformNotifier Notifier
 @inject NavigationManager Nav
 
@@ -8,23 +9,23 @@
 
 <div class="pc-head pc-rise">
     <div>
-        <div class="pc-eyebrow">Inbox</div>
-        <h1 class="pc-title">Notifications</h1>
-        <div class="pc-sub">New companies from the last two weeks, and companies that need a look: overdue payments, trials ending, seats nearly used, accounts gone quiet.</div>
+        <div class="pc-eyebrow">@T["Inbox"]</div>
+        <h1 class="pc-title">@T["Notifications"]</h1>
+        <div class="pc-sub">@T["New companies from the last two weeks, and companies that need a look: overdue payments, trials ending, seats nearly used, accounts gone quiet."]</div>
     </div>
     <div class="d-flex" style="gap:10px">
         <div class="pc-seg">
-            <button class="@(!_unreadOnly ? "is-on" : "")" @onclick="() => _unreadOnly = false" data-testid="notes-all">All <span class="n">@Notifier.Items.Count</span></button>
-            <button class="@(_unreadOnly ? "is-on" : "")" @onclick="() => _unreadOnly = true" data-testid="notes-unread">Unread <span class="n">@Notifier.Unread</span></button>
+            <button class="@(!_unreadOnly ? "is-on" : "")" @onclick="() => _unreadOnly = false" data-testid="notes-all">@T["All"] <span class="n">@Notifier.Items.Count</span></button>
+            <button class="@(_unreadOnly ? "is-on" : "")" @onclick="() => _unreadOnly = true" data-testid="notes-unread">@T["Unread"] <span class="n">@Notifier.Unread</span></button>
         </div>
-        <button class="pc-btn" @onclick="Notifier.MarkAllReadAsync" data-testid="notes-mark-all"><MudIcon Icon="@Icons.Material.Filled.DoneAll" Size="Size.Small" />Mark all read</button>
+        <button class="pc-btn" @onclick="Notifier.MarkAllReadAsync" data-testid="notes-mark-all"><MudIcon Icon="@Icons.Material.Filled.DoneAll" Size="Size.Small" />@T["Mark all read"]</button>
     </div>
 </div>
 
 <div class="pc-card pc-card--flush pc-rise" data-testid="notes-list">
     @if (Shown.Count == 0)
     {
-        <div class="pc-empty"><div class="pc-empty__art"><MudIcon Icon="@Icons.Material.Filled.NotificationsNone" Size="Size.Large" /></div><h3 style="margin:0 0 6px">@(_unreadOnly ? "Nothing unread" : "Nothing yet")</h3><div>New companies and problems show up here.</div></div>
+        <div class="pc-empty"><div class="pc-empty__art"><MudIcon Icon="@Icons.Material.Filled.NotificationsNone" Size="Size.Large" /></div><h3 style="margin:0 0 6px">@(_unreadOnly ? "Nothing unread" : "Nothing yet")</h3><div>@T["New companies and problems show up here."]</div></div>
     }
     @foreach (var n in Shown)
     {

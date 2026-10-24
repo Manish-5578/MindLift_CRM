@@ -86,6 +86,14 @@ public sealed class AppState(HttpClient http, AuthSession session, Translator tr
         return setting is { IsEnabled: true } && permission is { CanView: true };
     }
 
+    /// <summary>True when the module is enabled and the user may create records in it.</summary>
+    public bool CanCreate(AppModule module) => CanView(module) && Permission(module)?.CanCreate == true;
+
+    /// <summary>True when the module is enabled and the user may change records in it.</summary>
+    public bool CanEdit(AppModule module) => CanView(module) && Permission(module)?.CanEdit == true;
+
+    private ModulePermissionDto? Permission(AppModule module) => Bootstrap?.Permissions.FirstOrDefault(p => p.Module == module.ToString());
+
     public string ModuleLabel(AppModule module, bool plural = true)
     {
         var setting = Bootstrap?.Modules.FirstOrDefault(m => m.Module == module.ToString());

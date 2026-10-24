@@ -1,5 +1,6 @@
 @page "/platform/companies/{Id:guid}"
 @layout PlatformLayout
+@inject Translator T
 @inject HttpClient Http
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
@@ -7,13 +8,13 @@
 
 <PageTitle>@(_d?.Company.Name ?? "Company") · MindLift platform</PageTitle>
 
-<a class="pc-back" href="/platform/companies"><MudIcon Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Small" />All companies</a>
+<a class="pc-back" href="/platform/companies"><MudIcon Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Small" />@T["All companies"]</a>
 
 @if (_notFound)
 {
     <div class="pc-card pc-empty" data-testid="company-missing">
         <div class="pc-empty__art"><MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" /></div>
-        <h3 style="margin:0">That company does not exist</h3>
+        <h3 style="margin:0">@T["That company does not exist"]</h3>
     </div>
 }
 else if (_d is null)
@@ -40,12 +41,12 @@ else
             </div>
             <div class="pc-hero__right">
                 <div style="text-align:center">
-                    <PcRing Value="c.Health" Size="72" Color="#fff" Title="Health score" />
-                    <div style="font-size:11px;opacity:.85;margin-top:4px;font-weight:650">HEALTH</div>
+                    <PcRing Value="c.Health" Size="72" Color="#fff" Title="@T["Health score"]" />
+                    <div style="font-size:11px;opacity:.85;margin-top:4px;font-weight:650">@T["HEALTH"]</div>
                 </div>
-                <button class="pc-btn" @onclick="() => _supportOpen = true" data-testid="support-open"><MudIcon Icon="@Icons.Material.Filled.SupportAgent" Size="Size.Small" />Support view</button>
+                <button class="pc-btn" @onclick="() => _supportOpen = true" data-testid="support-open"><MudIcon Icon="@Icons.Material.Filled.SupportAgent" Size="Size.Small" />@T["Support view"]</button>
                 <div style="position:relative">
-                    <button class="pc-btn" @onclick="() => _statusOpen = !_statusOpen" data-testid="status-menu"><MudIcon Icon="@Icons.Material.Filled.Tune" Size="Size.Small" />Status</button>
+                    <button class="pc-btn" @onclick="() => _statusOpen = !_statusOpen" data-testid="status-menu"><MudIcon Icon="@Icons.Material.Filled.Tune" Size="Size.Small" />@T["Status"]</button>
                     @if (_statusOpen)
                     {
                         <div class="pc-search__panel" style="inset-inline-start:auto;inset-inline-end:0;min-width:190px;top:46px;color:var(--pc-text)">
@@ -66,58 +67,58 @@ else
         <div class="pc-slide" data-testid="support-panel">
             <div class="pc-slide__scrim" @onclick="() => _supportOpen = false"></div>
             <div class="pc-slide__panel">
-                <div class="pc-slide__head"><div class="pc-card__title" style="font-size:18px">Support view of @c.Name</div><button class="pc-btn pc-btn--icon pc-btn--ghost" @onclick="() => _supportOpen = false" aria-label="Close"><MudIcon Icon="@Icons.Material.Filled.Close" /></button></div>
+                <div class="pc-slide__head"><div class="pc-card__title" style="font-size:18px">Support view of @c.Name</div><button class="pc-btn pc-btn--icon pc-btn--ghost" @onclick="() => _supportOpen = false" aria-label="@T["Close"]"><MudIcon Icon="@Icons.Material.Filled.Close" /></button></div>
                 <div class="pc-slide__body">
-                    <div class="pc-card__hint">You will see the workspace as its owner sees it, in a new tab, for up to 30 minutes. It is read-only: nothing can be changed. Your reason, and every page you look at, is recorded in the audit trail.</div>
-                    <div class="pc-field"><label for="support-reason">Why do you need to look?</label><textarea id="support-reason" class="pc-textarea" style="min-height:90px" @bind="_supportReason" @bind:event="oninput" placeholder="For example: the customer says the lead list is empty" data-testid="support-reason"></textarea></div>
+                    <div class="pc-card__hint">@T["You will see the workspace as its owner sees it, in a new tab, for up to 30 minutes. It is read-only: nothing can be changed. Your reason, and every page you look at, is recorded in the audit trail."]</div>
+                    <div class="pc-field"><label for="support-reason">@T["Why do you need to look?"]</label><textarea id="support-reason" class="pc-textarea" style="min-height:90px" @bind="_supportReason" @bind:event="oninput" placeholder="@T["For example: the customer says the lead list is empty"]" data-testid="support-reason"></textarea></div>
                 </div>
                 <div class="pc-slide__foot">
-                    <button class="pc-btn" @onclick="() => _supportOpen = false">Cancel</button>
-                    <button class="pc-btn pc-btn--primary" disabled="@((_supportReason ?? "").Trim().Length < 5 || _saving)" @onclick="StartSupportAsync" data-testid="support-start-button">Open support view</button>
+                    <button class="pc-btn" @onclick="() => _supportOpen = false">@T["Cancel"]</button>
+                    <button class="pc-btn pc-btn--primary" disabled="@((_supportReason ?? "").Trim().Length < 5 || _saving)" @onclick="StartSupportAsync" data-testid="support-start-button">@T["Open support view"]</button>
                 </div>
             </div>
         </div>
     }
 
     <div class="pc-tabs" role="tablist" data-testid="company-tabs">
-        <button role="tab" class="@Tab("overview")" @onclick='() => _tab = "overview"' data-testid="tab-overview"><MudIcon Icon="@Icons.Material.Filled.Dashboard" Size="Size.Small" />Overview</button>
-        <button role="tab" class="@Tab("modules")" @onclick='() => _tab = "modules"' data-testid="tab-modules"><MudIcon Icon="@Icons.Material.Filled.Widgets" Size="Size.Small" />Modules <span class="pc-chip pc-chip--brand">@(ModulesOn)/@(Switchable.Count + CoreCount)</span></button>
-        <button role="tab" class="@Tab("plan")" @onclick='() => _tab = "plan"' data-testid="tab-plan"><MudIcon Icon="@Icons.Material.Filled.Diamond" Size="Size.Small" />Plan &amp; limits</button>
-        <button role="tab" class="@Tab("billing")" @onclick="OpenBillingAsync" data-testid="tab-billing"><MudIcon Icon="@Icons.Material.Filled.ReceiptLong" Size="Size.Small" />Billing</button>
-        <button role="tab" class="@Tab("data")" @onclick="OpenDataAsync" data-testid="tab-data"><MudIcon Icon="@Icons.Material.Filled.Storage" Size="Size.Small" />Data</button>
-        <button role="tab" class="@Tab("history")" @onclick='() => _tab = "history"' data-testid="tab-history"><MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small" />History</button>
+        <button role="tab" class="@Tab("overview")" @onclick='() => _tab = "overview"' data-testid="tab-overview"><MudIcon Icon="@Icons.Material.Filled.Dashboard" Size="Size.Small" />@T["Overview"]</button>
+        <button role="tab" class="@Tab("modules")" @onclick='() => _tab = "modules"' data-testid="tab-modules"><MudIcon Icon="@Icons.Material.Filled.Widgets" Size="Size.Small" />@T["Modules"] <span class="pc-chip pc-chip--brand">@(ModulesOn)/@(Switchable.Count + CoreCount)</span></button>
+        <button role="tab" class="@Tab("plan")" @onclick='() => _tab = "plan"' data-testid="tab-plan"><MudIcon Icon="@Icons.Material.Filled.Diamond" Size="Size.Small" />@T["Plan & limits"]</button>
+        <button role="tab" class="@Tab("billing")" @onclick="OpenBillingAsync" data-testid="tab-billing"><MudIcon Icon="@Icons.Material.Filled.ReceiptLong" Size="Size.Small" />@T["Billing"]</button>
+        <button role="tab" class="@Tab("data")" @onclick="OpenDataAsync" data-testid="tab-data"><MudIcon Icon="@Icons.Material.Filled.Storage" Size="Size.Small" />@T["Data"]</button>
+        <button role="tab" class="@Tab("history")" @onclick='() => _tab = "history"' data-testid="tab-history"><MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small" />@T["History"]</button>
     </div>
 
     @if (_tab == "overview")
     {
         <div class="pc-grid pc-grid--kpi">
-            <PcKpi ShowZero="true" Index="0" Label="Users" Value="c.Users" Icon="@Icons.Material.Filled.Groups" Solid="#6366F1"><Foot>@c.ActiveUsers7d signed in this week</Foot></PcKpi>
-            <PcKpi ShowZero="true" Index="1" Label="Leads and contacts" Value="c.Leads + c.Contacts" Icon="@Icons.Material.Filled.Contacts" Solid="#06B6D4"><Foot>@c.Leads leads · @c.Contacts contacts</Foot></PcKpi>
-            <PcKpi ShowZero="true" Index="2" Label="Accounts and deals" Value="c.Accounts + c.Deals" Icon="@Icons.Material.Filled.Handshake" Solid="#10B981"><Foot>@c.Accounts accounts · @c.Deals deals</Foot></PcKpi>
-            <PcKpi ShowZero="true" Index="3" Label="Documents" Value="c.Documents" Icon="@Icons.Material.Filled.DocumentScanner" Solid="#F59E0B"><Foot>@(c.AiAllowed ? (c.AiEnabled ? "AI reading is on" : "AI reading is allowed") : "AI reading is off")</Foot></PcKpi>
+            <PcKpi ShowZero="true" Index="0" Label="@T["Users"]" Value="c.Users" Icon="@Icons.Material.Filled.Groups" Solid="#6366F1"><Foot>@c.ActiveUsers7d signed in this week</Foot></PcKpi>
+            <PcKpi ShowZero="true" Index="1" Label="@T["Leads and contacts"]" Value="c.Leads + c.Contacts" Icon="@Icons.Material.Filled.Contacts" Solid="#06B6D4"><Foot>@c.Leads leads · @c.Contacts contacts</Foot></PcKpi>
+            <PcKpi ShowZero="true" Index="2" Label="@T["Accounts and deals"]" Value="c.Accounts + c.Deals" Icon="@Icons.Material.Filled.Handshake" Solid="#10B981"><Foot>@c.Accounts accounts · @c.Deals deals</Foot></PcKpi>
+            <PcKpi ShowZero="true" Index="3" Label="@T["Documents"]" Value="c.Documents" Icon="@Icons.Material.Filled.DocumentScanner" Solid="#F59E0B"><Foot>@(c.AiAllowed ? (c.AiEnabled ? "AI reading is on" : "AI reading is allowed") : "AI reading is off")</Foot></PcKpi>
         </div>
         <div class="pc-grid pc-grid--two">
             <div class="pc-card pc-rise">
-                <div class="pc-card__head"><div class="pc-card__title">Usage against the plan</div></div>
+                <div class="pc-card__head"><div class="pc-card__title">@T["Usage against the plan"]</div></div>
                 <div class="pc-meter" style="margin-bottom:26px">
-                    <div class="pc-meter__top"><span class="pc-card__hint">People</span><b class="pc-num">@c.Users <small style="font-size:14px;color:var(--pc-text-3)">of @_d.MaxUsers</small></b></div>
+                    <div class="pc-meter__top"><span class="pc-card__hint">@T["People"]</span><b class="pc-num">@c.Users <small style="font-size:14px;color:var(--pc-text-3)">of @_d.MaxUsers</small></b></div>
                     <div class="pc-bar @(Pct(c.Users, _d.MaxUsers) >= 90 ? "pc-bar--warn" : "")"><i style="width:@Pct(c.Users, _d.MaxUsers)%"></i></div>
                 </div>
                 <div class="pc-meter">
-                    <div class="pc-meter__top"><span class="pc-card__hint">Records</span><b class="pc-num">@Pc.Num(_d.Records) <small style="font-size:14px;color:var(--pc-text-3)">of @Pc.Num(_d.MaxRecords)</small></b></div>
+                    <div class="pc-meter__top"><span class="pc-card__hint">@T["Records"]</span><b class="pc-num">@Pc.Num(_d.Records) <small style="font-size:14px;color:var(--pc-text-3)">of @Pc.Num(_d.MaxRecords)</small></b></div>
                     <div class="pc-bar @(Pct(_d.Records, _d.MaxRecords) >= 90 ? "pc-bar--warn" : "")"><i style="width:@Pct(_d.Records, _d.MaxRecords)%"></i></div>
                 </div>
             </div>
             <div class="pc-card pc-rise" style="--i:1">
-                <div class="pc-card__head"><div class="pc-card__title">About this company</div></div>
-                <div class="pc-kv"><span>Owner</span><span>@(_d.OwnerName ?? "-")@(_d.OwnerEmail is null ? "" : " · " + _d.OwnerEmail)</span></div>
-                <div class="pc-kv"><span>Joined</span><span>@Pc.Date(c.CreatedAt)</span></div>
-                <div class="pc-kv"><span>Last signed in</span><span>@Pc.Ago(c.LastActiveAt)</span></div>
-                @if (c.Status == "Trial") { <div class="pc-kv"><span>Trial ends</span><span>@Pc.Date(c.TrialEndsAt)</span></div> }
-                <div class="pc-kv"><span>Modules</span><span>@c.ModulesEnabled of @c.ModulesTotal available to them</span></div>
+                <div class="pc-card__head"><div class="pc-card__title">@T["About this company"]</div></div>
+                <div class="pc-kv"><span>@T["Owner"]</span><span>@(_d.OwnerName ?? "-")@(_d.OwnerEmail is null ? "" : " · " + _d.OwnerEmail)</span></div>
+                <div class="pc-kv"><span>@T["Joined"]</span><span>@Pc.Date(c.CreatedAt)</span></div>
+                <div class="pc-kv"><span>@T["Last signed in"]</span><span>@Pc.Ago(c.LastActiveAt)</span></div>
+                @if (c.Status == "Trial") { <div class="pc-kv"><span>@T["Trial ends"]</span><span>@Pc.Date(c.TrialEndsAt)</span></div> }
+                <div class="pc-kv"><span>@T["Modules"]</span><span>@c.ModulesEnabled of @c.ModulesTotal available to them</span></div>
                 @if (_d.TenantDisabledModules.Count > 0)
                 {
-                    <div class="pc-kv"><span>Hidden by their own admin</span><span>@string.Join(", ", _d.TenantDisabledModules)</span></div>
+                    <div class="pc-kv"><span>@T["Hidden by their own admin"]</span><span>@string.Join(", ", _d.TenantDisabledModules)</span></div>
                 }
             </div>
         </div>
@@ -126,15 +127,15 @@ else
     {
         <div class="pc-card pc-rise" style="margin-bottom:22px">
             <div class="pc-mods__head">
-                <PcRing Value="ModulesPct" Size="76" Color="#6366F1" Title="Share of modules switched on" />
+                <PcRing Value="ModulesPct" Size="76" Color="#6366F1" Title="@T["Share of modules switched on"]" />
                 <div style="flex:1;min-width:220px">
                     <div class="pc-card__title" style="font-size:18px" data-testid="modules-summary">@ModulesOn of @(Switchable.Count + CoreCount) modules are on for @c.Name</div>
-                    <div class="pc-card__hint" style="margin-top:4px">A module you switch off disappears from this company and its API refuses it straight away. Core modules are always on. A module left out of the plan can only be added by changing the plan.</div>
+                    <div class="pc-card__hint" style="margin-top:4px">@T["A module you switch off disappears from this company and its API refuses it straight away. Core modules are always on. A module left out of the plan can only be added by changing the plan."]</div>
                 </div>
-                <input class="pc-input" style="min-width:220px" placeholder="Find a module" @bind="_find" @bind:event="oninput" data-testid="module-find" />
+                <input class="pc-input" style="min-width:220px" placeholder="@T["Find a module"]" @bind="_find" @bind:event="oninput" data-testid="module-find" />
             </div>
             <div class="pc-presets" data-testid="presets">
-                <span class="pc-card__hint" style="align-self:center;margin-inline-end:4px">Start from</span>
+                <span class="pc-card__hint" style="align-self:center;margin-inline-end:4px">@T["Start from"]</span>
                 @foreach (var p in _presets)
                 {
                     var preset = p;
@@ -161,10 +162,10 @@ else
                         <span style="min-width:0;flex:1">
                             <span class="pc-mod__name" style="display:block">@module.Name</span>
                             <span class="pc-mod__desc" style="display:block">@module.Description</span>
-                            @if (soon) { <span class="pc-mod__tag">Coming soon</span> }
+                            @if (soon) { <span class="pc-mod__tag">@T["Coming soon"]</span> }
                             else if (planOff) { <span class="pc-mod__tag pc-mod__tag--warn">Not in the @c.PlanName plan</span> }
-                            else if (locked) { <span class="pc-mod__tag">Always on</span> }
-                            else if (TenantOff(module)) { <span class="pc-mod__tag pc-mod__tag--warn">Hidden by their admin</span> }
+                            else if (locked) { <span class="pc-mod__tag">@T["Always on"]</span> }
+                            else if (TenantOff(module)) { <span class="pc-mod__tag pc-mod__tag--warn">@T["Hidden by their admin"]</span> }
                         </span>
                         @if (!locked && !soon) { <span class="pc-switch"></span> }
                     </button>
@@ -179,7 +180,7 @@ else
                     <b>@(_off.Except(_savedOff).Count() + _savedOff.Except(_off).Count()) unsaved change@(_off.Except(_savedOff).Count() + _savedOff.Except(_off).Count() == 1 ? "" : "s")</b>
                     <div>@DiffText</div>
                 </div>
-                <button class="pc-btn pc-btn--ghost" @onclick="Discard" data-testid="discard">Discard</button>
+                <button class="pc-btn pc-btn--ghost" @onclick="Discard" data-testid="discard">@T["Discard"]</button>
                 <button class="pc-btn pc-btn--primary" @onclick="SaveModulesAsync" disabled="@_saving" data-testid="save-modules"><MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />@(_saving ? "Saving" : "Save modules")</button>
             </div>
         }
@@ -191,7 +192,7 @@ else
             {
                 var plan = p;
                 <div class="pc-card pc-plan pc-interactive @(plan.Key == c.PlanKey ? "is-current" : "")" @onclick="() => ChangePlanAsync(plan)" data-testid="plan-@plan.Key">
-                    @if (plan.Key == c.PlanKey) { <div class="pc-plan__ribbon">Current</div> }
+                    @if (plan.Key == c.PlanKey) { <div class="pc-plan__ribbon">@T["Current"]</div> }
                     <div class="pc-card__title" style="font-size:18px">@plan.Name</div>
                     <div class="pc-plan__price pc-num">@Pc.Money(plan.PriceMonthly)<small> / month</small></div>
                     <ul>
@@ -205,19 +206,19 @@ else
 
         <div class="pc-grid pc-grid--two">
             <div class="pc-card pc-rise">
-                <div class="pc-card__head"><div class="pc-card__title">Limits</div></div>
+                <div class="pc-card__head"><div class="pc-card__title">@T["Limits"]</div></div>
                 <div class="pc-field" style="margin-bottom:20px">
-                    <label for="max-users">User limit</label>
+                    <label for="max-users">@T["User limit"]</label>
                     <input id="max-users" class="pc-input" type="number" min="1" max="100000" placeholder="@($"Plan default: {_d.PlanMaxUsers}")" @bind="_maxUsers" data-testid="max-users" />
                     <small>Leave empty to use the plan's limit of @_d.PlanMaxUsers. Set a number to give this company more or fewer seats than its plan.</small>
                 </div>
                 <div class="pc-field" style="margin-bottom:20px">
-                    <label>AI document reading</label>
+                    <label>@T["AI document reading"]</label>
                     <label class="d-flex align-center" style="gap:12px;cursor:pointer;font-weight:500;font-size:14px;color:var(--pc-text)">
                         <input type="checkbox" @bind="_aiAllowed" data-testid="ai-allowed" style="width:18px;height:18px;accent-color:#6366F1" />
                         This company may use AI to read its documents
                     </label>
-                    <small>When off, its own AI switch is turned off too and nothing is sent to the local language model.</small>
+                    <small>@T["When off, its own AI switch is turned off too and nothing is sent to the local language model."]</small>
                 </div>
                 @if (c.Status == "Trial")
                 {
@@ -232,10 +233,10 @@ else
                 }
             </div>
             <div class="pc-card pc-rise" style="--i:1">
-                <div class="pc-card__head"><div class="pc-card__title">Private notes</div><span class="pc-card__hint">Only you see these</span></div>
-                <textarea class="pc-textarea" placeholder="Contract details, who to call, what was promised." @bind="_notes" data-testid="notes" maxlength="2000"></textarea>
+                <div class="pc-card__head"><div class="pc-card__title">@T["Private notes"]</div><span class="pc-card__hint">@T["Only you see these"]</span></div>
+                <textarea class="pc-textarea" placeholder="@T["Contract details, who to call, what was promised."]" @bind="_notes" data-testid="notes" maxlength="2000"></textarea>
                 <div style="margin-top:18px;display:flex;justify-content:flex-end">
-                    <button class="pc-btn pc-btn--primary" @onclick="SaveLimitsAsync" disabled="@_saving" data-testid="save-limits"><MudIcon Icon="@Icons.Material.Filled.Save" Size="Size.Small" />Save limits and notes</button>
+                    <button class="pc-btn pc-btn--primary" @onclick="SaveLimitsAsync" disabled="@_saving" data-testid="save-limits"><MudIcon Icon="@Icons.Material.Filled.Save" Size="Size.Small" />@T["Save limits and notes"]</button>
                 </div>
             </div>
         </div>
@@ -250,29 +251,29 @@ else
         {
             var bill = _bill;
             <div class="pc-grid pc-grid--kpi">
-                <PcKpi Index="0" Label="Subscription" Value="0" Icon="@Icons.Material.Filled.Verified" Solid="#10B981" TestId="bill-status">
+                <PcKpi Index="0" Label="@T["Subscription"]" Value="0" Icon="@Icons.Material.Filled.Verified" Solid="#10B981" TestId="bill-status">
                     <Foot><b style="font-size:18px;color:var(--pc-text)">@BillStatus(bill.Status)</b>&nbsp;· @bill.PlanName @bill.Interval</Foot>
                 </PcKpi>
-                <PcKpi Index="1" Label="Paid until" Value="0" Icon="@Icons.Material.Filled.Event" Solid="#06B6D4">
+                <PcKpi Index="1" Label="@T["Paid until"]" Value="0" Icon="@Icons.Material.Filled.Event" Solid="#06B6D4">
                     <Foot><b style="font-size:18px;color:var(--pc-text)">@Pc.Date(bill.CurrentPeriodEnd)</b>@(bill.CancelAtPeriodEnd ? " · cancelled" : "")</Foot>
                 </PcKpi>
-                <PcKpi Index="2" Label="Paid in total" Value="bill.LifetimePaid" Money="true" Icon="@Icons.Material.Filled.Payments" Solid="#F59E0B"><Foot>Via @bill.Provider</Foot></PcKpi>
+                <PcKpi Index="2" Label="@T["Paid in total"]" Value="bill.LifetimePaid" Money="true" Icon="@Icons.Material.Filled.Payments" Solid="#F59E0B"><Foot>Via @bill.Provider</Foot></PcKpi>
             </div>
             @if (bill.PendingPlanName is not null)
             {
                 <div class="pc-attn pc-attn--warning" style="margin-bottom:20px;cursor:default" data-testid="bill-pending">
                     <div class="pc-attn__icon"><MudIcon Icon="@Icons.Material.Filled.HourglassTop" /></div>
-                    <div><div class="pc-attn__name">Waiting for payment</div><div class="pc-attn__msg">They chose the @bill.PendingPlanName plan (@bill.PendingInterval). Mark the open invoice paid when the money arrives.</div></div>
+                    <div><div class="pc-attn__name">@T["Waiting for payment"]</div><div class="pc-attn__msg">They chose the @bill.PendingPlanName plan (@bill.PendingInterval). Mark the open invoice paid when the money arrives.</div></div>
                 </div>
             }
             <div class="pc-grid pc-grid--main">
                 <div class="pc-card pc-card--flush" style="overflow-x:auto">
-                    <div class="pc-card__head" style="padding:22px 22px 0"><div class="pc-card__title">Invoices</div></div>
-                    @if (bill.Invoices.Count == 0) { <div class="pc-card__hint" style="padding:0 22px 22px">No invoices yet.</div> }
+                    <div class="pc-card__head" style="padding:22px 22px 0"><div class="pc-card__title">@T["Invoices"]</div></div>
+                    @if (bill.Invoices.Count == 0) { <div class="pc-card__hint" style="padding:0 22px 22px">@T["No invoices yet."]</div> }
                     else
                     {
                         <table class="pc-table" data-testid="bill-invoices">
-                            <thead><tr><th>Invoice</th><th>Plan</th><th>Period</th><th>Amount</th><th>Status</th><th></th></tr></thead>
+                            <thead><tr><th>@T["Invoice"]</th><th>@T["Plan"]</th><th>@T["Period"]</th><th>@T["Amount"]</th><th>@T["Status"]</th><th></th></tr></thead>
                             <tbody>
                             @foreach (var i in bill.Invoices)
                             {
@@ -286,8 +287,8 @@ else
                                     <td class="end">
                                         @if (invoice.Status == "open")
                                         {
-                                            <button class="pc-btn pc-btn--sm pc-btn--primary" @onclick="() => MarkPaidAsync(invoice)" data-testid="bill-mark-paid">Mark paid</button>
-                                            <button class="pc-btn pc-btn--sm pc-btn--ghost" @onclick="() => VoidAsync(invoice)">Cancel</button>
+                                            <button class="pc-btn pc-btn--sm pc-btn--primary" @onclick="() => MarkPaidAsync(invoice)" data-testid="bill-mark-paid">@T["Mark paid"]</button>
+                                            <button class="pc-btn pc-btn--sm pc-btn--ghost" @onclick="() => VoidAsync(invoice)">@T["Cancel"]</button>
                                         }
                                     </td>
                                 </tr>
@@ -297,17 +298,17 @@ else
                     }
                 </div>
                 <div class="pc-card">
-                    <div class="pc-card__head"><div class="pc-card__title">Record a payment</div></div>
-                    <div class="pc-field" style="margin-bottom:14px"><label for="pay-plan">Plan</label>
+                    <div class="pc-card__head"><div class="pc-card__title">@T["Record a payment"]</div></div>
+                    <div class="pc-field" style="margin-bottom:14px"><label for="pay-plan">@T["Plan"]</label>
                         <select id="pay-plan" class="pc-select" @bind="_payPlan" data-testid="pay-plan">@foreach (var p in _plans.Where(p => p.IsActive)) { <option value="@p.Key">@p.Name</option> }</select></div>
                     <div class="d-flex" style="gap:12px;margin-bottom:14px">
-                        <div class="pc-field" style="flex:1"><label for="pay-interval">Period</label>
-                            <select id="pay-interval" class="pc-select" @bind="_payInterval"><option value="monthly">One month</option><option value="yearly">One year</option></select></div>
-                        <div class="pc-field" style="flex:1"><label for="pay-amount">Amount</label><input id="pay-amount" class="pc-input" type="number" min="0" step="0.01" placeholder="Plan price" @bind="_payAmount" data-testid="pay-amount" /></div>
+                        <div class="pc-field" style="flex:1"><label for="pay-interval">@T["Period"]</label>
+                            <select id="pay-interval" class="pc-select" @bind="_payInterval"><option value="monthly">@T["One month"]</option><option value="yearly">@T["One year"]</option></select></div>
+                        <div class="pc-field" style="flex:1"><label for="pay-amount">@T["Amount"]</label><input id="pay-amount" class="pc-input" type="number" min="0" step="0.01" placeholder="@T["Plan price"]" @bind="_payAmount" data-testid="pay-amount" /></div>
                     </div>
-                    <div class="pc-field" style="margin-bottom:18px"><label for="pay-ref">Reference</label><input id="pay-ref" class="pc-input" placeholder="Bank transfer reference, cheque number" @bind="_payRef" data-testid="pay-ref" /></div>
-                    <button class="pc-btn pc-btn--primary" @onclick="RecordAsync" disabled="@_saving" data-testid="pay-record"><MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />Record payment</button>
-                    <div class="pc-card__hint" style="margin-top:10px">The company becomes active on this plan for the period, and its owner gets a receipt.</div>
+                    <div class="pc-field" style="margin-bottom:18px"><label for="pay-ref">@T["Reference"]</label><input id="pay-ref" class="pc-input" placeholder="@T["Bank transfer reference, cheque number"]" @bind="_payRef" data-testid="pay-ref" /></div>
+                    <button class="pc-btn pc-btn--primary" @onclick="RecordAsync" disabled="@_saving" data-testid="pay-record"><MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />@T["Record payment"]</button>
+                    <div class="pc-card__hint" style="margin-top:10px">@T["The company becomes active on this plan for the period, and its owner gets a receipt."]</div>
                 </div>
             </div>
         }
@@ -316,26 +317,26 @@ else
     {
         <div class="pc-grid pc-grid--two">
             <div class="pc-card pc-rise">
-                <div class="pc-card__head"><div class="pc-card__title">Export all data</div><span class="pc-card__hint">Every record and file, in one ZIP</span></div>
-                <button class="pc-btn pc-btn--primary" @onclick="ExportAsync" disabled="@_saving" data-testid="pc-export"><MudIcon Icon="@Icons.Material.Filled.Archive" Size="Size.Small" />Prepare an export</button>
-                <div class="pc-card__hint" style="margin:10px 0 14px">For a backup of this one company, or when it leaves. Passwords and keys are never included.</div>
+                <div class="pc-card__head"><div class="pc-card__title">@T["Export all data"]</div><span class="pc-card__hint">@T["Every record and file, in one ZIP"]</span></div>
+                <button class="pc-btn pc-btn--primary" @onclick="ExportAsync" disabled="@_saving" data-testid="pc-export"><MudIcon Icon="@Icons.Material.Filled.Archive" Size="Size.Small" />@T["Prepare an export"]</button>
+                <div class="pc-card__hint" style="margin:10px 0 14px">@T["For a backup of this one company, or when it leaves. Passwords and keys are never included."]</div>
                 @foreach (var e in _exports)
                 {
                     var export = e;
                     <div class="pc-kv">
                         <span>@Pc.Date(export.CreatedAt) · @(export.SizeBytes is { } b ? $"{b / 1024.0 / 1024.0:0.#} MB" : "-")</span>
                         <span>
-                            @if (export.Status == "ready" && export.ExpiresAt > DateTime.UtcNow) { <button class="pc-btn pc-btn--sm" @onclick="() => DownloadAsync(export)">Download</button> }
+                            @if (export.Status == "ready" && export.ExpiresAt > DateTime.UtcNow) { <button class="pc-btn pc-btn--sm" @onclick="() => DownloadAsync(export)">@T["Download"]</button> }
                             else { @export.Status }
                         </span>
                     </div>
                 }
             </div>
             <div class="pc-card pc-rise" style="--i:1;border-color:color-mix(in srgb, var(--pc-bad) 40%, var(--pc-border))" data-testid="pc-danger">
-                <div class="pc-card__head"><div class="pc-card__title" style="color:var(--pc-bad)">Remove this company for good</div></div>
+                <div class="pc-card__head"><div class="pc-card__title" style="color:var(--pc-bad)">@T["Remove this company for good"]</div></div>
                 <div class="pc-card__hint" style="margin-bottom:14px">Deletes every record, user and file of @c.Name. This cannot be undone. Prepare an export first if anything may be needed later.</div>
-                <div class="pc-field" style="margin-bottom:14px"><label for="purge-confirm">Type <b>@c.Slug</b> to confirm</label><input id="purge-confirm" class="pc-input" @bind="_purgeConfirm" @bind:event="oninput" data-testid="purge-confirm" /></div>
-                <button class="pc-btn pc-btn--danger" disabled="@(_purgeConfirm != c.Slug || _saving)" @onclick="PurgeAsync" data-testid="purge-button"><MudIcon Icon="@Icons.Material.Filled.DeleteForever" Size="Size.Small" />Remove permanently</button>
+                <div class="pc-field" style="margin-bottom:14px"><label for="purge-confirm">@T["Type"] <b>@c.Slug</b> to confirm</label><input id="purge-confirm" class="pc-input" @bind="_purgeConfirm" @bind:event="oninput" data-testid="purge-confirm" /></div>
+                <button class="pc-btn pc-btn--danger" disabled="@(_purgeConfirm != c.Slug || _saving)" @onclick="PurgeAsync" data-testid="purge-button"><MudIcon Icon="@Icons.Material.Filled.DeleteForever" Size="Size.Small" />@T["Remove permanently"]</button>
             </div>
         </div>
     }
@@ -343,7 +344,7 @@ else
     {
         <div class="pc-card pc-rise" data-testid="history">
             <div class="pc-card__head"><div class="pc-card__title">Everything changed for @c.Name</div></div>
-            @if (_d.History.Count == 0) { <div class="pc-card__hint">Nothing yet. Changes to modules, plan, limits and status will be listed here.</div> }
+            @if (_d.History.Count == 0) { <div class="pc-card__hint">@T["Nothing yet. Changes to modules, plan, limits and status will be listed here."]</div> }
             <div class="pc-timeline">
                 @foreach (var h in _d.History)
                 {

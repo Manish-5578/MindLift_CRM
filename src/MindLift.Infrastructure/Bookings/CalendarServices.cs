@@ -97,6 +97,13 @@ public sealed class CalendarService(AppDbContext db, ITenantContext tenant, IDat
             events.Add(new CalendarEventDto(a.Id, kind, a.Subject, start, end, a.OwnerId, owners.GetValueOrDefault(a.OwnerId), a.Status, href, linked));
         }
 
+        // Times taken in the person's own Google or Microsoft calendar, shown as "Busy" (the event itself is never copied here).
+        if (kinds is null || kinds.Count == 0 || kinds.Contains("external", StringComparer.OrdinalIgnoreCase))
+        {
+            var blocks = await db.ExternalBusyBlocks.AsNoTracking().Where(b => b.UserId == me && b.StartAt < toUtc && b.EndAt > fromUtc).OrderBy(b => b.StartAt).Take(500).ToListAsync(cancellationToken);
+            events.AddRange(blocks.Select(b => new CalendarEventDto(b.Id, "external", "Busy (other calendar)", b.StartAt, b.EndAt, me, null, "Open", "/calendar/connections", null)));
+        }
+
         return events;
     }
 }

@@ -26,4 +26,15 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
   </ItemGroup>
+  <!--
+    The staff app and the customer portal are both Blazor WebAssembly apps, and each has its own index.html. Published as they are, both land at
+    wwwroot/index.html and the build stops (NETSDK1152). The portal's page belongs under /portal, so it is moved there before that check.
+  -->
+  <Target Name="MovePortalIndexUnderPortal" AfterTargets="ComputeFilesToPublish" BeforeTargets="_HandleFileConflictsForPublish">
+    <ItemGroup>
+      <_PortalIndex Include="@(ResolvedFileToPublish)" Condition="'%(Filename)%(Extension)' == 'index.html' And $([System.String]::new('%(FullPath)').Contains('MindLift.Portal'))" />
+      <ResolvedFileToPublish Remove="@(_PortalIndex)" />
+      <ResolvedFileToPublish Include="@(_PortalIndex)" RelativePath="wwwroot/portal/index.html" />
+    </ItemGroup>
+  </Target>
 </Project>

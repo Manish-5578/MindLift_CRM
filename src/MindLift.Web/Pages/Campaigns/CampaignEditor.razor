@@ -1,0 +1,234 @@
+@page "/campaigns/new"
+@page "/campaigns/{Id:guid}"
+@implements IDisposable
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject AppState App
+@inject Translator T
+
+<PageTitle>@(_name is { Length: > 0 } ? _name : T["New campaign"]) · MindLift</PageTitle>
+
+<div class="ml-page">
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/campaigns" Class="mb-2">@T["All campaigns"]</MudButton>
+
+    @if (_notFound)
+    {
+        <EmptyState Title="That campaign does not exist" Message="It may have been deleted." />
+    }
+    else if (_loading)
+    {
+        <MlCard Loading="true" />
+    }
+    else
+    {
+        var locked = _c is not null && _c.Status is not ("draft" or "scheduled");
+        <div class="d-flex flex-wrap align-center justify-space-between gap-3 mb-4">
+            <MudText Typo="Typo.h5" Style="font-weight:700">@(_c is null ? T["New campaign"] : _c.Name)</MudText>
+            @if (_c is not null) { <MudChip T="string" Variant="Variant.Text" Color="@(_c.Status == "sent" ? Color.Success : Color.Info)" data-testid="campaign-status">@T[_c.Status]</MudChip> }
+        </div>
+
+        @if (_c is { } done && done.Stats.Recipients > 0)
+        {
+            var st = done.Stats;
+            <div class="ch-kpis" data-testid="campaign-results">
+                <ChartKpi Label="@T["Sent"]" Value="@st.Sent.ToString("N0")" Icon="@Icons.Material.Filled.Send" Color="#2563EB" Ring="@Pct(st.Sent, st.Recipients)" Hint="@T["of {0}", st.Recipients.ToString("N0")]" />
+                <ChartKpi Label="@T["Opened"]" Value="@st.Opened.ToString("N0")" Icon="@Icons.Material.Filled.MarkEmailRead" Color="#10B981" Ring="@Pct(st.Opened, st.Sent)" TestId="stat-opened" />
+                <ChartKpi Label="@T["Clicked"]" Value="@st.Clicked.ToString("N0")" Icon="@Icons.Material.Filled.AdsClick" Color="#8B5CF6" Ring="@Pct(st.Clicked, st.Sent)" TestId="stat-clicked" />
+                <ChartKpi Label="@T["Unsubscribed"]" Value="@st.Unsubscribed.ToString("N0")" Icon="@Icons.Material.Filled.Unsubscribe" Color="#F59E0B" />
+                @if (st.Pending > 0 || st.Failed > 0 || st.Skipped > 0)
+                {
+                    <ChartKpi Label="@T["Waiting or not sent"]" Value="@((st.Pending + st.Failed + st.Skipped).ToString("N0"))" Icon="@Icons.Material.Filled.Schedule" Color="#DC2626"
+                              Hint="@T["{0} waiting · {1} failed · {2} skipped", st.Pending, st.Failed, st.Skipped]" />
+                }
+            </div>
+        }
+
+        <MudGrid Spacing="3">
+            <MudItem xs="12" md="7">
+                <MlCard Title="Message">
+                    <div class="ml-stack">
+                        <MudTextField @bind-Value="_name" Label="@T["Name (only you see it) *"]" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Disabled="locked" data-testid="campaign-name" />
+                        <MudTextField @bind-Value="_subject" Label="@T["Subject"]" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Disabled="locked" data-testid="campaign-subject" />
+                        <MudTextField @bind-Value="_body" Label="@T["Message"]" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="10" Immediate="true" Disabled="locked"
+                                      HelperText="@T["Use {{first_name}}, {{last_name}} and {{company}} to personalise. Web addresses become tracked links."]" data-testid="campaign-body" />
+                    </div>
+                </MlCard>
+            </MudItem>
+            <MudItem xs="12" md="5">
+                <MlCard Title="Who gets it" Class="mb-3">
+                    <div class="ml-stack">
+                        <MudSelect T="string" Value="_type" ValueChanged="TypeChanged" Label="@T["People"]" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="locked" data-testid="campaign-type">
+                            <MudSelectItem T="string" Value="@("leads")">@T["Leads"]</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("contacts")">@T["Contacts"]</MudSelectItem>
+                        </MudSelect>
+                        @if (_type == "leads")
+                        {
+                            <MudTextField T="string" @bind-Value="_status" Label="@T["Status code (optional)"]" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="locked" OnBlur="PreviewAsync" />
+                            <MudTextField T="string" @bind-Value="_source" Label="@T["Source code (optional)"]" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="locked" OnBlur="PreviewAsync" />
+                            <MudTextField T="string" @bind-Value="_tag" Label="@T["Tag (optional)"]" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="locked" OnBlur="PreviewAsync" data-testid="campaign-tag" />
+                        }
+                        else
+                        {
+                            <MudTextField T="string" @bind-Value="_contactType" Label="@T["Contact type (optional)"]" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="locked" OnBlur="PreviewAsync" />
+                        }
+                        @if (_preview is { } p)
+                        {
+                            <MudAlert Severity="@(p.Reachable == 0 ? Severity.Warning : Severity.Success)" Dense="true" data-testid="campaign-preview">
+                                <b>@p.Reachable.ToString("N0")</b> @T["people will get it."]
+                                @if (p.NoEmail > 0 || p.DoNotEmail > 0) { <div style="font-size:12px">@T["Left out: {0} without an email, {1} who asked not to be emailed.", p.NoEmail, p.DoNotEmail]</div> }
+                            </MudAlert>
+                        }
+                    </div>
+                </MlCard>
+
+                @if (!locked)
+                {
+                    <MlCard Title="Send">
+                        <div class="ml-stack">
+                            @if (_c is null)
+                            {
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveNewAsync" Disabled="_busy" data-testid="campaign-save">@T["Save draft"]</MudButton>
+                            }
+                            else
+                            {
+                                <MudButton Variant="Variant.Outlined" OnClick="SaveAsync" Disabled="_busy" data-testid="campaign-save">@T["Save changes"]</MudButton>
+                                <div class="d-flex gap-2">
+                                    <MudTextField @bind-Value="_testTo" Label="@T["Send a test to"]" Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex:1" data-testid="campaign-test-to" />
+                                    <MudButton Variant="Variant.Outlined" OnClick="TestAsync" Disabled="@(_busy || string.IsNullOrWhiteSpace(_testTo))" data-testid="campaign-test">@T["Test"]</MudButton>
+                                </div>
+                                <div class="d-flex gap-2 align-center">
+                                    <MudTextField T="DateTime?" @bind-Value="_at" InputType="InputType.DateTimeLocal" Label="@T["Send later at"]" Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex:1" data-testid="campaign-at" />
+                                    <MudButton Variant="Variant.Outlined" OnClick="ScheduleAsync" Disabled="@(_busy || _at is null)" data-testid="campaign-schedule">@T["Schedule"]</MudButton>
+                                </div>
+                                @if (_c.Status == "scheduled") { <MudButton Variant="Variant.Text" OnClick="Unschedule">@T["Remove the schedule"]</MudButton> }
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Send" OnClick="SendAsync" Disabled="_busy" data-testid="campaign-send">@T["Send now"]</MudButton>
+                            }
+                            @if (_error is not null) { <MudAlert Severity="Severity.Error" Dense="true" data-testid="campaign-error">@_error</MudAlert> }
+                        </div>
+                    </MlCard>
+                }
+                else
+                {
+                    <MlCard Title="Actions">
+                        <div class="ml-stack">
+                            @if (_c!.Status == "sending") { <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="CancelAsync" data-testid="campaign-cancel">@T["Stop sending"]</MudButton> }
+                            <MudButton Variant="Variant.Outlined" OnClick="DuplicateAsync" data-testid="campaign-duplicate">@T["Make a copy"]</MudButton>
+                        </div>
+                    </MlCard>
+                }
+            </MudItem>
+        </MudGrid>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid? Id { get; set; }
+
+    private CampaignDto? _c;
+    private AudiencePreviewDto? _preview;
+    private bool _loading = true, _notFound, _busy;
+    private string _name = "", _subject = "", _body = "", _type = "leads";
+    private string? _status, _source, _tag, _contactType, _error, _testTo;
+    private DateTime? _at;
+    private Timer? _poll;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        if (Id is null)
+        {
+            _c = null;
+            _body = "Hi {{first_name}},\n\n";
+            await PreviewAsync();
+        }
+        else
+        {
+            var response = await Http.GetAsync($"api/v1/campaigns/{Id}");
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound) { _notFound = true; _loading = false; return; }
+            Load((await response.Content.ReadFromJsonAsync<CampaignDto>())!);
+            await PreviewAsync();
+            // While it is being sent, the numbers update by themselves.
+            _poll?.Dispose();
+            _poll = new Timer(_ => InvokeAsync(async () =>
+            {
+                if (_c is { Status: "sending" }) { Load((await Http.GetFromJsonAsync<CampaignDto>($"api/v1/campaigns/{Id}"))!); StateHasChanged(); }
+            }), null, TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(3));
+        }
+
+        _loading = false;
+    }
+
+    private void Load(CampaignDto c)
+    {
+        _c = c;
+        _name = c.Name; _subject = c.Subject; _body = c.Body;
+        _type = c.Audience.Type; _status = c.Audience.Status; _source = c.Audience.Source; _tag = c.Audience.Tag; _contactType = c.Audience.ContactType;
+        _at = c.ScheduledAt?.ToLocalTime();
+    }
+
+    private SaveCampaignRequest Request() => new(_name, _subject, _body, new CampaignAudience(_type, _status, _source, _tag, _contactType));
+
+    private async Task TypeChanged(string type) { _type = type; await PreviewAsync(); }
+
+    private async Task PreviewAsync()
+    {
+        var response = await Http.PostAsJsonAsync("api/v1/campaigns/audience-preview", Request().Audience);
+        _preview = response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<AudiencePreviewDto>() : null;
+    }
+
+    private async Task<bool> CallAsync(Func<Task<HttpResponseMessage>> call, string? done = null)
+    {
+        _busy = true; _error = null;
+        try
+        {
+            var response = await call();
+            if (!response.IsSuccessStatusCode) { _error = await ProblemText.FromAsync(response, T["That did not work."]); return false; }
+            if (response.Content.Headers.ContentLength > 0 && response.Content.Headers.ContentType?.MediaType == "application/json") Load((await response.Content.ReadFromJsonAsync<CampaignDto>())!);
+            if (done is not null) Snackbar.Add(done, Severity.Success);
+            return true;
+        }
+        finally { _busy = false; }
+    }
+
+    private async Task SaveNewAsync()
+    {
+        _busy = true; _error = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/v1/campaigns", Request());
+            if (!response.IsSuccessStatusCode) { _error = await ProblemText.FromAsync(response, T["That did not work."]); return; }
+            var created = (await response.Content.ReadFromJsonAsync<CampaignDto>())!;
+            Nav.NavigateTo($"/campaigns/{created.Id}");
+        }
+        finally { _busy = false; }
+    }
+
+    private Task SaveAsync() => CallAsync(() => Http.PutAsJsonAsync($"api/v1/campaigns/{Id}", Request()), T["Saved."]);
+    private Task TestAsync() => CallAsync(() => Http.PostAsJsonAsync($"api/v1/campaigns/{Id}/test", new SendTestRequest(_testTo ?? "")), T["Test email sent."]);
+
+    private async Task SendAsync()
+    {
+        if (!await CallAsync(() => Http.PutAsJsonAsync($"api/v1/campaigns/{Id}", Request()))) return;
+        if (await CallAsync(() => Http.PostAsync($"api/v1/campaigns/{Id}/send", null), T["Sending has started."])) await PreviewAsync();
+    }
+
+    private async Task ScheduleAsync()
+    {
+        if (!await CallAsync(() => Http.PutAsJsonAsync($"api/v1/campaigns/{Id}", Request()))) return;
+        await CallAsync(() => Http.PostAsJsonAsync($"api/v1/campaigns/{Id}/schedule", new ScheduleCampaignRequest(_at?.ToUniversalTime())), T["Scheduled."]);
+    }
+
+    private Task Unschedule() => CallAsync(() => Http.PostAsJsonAsync($"api/v1/campaigns/{Id}/schedule", new ScheduleCampaignRequest(null)), T["The schedule was removed."]);
+    private Task CancelAsync() => CallAsync(() => Http.PostAsync($"api/v1/campaigns/{Id}/cancel", null), T["Sending stopped."]);
+
+    private async Task DuplicateAsync()
+    {
+        var response = await Http.PostAsync($"api/v1/campaigns/{Id}/duplicate", null);
+        if (response.IsSuccessStatusCode) Nav.NavigateTo($"/campaigns/{(await response.Content.ReadFromJsonAsync<CampaignDto>())!.Id}");
+    }
+
+    private static double? Pct(int part, int whole) => whole == 0 ? null : 100.0 * part / whole;
+
+    public void Dispose() => _poll?.Dispose();
+}

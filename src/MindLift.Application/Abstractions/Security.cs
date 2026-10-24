@@ -41,6 +41,10 @@ public interface IEmailSender
 {
     Task SendAsync(string to, string subject, string textBody, CancellationToken cancellationToken = default);
 
+    /// <summary>Sends a message with an HTML version beside the text one. Senders that cannot send HTML send the text only.</summary>
+    Task SendHtmlAsync(string to, string subject, string textBody, string htmlBody, CancellationToken cancellationToken = default)
+        => SendAsync(to, subject, textBody, cancellationToken);
+
     /// <summary>Sends an email with attachments. Senders that cannot attach files send the text only.</summary>
     Task SendAsync(string to, string subject, string textBody, IReadOnlyList<EmailAttachment> attachments, CancellationToken cancellationToken = default)
         => SendAsync(to, subject, textBody, cancellationToken);

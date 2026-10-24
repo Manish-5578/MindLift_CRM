@@ -74,3 +74,26 @@ Nothing can be changed from it; the reason and every page viewed are kept in the
 
 - Record-change history (`audit_logs`) older than `Audit__RetentionDays` (730 by default; 0 keeps everything) is removed nightly.
 - Read notifications and expired sign-in tokens are cleaned up nightly.
+
+## Calendar sync (Google and Microsoft)
+
+People connect their own calendar under Calendar, Connect calendars. Their meetings are copied to it, and the times already taken there block booking.
+Each service stays off until you give its client id and secret (`CALENDAR_GOOGLE_CLIENT_ID`, `CALENDAR_GOOGLE_CLIENT_SECRET`, `CALENDAR_MICROSOFT_CLIENT_ID`,
+`CALENDAR_MICROSOFT_CLIENT_SECRET`, optional `CALENDAR_MICROSOFT_TENANT`). Register the redirect address `APP_BASE_URL/calendar/oauth/google/callback`
+(and `.../microsoft/callback`) with each service.
+
+- Google: create an OAuth client (Web application) in Google Cloud Console, enable the Google Calendar API, and add the scopes `calendar.events` and `calendar.readonly`.
+- Microsoft: register an app in Microsoft Entra, add the delegated permissions `Calendars.ReadWrite`, `User.Read` and `offline_access`, and create a client secret.
+
+A calendar feed (.ics) needs no set-up: any person can make one for Apple Calendar or any app that subscribes to an address.
+
+## Tickets and campaigns
+
+Both are modules like the others: switch them on or off per company in the platform console, or leave them to a plan. Campaigns send through the same
+protection as other automated mail (daily limit per company, unsubscribe link, do-not-email list), and what does not fit in a day goes out the next day.
+
+## Arabic
+
+The Arabic OCR model is the higher-accuracy one (`tools/tessdata/ara.traineddata`). Pages that are mostly Arabic are read with Arabic alone as well as with Arabic and
+English together, and the better reading is kept. Arabic lines are put in reading order, digits are written as ordinary digits, and direction marks are removed.
+The platform console can be switched to Arabic (right to left) from its top bar.

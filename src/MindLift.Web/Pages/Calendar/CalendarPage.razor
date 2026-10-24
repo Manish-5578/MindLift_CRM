@@ -13,6 +13,7 @@
 <div class="ml-page">
     <PageHeader Title="@App.ModuleLabel(AppModule.Calendar)" Subtitle="@RangeTitle">
         <Actions>
+            <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Filled.SyncAlt" Href="/calendar/connections" data-testid="cal-connect">@T["Connect calendars"]</MudButton>
             <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small" data-testid="cal-views">
                 <MudButton Color='@(_view == "day" ? Color.Primary : Color.Default)' OnClick='() => SetViewAsync("day")' data-testid="cal-view-day">@T["Day"]</MudButton>
                 <MudButton Color='@(_view == "week" ? Color.Primary : Color.Default)' OnClick='() => SetViewAsync("week")' data-testid="cal-view-week">@T["Week"]</MudButton>

@@ -145,7 +145,7 @@ public sealed class PlatformConsoleE2ETests(E2EHost host)
         await Expect(page.Locator("[data-testid=module-Invoices]")).ToHaveAttributeAsync("aria-pressed", "true");
 
         // Roadmap modules are listed but cannot be switched on, core modules cannot be switched off.
-        await Expect(page.Locator("[data-testid=module-Tickets]")).ToBeDisabledAsync();
+        await Expect(page.Locator("[data-testid=module-Projects]")).ToBeDisabledAsync();
         await Expect(page.Locator("[data-testid=module-Dashboard]")).ToBeDisabledAsync();
     }
 
@@ -189,7 +189,7 @@ public sealed class PlatformConsoleE2ETests(E2EHost host)
 
         await page.GotoAsync("/platform/modules");
         await Expect(page.Locator("[data-testid=catalogue-Documents]")).ToBeVisibleAsync();
-        await Expect(page.Locator("[data-testid=catalogue-Tickets]")).ToContainTextAsync("Coming soon");
+        await Expect(page.Locator("[data-testid=catalogue-Projects]")).ToContainTextAsync("Coming soon");
         await Shots.SaveAsync(page, "platform-modules");
 
         await page.GotoAsync("/platform/plans");
@@ -327,7 +327,7 @@ public sealed class PlatformConsoleE2ETests(E2EHost host)
         await page.Locator("[data-testid=mod-view-table]").ClickAsync();
         await Expect(page.Locator("[data-testid=module-row-Documents]")).ToContainTextAsync("Optional");
         await Expect(page.Locator("[data-testid=module-row-Dashboard]")).ToContainTextAsync("Always on");
-        await Expect(page.Locator("[data-testid=module-row-Tickets]")).ToContainTextAsync("Coming soon");
+        await Expect(page.Locator("[data-testid=module-row-Projects]")).ToContainTextAsync("Coming soon");
         await Shots.SaveAsync(page, "platform-modules-table");
 
         await page.Locator("[data-testid=mod-view-matrix]").ClickAsync();

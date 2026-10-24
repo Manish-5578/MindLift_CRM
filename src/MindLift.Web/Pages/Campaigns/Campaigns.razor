@@ -1,0 +1,64 @@
+@page "/campaigns"
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject AppState App
+@inject Translator T
+
+<PageTitle>@T["Campaigns"] · MindLift</PageTitle>
+
+<div class="ml-page">
+    <PageHeader Title="Campaigns" Subtitle="Email many people at once, and see who opened and clicked.">
+        <Actions>
+            @if (App.CanCreate(AppModule.Campaigns))
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Href="/campaigns/new" data-testid="primary-action">@T["New campaign"]</MudButton>
+            }
+        </Actions>
+    </PageHeader>
+
+    @if (_items is null)
+    {
+        <MlCard Loading="true" />
+    }
+    else if (_items.Count == 0)
+    {
+        <EmptyState Title="No campaigns yet" Message="Write a message, choose who gets it, and send it now or later." />
+    }
+    else
+    {
+        <MlCard Flush="true" TestId="campaign-list">
+            <MudSimpleTable Hover="true" Style="background:transparent">
+                <thead><tr><th>@T["Campaign"]</th><th>@T["Status"]</th><th>@T["Sent"]</th><th>@T["Opened"]</th><th>@T["Clicked"]</th><th>@T["Unsubscribed"]</th></tr></thead>
+                <tbody>
+                    @foreach (var c in _items)
+                    {
+                        var item = c;
+                        <tr style="cursor:pointer" @onclick="@(() => Nav.NavigateTo($"/campaigns/{item.Id}"))" data-testid="campaign-row">
+                            <td><b>@item.Name</b><div class="ml-muted" style="font-size:12px">@item.Subject</div></td>
+                            <td><MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="@StatusColor(item.Status)">@T[item.Status]</MudChip>
+                                @if (item.Status == "scheduled" && item.ScheduledAt is { } at) { <div class="ml-muted" style="font-size:12px">@at.ToLocalTime().ToString("dd MMM HH:mm")</div> }</td>
+                            <td>@item.Stats.Sent.ToString("N0") <span class="ml-muted">/ @item.Stats.Recipients.ToString("N0")</span></td>
+                            <td>@Rate(item.Stats.Opened, item.Stats.Sent)</td>
+                            <td>@Rate(item.Stats.Clicked, item.Stats.Sent)</td>
+                            <td>@item.Stats.Unsubscribed</td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        </MlCard>
+    }
+</div>
+
+@code {
+    private List<CampaignListItemDto>? _items;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _items = await Http.GetFromJsonAsync<List<CampaignListItemDto>>("api/v1/campaigns") ?? []; }
+        catch (HttpRequestException) { _items = []; }
+    }
+
+    private static string Rate(int part, int whole) => whole == 0 ? "-" : $"{Math.Round(100.0 * part / whole)}%";
+
+    private static Color StatusColor(string status) => status switch { "sent" => Color.Success, "sending" => Color.Info, "scheduled" => Color.Warning, "cancelled" => Color.Default, _ => Color.Default };
+}

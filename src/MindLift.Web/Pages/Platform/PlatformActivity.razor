@@ -1,5 +1,6 @@
 @page "/platform/activity"
 @layout PlatformLayout
+@inject Translator T
 @inject HttpClient Http
 @inject NavigationManager Nav
 @inject IJSRuntime JS
@@ -8,11 +9,11 @@
 
 <div class="pc-head pc-rise">
     <div>
-        <div class="pc-eyebrow">Audit trail</div>
+        <div class="pc-eyebrow">@T["Audit trail"]</div>
         <h1 class="pc-title">Every change, <span class="pc-grad">on record.</span></h1>
-        <div class="pc-sub">Everything the platform owner does: sign-ins, onboarding companies, plans, modules, limits and status changes, and exports. Nothing here can be edited or removed.</div>
+        <div class="pc-sub">@T["Everything the platform owner does: sign-ins, onboarding companies, plans, modules, limits and status changes, and exports. Nothing here can be edited or removed."]</div>
     </div>
-    <button class="pc-btn" @onclick="ExportAsync" data-testid="audit-export"><MudIcon Icon="@Icons.Material.Filled.Download" Size="Size.Small" />Export CSV</button>
+    <button class="pc-btn" @onclick="ExportAsync" data-testid="audit-export"><MudIcon Icon="@Icons.Material.Filled.Download" Size="Size.Small" />@T["Export CSV"]</button>
 </div>
 
 <div class="d-flex align-center flex-wrap pc-rise" style="gap:12px;margin-bottom:20px;--i:1">
@@ -23,19 +24,19 @@
             <button class="@(_kind == kind ? "is-on" : "")" @onclick="() => SetKind(kind)" data-testid="audit-kind-@(kind == "" ? "all" : kind)">@k.Value</button>
         }
     </div>
-    <select class="pc-select" @onchange="OnCompany" data-testid="audit-company" aria-label="Company">
-        <option value="">All companies</option>
+    <select class="pc-select" @onchange="OnCompany" data-testid="audit-company" aria-label="@T["Company"]">
+        <option value="">@T["All companies"]</option>
         @foreach (var c in _companies)
         {
             <option value="@c.Id">@c.Name</option>
         }
     </select>
-    <input class="pc-input" type="date" @bind="From" data-testid="audit-from" aria-label="From date" />
-    <input class="pc-input" type="date" @bind="To" data-testid="audit-to" aria-label="To date" />
-    <input class="pc-input" style="min-width:220px" placeholder="Search who, what or which company" @bind="Search" @bind:event="oninput" data-testid="audit-search" />
+    <input class="pc-input" type="date" @bind="From" data-testid="audit-from" aria-label="@T["From date"]" />
+    <input class="pc-input" type="date" @bind="To" data-testid="audit-to" aria-label="@T["To date"]" />
+    <input class="pc-input" style="min-width:220px" placeholder="@T["Search who, what or which company"]" @bind="Search" @bind:event="oninput" data-testid="audit-search" />
     @if (Filtered)
     {
-        <button class="pc-btn pc-btn--ghost" @onclick="ClearAsync" data-testid="audit-clear"><MudIcon Icon="@Icons.Material.Filled.FilterAltOff" Size="Size.Small" />Clear</button>
+        <button class="pc-btn pc-btn--ghost" @onclick="ClearAsync" data-testid="audit-clear"><MudIcon Icon="@Icons.Material.Filled.FilterAltOff" Size="Size.Small" />@T["Clear"]</button>
     }
 </div>
 
@@ -46,12 +47,12 @@
     }
     else if (_page.Items.Count == 0)
     {
-        <div class="pc-empty"><div class="pc-empty__art"><MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Large" /></div><h3 style="margin:0 0 6px">@(Filtered ? "Nothing matches these filters" : "Nothing yet")</h3><div>Changes to modules, plans, limits and status appear here.</div></div>
+        <div class="pc-empty"><div class="pc-empty__art"><MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Large" /></div><h3 style="margin:0 0 6px">@(Filtered ? "Nothing matches these filters" : "Nothing yet")</h3><div>@T["Changes to modules, plans, limits and status appear here."]</div></div>
     }
     else
     {
         <table class="pc-table" data-testid="audit-table">
-            <thead><tr><th style="width:170px">When</th><th>Who</th><th>Action</th><th>Company</th><th>What changed</th><th style="width:40px"></th></tr></thead>
+            <thead><tr><th style="width:170px">@T["When"]</th><th>@T["Who"]</th><th>@T["Action"]</th><th>@T["Company"]</th><th>@T["What changed"]</th><th style="width:40px"></th></tr></thead>
             <tbody>
             @foreach (var a in _page.Items)
             {
@@ -61,7 +62,7 @@
                     <td><div style="font-weight:650">@Pc.Ago(entry.At)</div><div class="pc-card__hint">@entry.At.ToString("d MMM yyyy HH:mm")</div></td>
                     <td><div class="d-flex align-center" style="gap:10px"><PcAvatar Name="@entry.Actor" Size="28" /><span>@entry.Actor</span></div></td>
                     <td><span class="pc-act pc-act--@Group(entry.Action)">@Label(entry.Action)</span></td>
-                    <td>@if (entry.TenantId is not null) { <span>@entry.Company</span> } else { <span class="pc-card__hint">Platform</span> }</td>
+                    <td>@if (entry.TenantId is not null) { <span>@entry.Company</span> } else { <span class="pc-card__hint">@T["Platform"]</span> }</td>
                     <td style="max-width:420px">@entry.Summary</td>
                     <td><MudIcon Icon="@(open ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)" Size="Size.Small" /></td>
                 </tr>
@@ -70,12 +71,12 @@
                     <tr class="pc-detail" data-testid="audit-detail">
                         <td colspan="6">
                             <div class="pc-detail__grid">
-                                <div><b>Exact time (UTC)</b>@entry.At.ToString("yyyy-MM-dd HH:mm:ss")</div>
-                                <div><b>Action code</b>@entry.Action</div>
-                                <div><b>Done by</b>@entry.Actor</div>
-                                <div><b>Company</b>@if (entry.TenantId is { } id) { <a style="color:var(--pc-brand);font-weight:650;cursor:pointer" @onclick="() => OpenCompany(id)" @onclick:stopPropagation="true">@entry.Company</a> } else { <span>Whole platform</span> }</div>
-                                <div style="grid-column:1/-1"><b>What changed</b>@entry.Summary</div>
-                                <div><b>Record id</b><span class="pc-num" style="font-size:12px">@entry.Id</span></div>
+                                <div><b>@T["Exact time (UTC)"]</b>@entry.At.ToString("yyyy-MM-dd HH:mm:ss")</div>
+                                <div><b>@T["Action code"]</b>@entry.Action</div>
+                                <div><b>@T["Done by"]</b>@entry.Actor</div>
+                                <div><b>@T["Company"]</b>@if (entry.TenantId is { } id) { <a style="color:var(--pc-brand);font-weight:650;cursor:pointer" @onclick="() => OpenCompany(id)" @onclick:stopPropagation="true">@entry.Company</a> } else { <span>@T["Whole platform"]</span> }</div>
+                                <div style="grid-column:1/-1"><b>@T["What changed"]</b>@entry.Summary</div>
+                                <div><b>@T["Record id"]</b><span class="pc-num" style="font-size:12px">@entry.Id</span></div>
                             </div>
                         </td>
                     </tr>
@@ -86,8 +87,8 @@
         <div class="d-flex align-center justify-space-between" style="padding:14px 18px;gap:12px;flex-wrap:wrap">
             <span class="pc-card__hint" data-testid="audit-count">@Range of @_page.Total</span>
             <div class="d-flex" style="gap:8px">
-                <button class="pc-btn pc-btn--sm" disabled="@(_pageNo <= 1)" @onclick="() => GoAsync(_pageNo - 1)" data-testid="audit-prev">Newer</button>
-                <button class="pc-btn pc-btn--sm" disabled="@(_pageNo * PageSize >= _page.Total)" @onclick="() => GoAsync(_pageNo + 1)" data-testid="audit-next">Older</button>
+                <button class="pc-btn pc-btn--sm" disabled="@(_pageNo <= 1)" @onclick="() => GoAsync(_pageNo - 1)" data-testid="audit-prev">@T["Newer"]</button>
+                <button class="pc-btn pc-btn--sm" disabled="@(_pageNo * PageSize >= _page.Total)" @onclick="() => GoAsync(_pageNo + 1)" data-testid="audit-next">@T["Older"]</button>
             </div>
         </div>
     }

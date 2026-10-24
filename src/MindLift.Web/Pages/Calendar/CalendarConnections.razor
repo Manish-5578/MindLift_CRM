@@ -1,0 +1,128 @@
+@page "/calendar/connections"
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+@inject Translator T
+
+<PageTitle>@T["Connect your calendar"] · MindLift</PageTitle>
+
+<div class="ml-page ml-page--form">
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/calendar" Class="mb-2">@T["Calendar"]</MudButton>
+    <PageHeader Title="Connect your calendar" Subtitle="Meetings you make here appear in your Google or Outlook calendar, and times already taken there block booking." />
+
+    @if (_data is null)
+    {
+        <MlCard Loading="true" />
+    }
+    else
+    {
+        <MlCard Title="Your calendars" Class="mb-4" TestId="calendar-connections">
+            @foreach (var p in _data.Providers)
+            {
+                var provider = p;
+                var connected = _data.Connections.Where(c => c.Provider == provider.Key).ToList();
+                <div style="border:1px solid var(--ml-border);border-radius:12px;padding:14px;margin-bottom:12px" data-testid="@($"provider-{provider.Key}")">
+                    <div class="d-flex align-center gap-2 flex-wrap">
+                        <MudIcon Icon="@(provider.Key == "google" ? Icons.Material.Filled.CalendarMonth : Icons.Material.Filled.Event)" />
+                        <b>@provider.Name</b>
+                        <span style="flex:1"></span>
+                        @if (!provider.Configured)
+                        {
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@T["Not set up by your administrator"]</MudChip>
+                        }
+                        else if (connected.Count == 0)
+                        {
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => ConnectAsync(provider.Key)" Disabled="_busy" data-testid="@($"connect-{provider.Key}")">@T["Connect"]</MudButton>
+                        }
+                    </div>
+                    @foreach (var c in connected)
+                    {
+                        var connection = c;
+                        <div class="d-flex align-center gap-2 flex-wrap mt-2" data-testid="calendar-connection">
+                            <MudIcon Icon="@(connection.LastError is null ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.ErrorOutline)" Color="@(connection.LastError is null ? Color.Success : Color.Error)" Size="Size.Small" />
+                            <span>@connection.AccountEmail</span>
+                            <MudText Typo="Typo.caption" Class="ml-muted">@(connection.LastSyncAt is { } at ? T["Last synced {0}", at.ToLocalTime().ToString("dd MMM HH:mm")] : T["Not synced yet"])</MudText>
+                            <span style="flex:1"></span>
+                            <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="SyncAsync" Disabled="_busy">@T["Sync now"]</MudButton>
+                            <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Error" OnClick="() => DisconnectAsync(connection)" Disabled="_busy">@T["Disconnect"]</MudButton>
+                        </div>
+                        @if (connection.LastError is not null) { <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@connection.LastError</MudAlert> }
+                    }
+                </div>
+            }
+            <MudText Typo="Typo.caption" Class="ml-muted">@T["Only the times of your events are read from your calendar, never what they are. Disconnecting removes the copies MindLift made."]</MudText>
+        </MlCard>
+
+        <MlCard Title="Calendar feed" Subtitle="@T["For Apple Calendar, or any calendar app that can subscribe to an address. Read-only."]" TestId="calendar-feed">
+            @if (_feedUrl is not null)
+            {
+                <MudAlert Severity="Severity.Success" Dense="true" Class="mb-3">@T["Copy this address now. It is shown only once. Anyone who has it can see your meetings."]</MudAlert>
+                <MudTextField Value="_feedUrl" ReadOnly="true" Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.ContentCopy" OnAdornmentClick="CopyAsync" data-testid="feed-url" />
+            }
+            <div class="d-flex gap-2 mt-3">
+                <MudButton Variant="Variant.Outlined" OnClick="NewFeedAsync" Disabled="_busy" data-testid="feed-new">@T[_data.HasFeed ? "Make a new address" : "Make my feed address"]</MudButton>
+                @if (_data.HasFeed) { <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="RemoveFeedAsync" Disabled="_busy">@T["Turn the feed off"]</MudButton> }
+            </div>
+        </MlCard>
+    }
+</div>
+
+@code {
+    private CalendarSyncDto? _data;
+    private string? _feedUrl;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        var uri = new Uri(Nav.Uri);
+        if (uri.Query.Contains("connected=")) Snackbar.Add(T["Your calendar is connected. The first sync is running."], Severity.Success);
+        else if (uri.Query.Contains("failed=")) Snackbar.Add(T["The calendar could not be connected. Please try again."], Severity.Error);
+        if (uri.Query.Contains("connected=")) await SyncAsync();
+    }
+
+    private async Task LoadAsync() => _data = await Http.GetFromJsonAsync<CalendarSyncDto>("api/v1/calendar/sync");
+
+    private async Task Run(Func<Task<HttpResponseMessage>> call, Action<HttpResponseMessage>? after = null)
+    {
+        _busy = true;
+        try
+        {
+            var response = await call();
+            if (!response.IsSuccessStatusCode) { Snackbar.Add(await ProblemText.FromAsync(response, T["That did not work."]), Severity.Error); return; }
+            after?.Invoke(response);
+            await LoadAsync();
+        }
+        finally { _busy = false; }
+    }
+
+    private async Task ConnectAsync(string provider)
+    {
+        var response = await Http.PostAsync($"api/v1/calendar/sync/connect/{provider}", null);
+        if (!response.IsSuccessStatusCode) { Snackbar.Add(await ProblemText.FromAsync(response, T["That did not work."]), Severity.Error); return; }
+        Nav.NavigateTo((await response.Content.ReadFromJsonAsync<CalendarConnectUrlDto>())!.Url, forceLoad: true);
+    }
+
+    private Task SyncAsync() => Run(() => Http.PostAsync("api/v1/calendar/sync/now", null));
+    private Task DisconnectAsync(CalendarConnectionDto c) => Run(() => Http.DeleteAsync($"api/v1/calendar/sync/connections/{c.Id}"));
+
+    private async Task NewFeedAsync()
+    {
+        _busy = true;
+        try
+        {
+            var response = await Http.PostAsync("api/v1/calendar/sync/feed", null);
+            if (response.IsSuccessStatusCode) { _feedUrl = (await response.Content.ReadFromJsonAsync<CalendarFeedDto>())!.Url; await LoadAsync(); }
+        }
+        finally { _busy = false; }
+    }
+
+    private async Task RemoveFeedAsync() { _feedUrl = null; await Run(() => Http.DeleteAsync("api/v1/calendar/sync/feed")); }
+
+    private async Task CopyAsync()
+    {
+        try { await JS.InvokeVoidAsync("navigator.clipboard.writeText", _feedUrl); Snackbar.Add(T["Copied."], Severity.Success); }
+        catch (JSException) { }
+    }
+}

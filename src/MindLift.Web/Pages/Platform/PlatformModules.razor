@@ -1,5 +1,6 @@
 @page "/platform/modules"
 @layout PlatformLayout
+@inject Translator T
 @inject HttpClient Http
 @inject NavigationManager Nav
 
@@ -7,14 +8,14 @@
 
 <div class="pc-head pc-rise">
     <div>
-        <div class="pc-eyebrow">Product</div>
-        <h1 class="pc-title">Every feature is a <span class="pc-grad">module.</span></h1>
-        <div class="pc-sub">The full catalogue, how many companies have each module, and who has what. To choose modules for one company, open it and use its Modules tab.</div>
+        <div class="pc-eyebrow">@T["Product"]</div>
+        <h1 class="pc-title">@T["Every feature is a"] <span class="pc-grad">@T["module."]</span></h1>
+        <div class="pc-sub">@T["The full catalogue, how many companies have each module, and who has what. To choose modules for one company, open it and use its Modules tab."]</div>
     </div>
-    <div class="pc-seg" role="group" aria-label="View">
-        <button class="@(_view == "cards" ? "is-on" : "")" @onclick='() => _view = "cards"' data-testid="mod-view-cards"><MudIcon Icon="@Icons.Material.Filled.GridView" Size="Size.Small" />Cards</button>
-        <button class="@(_view == "table" ? "is-on" : "")" @onclick='() => _view = "table"' data-testid="mod-view-table"><MudIcon Icon="@Icons.Material.Filled.TableRows" Size="Size.Small" />Table</button>
-        <button class="@(_view == "matrix" ? "is-on" : "")" @onclick='() => _view = "matrix"' data-testid="mod-view-matrix"><MudIcon Icon="@Icons.Material.Filled.Grid4x4" Size="Size.Small" />Who has what</button>
+    <div class="pc-seg" role="group" aria-label="@T["View"]">
+        <button class="@(_view == "cards" ? "is-on" : "")" @onclick='() => _view = "cards"' data-testid="mod-view-cards"><MudIcon Icon="@Icons.Material.Filled.GridView" Size="Size.Small" />@T["Cards"]</button>
+        <button class="@(_view == "table" ? "is-on" : "")" @onclick='() => _view = "table"' data-testid="mod-view-table"><MudIcon Icon="@Icons.Material.Filled.TableRows" Size="Size.Small" />@T["Table"]</button>
+        <button class="@(_view == "matrix" ? "is-on" : "")" @onclick='() => _view = "matrix"' data-testid="mod-view-matrix"><MudIcon Icon="@Icons.Material.Filled.Grid4x4" Size="Size.Small" />@T["Who has what"]</button>
     </div>
 </div>
 
@@ -26,7 +27,7 @@ else if (_view == "table")
 {
     <div class="pc-card pc-card--flush" style="overflow-x:auto">
         <table class="pc-table" data-testid="module-table">
-            <thead><tr><th>Module</th><th>Group</th><th>Kind</th><th>Companies</th><th style="min-width:180px">Share</th><th>Description</th></tr></thead>
+            <thead><tr><th>@T["Module"]</th><th>@T["Group"]</th><th>@T["Kind"]</th><th>@T["Companies"]</th><th style="min-width:180px">@T["Share"]</th><th>@T["Description"]</th></tr></thead>
             <tbody>
             @foreach (var m in _modules)
             {
@@ -52,7 +53,7 @@ else if (_view == "matrix")
     }
     else if (_companies.Count == 0)
     {
-        <div class="pc-card pc-empty">No companies yet.</div>
+        <div class="pc-card pc-empty">@T["No companies yet."]</div>
     }
     else
     {
@@ -60,7 +61,7 @@ else if (_view == "matrix")
             <table>
                 <thead>
                     <tr>
-                        <th>Company</th>
+                        <th>@T["Company"]</th>
                         @foreach (var m in Optional) { <th title="@m.Name"><div class="v">@m.Name</div></th> }
                     </tr>
                 </thead>
@@ -95,7 +96,7 @@ else
                     <span style="min-width:0;flex:1">
                         <span class="pc-mod__name" style="display:block">@m.Name</span>
                         <span class="pc-mod__desc" style="display:block">@m.Description</span>
-                        @if (!m.Available) { <span class="pc-mod__tag">Coming soon</span> }
+                        @if (!m.Available) { <span class="pc-mod__tag">@T["Coming soon"]</span> }
                         else
                         {
                             <span style="display:block;margin-top:12px">

@@ -83,5 +83,13 @@ public sealed class EmailGuard(AppDbContext db, ITenantContext tenant, NumberSeq
             db.EmailSuppressions.Add(new EmailSuppression { Email = address, Reason = reason });
             await db.SaveChangesAsync(cancellationToken);
         }
+
+        // Campaign results count the people who unsubscribed from a campaign's mail.
+        if (reason == "unsubscribed")
+        {
+            var now = clock.UtcNow;
+            await db.CampaignRecipients.Where(r => r.Email == address && r.Status == "sent" && r.UnsubscribedAt == null)
+                .ExecuteUpdateAsync(s => s.SetProperty(r => r.UnsubscribedAt, now), cancellationToken);
+        }
     }
 }

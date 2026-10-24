@@ -209,7 +209,7 @@ public sealed class PlatformConsoleTests(MindLiftApiFactory factory) : IClassFix
     {
         var (platform, _, id) = await SetUpAsync();
 
-        var detail = await SetModulesAsync(platform, id, "Tickets", "Campaigns");
+        var detail = await SetModulesAsync(platform, id, "Projects", "Integrations");
 
         detail.DisabledModules.ShouldBeEmpty();
     }
@@ -266,7 +266,7 @@ public sealed class PlatformConsoleTests(MindLiftApiFactory factory) : IClassFix
         var reports = modules.Single(m => m.Key == "Reports");
         reports.Companies.ShouldBeLessThan(reports.Total);
         modules.Single(m => m.Key == "Settings").Companies.ShouldBe(modules.Single(m => m.Key == "Settings").Total);
-        modules.Single(m => m.Key == "Tickets").Available.ShouldBeFalse();
+        modules.Single(m => m.Key == "Projects").Available.ShouldBeFalse();
     }
 
     [Fact]

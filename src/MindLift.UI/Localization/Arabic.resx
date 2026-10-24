@@ -4955,4 +4955,520 @@
   <data name="{0} records are being changed in the background. You will get a notification when it is done." xml:space="preserve">
     <value>يجري تعديل {0} سجل في الخلفية. سيصلك إشعار عند الانتهاء.</value>
   </data>
+  <data name="A module you switch off disappears from this company and its API refuses it straight away. Core modules are always on. A module left out of the plan can only be added by changing the plan." xml:space="preserve">
+    <value>الوحدة التي توقفها تختفي من هذه الشركة وترفضها واجهة البرمجة فوراً. الوحدات الأساسية تعمل دائماً. والوحدة غير المشمولة في الباقة لا تضاف إلا بتغيير الباقة.</value>
+  </data>
+  <data name="AI document reading" xml:space="preserve">
+    <value>قراءة المستندات بالذكاء الاصطناعي</value>
+  </data>
+  <data name="About this company" xml:space="preserve">
+    <value>عن هذه الشركة</value>
+  </data>
+  <data name="Accounts and deals" xml:space="preserve">
+    <value>الحسابات والصفقات</value>
+  </data>
+  <data name="Action code" xml:space="preserve">
+    <value>رمز الإجراء</value>
+  </data>
+  <data name="All companies" xml:space="preserve">
+    <value>كل الشركات</value>
+  </data>
+  <data name="Any activity" xml:space="preserve">
+    <value>أي نشاط</value>
+  </data>
+  <data name="Any plan" xml:space="preserve">
+    <value>أي باقة</value>
+  </data>
+  <data name="Audit trail" xml:space="preserve">
+    <value>سجل التدقيق</value>
+  </data>
+  <data name="Back to my workspace" xml:space="preserve">
+    <value>العودة إلى مساحة عملي</value>
+  </data>
+  <data name="Bank transfer reference, cheque number" xml:space="preserve">
+    <value>مرجع التحويل البنكي، رقم الشيك</value>
+  </data>
+  <data name="Billing" xml:space="preserve">
+    <value>الفوترة</value>
+  </data>
+  <data name="Cards" xml:space="preserve">
+    <value>بطاقات</value>
+  </data>
+  <data name="Changes to modules, plans, limits and status appear here." xml:space="preserve">
+    <value>تظهر هنا التغييرات على الوحدات والباقات والحدود والحالة.</value>
+  </data>
+  <data name="Click to edit" xml:space="preserve">
+    <value>اضغط للتعديل</value>
+  </data>
+  <data name="Coming soon" xml:space="preserve">
+    <value>قريباً</value>
+  </data>
+  <data name="Command centre" xml:space="preserve">
+    <value>مركز القيادة</value>
+  </data>
+  <data name="Companies" xml:space="preserve">
+    <value>الشركات</value>
+  </data>
+  <data name="Companies by plan" xml:space="preserve">
+    <value>الشركات حسب الباقة</value>
+  </data>
+  <data name="Companies by status" xml:space="preserve">
+    <value>الشركات حسب الحالة</value>
+  </data>
+  <data name="Contract details, who to call, what was promised." xml:space="preserve">
+    <value>تفاصيل العقد، ومن يجب الاتصال به، وما تم الوعد به.</value>
+  </data>
+  <data name="Core modules (Dashboard, Users, Settings) are always included." xml:space="preserve">
+    <value>الوحدات الأساسية (لوحة المتابعة، المستخدمون، الإعدادات) مشمولة دائماً.</value>
+  </data>
+  <data name="Country (2 letters)" xml:space="preserve">
+    <value>الدولة (حرفان)</value>
+  </data>
+  <data name="Current" xml:space="preserve">
+    <value>الحالية</value>
+  </data>
+  <data name="Customers" xml:space="preserve">
+    <value>العملاء</value>
+  </data>
+  <data name="Data" xml:space="preserve">
+    <value>البيانات</value>
+  </data>
+  <data name="Document operations" xml:space="preserve">
+    <value>عمليات المستندات</value>
+  </data>
+  <data name="Done by" xml:space="preserve">
+    <value>نفّذها</value>
+  </data>
+  <data name="Download" xml:space="preserve">
+    <value>تنزيل</value>
+  </data>
+  <data name="Every company on MindLift: who they are, what they use and how healthy the account is. Open one to choose its modules and limits." xml:space="preserve">
+    <value>كل شركة على مايند ليفت: من هي، وماذا تستخدم، وكم هو سليم حسابها. افتح إحداها لاختيار وحداتها وحدودها.</value>
+  </data>
+  <data name="Every feature is a" xml:space="preserve">
+    <value>كل ميزة هي</value>
+  </data>
+  <data name="Every record and file, in one ZIP" xml:space="preserve">
+    <value>كل سجل وملف في ملف ZIP واحد</value>
+  </data>
+  <data name="Everything the platform owner does: sign-ins, onboarding companies, plans, modules, limits and status changes, and exports. Nothing here can be edited or removed." xml:space="preserve">
+    <value>كل ما يفعله مالك المنصة: تسجيلات الدخول، وإضافة الشركات، والباقات، والوحدات، والحدود، وتغييرات الحالة، والتصدير. لا يمكن تعديل أي شيء هنا أو حذفه.</value>
+  </data>
+  <data name="Exact time (UTC)" xml:space="preserve">
+    <value>الوقت بالتحديد (بالتوقيت العالمي)</value>
+  </data>
+  <data name="Export CSV" xml:space="preserve">
+    <value>تصدير CSV</value>
+  </data>
+  <data name="Export all data" xml:space="preserve">
+    <value>تصدير كل البيانات</value>
+  </data>
+  <data name="Filter by name" xml:space="preserve">
+    <value>تصفية بالاسم</value>
+  </data>
+  <data name="Find a module" xml:space="preserve">
+    <value>ابحث عن وحدة</value>
+  </data>
+  <data name="First password" xml:space="preserve">
+    <value>كلمة المرور الأولى</value>
+  </data>
+  <data name="For a backup of this one company, or when it leaves." xml:space="preserve">
+    <value>لنسخة احتياطية لهذه الشركة وحدها، أو عند مغادرتها.</value>
+  </data>
+  <data name="For a backup of this one company, or when it leaves. Passwords and keys are never included." xml:space="preserve">
+    <value>لنسخة احتياطية لهذه الشركة وحدها، أو عند مغادرتها. لا تُضمَّن كلمات المرور والمفاتيح أبداً.</value>
+  </data>
+  <data name="For example: the customer says the lead list is empty" xml:space="preserve">
+    <value>مثال: يقول العميل إن قائمة العملاء المحتملين فارغة</value>
+  </data>
+  <data name="From date" xml:space="preserve">
+    <value>من تاريخ</value>
+  </data>
+  <data name="Full suite" xml:space="preserve">
+    <value>الباقة الكاملة</value>
+  </data>
+  <data name="Generate" xml:space="preserve">
+    <value>إنشاء</value>
+  </data>
+  <data name="Group" xml:space="preserve">
+    <value>المجموعة</value>
+  </data>
+  <data name="Health" xml:space="preserve">
+    <value>الصحة</value>
+  </data>
+  <data name="Health score" xml:space="preserve">
+    <value>درجة الصحة</value>
+  </data>
+  <data name="Hidden by their admin" xml:space="preserve">
+    <value>أخفاها مدير الشركة</value>
+  </data>
+  <data name="Hidden by their own admin" xml:space="preserve">
+    <value>أخفاها مدير الشركة نفسه</value>
+  </data>
+  <data name="History" xml:space="preserve">
+    <value>السجل</value>
+  </data>
+  <data name="How many companies use MindLift, how much they use it, and what needs your attention today." xml:space="preserve">
+    <value>كم شركة تستخدم مايند ليفت، وكم تستخدمه، وما الذي يحتاج انتباهك اليوم.</value>
+  </data>
+  <data name="Inactive" xml:space="preserve">
+    <value>غير نشطة</value>
+  </data>
+  <data name="Inbox" xml:space="preserve">
+    <value>صندوق الوارد</value>
+  </data>
+  <data name="Joined" xml:space="preserve">
+    <value>انضمت</value>
+  </data>
+  <data name="Kind" xml:space="preserve">
+    <value>النوع</value>
+  </data>
+  <data name="Last active" xml:space="preserve">
+    <value>آخر نشاط</value>
+  </data>
+  <data name="Last signed in" xml:space="preserve">
+    <value>آخر دخول</value>
+  </data>
+  <data name="Leads and contacts" xml:space="preserve">
+    <value>العملاء المحتملون وجهات الاتصال</value>
+  </data>
+  <data name="Limits" xml:space="preserve">
+    <value>الحدود</value>
+  </data>
+  <data name="Mark all read" xml:space="preserve">
+    <value>تحديد الكل كمقروء</value>
+  </data>
+  <data name="Mark paid" xml:space="preserve">
+    <value>تحديد كمدفوعة</value>
+  </data>
+  <data name="MindLift" xml:space="preserve">
+    <value>مايند ليفت</value>
+  </data>
+  <data name="Minimal" xml:space="preserve">
+    <value>الحد الأدنى</value>
+  </data>
+  <data name="Modules in this plan" xml:space="preserve">
+    <value>الوحدات في هذه الباقة</value>
+  </data>
+  <data name="Monthly revenue from active companies" xml:space="preserve">
+    <value>الإيراد الشهري من الشركات النشطة</value>
+  </data>
+  <data name="Needs your attention" xml:space="preserve">
+    <value>يحتاج انتباهك</value>
+  </data>
+  <data name="New companies" xml:space="preserve">
+    <value>شركات جديدة</value>
+  </data>
+  <data name="New companies and problems show up here." xml:space="preserve">
+    <value>تظهر هنا الشركات الجديدة والمشكلات.</value>
+  </data>
+  <data name="New companies from the last two weeks, and companies that need a look: overdue payments, trials ending, seats nearly used, accounts gone quiet." xml:space="preserve">
+    <value>الشركات الجديدة خلال الأسبوعين الأخيرين، والشركات التي تحتاج إلى نظرة: دفعات متأخرة، وتجارب تنتهي، ومقاعد توشك أن تُستنفد، وحسابات خاملة.</value>
+  </data>
+  <data name="New companies per day" xml:space="preserve">
+    <value>الشركات الجديدة يومياً</value>
+  </data>
+  <data name="New company" xml:space="preserve">
+    <value>شركة جديدة</value>
+  </data>
+  <data name="New plan" xml:space="preserve">
+    <value>باقة جديدة</value>
+  </data>
+  <data name="Newer" xml:space="preserve">
+    <value>الأحدث</value>
+  </data>
+  <data name="Newest companies" xml:space="preserve">
+    <value>أحدث الشركات</value>
+  </data>
+  <data name="No AI" xml:space="preserve">
+    <value>بدون ذكاء اصطناعي</value>
+  </data>
+  <data name="No changes yet. Anything you change for a company shows here." xml:space="preserve">
+    <value>لا تغييرات بعد. كل ما تغيّره لشركة يظهر هنا.</value>
+  </data>
+  <data name="No companies yet." xml:space="preserve">
+    <value>لا توجد شركات بعد.</value>
+  </data>
+  <data name="No company matches" xml:space="preserve">
+    <value>لا توجد شركة مطابقة</value>
+  </data>
+  <data name="No invoices yet." xml:space="preserve">
+    <value>لا فواتير بعد.</value>
+  </data>
+  <data name="None" xml:space="preserve">
+    <value>لا شيء</value>
+  </data>
+  <data name="Nothing needs you right now" xml:space="preserve">
+    <value>لا شيء يحتاجك الآن</value>
+  </data>
+  <data name="Nothing yet. Changes to modules, plan, limits and status will be listed here." xml:space="preserve">
+    <value>لا شيء بعد. ستُدرج هنا تغييرات الوحدات والباقة والحدود والحالة.</value>
+  </data>
+  <data name="Offer this plan to new companies" xml:space="preserve">
+    <value>اعرض هذه الباقة على الشركات الجديدة</value>
+  </data>
+  <data name="Older" xml:space="preserve">
+    <value>الأقدم</value>
+  </data>
+  <data name="On trial (14 days)" xml:space="preserve">
+    <value>في فترة تجريبية (14 يوماً)</value>
+  </data>
+  <data name="Onboard a company" xml:space="preserve">
+    <value>إضافة شركة</value>
+  </data>
+  <data name="One month" xml:space="preserve">
+    <value>شهر واحد</value>
+  </data>
+  <data name="One year" xml:space="preserve">
+    <value>سنة واحدة</value>
+  </data>
+  <data name="Only you see these" xml:space="preserve">
+    <value>أنت وحدك ترى هذه</value>
+  </data>
+  <data name="Open support view" xml:space="preserve">
+    <value>فتح عرض الدعم</value>
+  </data>
+  <data name="Overview" xml:space="preserve">
+    <value>نظرة عامة</value>
+  </data>
+  <data name="Owner email (their sign-in)" xml:space="preserve">
+    <value>بريد المالك (للدخول)</value>
+  </data>
+  <data name="Owner first name" xml:space="preserve">
+    <value>الاسم الأول للمالك</value>
+  </data>
+  <data name="Owner last name" xml:space="preserve">
+    <value>اسم عائلة المالك</value>
+  </data>
+  <data name="Paid in total" xml:space="preserve">
+    <value>إجمالي المدفوع</value>
+  </data>
+  <data name="Paid until" xml:space="preserve">
+    <value>مدفوع حتى</value>
+  </data>
+  <data name="Paying and active" xml:space="preserve">
+    <value>الدافعة والنشطة</value>
+  </data>
+  <data name="People" xml:space="preserve">
+    <value>الأشخاص</value>
+  </data>
+  <data name="People using it" xml:space="preserve">
+    <value>من يستخدمه</value>
+  </data>
+  <data name="Plan" xml:space="preserve">
+    <value>الباقة</value>
+  </data>
+  <data name="Plan &amp; limits" xml:space="preserve">
+    <value>الباقة والحدود</value>
+  </data>
+  <data name="Plan price" xml:space="preserve">
+    <value>سعر الباقة</value>
+  </data>
+  <data name="Plans" xml:space="preserve">
+    <value>الباقات</value>
+  </data>
+  <data name="Platform" xml:space="preserve">
+    <value>المنصة</value>
+  </data>
+  <data name="Platform console" xml:space="preserve">
+    <value>لوحة المنصة</value>
+  </data>
+  <data name="Platform navigation" xml:space="preserve">
+    <value>تنقل المنصة</value>
+  </data>
+  <data name="Platform owner" xml:space="preserve">
+    <value>مالك المنصة</value>
+  </data>
+  <data name="Prepare an export" xml:space="preserve">
+    <value>تجهيز تصدير</value>
+  </data>
+  <data name="Price / month" xml:space="preserve">
+    <value>السعر / شهر</value>
+  </data>
+  <data name="Price / year" xml:space="preserve">
+    <value>السعر / سنة</value>
+  </data>
+  <data name="Pricing" xml:space="preserve">
+    <value>التسعير</value>
+  </data>
+  <data name="Private notes" xml:space="preserve">
+    <value>ملاحظات خاصة</value>
+  </data>
+  <data name="Record a payment" xml:space="preserve">
+    <value>تسجيل دفعة</value>
+  </data>
+  <data name="Record id" xml:space="preserve">
+    <value>معرّف السجل</value>
+  </data>
+  <data name="Records allowed" xml:space="preserve">
+    <value>السجلات المسموحة</value>
+  </data>
+  <data name="Remove permanently" xml:space="preserve">
+    <value>حذف نهائي</value>
+  </data>
+  <data name="Remove this company for good" xml:space="preserve">
+    <value>حذف هذه الشركة نهائياً</value>
+  </data>
+  <data name="Retired" xml:space="preserve">
+    <value>متوقفة</value>
+  </data>
+  <data name="Sales &amp; billing" xml:space="preserve">
+    <value>المبيعات والفوترة</value>
+  </data>
+  <data name="Sales CRM" xml:space="preserve">
+    <value>إدارة علاقات المبيعات</value>
+  </data>
+  <data name="Save limits and notes" xml:space="preserve">
+    <value>حفظ الحدود والملاحظات</value>
+  </data>
+  <data name="Search companies by name or address" xml:space="preserve">
+    <value>ابحث عن الشركات بالاسم أو العنوان</value>
+  </data>
+  <data name="Search who, what or which company" xml:space="preserve">
+    <value>ابحث عن من أو ماذا أو أي شركة</value>
+  </data>
+  <data name="Shape what each plan costs, how much it allows and which modules it includes. A change reaches every company on the plan at once." xml:space="preserve">
+    <value>حدّد سعر كل باقة وما تسمح به والوحدات التي تشملها. أي تغيير يصل إلى كل شركة في الباقة فوراً.</value>
+  </data>
+  <data name="Share" xml:space="preserve">
+    <value>شارك</value>
+  </data>
+  <data name="Share it with them. They can change it after signing in. At least 8 characters." xml:space="preserve">
+    <value>شاركها معهم. يمكنهم تغييرها بعد الدخول. 8 أحرف على الأقل.</value>
+  </data>
+  <data name="Share of modules switched on" xml:space="preserve">
+    <value>نسبة الوحدات المفعّلة</value>
+  </data>
+  <data name="Show or hide the menu" xml:space="preserve">
+    <value>إظهار القائمة أو إخفاؤها</value>
+  </data>
+  <data name="Sign in to continue" xml:space="preserve">
+    <value>سجّل الدخول للمتابعة</value>
+  </data>
+  <data name="Signed in during the last 30 days" xml:space="preserve">
+    <value>سجّلت الدخول خلال آخر 30 يوماً</value>
+  </data>
+  <data name="Signups per day over the last 30 days" xml:space="preserve">
+    <value>التسجيلات يومياً خلال آخر 30 يوماً</value>
+  </data>
+  <data name="Sort" xml:space="preserve">
+    <value>ترتيب</value>
+  </data>
+  <data name="Sort: Last active" xml:space="preserve">
+    <value>ترتيب: آخر نشاط</value>
+  </data>
+  <data name="Sort: Most records" xml:space="preserve">
+    <value>ترتيب: الأكثر سجلات</value>
+  </data>
+  <data name="Sort: Most users" xml:space="preserve">
+    <value>ترتيب: الأكثر مستخدمين</value>
+  </data>
+  <data name="Sort: Name" xml:space="preserve">
+    <value>ترتيب: الاسم</value>
+  </data>
+  <data name="Sort: Needs care first" xml:space="preserve">
+    <value>ترتيب: الأحوج للعناية أولاً</value>
+  </data>
+  <data name="Sort: Newest" xml:space="preserve">
+    <value>ترتيب: الأحدث</value>
+  </data>
+  <data name="Start from" xml:space="preserve">
+    <value>ابدأ من</value>
+  </data>
+  <data name="Starts as" xml:space="preserve">
+    <value>تبدأ كـ</value>
+  </data>
+  <data name="Support view" xml:space="preserve">
+    <value>عرض الدعم</value>
+  </data>
+  <data name="Switch light or dark" xml:space="preserve">
+    <value>التبديل بين الفاتح والداكن</value>
+  </data>
+  <data name="Table" xml:space="preserve">
+    <value>جدول</value>
+  </data>
+  <data name="That company does not exist" xml:space="preserve">
+    <value>هذه الشركة غير موجودة</value>
+  </data>
+  <data name="The company becomes active on this plan for the period, and its owner gets a receipt." xml:space="preserve">
+    <value>تصبح الشركة نشطة على هذه الباقة طوال الفترة، ويصل مالكها إيصال.</value>
+  </data>
+  <data name="The full catalogue, how many companies have each module, and who has what. To choose modules for one company, open it and use its Modules tab." xml:space="preserve">
+    <value>الدليل الكامل، وعدد الشركات التي لديها كل وحدة، ومن لديه ماذا. لاختيار وحدات شركة، افتحها واستخدم تبويب الوحدات.</value>
+  </data>
+  <data name="This area is for the platform owner" xml:space="preserve">
+    <value>هذه المنطقة لمالك المنصة</value>
+  </data>
+  <data name="To date" xml:space="preserve">
+    <value>إلى تاريخ</value>
+  </data>
+  <data name="Trial ends" xml:space="preserve">
+    <value>تنتهي التجربة</value>
+  </data>
+  <data name="Try another word or clear the filters." xml:space="preserve">
+    <value>جرّب كلمة أخرى أو امسح عوامل التصفية.</value>
+  </data>
+  <data name="Usage against the plan" xml:space="preserve">
+    <value>الاستخدام مقابل الباقة</value>
+  </data>
+  <data name="User limit" xml:space="preserve">
+    <value>حد المستخدمين</value>
+  </data>
+  <data name="Users allowed" xml:space="preserve">
+    <value>المستخدمون المسموحون</value>
+  </data>
+  <data name="View all" xml:space="preserve">
+    <value>عرض الكل</value>
+  </data>
+  <data name="Waiting for payment" xml:space="preserve">
+    <value>بانتظار الدفع</value>
+  </data>
+  <data name="What changed" xml:space="preserve">
+    <value>ما الذي تغيّر</value>
+  </data>
+  <data name="When" xml:space="preserve">
+    <value>متى</value>
+  </data>
+  <data name="When off, its own AI switch is turned off too and nothing is sent to the local language model." xml:space="preserve">
+    <value>عند الإيقاف يُغلق مفتاح الذكاء الاصطناعي لديها أيضاً ولا يُرسل شيء إلى النموذج اللغوي المحلي.</value>
+  </data>
+  <data name="Which modules are used" xml:space="preserve">
+    <value>الوحدات المستخدمة</value>
+  </data>
+  <data name="Who" xml:space="preserve">
+    <value>من</value>
+  </data>
+  <data name="Who has what" xml:space="preserve">
+    <value>من لديه ماذا</value>
+  </data>
+  <data name="Who this plan is for" xml:space="preserve">
+    <value>لمن هذه الباقة</value>
+  </data>
+  <data name="Whole platform" xml:space="preserve">
+    <value>المنصة كلها</value>
+  </data>
+  <data name="Why do you need to look?" xml:space="preserve">
+    <value>لماذا تحتاج إلى الاطلاع؟</value>
+  </data>
+  <data name="You are all caught up" xml:space="preserve">
+    <value>لا شيء جديد</value>
+  </data>
+  <data name="You can fine-tune each module on the company page afterwards." xml:space="preserve">
+    <value>يمكنك ضبط كل وحدة لاحقاً من صفحة الشركة.</value>
+  </data>
+  <data name="You will see the workspace as its owner sees it, in a new tab, for up to 30 minutes. It is read-only: nothing can be changed. Your reason, and every page you look at, is recorded in the audit trail." xml:space="preserve">
+    <value>سترى مساحة العمل كما يراها مالكها، في تبويب جديد، لمدة تصل إلى 30 دقيقة. العرض للقراءة فقط: لا يمكن تغيير شيء. سبب الاطلاع وكل صفحة تشاهدها يُسجَّلان في سجل التدقيق.</value>
+  </data>
+  <data name="Your account manages a company, not the platform." xml:space="preserve">
+    <value>حسابك يدير شركة وليس المنصة.</value>
+  </data>
+  <data name="module." xml:space="preserve">
+    <value>وحدة.</value>
+  </data>
+  <data name="Signups" xml:space="preserve">
+    <value>التسجيلات</value>
+  </data>
+  <data name="Companies by" xml:space="preserve">
+    <value>الشركات حسب</value>
+  </data>
 </root>

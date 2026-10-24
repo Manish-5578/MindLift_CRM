@@ -29,6 +29,14 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<SendingDomain> SendingDomains { get; set; } = null!;
     public DbSet<DataExport> DataExports { get; set; } = null!;
     public DbSet<SupportSession> SupportSessions { get; set; } = null!;
+    public DbSet<Ticket> Tickets { get; set; } = null!;
+    public DbSet<TicketComment> TicketComments { get; set; } = null!;
+    public DbSet<Campaign> Campaigns { get; set; } = null!;
+    public DbSet<CampaignRecipient> CampaignRecipients { get; set; } = null!;
+    public DbSet<CalendarConnection> CalendarConnections { get; set; } = null!;
+    public DbSet<CalendarEventLink> CalendarEventLinks { get; set; } = null!;
+    public DbSet<ExternalBusyBlock> ExternalBusyBlocks { get; set; } = null!;
+    public DbSet<CalendarFeed> CalendarFeeds { get; set; } = null!;
     public DbSet<Plan> Plans { get; set; } = null!;
     public DbSet<RefreshToken> RefreshTokens { get; set; } = null!;
     public DbSet<TenantSettings> TenantSettings { get; set; } = null!;
@@ -192,6 +200,73 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.ToTable("data_exports");
             b.HasIndex(x => new { x.TenantId, x.CreatedAt });
             b.Property(x => x.Status).HasMaxLength(10);
+        });
+
+        builder.Entity<CalendarConnection>(b =>
+        {
+            b.ToTable("calendar_connections");
+            b.HasIndex(x => new { x.TenantId, x.UserId, x.Provider });
+            b.Property(x => x.Provider).HasMaxLength(20);
+            b.Property(x => x.AccountEmail).HasMaxLength(320);
+        });
+        builder.Entity<CalendarEventLink>(b =>
+        {
+            b.ToTable("calendar_event_links");
+            b.HasIndex(x => new { x.ConnectionId, x.ActivityId }).IsUnique();
+            b.Property(x => x.ExternalId).HasMaxLength(1024);
+            b.Property(x => x.ContentHash).HasMaxLength(64);
+        });
+        builder.Entity<ExternalBusyBlock>(b =>
+        {
+            b.ToTable("external_busy_blocks");
+            b.HasIndex(x => new { x.TenantId, x.UserId, x.StartAt });
+            b.HasIndex(x => x.ConnectionId);
+            b.Property(x => x.ExternalId).HasMaxLength(1024);
+        });
+        builder.Entity<CalendarFeed>(b =>
+        {
+            b.ToTable("calendar_feeds");
+            b.HasIndex(x => x.TokenHash).IsUnique();
+            b.HasIndex(x => new { x.TenantId, x.UserId });
+        });
+        builder.Entity<Campaign>(b =>
+        {
+            b.ToTable("campaigns");
+            b.HasIndex(x => new { x.TenantId, x.Status, x.CreatedAt });
+            b.HasIndex(x => new { x.Status, x.ScheduledAt });
+            b.Property(x => x.Name).HasMaxLength(150);
+            b.Property(x => x.Subject).HasMaxLength(200);
+            b.Property(x => x.Status).HasMaxLength(10);
+            b.Property(x => x.AudienceType).HasMaxLength(10);
+        });
+        builder.Entity<CampaignRecipient>(b =>
+        {
+            b.ToTable("campaign_recipients");
+            b.HasIndex(x => new { x.TenantId, x.CampaignId, x.Status });
+            b.HasIndex(x => x.Token).IsUnique();
+            b.HasIndex(x => new { x.TenantId, x.Email });
+            b.Property(x => x.Email).HasMaxLength(320);
+            b.Property(x => x.Status).HasMaxLength(10);
+            b.Property(x => x.Token).HasMaxLength(40);
+        });
+        builder.Entity<Ticket>(b =>
+        {
+            b.ToTable("tickets");
+            b.HasIndex(x => new { x.TenantId, x.Status, x.LastActivityAt });
+            b.HasIndex(x => new { x.TenantId, x.AssigneeId, x.Status });
+            b.HasIndex(x => new { x.TenantId, x.Number }).IsUnique();
+            b.Property(x => x.Number).HasMaxLength(20);
+            b.Property(x => x.Subject).HasMaxLength(200);
+            b.Property(x => x.Status).HasMaxLength(10);
+            b.Property(x => x.Priority).HasMaxLength(10);
+            b.Property(x => x.Category).HasMaxLength(100);
+            b.Property(x => x.Channel).HasMaxLength(10);
+        });
+        builder.Entity<TicketComment>(b =>
+        {
+            b.ToTable("ticket_comments");
+            b.HasIndex(x => new { x.TenantId, x.TicketId, x.CreatedAt });
+            b.Property(x => x.AuthorName).HasMaxLength(200);
         });
 
         builder.Entity<SupportSession>(b =>

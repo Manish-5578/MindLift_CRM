@@ -491,3 +491,6 @@ App_Data/
 
 # local dev logins
 .claude/*.local.txt
+
+# local experiments and test builds
+.scratch/

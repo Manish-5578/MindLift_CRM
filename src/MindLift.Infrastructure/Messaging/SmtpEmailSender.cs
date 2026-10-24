@@ -14,13 +14,19 @@ public sealed class SmtpEmailSender(IOptions<SmtpOptions> options) : IEmailSende
     public Task SendAsync(string to, string subject, string textBody, CancellationToken cancellationToken = default)
         => SendAsync(to, subject, textBody, [], cancellationToken);
 
-    public async Task SendAsync(string to, string subject, string textBody, IReadOnlyList<EmailAttachment> attachments, CancellationToken cancellationToken = default)
+    public Task SendHtmlAsync(string to, string subject, string textBody, string htmlBody, CancellationToken cancellationToken = default)
+        => DeliverAsync(to, subject, textBody, [], htmlBody, cancellationToken);
+
+    public Task SendAsync(string to, string subject, string textBody, IReadOnlyList<EmailAttachment> attachments, CancellationToken cancellationToken = default)
+        => DeliverAsync(to, subject, textBody, attachments, null, cancellationToken);
+
+    private async Task DeliverAsync(string to, string subject, string textBody, IReadOnlyList<EmailAttachment> attachments, string? htmlBody, CancellationToken cancellationToken)
     {
         var message = new MimeMessage();
         message.From.Add(new MailboxAddress(_options.FromName, _options.FromAddress));
         message.To.Add(MailboxAddress.Parse(to));
         message.Subject = subject;
-        var body = new BodyBuilder { TextBody = textBody };
+        var body = new BodyBuilder { TextBody = textBody, HtmlBody = htmlBody };
         foreach (var attachment in attachments)
         {
             body.Attachments.Add(attachment.FileName, attachment.Content, ContentType.Parse(attachment.ContentType));

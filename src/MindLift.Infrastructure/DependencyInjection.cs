@@ -79,6 +79,17 @@ public static class DependencyInjection
         services.AddScoped<MindLift.Infrastructure.Billing.BillingRenewalJob>();
         services.AddScoped<MindLift.Infrastructure.DataPortability.CompanyDataService>();
         services.AddScoped<MindLift.Infrastructure.Platform.SupportAccessService>();
+        services.AddScoped<MindLift.Infrastructure.Tickets.TicketService>();
+        services.AddScoped<MindLift.Infrastructure.Campaigns.CampaignService>();
+        services.AddScoped<MindLift.Infrastructure.Campaigns.CampaignSendJob>();
+        services.AddScoped<MindLift.Infrastructure.Campaigns.CampaignScheduleJob>();
+
+        // Calendar sync: Google and Microsoft. A service stays off until its client id and secret are in the settings.
+        services.AddHttpClient(MindLift.Infrastructure.CalendarSync.CalendarHttp.ClientName, c => c.Timeout = TimeSpan.FromSeconds(20));
+        services.AddScoped<MindLift.Infrastructure.CalendarSync.ICalendarProvider, MindLift.Infrastructure.CalendarSync.GoogleCalendarProvider>();
+        services.AddScoped<MindLift.Infrastructure.CalendarSync.ICalendarProvider, MindLift.Infrastructure.CalendarSync.MicrosoftCalendarProvider>();
+        services.AddScoped<MindLift.Infrastructure.CalendarSync.CalendarSyncService>();
+        services.AddScoped<MindLift.Infrastructure.CalendarSync.CalendarSyncJob>();
         services.AddScoped<MindLift.Infrastructure.Common.BulkQueue>();
         services.AddScoped<MindLift.Infrastructure.Common.BulkJob>();
         services.AddScoped<SystemSeedService>();

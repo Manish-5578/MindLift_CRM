@@ -19,6 +19,7 @@ public static class NotificationTypes
     public const string ImportCompleted = "ImportCompleted";
     public const string BulkCompleted = "BulkCompleted";
     public const string Billing = "Billing";
+    public const string TicketAssigned = "TicketAssigned";
     public const string TrialEnding = "TrialEnding";
     public const string PortalUpload = "PortalUpload";
 
@@ -44,6 +45,7 @@ public static class NotificationTypes
         (ImportCompleted, "An import finishes", true),
         (BulkCompleted, "A large bulk change finishes", false),
         (Billing, "Invoices, payments and renewals", true),
+        (TicketAssigned, "A ticket is assigned to me", true),
         (TrialEnding, "My trial is ending", true),
         (PortalUpload, "A customer uploads a requested document", true),
     ];

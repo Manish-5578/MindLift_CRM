@@ -334,6 +334,8 @@ new RecurringJobManager(hangfireStorage).AddOrUpdate<MindLift.Infrastructure.Not
 new RecurringJobManager(hangfireStorage).AddOrUpdate<MindLift.Infrastructure.Notifications.DailyDigestJob>("daily-digest", job => job.RunAsync(CancellationToken.None), Cron.Hourly());
 new RecurringJobManager(hangfireStorage).AddOrUpdate<MindLift.Infrastructure.Bookings.BookingReminderJob>("booking-reminders", job => job.RunAsync(CancellationToken.None), "*/5 * * * *");
 new RecurringJobManager(hangfireStorage).AddOrUpdate<MindLift.Infrastructure.Notifications.NotificationCleanupJob>("notification-cleanup", job => job.RunAsync(CancellationToken.None), Cron.Daily(3, 30));
+new RecurringJobManager(hangfireStorage).AddOrUpdate<MindLift.Infrastructure.CalendarSync.CalendarSyncJob>("calendar-sync", job => job.RunAsync(CancellationToken.None), "*/10 * * * *");
+new RecurringJobManager(hangfireStorage).AddOrUpdate<MindLift.Infrastructure.Campaigns.CampaignScheduleJob>("campaign-schedule", job => job.RunAsync(CancellationToken.None), "*/5 * * * *");
 new RecurringJobManager(hangfireStorage).AddOrUpdate<MindLift.Infrastructure.Billing.BillingRenewalJob>("billing-renewals", job => job.RunAsync(CancellationToken.None), Cron.Daily(5));
 new RecurringJobManager(hangfireStorage).AddOrUpdate<MindLift.Infrastructure.Persistence.AuditRetentionJob>("audit-retention", job => job.RunAsync(CancellationToken.None), Cron.Daily(2));
 new RecurringJobManager(hangfireStorage).AddOrUpdate<MindLift.Infrastructure.Cpq.DocumentExpiryJob>("document-expiry", job => job.RunAsync(CancellationToken.None), Cron.Daily(4));

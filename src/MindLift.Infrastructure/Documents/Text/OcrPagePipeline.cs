@@ -263,6 +263,18 @@ public sealed class OcrPagePipeline(IOcrEngine primary, IReadOnlyList<IOcrEngine
                 best = attempts[OcrQuality.Best(attempts.Select(a => a.Quality).ToList())];
             }
 
+            // A page that is mostly Arabic is also read with the Arabic model on its own. Reading Arabic and English together lets Latin letters
+            // creep into Arabic words, and it is a little less sure of the Arabic itself.
+            if (best.Quality.Score < options.TargetPageConfidence && LooksArabic(best.Text) && options.Languages.Contains("ara") && options.Languages.Contains('+'))
+            {
+                var arabicPath = paths.TryGetValue(Variant.Enhanced, out var found) ? found : PathFor(Variant.Enhanced);
+                var result = await primary.RecognizeAsync(arabicPath, request with { Languages = "ara", PageSegMode = 3 }, ct);
+                var attempt = ToAttempt(result.Words, page.Enhanced.Width, page.Enhanced.Height, page.StraightMap);
+                attempts.Add(attempt);
+                logger.LogDebug("Read the page with the Arabic model alone: {Quality}", OcrQuality.Describe(attempt.Quality));
+                best = attempts[OcrQuality.Best(attempts.Select(a => a.Quality).ToList())];
+            }
+
             if (best.Quality.Score < options.MinPageConfidence)
             {
                 var extra = await TryOtherEnginesAsync(paths.TryGetValue(Variant.Enhanced, out var enhancedPath) ? enhancedPath : PathFor(Variant.Enhanced), page, request, HasNonLatinLetters(best.Text), ct);
@@ -389,6 +401,8 @@ public sealed class OcrPagePipeline(IOcrEngine primary, IReadOnlyList<IOcrEngine
     }
 
     /// <summary>True when the text has letters from a script other than Latin, such as Arabic.</summary>
+    private static bool LooksArabic(string text) => ArabicText.RightToLeftShare(text) >= 0.5;
+
     private static bool HasNonLatinLetters(string text) => text.Any(c => char.IsLetter(c) && c > 'ɏ');
 
     private async Task<List<Attempt>> TryOtherEnginesAsync(string enhancedPath, PreparedPage page, OcrRequest request, bool nonLatin, CancellationToken ct)

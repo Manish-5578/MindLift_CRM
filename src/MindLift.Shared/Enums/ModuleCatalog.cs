@@ -55,9 +55,9 @@ public static class ModuleCatalog
 
         M(AppModule.Portal, "Customer portal", "A branded portal where a company's own customers send and receive documents.", Channels, "portal"),
 
-        M(AppModule.Tickets, "Support tickets", "A help desk with queues and service levels.", Roadmap, "tickets", available: false),
+        M(AppModule.Tickets, "Support tickets", "A help desk: requests, owners, answer times and replies by email.", Engagement, "tickets"),
         M(AppModule.Projects, "Projects", "Delivery projects, milestones and time.", Roadmap, "projects", available: false),
-        M(AppModule.Campaigns, "Campaigns", "Email and WhatsApp campaigns with results.", Roadmap, "campaigns", available: false),
+        M(AppModule.Campaigns, "Campaigns", "Email campaigns to a chosen audience, with opens, clicks and unsubscribes.", Engagement, "campaigns"),
         M(AppModule.Integrations, "Integrations", "Connectors and a public API.", Roadmap, "integrations", available: false),
     ];
 

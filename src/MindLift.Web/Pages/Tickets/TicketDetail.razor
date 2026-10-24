@@ -1,0 +1,134 @@
+@page "/tickets/{Id:guid}"
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@inject AppState App
+@inject Translator T
+
+<PageTitle>@(_t?.Number ?? T["Ticket"]) · MindLift</PageTitle>
+
+<div class="ml-page">
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/tickets" Class="mb-2">@T["All tickets"]</MudButton>
+
+    @if (_notFound)
+    {
+        <EmptyState Title="That ticket does not exist" Message="It may have been deleted, or it is not one you can see." />
+    }
+    else if (_t is null)
+    {
+        <MlCard Loading="true" />
+    }
+    else
+    {
+        var t = _t;
+        <div class="d-flex flex-wrap align-center justify-space-between gap-3 mb-4">
+            <div>
+                <MudText Typo="Typo.overline" Class="ml-muted">@t.Number · @T[t.Channel]</MudText>
+                <MudText Typo="Typo.h5" Style="font-weight:700" data-testid="ticket-title">@t.Subject</MudText>
+            </div>
+            <div class="d-flex align-center gap-2">
+                <MudChip T="string" Color="@(t.IsLate ? Color.Error : Color.Default)" Variant="Variant.Outlined" Size="Size.Small">
+                    @(t.IsLate ? T["Late: answer was due {0}", t.DueAt!.Value.ToLocalTime().ToString("dd MMM HH:mm")] : t.FirstResponseAt is null && t.DueAt is { } d ? T["Answer due {0}", d.ToLocalTime().ToString("dd MMM HH:mm")] : T["Answered"])
+                </MudChip>
+                <MudSelect T="string" Value="t.Status" ValueChanged="SetStatusAsync" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Style="min-width:150px" data-testid="ticket-status">
+                    @foreach (var s in TicketStatuses.All) { <MudSelectItem T="string" Value="@s">@T[s]</MudSelectItem> }
+                </MudSelect>
+            </div>
+        </div>
+
+        <MudGrid Spacing="3">
+            <MudItem xs="12" md="8">
+                @if (!string.IsNullOrWhiteSpace(t.Description))
+                {
+                    <MlCard Title="The request" Class="mb-3"><div style="white-space:pre-wrap">@t.Description</div></MlCard>
+                }
+
+                <MlCard Title="Conversation" TestId="ticket-thread">
+                    @if (t.Comments.Count == 0) { <MudText Typo="Typo.body2" Class="ml-muted">@T["No replies yet."]</MudText> }
+                    @foreach (var c in t.Comments)
+                    {
+                        <div class="mb-3 pa-3" style="border-radius:12px;border:1px solid var(--ml-border);background:@(c.IsInternal ? "color-mix(in srgb, var(--ml-warning) 10%, var(--ml-surface))" : "var(--ml-surface)")" data-testid="ticket-comment">
+                            <div class="d-flex justify-space-between">
+                                <b>@c.AuthorName</b>
+                                <span class="ml-muted" style="font-size:12px">@(c.IsInternal ? T["Internal note"] + " · " : "")@c.CreatedAt.ToLocalTime().ToString("dd MMM HH:mm")</span>
+                            </div>
+                            <div style="white-space:pre-wrap;margin-top:6px">@c.Body</div>
+                        </div>
+                    }
+
+                    @if (App.CanEdit(AppModule.Tickets))
+                    {
+                        <MudTextField @bind-Value="_reply" Lines="4" Variant="Variant.Outlined" Margin="Margin.Dense" Label="@T["Write a reply or a note"]" Immediate="true" data-testid="ticket-reply" />
+                        <div class="d-flex flex-wrap align-center gap-3 mt-2">
+                            <MudCheckBox T="bool" @bind-Value="_internal" Label="@T["Internal note (the customer does not see it)"]" Dense="true" data-testid="ticket-internal" />
+                            @if (!_internal && !string.IsNullOrEmpty(t.ContactEmail))
+                            {
+                                <MudCheckBox T="bool" @bind-Value="_email" Label="@T["Email this to {0}", t.ContactEmail]" Dense="true" data-testid="ticket-email" />
+                            }
+                            <span style="flex:1"></span>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ReplyAsync" Disabled="@(_busy || string.IsNullOrWhiteSpace(_reply))" data-testid="ticket-send">@T[_internal ? "Add note" : "Send reply"]</MudButton>
+                        </div>
+                    }
+                </MlCard>
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                <MlCard Title="Details">
+                    <div class="ml-stack">
+                        <MudSelect T="Guid?" Value="t.AssigneeId" ValueChanged="AssignAsync" Label="@T["Assigned to"]" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@(!App.CanEdit(AppModule.Tickets))" data-testid="ticket-assignee">
+                            <MudSelectItem T="Guid?" Value="(Guid?)null">@T["Nobody"]</MudSelectItem>
+                            @foreach (var u in _users) { <MudSelectItem T="Guid?" Value="@u.Id">@u.FullName</MudSelectItem> }
+                        </MudSelect>
+                        <div class="pc-kv-ml"><span class="ml-muted">@T["Priority"]</span> <b>@T[t.Priority]</b></div>
+                        <div class="pc-kv-ml"><span class="ml-muted">@T["Customer"]</span> <b>@(t.ContactName ?? "-")</b></div>
+                        @if (t.AccountName is not null) { <div class="pc-kv-ml"><span class="ml-muted">@T["Account"]</span> <b>@t.AccountName</b></div> }
+                        <div class="pc-kv-ml"><span class="ml-muted">@T["Opened"]</span> <b>@t.CreatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</b></div>
+                        @if (t.FirstResponseAt is { } fr) { <div class="pc-kv-ml"><span class="ml-muted">@T["First answer"]</span> <b>@fr.ToLocalTime().ToString("dd MMM HH:mm")</b></div> }
+                        @if (t.ResolvedAt is { } rs) { <div class="pc-kv-ml"><span class="ml-muted">@T["Resolved"]</span> <b>@rs.ToLocalTime().ToString("dd MMM HH:mm")</b></div> }
+                    </div>
+                </MlCard>
+            </MudItem>
+        </MudGrid>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private TicketDto? _t;
+    private List<UserListItem> _users = [];
+    private bool _notFound, _busy, _internal, _email;
+    private string? _reply;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _users = await RecordLookups.UsersAsync(Http);
+        var response = await Http.GetAsync($"api/v1/tickets/{Id}");
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound) { _notFound = true; return; }
+        _t = response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<TicketDto>() : null;
+    }
+
+    private async Task Apply(HttpResponseMessage response, string? done = null)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            _t = await response.Content.ReadFromJsonAsync<TicketDto>();
+            if (done is not null) Snackbar.Add(done, Severity.Success);
+        }
+        else Snackbar.Add(await ProblemText.FromAsync(response, T["That did not work."]), Severity.Error);
+    }
+
+    private async Task SetStatusAsync(string status) => await Apply(await Http.PostAsJsonAsync($"api/v1/tickets/{Id}/status", new ChangeTicketStatusRequest(status)));
+    private async Task AssignAsync(Guid? who) => await Apply(await Http.PostAsJsonAsync($"api/v1/tickets/{Id}/assign", new AssignTicketRequest(who)));
+
+    private async Task ReplyAsync()
+    {
+        _busy = true;
+        try
+        {
+            await Apply(await Http.PostAsJsonAsync($"api/v1/tickets/{Id}/comments", new AddTicketCommentRequest(_reply ?? "", _internal, _email && !_internal)), _internal ? T["Note added."] : T["Reply sent."]);
+            if (_t is not null && _t.Comments.Count > 0) { _reply = null; }
+        }
+        finally { _busy = false; }
+    }
+}
