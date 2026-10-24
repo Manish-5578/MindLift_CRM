@@ -133,6 +133,14 @@
             }
 
             var result = (await response.Content.ReadFromJsonAsync<BulkActionResult>())!;
+            if (result.Queued)
+            {
+                // Too many to change while you wait: it runs in the background and a notification brings the result.
+                Snackbar.Add(T["{0} records are being changed in the background. You will get a notification when it is done.", result.Requested.ToString("N0")], Severity.Info);
+                await Selection.Done();
+                return;
+            }
+
             if (result.Succeeded > 0)
             {
                 Snackbar.Add(done(result.Succeeded.ToString("N0")), Severity.Success);

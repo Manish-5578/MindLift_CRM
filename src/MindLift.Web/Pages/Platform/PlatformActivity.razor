@@ -95,7 +95,7 @@
 
 @code {
     private const int PageSize = 20;
-    private static readonly Dictionary<string, string> Kinds = new() { [""] = "Everything", ["company"] = "Companies", ["modules"] = "Modules", ["plan"] = "Plans", ["status"] = "Status", ["limits"] = "Limits", ["auth"] = "Sign-ins", ["audit"] = "Exports" };
+    private static readonly Dictionary<string, string> Kinds = new() { [""] = "Everything", ["company"] = "Companies", ["modules"] = "Modules", ["plan"] = "Plans", ["status"] = "Status", ["limits"] = "Limits", ["auth"] = "Sign-ins", ["audit"] = "Exports", ["billing"] = "Billing", ["support"] = "Support" };
 
     private PagedResult<PlatformAuditDto>? _page;
     private List<PlatformCompanyDto> _companies = [];
@@ -113,7 +113,7 @@
     private bool Filtered => _kind != "" || _companyId != "" || _from is not null || _to is not null || _search.Trim() != "";
     private string Range => _page is null || _page.Total == 0 ? "0" : $"{(_pageNo - 1) * PageSize + 1}-{Math.Min(_pageNo * PageSize, _page.Total)}";
 
-    private static string Group(string action) => action.Split('.')[0] is var g && g is "modules" or "plan" or "status" or "limits" or "company" or "auth" or "audit" ? g : "company";
+    private static string Group(string action) => action.Split('.')[0] is var g && g is "modules" or "plan" or "status" or "limits" or "company" or "auth" or "audit" or "billing" or "support" ? g : "company";
 
     private static string Label(string action) => action switch
     {
@@ -128,6 +128,10 @@
         "auth.signin" => "Signed in",
         "auth.failed" => "Failed sign-in",
         "audit.exported" => "Exported trail",
+        "billing.payment" => "Payment",
+        "company.purged" => "Company removed",
+        "support.started" => "Support view opened",
+        "support.ended" => "Support view closed",
         _ => action
     };
 

@@ -55,6 +55,22 @@
         }
 
         <MudMainContent>
+            @if (Session.IsSupport)
+            {
+                <div class="ml-billing-banner ml-billing-banner--bad" data-testid="support-banner">
+                    <MudIcon Icon="@Icons.Material.Filled.SupportAgent" Size="Size.Small" />
+                    <span>@T["Support view of {0}, opened by {1}. Read-only: nothing can be changed, and every page viewed is recorded.", App.Bootstrap?.Company.CompanyName ?? "", Session.SupportBy ?? ""]</span>
+                    <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Error" OnClick="EndSupportAsync" data-testid="support-end">@T["End support view"]</MudButton>
+                </div>
+            }
+            else if (Session.IsSignedIn && App.Bootstrap is not null && BillingBanner is { } banner && !Nav.Uri.Contains("/settings/billing"))
+            {
+                <div class="ml-billing-banner ml-billing-banner--@banner.Kind" data-testid="billing-banner">
+                    <MudIcon Icon="@(banner.Kind == "bad" ? Icons.Material.Filled.ErrorOutline : Icons.Material.Filled.HourglassBottom)" Size="Size.Small" />
+                    <span>@banner.Text</span>
+                    @if (App.IsAdmin) { <MudButton Size="Size.Small" Variant="Variant.Filled" Color="@(banner.Kind == "bad" ? Color.Error : Color.Primary)" Href="/settings/billing">@T["Choose a plan"]</MudButton> }
+                </div>
+            }
             @* A new key when the language changes makes every screen draw itself again in the new language. *@
             <div @key="T.Language" class="ml-lang-root">@Body</div>
         </MudMainContent>
@@ -70,6 +86,37 @@
     private bool _drawerOpen = true;
 
     private sealed record NavItem(string Label, string Href, string Icon);
+
+    private sealed record Banner(string Kind, string Text);
+
+    private async Task EndSupportAsync()
+    {
+        await Http.PostAsync("api/v1/support/end", null);
+        Session.Clear();
+        App.Reset();
+        await JS.InvokeVoidAsync("close");   // the tab was opened for the support view
+        Nav.NavigateTo("/login", forceLoad: true);
+    }
+
+    /// <summary>Tells people when the trial is about to end or the subscription has lapsed, so a refused change is never a surprise.</summary>
+    private Banner? BillingBanner
+    {
+        get
+        {
+            var me = Session.Me;
+            if (me is null) return null;
+            if (me.TenantStatus is "PastDue" or "Cancelled")
+                return new("bad", T["Your subscription has lapsed. You can still see everything, but changes are paused until a plan is chosen."]);
+            if (me.TenantStatus == "Trial" && me.TrialEndsAtUtc is { } ends)
+            {
+                var days = (int)Math.Ceiling((ends - DateTime.UtcNow).TotalDays);
+                if (days <= 0) return new("bad", T["Your free trial has ended. Choose a plan to keep making changes."]);
+                if (days <= 7) return new("warn", days == 1 ? T["Your free trial ends tomorrow."] : T["Your free trial ends in {0} days.", days]);
+            }
+
+            return null;
+        }
+    }
 
     private IEnumerable<NavItem> NavItems
     {

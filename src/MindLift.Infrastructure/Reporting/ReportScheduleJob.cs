@@ -17,6 +17,7 @@ namespace MindLift.Infrastructure.Reporting;
 /// </summary>
 public sealed class ReportScheduleJob(
     AppDbContext db,
+    MindLift.Application.Abstractions.ITenantContext tenantContext,
     IEmailSender emailSender,
     IReportExecutor executor,
     ReportSqlBuilder sqlBuilder,
@@ -27,6 +28,9 @@ public sealed class ReportScheduleJob(
     public async Task RunAsync(Guid tenantId, Guid scheduleId, CancellationToken ct = default)
     {
         logger.LogInformation("Executing ReportScheduleJob for tenant {TenantId}, schedule {ScheduleId}", tenantId, scheduleId);
+
+        // A background job has no signed-in user. Everything it writes (the execution log) must still belong to the company.
+        using var scope = tenantContext.Use(tenantId);
 
         var schedule = await db.ReportSchedules
             .IgnoreQueryFilters()

@@ -12,7 +12,7 @@ using MindLift.Shared.Contracts;
 
 namespace MindLift.Infrastructure.Cpq;
 
-public sealed class CpqService(IAppDbContext db, ITenantContext tenant) : ICpqService
+public sealed class CpqService(IAppDbContext db, ITenantContext tenant, MindLift.Infrastructure.Tenancy.NumberSequences numbers) : ICpqService
 {
     private Guid CurrentTenantId => tenant.TenantId ?? throw new UnauthorizedAccessException("Tenant context required.");
 
@@ -232,8 +232,7 @@ public sealed class CpqService(IAppDbContext db, ITenantContext tenant) : ICpqSe
     {
         if (string.IsNullOrWhiteSpace(req.Title)) throw new ValidationException("Title", "Quote title is required.");
 
-        var quoteCount = await db.Set<Quote>().CountAsync(ct);
-        var quoteNumber = $"Q-{10001 + quoteCount}";
+        var quoteNumber = $"Q-{await numbers.NextAsync(MindLift.Infrastructure.Tenancy.NumberSequences.Quote, async () => 10001 + await db.Set<Quote>().IgnoreQueryFilters().CountAsync(x => x.TenantId == CurrentTenantId, ct), ct)}";
 
         var quote = new Quote
         {
@@ -349,8 +348,7 @@ public sealed class CpqService(IAppDbContext db, ITenantContext tenant) : ICpqSe
             .FirstOrDefaultAsync(x => x.Id == quoteId && !x.IsDeleted, ct)
             ?? throw new NotFoundException("Quote", quoteId);
 
-        var invoiceCount = await db.Set<Invoice>().CountAsync(ct);
-        var invoiceNumber = $"INV-{10001 + invoiceCount}";
+        var invoiceNumber = await NextInvoiceNumberAsync(ct);
 
         var invoice = new Invoice
         {
@@ -433,10 +431,12 @@ public sealed class CpqService(IAppDbContext db, ITenantContext tenant) : ICpqSe
         return inv == null ? null : MapInvoice(inv);
     }
 
+    private async Task<string> NextInvoiceNumberAsync(CancellationToken ct)
+        => $"INV-{await numbers.NextAsync(MindLift.Infrastructure.Tenancy.NumberSequences.Invoice, async () => 10001 + await db.Set<Invoice>().IgnoreQueryFilters().CountAsync(x => x.TenantId == CurrentTenantId, ct), ct)}";
+
     public async Task<InvoiceDto> CreateInvoiceAsync(SaveInvoiceRequest req, CancellationToken ct = default)
     {
-        var invoiceCount = await db.Set<Invoice>().CountAsync(ct);
-        var invoiceNumber = $"INV-{10001 + invoiceCount}";
+        var invoiceNumber = await NextInvoiceNumberAsync(ct);
 
         var inv = new Invoice
         {

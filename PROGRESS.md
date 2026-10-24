@@ -810,3 +810,16 @@ Test totals: 373 unit, 143 UI component, 231 integration (747 in all), all passi
 - [x] Modules page: cards, table and a "who has what" grid (companies by modules).
 - [x] Audit trail: filter by company, kind, words and dates; open a row for detail; export CSV.
 - [x] Notifications: a bell and an inbox for new companies and companies that need a look (overdue, trial ending, seats nearly used, gone quiet). Read state is kept in the browser.
+
+## Production hardening and SaaS foundations (2026-10-24)
+
+- [x] Review fixes: file volume and non-root permissions, required mail settings, scheduled reports run in their company, gap-free race-free quote and invoice numbers, upload allowlist and size limit, webhook connection pinned to the checked address, report time limit applied, Hangfire shutdown waits for jobs, stage history scoped to the company, missing indexes.
+- [x] Per-request checks cached (person, company standing, module switches) and dropped the moment they change; a token stops working at once when the password changes or the person is deactivated.
+- [x] Bulk changes over 50 records run in the background with a notification; automation mail and webhooks sent from inside a transaction go out afterwards.
+- [x] Separate worker container for heavy queues, Redis for shared cache and live notifications, migration lock, nightly database backup, capped connection pools, audit retention, S3-compatible file storage.
+- [x] Logs with correlation, company and user on every line; daily files, Seq and Sentry when configured; live and ready health checks.
+- [x] Billing: subscriptions, invoices, plans with yearly price and currency, company Billing page, trial and past-due banner, platform owner records payments, renewal invoices, past-due and cancellation by daily job. A gateway plugs in through `IPaymentProvider` (Stripe or Razorpay to be chosen).
+- [x] Email protection: daily automated mail limit per company, unsubscribe link and do-not-email list, sending domain verification (ownership, SPF, DMARC). A transactional provider to be chosen.
+- [x] Company data export (ZIP, signed download link) and permanent removal by the platform owner.
+- [x] Read-only, time-limited, recorded support view for the platform owner.
+- See docs/OPERATIONS.md.

@@ -33,4 +33,8 @@ public sealed record BulkDeleteRequest(IReadOnlyList<Guid>? Ids, ListQuery? AllM
 
 public sealed record BulkFailure(Guid Id, string? Name, string Message);
 
-public sealed record BulkActionResult(int Requested, int Succeeded, IReadOnlyList<BulkFailure> Failures);
+/// <summary>
+/// What a bulk change did. When <c>Queued</c> is true the change was too large to make while the person waits: it runs in the background
+/// (<c>JobId</c>) and a notification brings the result. Nothing has been changed yet at that point.
+/// </summary>
+public sealed record BulkActionResult(int Requested, int Succeeded, IReadOnlyList<BulkFailure> Failures, bool Queued = false, string? JobId = null);

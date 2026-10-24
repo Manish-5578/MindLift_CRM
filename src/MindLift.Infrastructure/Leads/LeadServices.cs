@@ -51,7 +51,8 @@ public sealed class LeadService(
     IDataScopeService scope,
     AssignmentService assignment,
     INotificationService notifications,
-    IRecordSavePipeline savePipeline)
+    IRecordSavePipeline savePipeline,
+    MindLift.Infrastructure.Common.BulkQueue bulkQueue)
 {
     private const int MaxImportRows = 5000;
     private const int MaxExportRows = 10000;
@@ -126,6 +127,11 @@ public sealed class LeadService(
         };
 
         var ids = await BulkRunner.TargetsAsync(request.Ids, request.AllMatching, MatchingIdsAsync, cancellationToken);
+        if (bulkQueue.ShouldQueue(ids))
+        {
+            return bulkQueue.Queue("leads", request, ids);
+        }
+
         return await BulkRunner.RunAsync(db, ids, async (id, ct) =>
         {
             var lead = await GetAsync(id, ct);
@@ -136,6 +142,11 @@ public sealed class LeadService(
     public async Task<BulkActionResult> BulkDeleteAsync(BulkDeleteRequest request, CancellationToken cancellationToken = default)
     {
         var ids = await BulkRunner.TargetsAsync(request.Ids, request.AllMatching, MatchingIdsAsync, cancellationToken);
+        if (bulkQueue.ShouldQueue(ids))
+        {
+            return bulkQueue.QueueDelete("leads", ids);
+        }
+
         return await BulkRunner.RunAsync(db, ids, DeleteAsync, cancellationToken);
     }
 

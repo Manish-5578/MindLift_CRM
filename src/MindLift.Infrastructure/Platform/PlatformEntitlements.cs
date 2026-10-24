@@ -15,7 +15,7 @@ public sealed class PlatformEntitlements(AppDbContext db, ITenantContext tenant,
     /// <summary>What is kept for one company.</summary>
     public sealed record Snapshot(string[] DisabledModules, bool AiAllowed);
 
-    private static readonly HybridCacheEntryOptions Keep = new() { Expiration = TimeSpan.FromMinutes(10), LocalCacheExpiration = TimeSpan.FromMinutes(10) };
+    private static readonly HybridCacheEntryOptions Keep = new() { Expiration = TimeSpan.FromMinutes(10), LocalCacheExpiration = TimeSpan.FromMinutes(1) };
 
     private static string Key(Guid tenantId) => $"platform:entitlements:{tenantId}";
 

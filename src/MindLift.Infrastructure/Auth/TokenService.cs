@@ -28,6 +28,12 @@ public sealed class TokenService(IOptions<JwtOptions> options, IClock clock)
             new("lang", user.Language),
         };
 
+        // The session stamp: when the password changes or the person is signed out everywhere, the stamp changes and older tokens stop working.
+        if (!string.IsNullOrEmpty(user.SecurityStamp))
+        {
+            claims.Add(new Claim("sst", user.SecurityStamp));
+        }
+
         if (isPlatformAdmin)
         {
             claims.Add(new Claim("plat", "true"));
@@ -43,6 +49,28 @@ public sealed class TokenService(IOptions<JwtOptions> options, IClock clock)
             signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256));
 
         return (new JwtSecurityTokenHandler().WriteToken(token), expires);
+    }
+
+    /// <summary>
+    /// A read-only support sign-in as the company's owner: it names the support session (imp) and who opened it (imp_by),
+    /// lasts only until the session ends, and has no refresh token.
+    /// </summary>
+    public (string Token, DateTime ExpiresAtUtc) CreateSupportToken(AppUser owner, Guid sessionId, string openedBy, DateTime expiresAt)
+    {
+        var claims = new List<Claim>
+        {
+            new("sub", owner.Id.ToString()),
+            new("tid", owner.TenantId.ToString()),
+            new("email", owner.Email ?? string.Empty),
+            new("name", $"{owner.FirstName} {owner.LastName}".Trim()),
+            new("lang", owner.Language),
+            new("imp", sessionId.ToString()),
+            new("imp_by", openedBy),
+        };
+
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SigningKey));
+        var token = new JwtSecurityToken(_options.Issuer, _options.Audience, claims, clock.UtcNow, expiresAt, new SigningCredentials(key, SecurityAlgorithms.HmacSha256));
+        return (new JwtSecurityTokenHandler().WriteToken(token), expiresAt);
     }
 
     public (string Token, DateTime ExpiresAtUtc) CreatePortalAccessToken(

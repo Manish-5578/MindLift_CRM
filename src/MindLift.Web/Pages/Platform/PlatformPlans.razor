@@ -35,7 +35,8 @@ else
                 @if (!plan.IsActive) { <div class="pc-plan__ribbon" style="background:#94A3B8">Retired</div> }
                 <div class="pc-card__title" style="font-size:18px">@plan.Name</div>
                 @if (!string.IsNullOrWhiteSpace(plan.Description)) { <div class="pc-card__hint" style="margin-top:4px">@plan.Description</div> }
-                <div class="pc-plan__price pc-num">@Pc.Money(plan.PriceMonthly)<small> / month</small></div>
+                <div class="pc-plan__price pc-num">@(plan.Currency == "USD" ? Pc.Money(plan.PriceMonthly) : $"{plan.Currency} {plan.PriceMonthly:N0}")<small> / month</small></div>
+                <div class="pc-card__hint">@(plan.Currency) @((plan.PriceYearly ?? plan.PriceMonthly * 10).ToString("N0")) / year</div>
                 <ul>
                     <li><MudIcon Icon="@Icons.Material.Filled.CheckCircle" />@plan.MaxUsers users</li>
                     <li><MudIcon Icon="@Icons.Material.Filled.CheckCircle" />@Pc.Num(plan.MaxRecords) records</li>
@@ -61,6 +62,10 @@ else
                     <div class="pc-field" style="flex:1"><label for="plan-users">Users allowed</label><input id="plan-users" class="pc-input" type="number" min="1" @bind="_users" data-testid="plan-users" /></div>
                     <div class="pc-field" style="flex:1"><label for="plan-records">Records allowed</label><input id="plan-records" class="pc-input" type="number" min="1" @bind="_records" data-testid="plan-records" /></div>
                     <div class="pc-field" style="flex:1"><label for="plan-price">Price / month</label><input id="plan-price" class="pc-input" type="number" min="0" step="1" @bind="_price" data-testid="plan-price" /></div>
+                </div>
+                <div class="d-flex" style="gap:12px">
+                    <div class="pc-field" style="flex:1"><label for="plan-yearly">Price / year</label><input id="plan-yearly" class="pc-input" type="number" min="0" step="1" placeholder="@($"Ten months: {_price * 10:N0}")" @bind="_priceYearly" data-testid="plan-yearly" /></div>
+                    <div class="pc-field" style="flex:1"><label for="plan-currency">Currency</label><input id="plan-currency" class="pc-input" maxlength="3" @bind="_currency" data-testid="plan-currency" /></div>
                 </div>
                 <label class="d-flex align-center" style="gap:12px;cursor:pointer"><input type="checkbox" @bind="_active" style="width:18px;height:18px;accent-color:#6366F1" data-testid="plan-active" />Offer this plan to new companies</label>
 
@@ -104,6 +109,8 @@ else
     private string _name = "", _description = "";
     private int _users = 10, _records = 10000;
     private decimal _price = 29;
+    private decimal? _priceYearly;
+    private string _currency = "USD";
     private bool _active = true;
     private bool _confirmDelete;
     private HashSet<string> _included = [];
@@ -130,13 +137,13 @@ else
 
     private void OpenNew()
     {
-        _editId = null; _title = ""; _name = ""; _description = ""; _users = 10; _records = 10000; _price = 29; _active = true;
+        _editId = null; _title = ""; _name = ""; _description = ""; _users = 10; _records = 10000; _price = 29; _active = true; _priceYearly = null; _currency = "USD";
         _included = _switchable.Select(m => m.Key).ToHashSet(); _error = null; _confirmDelete = false; _open = true;
     }
 
     private void Edit(PlatformPlanDto p)
     {
-        _editId = p.Id; _title = p.Name; _name = p.Name; _description = p.Description ?? ""; _users = p.MaxUsers; _records = p.MaxRecords; _price = p.PriceMonthly; _active = p.IsActive;
+        _editId = p.Id; _title = p.Name; _name = p.Name; _description = p.Description ?? ""; _users = p.MaxUsers; _records = p.MaxRecords; _price = p.PriceMonthly; _active = p.IsActive; _priceYearly = p.PriceYearly; _currency = p.Currency;
         _included = (p.IncludedModules ?? _switchable.Select(m => m.Key).ToList()).ToHashSet(); _error = null; _confirmDelete = false; _open = true;
     }
 
@@ -149,7 +156,7 @@ else
     {
         // Every module ticked is the same as no list: the plan includes everything. None ticked is not allowed, so a plan cannot be empty by accident.
         if (_included.Count == 0) { _error = "Include at least one module."; return; }
-        var request = new SavePlanRequest(_name, _users, _records, _price, _active, _description, _included.ToList());
+        var request = new SavePlanRequest(_name, _users, _records, _price, _active, _description, _included.ToList(), _priceYearly, _currency);
         var response = _editId is { } id
             ? await Http.PutAsJsonAsync($"api/v1/platform/plans/{id}", request)
             : await Http.PostAsJsonAsync("api/v1/platform/plans", request);

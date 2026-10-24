@@ -226,7 +226,7 @@ public sealed class PlatformConsole(AppDbContext db, ITenantContext tenant, IClo
     {
         var counts = await Companies().GroupBy(t => t.PlanId).Select(g => new { g.Key, N = g.Count() }).ToDictionaryAsync(x => x.Key, x => x.N, cancellationToken);
         return (await db.Plans.AsNoTracking().OrderBy(p => p.PriceMonthly).ToListAsync(cancellationToken))
-            .Select(p => new PlatformPlanDto(p.Id, p.Key, p.Name, p.MaxUsers, p.MaxRecords, p.PriceMonthly, p.IsActive, counts.GetValueOrDefault(p.Id), p.Description, p.IncludedModules.Length == 0 ? ModuleCatalog.Switchable.Select(m => m.Module.ToString()).ToList() : p.IncludedModules)).ToList();
+            .Select(p => new PlatformPlanDto(p.Id, p.Key, p.Name, p.MaxUsers, p.MaxRecords, p.PriceMonthly, p.IsActive, counts.GetValueOrDefault(p.Id), p.Description, p.IncludedModules.Length == 0 ? ModuleCatalog.Switchable.Select(m => m.Module.ToString()).ToList() : p.IncludedModules, p.PriceYearly, p.Currency)).ToList();
     }
 
     private IQueryable<PlatformAuditEntry> AuditQuery(Guid? companyId, string? kind, string? search, DateTime? from, DateTime? to)
@@ -289,6 +289,15 @@ public sealed class PlatformConsole(AppDbContext db, ITenantContext tenant, IClo
         foreach (var t in recent)
         {
             items.Add(new($"signup:{t.Id}", "signup", "info", "New company", $"{t.Name} joined MindLift.", t.Id, t.Name, t.CreatedAt));
+        }
+
+        var waiting = await db.Subscriptions.AsNoTracking().Where(s => s.PendingPlanId != null).ToListAsync(cancellationToken);
+        foreach (var s in waiting)
+        {
+            var company = await db.Tenants.AsNoTracking().Where(t => t.Id == s.TenantId).Select(t => t.Name).FirstOrDefaultAsync(cancellationToken);
+            var planName = await db.Plans.AsNoTracking().Where(p => p.Id == s.PendingPlanId).Select(p => p.Name).FirstOrDefaultAsync(cancellationToken);
+            items.Add(new($"billing-request:{s.TenantId}:{s.PendingPlanId}:{s.PendingInterval}", "billing-request", "warning", "Awaiting payment",
+                $"{company} chose the {planName} plan ({s.PendingInterval}). Record the payment when it arrives.", s.TenantId, company, s.UpdatedAt));
         }
 
         var day = now.ToString("yyyyMMdd", CultureInfo.InvariantCulture);
@@ -481,6 +490,7 @@ public sealed class PlatformConsole(AppDbContext db, ITenantContext tenant, IClo
         plan.PriceMonthly = request.PriceMonthly;
         plan.IsActive = request.IsActive;
         plan.Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim();
+        ApplyPricing(plan, request);
         var modulesChanged = false;
         if (request.IncludedModules is not null)
         {
@@ -529,6 +539,7 @@ public sealed class PlatformConsole(AppDbContext db, ITenantContext tenant, IClo
             Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
             IncludedModules = ParseIncluded(request.IncludedModules ?? []),
         };
+        ApplyPricing(plan, request);
         db.Plans.Add(plan);
         await RecordAsync(null, "plan.created", $"Plan {plan.Name} created: {plan.MaxUsers} users, {plan.MaxRecords:N0} records, {plan.PriceMonthly:0.##} a month", cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
@@ -552,6 +563,27 @@ public sealed class PlatformConsole(AppDbContext db, ITenantContext tenant, IClo
         db.Plans.Remove(plan);
         await RecordAsync(null, "plan.deleted", $"Plan {plan.Name} deleted", cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>The yearly price (none means ten months) and the currency (a three-letter code).</summary>
+    private static void ApplyPricing(Plan plan, SavePlanRequest request)
+    {
+        if (request.PriceYearly is < 0 or > 10_000_000)
+        {
+            throw new ValidationException("priceYearly", "The yearly price is between 0 and 10,000,000.");
+        }
+
+        plan.PriceYearly = request.PriceYearly;
+        if (!string.IsNullOrWhiteSpace(request.Currency))
+        {
+            var code = request.Currency.Trim().ToUpperInvariant();
+            if (code.Length != 3 || !code.All(char.IsLetter))
+            {
+                throw new ValidationException("currency", "Use a three-letter currency code, for example USD, AED or INR.");
+            }
+
+            plan.Currency = code;
+        }
     }
 
     /// <summary>Only modules that can be switched on or off are kept; a list that names all of them (or none) means the plan includes everything.</summary>

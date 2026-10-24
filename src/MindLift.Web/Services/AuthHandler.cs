@@ -26,6 +26,12 @@ public sealed class AuthHandler(AuthSession session, Uri baseAddress) : Delegati
             return response;
         }
 
+        if (session.IsSupport)
+        {
+            session.Clear();   // the support session ended; it is never turned into another session
+            return response;
+        }
+
         if (!await RefreshAsync(cancellationToken))
         {
             return response;

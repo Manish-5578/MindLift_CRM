@@ -120,7 +120,8 @@ internal static class RecordHelpers
 }
 
 /// <summary>Contact records: list, read, create, edit, delete, duplicates, merge, import, export and the contact summary.</summary>
-public sealed class ContactService(AppDbContext db, ITenantContext tenant, IClock clock, FieldSettingsService fields, IDataScopeService scope, INotificationService notifications, IRecordSavePipeline savePipeline)
+public sealed class ContactService(AppDbContext db, ITenantContext tenant, IClock clock, FieldSettingsService fields, IDataScopeService scope, INotificationService notifications, IRecordSavePipeline savePipeline,
+    MindLift.Infrastructure.Common.BulkQueue bulkQueue)
 {
     private const int MaxExportRows = 10000;
 
@@ -190,6 +191,11 @@ public sealed class ContactService(AppDbContext db, ITenantContext tenant, ICloc
         }
 
         var ids = await BulkRunner.TargetsAsync(request.Ids, request.AllMatching, MatchingIdsAsync, cancellationToken);
+        if (bulkQueue.ShouldQueue(ids))
+        {
+            return bulkQueue.Queue("contacts", request, ids);
+        }
+
         return await BulkRunner.RunAsync(db, ids, async (id, ct) =>
         {
             var current = await GetAsync(id, ct);
@@ -200,6 +206,11 @@ public sealed class ContactService(AppDbContext db, ITenantContext tenant, ICloc
     public async Task<BulkActionResult> BulkDeleteAsync(BulkDeleteRequest request, CancellationToken cancellationToken = default)
     {
         var ids = await BulkRunner.TargetsAsync(request.Ids, request.AllMatching, MatchingIdsAsync, cancellationToken);
+        if (bulkQueue.ShouldQueue(ids))
+        {
+            return bulkQueue.QueueDelete("contacts", ids);
+        }
+
         return await BulkRunner.RunAsync(db, ids, DeleteAsync, cancellationToken);
     }
 
@@ -439,7 +450,8 @@ public sealed class ContactService(AppDbContext db, ITenantContext tenant, ICloc
 }
 
 /// <summary>Account (company) records, the parent hierarchy and the account summary.</summary>
-public sealed class AccountService(AppDbContext db, ITenantContext tenant, IClock clock, FieldSettingsService fields, IDataScopeService scope, INotificationService notifications, IRecordSavePipeline savePipeline)
+public sealed class AccountService(AppDbContext db, ITenantContext tenant, IClock clock, FieldSettingsService fields, IDataScopeService scope, INotificationService notifications, IRecordSavePipeline savePipeline,
+    MindLift.Infrastructure.Common.BulkQueue bulkQueue)
 {
     public static readonly IReadOnlyDictionary<string, string[]> ImportAliases = MindLift.Shared.Imports.ImportFieldSets.Accounts.ToDictionary(f => f.Field, f => f.Aliases);
 
@@ -510,6 +522,11 @@ public sealed class AccountService(AppDbContext db, ITenantContext tenant, ICloc
         }
 
         var ids = await BulkRunner.TargetsAsync(request.Ids, request.AllMatching, MatchingIdsAsync, cancellationToken);
+        if (bulkQueue.ShouldQueue(ids))
+        {
+            return bulkQueue.Queue("accounts", request, ids);
+        }
+
         return await BulkRunner.RunAsync(db, ids, async (id, ct) =>
         {
             var current = await GetAsync(id, ct);
@@ -520,6 +537,11 @@ public sealed class AccountService(AppDbContext db, ITenantContext tenant, ICloc
     public async Task<BulkActionResult> BulkDeleteAsync(BulkDeleteRequest request, CancellationToken cancellationToken = default)
     {
         var ids = await BulkRunner.TargetsAsync(request.Ids, request.AllMatching, MatchingIdsAsync, cancellationToken);
+        if (bulkQueue.ShouldQueue(ids))
+        {
+            return bulkQueue.QueueDelete("accounts", ids);
+        }
+
         return await BulkRunner.RunAsync(db, ids, DeleteAsync, cancellationToken);
     }
 

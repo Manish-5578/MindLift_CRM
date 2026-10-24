@@ -1,0 +1,114 @@
+@page "/settings/email-sending"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject Translator T
+
+<PageTitle>@T["Email sending"] · MindLift</PageTitle>
+
+<div class="ml-page ml-page--form">
+    <PageHeader Title="Email sending" Subtitle="Your sending domain, today's automated mail, and the people who asked not to be emailed." />
+    <SettingsNav Current="/settings/email-sending" />
+
+    @if (_data is null)
+    {
+        <MlCard Loading="true" />
+    }
+    else
+    {
+        var d = _data;
+        <div class="ch-kpis">
+            <ChartKpi Label="@T["Automated emails today"]" Value="@($"{d.SentToday:N0}")" Icon="@Icons.Material.Filled.Outbox" Color="#4F46E5"
+                      Ring="@(d.DailyLimit == 0 ? null : Math.Min(100, 100.0 * d.SentToday / d.DailyLimit))" Hint="@T["of {0} a day", d.DailyLimit.ToString("N0")]" TestId="mail-today" />
+            <ChartKpi Label="@T["Verified domains"]" Value="@($"{d.Domains.Count(x => x.Verified)} / {d.Domains.Count}")" Icon="@Icons.Material.Filled.VerifiedUser" Color="#10B981" />
+            <ChartKpi Label="@T["Do not email"]" Value="@($"{d.Suppressed.Count:N0}")" Icon="@Icons.Material.Filled.Unsubscribe" Color="#F59E0B" />
+        </div>
+
+        <MlCard Title="Sending domains" Subtitle="Add the records below at your domain provider, then press Check. Verified domains can send in your own name." Class="mb-4" TestId="mail-domains">
+            <div class="d-flex gap-2 mb-4" style="flex-wrap:wrap">
+                <MudTextField @bind-Value="_newDomain" Label="@T["Domain, for example acme.com"]" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width:260px" data-testid="mail-domain-input" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddDomainAsync" Disabled="_busy" data-testid="mail-domain-add">@T["Add domain"]</MudButton>
+            </div>
+            @foreach (var dom in d.Domains)
+            {
+                var domain = dom;
+                <div style="border:1px solid var(--ml-border);border-radius:12px;padding:14px;margin-bottom:12px" data-testid="mail-domain">
+                    <div class="d-flex align-center gap-2" style="flex-wrap:wrap">
+                        <MudIcon Icon="@(domain.Verified ? Icons.Material.Filled.VerifiedUser : Icons.Material.Filled.Pending)" Color="@(domain.Verified ? Color.Success : Color.Warning)" />
+                        <b style="font-size:15px">@domain.Domain</b>
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="@(domain.Verified ? Color.Success : Color.Warning)">@T[domain.Verified ? "Verified" : "Not verified yet"]</MudChip>
+                        <span style="flex:1"></span>
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="() => CheckAsync(domain)" Disabled="_busy" data-testid="mail-domain-check">@T["Check"]</MudButton>
+                        <MudIconButton Size="Size.Small" Icon="@Icons.Material.Outlined.Delete" OnClick="() => RemoveDomainAsync(domain)" aria-label="@T["Remove"]" />
+                    </div>
+                    @if (domain.LastCheckMessage is not null) { <MudText Typo="Typo.caption" Class="ml-muted">@domain.LastCheckMessage</MudText> }
+                    <MudSimpleTable Dense="true" Style="background:transparent;margin-top:8px">
+                        <thead><tr><th>@T["Type"]</th><th>@T["Name"]</th><th>@T["Value"]</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var r in domain.Records)
+                            {
+                                <tr title="@r.Purpose">
+                                    <td>@r.Type</td>
+                                    <td style="font-family:monospace;font-size:12px">@r.Name</td>
+                                    <td style="font-family:monospace;font-size:12px;word-break:break-all">@r.Value</td>
+                                    <td><MudIcon Icon="@(r.Found ? Icons.Material.Filled.CheckCircle : Icons.Material.Outlined.Circle)" Color="@(r.Found ? Color.Success : Color.Default)" Size="Size.Small" /></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                </div>
+            }
+        </MlCard>
+
+        <MlCard Title="Do not email" Subtitle="Automated mail never goes to these addresses. People are added here when they use the unsubscribe link." Class="mb-4" TestId="mail-suppressed">
+            <div class="d-flex gap-2 mb-3" style="flex-wrap:wrap">
+                <MudTextField @bind-Value="_newSuppression" Label="@T["Email address"]" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width:260px" />
+                <MudButton Variant="Variant.Outlined" OnClick="AddSuppressionAsync" Disabled="_busy">@T["Add"]</MudButton>
+            </div>
+            @if (d.Suppressed.Count == 0) { <MudText Typo="Typo.body2" Class="ml-muted">@T["Nobody yet."]</MudText> }
+            @foreach (var s in d.Suppressed)
+            {
+                var row = s;
+                <div class="d-flex align-center gap-2 py-1" style="border-bottom:1px solid var(--ml-border)">
+                    <span style="flex:1">@row.Email</span>
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@T[row.Reason]</MudChip>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@row.CreatedAt.ToLocalTime().ToString("dd MMM yyyy")</MudText>
+                    <MudIconButton Size="Size.Small" Icon="@Icons.Material.Outlined.Close" OnClick="() => RemoveSuppressionAsync(row)" aria-label="@T["Allow again"]" />
+                </div>
+            }
+        </MlCard>
+    }
+</div>
+
+@code {
+    private EmailSendingDto? _data;
+    private string? _newDomain;
+    private string? _newSuppression;
+    private bool _busy;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try { _data = await Http.GetFromJsonAsync<EmailSendingDto>("api/v1/settings/email-sending"); }
+        catch (HttpRequestException) { Snackbar.Add(T["We could not load this."], Severity.Error); }
+    }
+
+    private async Task Run(Func<Task<HttpResponseMessage>> call, string? done = null)
+    {
+        _busy = true;
+        try
+        {
+            var response = await call();
+            if (!response.IsSuccessStatusCode) { Snackbar.Add(await ProblemText.FromAsync(response, T["That did not work."]), Severity.Error); return; }
+            if (done is not null) Snackbar.Add(done, Severity.Success);
+            await LoadAsync();
+        }
+        finally { _busy = false; }
+    }
+
+    private async Task AddDomainAsync() { await Run(() => Http.PostAsJsonAsync("api/v1/settings/email-sending/domains", new AddSendingDomainRequest(_newDomain ?? ""))); _newDomain = null; }
+    private Task CheckAsync(SendingDomainDto d) => Run(() => Http.PostAsync($"api/v1/settings/email-sending/domains/{d.Id}/check", null));
+    private Task RemoveDomainAsync(SendingDomainDto d) => Run(() => Http.DeleteAsync($"api/v1/settings/email-sending/domains/{d.Id}"));
+    private async Task AddSuppressionAsync() { await Run(() => Http.PostAsJsonAsync("api/v1/settings/email-sending/suppressions", new AddSuppressionRequest(_newSuppression ?? ""))); _newSuppression = null; }
+    private Task RemoveSuppressionAsync(EmailSuppressionDto s) => Run(() => Http.DeleteAsync($"api/v1/settings/email-sending/suppressions/{s.Id}"), T["{0} can receive automated mail again.", s.Email]);
+}

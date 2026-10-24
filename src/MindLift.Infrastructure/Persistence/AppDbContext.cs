@@ -21,6 +21,14 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<StoredFile> Files { get; set; } = null!;
     public DbSet<Tenant> Tenants { get; set; } = null!;
     public DbSet<PlatformAuditEntry> PlatformAudit { get; set; } = null!;
+    public DbSet<NumberSequence> NumberSequences { get; set; } = null!;
+    public DbSet<Subscription> Subscriptions { get; set; } = null!;
+    public DbSet<BillingInvoice> BillingInvoices { get; set; } = null!;
+    public DbSet<BillingEvent> BillingEvents { get; set; } = null!;
+    public DbSet<EmailSuppression> EmailSuppressions { get; set; } = null!;
+    public DbSet<SendingDomain> SendingDomains { get; set; } = null!;
+    public DbSet<DataExport> DataExports { get; set; } = null!;
+    public DbSet<SupportSession> SupportSessions { get; set; } = null!;
     public DbSet<Plan> Plans { get; set; } = null!;
     public DbSet<RefreshToken> RefreshTokens { get; set; } = null!;
     public DbSet<TenantSettings> TenantSettings { get; set; } = null!;
@@ -141,11 +149,72 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.Property(t => t.Country).HasMaxLength(2);
         });
 
+        builder.Entity<Subscription>(b =>
+        {
+            b.ToTable("subscriptions");
+            b.HasIndex(x => x.TenantId).IsUnique();
+            b.HasIndex(x => x.ProviderSubscriptionId);
+            b.Property(x => x.Interval).HasMaxLength(10);
+            b.Property(x => x.Status).HasMaxLength(20);
+            b.Property(x => x.Provider).HasMaxLength(30);
+        });
+        builder.Entity<BillingInvoice>(b =>
+        {
+            b.ToTable("billing_invoices");
+            b.HasIndex(x => new { x.TenantId, x.IssuedAt });
+            b.HasIndex(x => x.Number).IsUnique();
+            b.Property(x => x.Amount).HasPrecision(18, 2);
+            b.Property(x => x.Currency).HasMaxLength(3);
+            b.Property(x => x.Status).HasMaxLength(10);
+        });
+        builder.Entity<BillingEvent>(b =>
+        {
+            b.ToTable("billing_events");
+            b.HasIndex(x => new { x.Provider, x.EventId }).IsUnique();
+        });
+
+        builder.Entity<EmailSuppression>(b =>
+        {
+            b.ToTable("email_suppressions");
+            b.HasIndex(x => new { x.TenantId, x.Email }).IsUnique().HasFilter("is_deleted = false");
+            b.Property(x => x.Email).HasMaxLength(320);
+            b.Property(x => x.Reason).HasMaxLength(20);
+        });
+        builder.Entity<SendingDomain>(b =>
+        {
+            b.ToTable("sending_domains");
+            b.HasIndex(x => new { x.TenantId, x.Domain }).IsUnique().HasFilter("is_deleted = false");
+            b.Property(x => x.Domain).HasMaxLength(253);
+        });
+
+        builder.Entity<DataExport>(b =>
+        {
+            b.ToTable("data_exports");
+            b.HasIndex(x => new { x.TenantId, x.CreatedAt });
+            b.Property(x => x.Status).HasMaxLength(10);
+        });
+
+        builder.Entity<SupportSession>(b =>
+        {
+            b.ToTable("support_sessions");
+            b.HasIndex(x => new { x.TenantId, x.StartedAt });
+            b.HasIndex(x => x.CodeHash);
+        });
+
+        builder.Entity<NumberSequence>(b =>
+        {
+            b.ToTable("number_sequences");
+            b.HasKey(x => new { x.TenantId, x.Key });
+            b.Property(x => x.Key).HasMaxLength(40);
+        });
+
         builder.Entity<Plan>(b =>
         {
             b.ToTable("plans");
             b.HasIndex(p => p.Key).IsUnique();
             b.Property(p => p.PriceMonthly).HasPrecision(18, 2);
+            b.Property(p => p.PriceYearly).HasPrecision(18, 2);
+            b.Property(p => p.Currency).HasMaxLength(3).HasDefaultValue("USD");
         });
 
         builder.Entity<RefreshToken>(b =>
@@ -252,12 +321,14 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.Property(x => x.Status).HasMaxLength(20);
             b.Property(x => x.ErrorMessage).HasMaxLength(2000);
         });
-        builder.Entity<Contact>(b => { b.ToTable("contacts"); b.HasIndex(x => new { x.TenantId, x.AccountId }); b.Property(x => x.FirstName).HasMaxLength(100); b.Property(x => x.LastName).HasMaxLength(100); b.Property(x => x.JobTitle).HasMaxLength(150); });
+        builder.Entity<Contact>(b => { b.ToTable("contacts"); b.HasIndex(x => new { x.TenantId, x.AccountId }); b.HasIndex(x => new { x.TenantId, x.NormalizedEmail }); b.HasIndex(x => new { x.TenantId, x.NormalizedPhone }); b.Property(x => x.FirstName).HasMaxLength(100); b.Property(x => x.LastName).HasMaxLength(100); b.Property(x => x.JobTitle).HasMaxLength(150); });
         builder.Entity<Account>(b => { b.ToTable("accounts"); b.Property(x => x.Name).HasMaxLength(200); b.Property(x => x.Website).HasMaxLength(300); b.Property(x => x.Phone).HasMaxLength(50); b.Property(x => x.Industry).HasMaxLength(100); b.HasIndex(x => new { x.TenantId, x.ParentAccountId }); });
         builder.Entity<Deal>(b =>
         {
             b.ToTable("deals");
             b.HasIndex(x => new { x.TenantId, x.PipelineId, x.StageId, x.Status });
+            b.HasIndex(x => new { x.TenantId, x.AccountId });
+            b.HasIndex(x => new { x.TenantId, x.PrimaryContactId });
             b.Property(x => x.Amount).HasPrecision(18, 2);
             b.Property(x => x.Currency).HasMaxLength(3);
             b.Property(x => x.Name).HasMaxLength(200);
@@ -559,6 +630,8 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.Property(x => x.DetectedInvoiceNumber).HasMaxLength(100);
             b.Property(x => x.OcrStructuredDataJson).HasColumnType("jsonb");
             b.HasIndex(x => new { x.TenantId, x.Category });
+            b.HasIndex(x => new { x.TenantId, x.AssociatedContactId });
+            b.HasIndex(x => new { x.TenantId, x.AssociatedAccountId });
         });
     }
 

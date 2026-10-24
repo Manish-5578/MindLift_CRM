@@ -11,7 +11,10 @@
         }
     </div>
     <div class="pc-kpi__label">@Label</div>
-    <div class="pc-kpi__value pc-num"><span data-testid="@(TestId)-value">@Shown</span>@if (Suffix is not null){<small>@Suffix</small>}</div>
+    @if (Money || Value != 0 || ShowZero)
+    {
+        <div class="pc-kpi__value pc-num"><span data-testid="@(TestId)-value">@Shown</span>@if (Suffix is not null){<small>@Suffix</small>}</div>
+    }
     <div class="pc-kpi__foot">@Foot</div>
     @if (Spark is { Count: > 1 })
     {
@@ -33,6 +36,9 @@
     [Parameter] public int Index { get; set; }
     [Parameter] public string? TestId { get; set; }
     [Parameter] public EventCallback OnClick { get; set; }
+
+    /// <summary>Show a zero. Off for cards that carry their text in the foot.</summary>
+    [Parameter] public bool ShowZero { get; set; }
 
     private decimal _shown;
     private decimal _from;

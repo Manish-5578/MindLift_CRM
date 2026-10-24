@@ -39,10 +39,13 @@ public static class DependencyInjection
         services.AddScoped<ITenantContext>(sp => sp.GetRequiredService<TenantContext>());
 
         services.AddScoped<AuditableEntityInterceptor>();
+        services.AddScoped<MindLift.Infrastructure.Caching.CacheInvalidationInterceptor>();
         services.AddDbContext<AppDbContext>((sp, options) => options
             .UseNpgsql(connectionString)
             .UseSnakeCaseNamingConvention()
-            .AddInterceptors(sp.GetRequiredService<AuditableEntityInterceptor>()));
+            .AddInterceptors(sp.GetRequiredService<AuditableEntityInterceptor>(), sp.GetRequiredService<MindLift.Infrastructure.Caching.CacheInvalidationInterceptor>()));
+        services.AddScoped<MindLift.Infrastructure.Caching.RequestStateCache>();
+        services.AddScoped<AuditRetentionJob>();
         services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbContext>());
 
         services.AddIdentityCore<AppUser>(options =>
@@ -68,6 +71,16 @@ public static class DependencyInjection
         services.AddScoped<RefreshTokenService>();
         services.AddScoped<AuthService>();
         services.AddScoped<TenantSignupService>();
+        services.AddScoped<NumberSequences>();
+
+        // Billing. Manual (bank transfer, recorded by the platform owner) until a payment gateway is connected.
+        services.AddSingleton<MindLift.Infrastructure.Billing.IPaymentProvider, MindLift.Infrastructure.Billing.ManualPaymentProvider>();
+        services.AddScoped<MindLift.Infrastructure.Billing.BillingService>();
+        services.AddScoped<MindLift.Infrastructure.Billing.BillingRenewalJob>();
+        services.AddScoped<MindLift.Infrastructure.DataPortability.CompanyDataService>();
+        services.AddScoped<MindLift.Infrastructure.Platform.SupportAccessService>();
+        services.AddScoped<MindLift.Infrastructure.Common.BulkQueue>();
+        services.AddScoped<MindLift.Infrastructure.Common.BulkJob>();
         services.AddScoped<SystemSeedService>();
         services.AddScoped<PlatformAdminSeeder>();
 
@@ -140,18 +153,48 @@ public static class DependencyInjection
 
         // Mail.
         services.AddScoped<IEmailSender, SmtpEmailSender>();
+        services.AddScoped<MindLift.Infrastructure.Messaging.EmailGuard>();
+        services.AddScoped<MindLift.Infrastructure.Messaging.SendingDomainService>();
+        services.AddSingleton<MindLift.Infrastructure.Messaging.IDnsTxtLookup, MindLift.Infrastructure.Messaging.DnsTxtLookup>();
 
-        // In-memory cache now, Redis later. Keys always start with the tenant id (plan 4.12).
+        // In-memory cache, shared through Redis when Redis:ConnectionString is set (needed when more than one server runs).
+        var redis = configuration["Redis:ConnectionString"];
+        if (!string.IsNullOrWhiteSpace(redis))
+        {
+            services.AddStackExchangeRedisCache(options =>
+            {
+                options.Configuration = redis;
+                options.InstanceName = "mindlift:";
+            });
+        }
+
         services.AddHybridCache();
 
-        var storagePath = configuration["Storage:LocalPath"] ?? "App_Data/files";
-        services.AddSingleton<IFileStorage>(new LocalFileStorage(storagePath));
+        // Files go to the server's disk (Local) or to a bucket (S3: Amazon S3, Cloudflare R2, MinIO and the like).
+        if (string.Equals(configuration["Storage:Provider"], "S3", StringComparison.OrdinalIgnoreCase))
+        {
+            var s3 = configuration.GetSection("Storage:S3").Get<S3StorageOptions>() ?? new S3StorageOptions();
+            services.AddSingleton<IFileStorage>(new S3FileStorage(s3));
+        }
+        else
+        {
+            var storagePath = configuration["Storage:LocalPath"] ?? "App_Data/files";
+            services.AddSingleton<IFileStorage>(new LocalFileStorage(storagePath));
+        }
         services.AddScoped<FileService>();
 
         // Automation & Save Pipeline (Core Zoho TCA Engine).
         services.AddHttpClient();
+        // Automation webhooks go out through a handler that checks the address it actually connects to, and never follows a redirect to somewhere else.
+        services.AddHttpClient("AutomationWebhooks").ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+        {
+            ConnectCallback = MindLift.Infrastructure.Automation.WebhookSecurity.ConnectSafelyAsync,
+            AllowAutoRedirect = false,
+            ConnectTimeout = TimeSpan.FromSeconds(5),
+        });
         services.AddScoped<MindLift.Application.Common.Automation.IAutomationExecutionContext, MindLift.Application.Common.Automation.AutomationExecutionContext>();
         services.AddScoped<MindLift.Application.Abstractions.IAutomationEngine, MindLift.Infrastructure.Automation.AutomationEngine>();
+        services.AddScoped<MindLift.Infrastructure.Automation.AutomationOutboxJob>();
         services.AddScoped<MindLift.Application.Abstractions.IRecordSavePipeline, MindLift.Infrastructure.Automation.RecordSavePipeline>();
         services.AddScoped<MindLift.Infrastructure.Automation.AutomationScheduledJob>();
 

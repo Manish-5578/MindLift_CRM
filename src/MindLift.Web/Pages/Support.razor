@@ -1,0 +1,57 @@
+@page "/support/{Code}"
+@layout AuthLayout
+@inject HttpClient Http
+@inject AuthSession Session
+@inject AppState App
+@inject NavigationManager Nav
+@inject Translator T
+
+<PageTitle>@T["Support view"] · MindLift</PageTitle>
+
+<div class="ml-stack" style="text-align:center;padding:40px 0" data-testid="support-start">
+    @if (_error is null)
+    {
+        <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        <MudText>@T["Opening the support view..."]</MudText>
+    }
+    else
+    {
+        <MudAlert Severity="Severity.Error">@_error</MudAlert>
+    }
+</div>
+
+@code {
+    [Parameter] public string Code { get; set; } = "";
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // The link is opened by the platform owner from the console. The code works once, for two minutes.
+        var response = await Http.PostAsJsonAsync("api/v1/support/exchange", new SupportExchangeRequest(Code));
+        if (!response.IsSuccessStatusCode)
+        {
+            _error = await ProblemText.FromAsync(response, T["This support link is not valid any more."]);
+            return;
+        }
+
+        var tokens = (await response.Content.ReadFromJsonAsync<TokenResponse>())!;
+        Session.StartSupport(tokens, ReadClaim(tokens.AccessToken, "imp_by") ?? "Support");
+        App.Reset();
+        await App.LoadAsync();
+        Nav.NavigateTo("/", replace: true);
+    }
+
+    /// <summary>Reads one claim from the token's payload (the middle part, base64url JSON).</summary>
+    private static string? ReadClaim(string token, string name)
+    {
+        try
+        {
+            var payload = token.Split('.')[1].Replace('-', '+').Replace('_', '/');
+            payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
+            using var doc = JsonDocument.Parse(Convert.FromBase64String(payload));
+            return doc.RootElement.TryGetProperty(name, out var value) ? value.GetString() : null;
+        }
+        catch (FormatException) { return null; }
+        catch (JsonException) { return null; }
+    }
+}

@@ -13,15 +13,15 @@ namespace MindLift.Api.Middleware;
 /// </summary>
 public sealed class SubscriptionGuardMiddleware(RequestDelegate next)
 {
-    public async Task InvokeAsync(HttpContext context, ITenantContext tenant, AppDbContext db, IClock clock)
+    public async Task InvokeAsync(HttpContext context, ITenantContext tenant, MindLift.Infrastructure.Caching.RequestStateCache state, IClock clock)
     {
         var path = context.Request.Path;
         var isWrite = !HttpMethods.IsGet(context.Request.Method) && !HttpMethods.IsHead(context.Request.Method) && !HttpMethods.IsOptions(context.Request.Method);
-        var exempt = path.StartsWithSegments("/api/v1/auth") || path.StartsWithSegments("/api/v1/platform");
+        var exempt = path.StartsWithSegments("/api/v1/auth") || path.StartsWithSegments("/api/v1/platform") || path.StartsWithSegments("/api/v1/billing");
 
         if (isWrite && !exempt && path.StartsWithSegments("/api/v1") && tenant.TenantId is { } tenantId)
         {
-            var workspace = await db.Tenants.AsNoTracking().Where(t => t.Id == tenantId).Select(t => new { t.Status, t.TrialEndsAt }).FirstOrDefaultAsync();
+            var workspace = await state.TenantAsync(tenantId, context.RequestAborted);
 
             // A trial past its end date counts as lapsed straight away, without waiting for the daily job to move it to PastDue.
             if (workspace is not null && workspace.Status is not "Suspended" && TenantAccess.IsLapsed(workspace.Status, workspace.TrialEndsAt, clock.UtcNow))

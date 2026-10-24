@@ -12,7 +12,7 @@ namespace MindLift.Infrastructure.Security;
 /// Role matrices are cached per tenant and invalidated when a role changes (plan 4.3).
 /// Module enablement is checked on every call, so disabling a module takes effect immediately.
 /// </summary>
-public sealed class PermissionService(IAppDbContext db, ITenantContext tenant, HybridCache cache, MindLift.Infrastructure.Settings.SettingsVersion settingsVersion, IPlatformEntitlements entitlements) : IPermissionService
+public sealed class PermissionService(IAppDbContext db, ITenantContext tenant, HybridCache cache, MindLift.Infrastructure.Settings.SettingsVersion settingsVersion, IPlatformEntitlements entitlements, MindLift.Infrastructure.Caching.RequestStateCache state) : IPermissionService
 {
     /// <summary>Cached form of one role's permissions.</summary>
     private sealed record RoleMatrix(bool IsAdmin, List<ModulePermission> Modules);
@@ -88,14 +88,15 @@ public sealed class PermissionService(IAppDbContext db, ITenantContext tenant, H
             cancellationToken: cancellationToken);
     }
 
-    private async Task<AppUser?> CurrentUserAsync(CancellationToken cancellationToken)
+    private async Task<MindLift.Infrastructure.Caching.UserState?> CurrentUserAsync(CancellationToken cancellationToken)
     {
         if (tenant.UserId is not { } userId)
         {
             return null;
         }
 
-        return await db.Set<AppUser>().AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+        var user = await state.UserAsync(userId, cancellationToken);
+        return user is not null && user.TenantId == tenant.TenantId ? user : null;
     }
 
     private async Task<bool> IsModuleEnabledAsync(AppModule module, CancellationToken cancellationToken)
@@ -106,10 +107,13 @@ public sealed class PermissionService(IAppDbContext db, ITenantContext tenant, H
             return false;
         }
 
-        var setting = await db.Set<ModuleSetting>().AsNoTracking()
-            .FirstOrDefaultAsync(m => m.Module == module, cancellationToken);
+        if (tenant.TenantId is not { } tenantId)
+        {
+            return false;
+        }
 
         // A module without a settings row is enabled.
-        return setting?.IsEnabled ?? true;
+        var switches = await state.ModulesAsync(tenantId, cancellationToken);
+        return !switches.TryGetValue(module.ToString(), out var on) || on;
     }
 }

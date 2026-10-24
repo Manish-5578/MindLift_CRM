@@ -5,6 +5,8 @@ services:
     image: postgres:16
     container_name: mindlift-prod-postgres
     restart: always
+    # Room for the web server's and the worker's connection pools (each capped below) plus maintenance.
+    command: ["postgres", "-c", "max_connections=200", "-c", "shared_buffers=256MB"]
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-mindlift}
       POSTGRES_USER: ${POSTGRES_USER:-mindlift}
@@ -28,10 +30,16 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-mindlift};Username=${POSTGRES_USER:-mindlift};Password=${POSTGRES_PASSWORD:?Database password required}"
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-mindlift};Username=${POSTGRES_USER:-mindlift};Password=${POSTGRES_PASSWORD:?Database password required};Maximum Pool Size=60;Timeout=15;Command Timeout=60"
       Database__MigrateOnStartup: "true"
+      # Shared cache and live notifications across servers.
+      Redis__ConnectionString: "redis:6379"
+      # The web server takes only the light background work; the worker below takes OCR, reports and imports.
+      Hangfire__Queues: "default,messaging"
       Jwt__SigningKey: "${JWT_SIGNING_KEY:?JWT signing key required}"
       Jwt__Issuer: "${JWT_ISSUER:-https://app.mindlift.io}"
       Jwt__Audience: "${JWT_AUDIENCE:-mindlift-api}"
@@ -42,8 +50,37 @@ services:
       # WhatsApp: the token you give Meta when you register the webhook. Leave empty if WhatsApp is not used.
       Communication__WhatsAppVerifyToken: "${WHATSAPP_VERIFY_TOKEN:-}"
       # Behind a reverse proxy, set FORWARDED_HEADERS_ENABLED=true and name the proxy so rate limits count each customer.
+      # If this stays false behind a proxy, every customer shares one address and the sign-in limit locks everyone out together.
       ForwardedHeaders__Enabled: "${FORWARDED_HEADERS_ENABLED:-false}"
       ForwardedHeaders__KnownProxies__0: "${FORWARDED_PROXY_ADDRESS:-127.0.0.1}"
+      # Uploaded files (documents, scans, attachments). Kept on the api-files volume so they survive a restart or an upgrade.
+      Storage__LocalPath: "/app/App_Data/files"
+      # Outgoing mail (sign-up, password reset, invitations, reports). Without a mail server nothing can be sent.
+      Smtp__Host: "${SMTP_HOST:?Mail server required}"
+      Smtp__Port: "${SMTP_PORT:-587}"
+      Smtp__UseStartTls: "${SMTP_STARTTLS:-true}"
+      Smtp__Username: "${SMTP_USERNAME:-}"
+      Smtp__Password: "${SMTP_PASSWORD:-}"
+      Smtp__FromAddress: "${SMTP_FROM_ADDRESS:?Sender address required}"
+      Smtp__FromName: "${SMTP_FROM_NAME:-MindLift}"
+      # Optional: files in a bucket (S3, Cloudflare R2, MinIO) instead of the api-files volume.
+      Storage__Provider: "${STORAGE_PROVIDER:-Local}"
+      Storage__S3__Bucket: "${S3_BUCKET:-}"
+      Storage__S3__Region: "${S3_REGION:-}"
+      Storage__S3__ServiceUrl: "${S3_SERVICE_URL:-}"
+      Storage__S3__AccessKey: "${S3_ACCESS_KEY:-}"
+      Storage__S3__SecretKey: "${S3_SECRET_KEY:-}"
+      # Optional: error tracking and searchable logs.
+      Sentry__Dsn: "${SENTRY_DSN:-}"
+      Seq__ServerUrl: "${SEQ_URL:-}"
+      Seq__ApiKey: "${SEQ_API_KEY:-}"
+      Logging__FilePath: "/app/logs/mindlift-.log"
+      # Billing without a gateway: shown to companies as how to pay (bank details).
+      Billing__Currency: "${BILLING_CURRENCY:-USD}"
+      Billing__PaymentInstructions: "${BILLING_PAYMENT_INSTRUCTIONS:-}"
+      # Automated mail per company per day, and the include your mail service gives for SPF.
+      Email__DailyLimitPerCompany: "${EMAIL_DAILY_LIMIT:-500}"
+      Email__SpfInclude: "${EMAIL_SPF_INCLUDE:-}"
       Ocr__TesseractPath: "/usr/bin/tesseract"
       Ocr__Languages: "eng+ara"
       # AI reading of document fields (see docs/ADMIN_GUIDE.md, section 3b). Off until LLM_PROVIDER=Ollama and a model is installed.
@@ -52,6 +89,9 @@ services:
       Llm__Model: "${LLM_MODEL:-qwen2.5:7b-instruct}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    volumes:
+      - api-files:/app/App_Data/files
+      - logs:/app/logs
     ports:
       - "8080:8080"
     healthcheck:
@@ -63,9 +103,118 @@ services:
     networks:
       - mindlift-network
 
+  # The heavy background work (reading documents, AI, reports, imports) in its own container, so it can never slow the web server down.
+  # Same image and settings as the api; it only takes the heavy queues and does not migrate the database.
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mindlift-prod-worker
+    restart: always
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-mindlift};Username=${POSTGRES_USER:-mindlift};Password=${POSTGRES_PASSWORD:?Database password required};Maximum Pool Size=40;Timeout=15;Command Timeout=120"
+      Database__MigrateOnStartup: "false"
+      Redis__ConnectionString: "redis:6379"
+      Hangfire__Queues: "ocr,reports,imports"
+      Hangfire__WorkerCount: "${WORKER_COUNT:-6}"
+      Jwt__SigningKey: "${JWT_SIGNING_KEY:?JWT signing key required}"
+      Jwt__Issuer: "${JWT_ISSUER:-https://app.mindlift.io}"
+      Jwt__Audience: "${JWT_AUDIENCE:-mindlift-api}"
+      Security__SecretKey: "${SECRET_KEY:?Secret key required}"
+      App__BaseUrl: "${APP_BASE_URL:?Public address of the app required, for example https://crm.example.com}"
+      Storage__LocalPath: "/app/App_Data/files"
+      Smtp__Host: "${SMTP_HOST:?Mail server required}"
+      Smtp__Port: "${SMTP_PORT:-587}"
+      Smtp__UseStartTls: "${SMTP_STARTTLS:-true}"
+      Smtp__Username: "${SMTP_USERNAME:-}"
+      Smtp__Password: "${SMTP_PASSWORD:-}"
+      Smtp__FromAddress: "${SMTP_FROM_ADDRESS:?Sender address required}"
+      Smtp__FromName: "${SMTP_FROM_NAME:-MindLift}"
+      # Optional: files in a bucket (S3, Cloudflare R2, MinIO) instead of the api-files volume.
+      Storage__Provider: "${STORAGE_PROVIDER:-Local}"
+      Storage__S3__Bucket: "${S3_BUCKET:-}"
+      Storage__S3__Region: "${S3_REGION:-}"
+      Storage__S3__ServiceUrl: "${S3_SERVICE_URL:-}"
+      Storage__S3__AccessKey: "${S3_ACCESS_KEY:-}"
+      Storage__S3__SecretKey: "${S3_SECRET_KEY:-}"
+      # Optional: error tracking and searchable logs.
+      Sentry__Dsn: "${SENTRY_DSN:-}"
+      Seq__ServerUrl: "${SEQ_URL:-}"
+      Seq__ApiKey: "${SEQ_API_KEY:-}"
+      Logging__FilePath: "/app/logs/mindlift-.log"
+      # Billing without a gateway: shown to companies as how to pay (bank details).
+      Billing__Currency: "${BILLING_CURRENCY:-USD}"
+      Billing__PaymentInstructions: "${BILLING_PAYMENT_INSTRUCTIONS:-}"
+      # Automated mail per company per day, and the include your mail service gives for SPF.
+      Email__DailyLimitPerCompany: "${EMAIL_DAILY_LIMIT:-500}"
+      Email__SpfInclude: "${EMAIL_SPF_INCLUDE:-}"
+      Ocr__TesseractPath: "/usr/bin/tesseract"
+      Ocr__Languages: "eng+ara"
+      Llm__Provider: "${LLM_PROVIDER:-None}"
+      Llm__BaseUrl: "${LLM_BASE_URL:-http://host.docker.internal:11434}"
+      Llm__Model: "${LLM_MODEL:-qwen2.5:7b-instruct}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - api-files:/app/App_Data/files
+      - logs:/app/logs
+    networks:
+      - mindlift-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: mindlift-prod-redis
+    restart: always
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - mindlift-network
+
+  # A full database backup every night, kept for BACKUP_KEEP_DAYS days in the backups volume. Copy that volume off the server too (see docs/OPERATIONS.md).
+  backup:
+    image: postgres:16
+    container_name: mindlift-prod-backup
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGDATABASE: ${POSTGRES_DB:-mindlift}
+      PGUSER: ${POSTGRES_USER:-mindlift}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Database password required}
+      KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          stamp=$$(date -u +%Y%m%d-%H%M%S)
+          pg_dump --format=custom --file=/backups/mindlift-$$stamp.dump && echo "backup $$stamp done" || echo "backup $$stamp FAILED"
+          find /backups -name 'mindlift-*.dump' -mtime +$$KEEP_DAYS -delete
+          sleep 86400
+        done
+    volumes:
+      - backups:/backups
+    networks:
+      - mindlift-network
+
 networks:
   mindlift-network:
     driver: bridge
 
 volumes:
   postgres-data:
+  api-files:
+  redis-data:
+  backups:
+  logs:

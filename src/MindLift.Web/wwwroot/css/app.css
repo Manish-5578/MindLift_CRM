@@ -91,3 +91,9 @@ code {
 html.ml-theme-fade *, html.ml-theme-fade *::before, html.ml-theme-fade *::after {
     transition: background-color .35s ease, color .35s ease, border-color .35s ease, fill .35s ease, stroke .35s ease, box-shadow .35s ease !important;
 }
+
+/* Trial and subscription notice above every page. */
+.ml-billing-banner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 12px var(--ml-page-pad, 24px) 0; padding: 10px 14px; border-radius: 12px; font-size: 13.5px; font-weight: 500; }
+.ml-billing-banner span { flex: 1; min-width: 200px; }
+.ml-billing-banner--warn { background: color-mix(in srgb, var(--ml-warning) 13%, var(--ml-surface)); color: var(--ml-text); border: 1px solid color-mix(in srgb, var(--ml-warning) 35%, transparent); }
+.ml-billing-banner--bad { background: color-mix(in srgb, var(--ml-error) 11%, var(--ml-surface)); color: var(--ml-text); border: 1px solid color-mix(in srgb, var(--ml-error) 35%, transparent); }

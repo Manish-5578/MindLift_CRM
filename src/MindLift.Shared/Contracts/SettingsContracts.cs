@@ -173,3 +173,26 @@ public sealed record BootstrapDto(
     IReadOnlyList<ModulePermissionDto> Permissions,
     string Version);
 
+
+// Email sending: the company's daily limit for automated mail, its own sending domains, and addresses that must not be emailed.
+
+public sealed record DnsRecordDto(string Type, string Name, string Value, string Purpose, bool Found);
+
+public sealed record SendingDomainDto(Guid Id, string Domain, bool Verified, bool OwnershipVerified, bool SpfOk, bool DmarcOk, DateTime? LastCheckedAt, string? LastCheckMessage, IReadOnlyList<DnsRecordDto> Records);
+
+public sealed record EmailSuppressionDto(Guid Id, string Email, string Reason, DateTime CreatedAt);
+
+public sealed record EmailSendingDto(int SentToday, int DailyLimit, IReadOnlyList<SendingDomainDto> Domains, IReadOnlyList<EmailSuppressionDto> Suppressed);
+
+public sealed record AddSendingDomainRequest(string Domain);
+
+public sealed record AddSuppressionRequest(string Email);
+
+/// <summary>A download of all of a company's data. <c>Status</c> is "running", "ready" or "failed".</summary>
+public sealed record DataExportDto(Guid Id, string Status, DateTime CreatedAt, DateTime? CompletedAt, DateTime? ExpiresAt, long? SizeBytes);
+
+/// <summary>The platform owner confirms the permanent removal of a company by typing its address (slug).</summary>
+public sealed record PurgeCompanyRequest(string Confirm);
+
+/// <summary>A short-lived address that downloads a file without signing in.</summary>
+public sealed record DownloadLinkDto(string Url);

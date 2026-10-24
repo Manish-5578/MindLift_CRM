@@ -17,6 +17,8 @@ public static class NotificationTypes
     public const string BookingCreated = "BookingCreated";
     public const string BookingCancelled = "BookingCancelled";
     public const string ImportCompleted = "ImportCompleted";
+    public const string BulkCompleted = "BulkCompleted";
+    public const string Billing = "Billing";
     public const string TrialEnding = "TrialEnding";
     public const string PortalUpload = "PortalUpload";
 
@@ -40,6 +42,8 @@ public static class NotificationTypes
         (BookingCreated, "A customer books a time with me", true),
         (BookingCancelled, "A customer cancels a booking", true),
         (ImportCompleted, "An import finishes", true),
+        (BulkCompleted, "A large bulk change finishes", false),
+        (Billing, "Invoices, payments and renewals", true),
         (TrialEnding, "My trial is ending", true),
         (PortalUpload, "A customer uploads a requested document", true),
     ];

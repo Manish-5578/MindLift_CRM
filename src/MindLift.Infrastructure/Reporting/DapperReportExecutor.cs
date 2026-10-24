@@ -31,17 +31,11 @@ public sealed class DapperReportExecutor(AppDbContext db) : IReportExecutor
             await conn.OpenAsync(ct);
         }
 
-        // Apply statement timeout for safe reporting queries
-        try
-        {
-            await conn.ExecuteAsync("SET LOCAL statement_timeout = '15s';");
-        }
-        catch
-        {
-            // Ignore if underlying DB driver doesn't support SET LOCAL in current state
-        }
-
-        var rawRows = (await conn.QueryAsync(built.Sql, built.Parameters)).ToList();
+        // SET LOCAL only applies inside a transaction, so the report runs in one (read only, rolled back afterwards).
+        await using var transaction = await conn.BeginTransactionAsync(ct);
+        await conn.ExecuteAsync("SET LOCAL statement_timeout = '15s';", transaction: transaction);
+        var rawRows = (await conn.QueryAsync(built.Sql, built.Parameters, transaction)).ToList();
+        await transaction.RollbackAsync(ct);
         sw.Stop();
 
         bool truncated = rawRows.Count > built.RequestedLimit;

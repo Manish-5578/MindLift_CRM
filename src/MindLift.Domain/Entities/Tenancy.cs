@@ -85,6 +85,12 @@ public sealed class Plan
     public decimal PriceMonthly { get; set; }
     public bool IsActive { get; set; } = true;
 
+    /// <summary>The yearly price. When not set, a year costs ten months.</summary>
+    public decimal? PriceYearly { get; set; }
+
+    /// <summary>The currency the plan is priced in (ISO code).</summary>
+    public string Currency { get; set; } = "USD";
+
     /// <summary>What the plan is for, in a sentence the platform owner writes.</summary>
     public string? Description { get; set; }
 
@@ -122,3 +128,14 @@ public sealed class TenantSettings : TenantEntity
 }
 
 
+
+/// <summary>
+/// The last number handed out for a kind of document (quotes, invoices) in one company. A number is taken with one atomic statement,
+/// so two people saving at the same moment never get the same number, and deleting a record never makes a number come back.
+/// </summary>
+public sealed class NumberSequence
+{
+    public Guid TenantId { get; set; }
+    public string Key { get; set; } = string.Empty;
+    public long LastValue { get; set; }
+}

@@ -264,7 +264,7 @@ public sealed class DocumentReviewAndOcrTests(MindLiftApiFactory factory) : ICla
         var res = await admin.Client.PostAsync("/api/v1/documents/upload", badForm);
         res.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         var body = await res.Content.ReadAsStringAsync();
-        body.ShouldContain("prohibited for security reasons");
+        body.ShouldContain("cannot be uploaded");
     }
 }
 

@@ -4952,4 +4952,7 @@
   <data name="We could not upload this document." xml:space="preserve">
     <value>تعذّر رفع هذا المستند.</value>
   </data>
+  <data name="{0} records are being changed in the background. You will get a notification when it is done." xml:space="preserve">
+    <value>يجري تعديل {0} سجل في الخلفية. سيصلك إشعار عند الانتهاء.</value>
+  </data>
 </root>

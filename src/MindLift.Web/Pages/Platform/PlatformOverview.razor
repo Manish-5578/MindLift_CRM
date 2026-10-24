@@ -33,13 +33,13 @@ else
     var o = _o;
     var spark = o.Signups.Select(s => s.Value).ToList();
     <div class="pc-grid pc-grid--kpi" data-testid="kpis">
-        <PcKpi Index="0" TestId="kpi-companies" Label="Companies" Value="o.Companies" Icon="@Icons.Material.Filled.Apartment" Solid="#6366F1" Trend="SignupTrend" Spark="spark">
+        <PcKpi ShowZero="true" Index="0" TestId="kpi-companies" Label="Companies" Value="o.Companies" Icon="@Icons.Material.Filled.Apartment" Solid="#6366F1" Trend="SignupTrend" Spark="spark">
             <Foot>@o.SignupsLast30 joined in the last 30 days</Foot>
         </PcKpi>
-        <PcKpi Index="1" TestId="kpi-active" Label="Paying and active" Value="o.Active" Icon="@Icons.Material.Filled.VerifiedUser" Solid="#10B981">
+        <PcKpi ShowZero="true" Index="1" TestId="kpi-active" Label="Paying and active" Value="o.Active" Icon="@Icons.Material.Filled.VerifiedUser" Solid="#10B981">
             <Foot>@o.Trial on trial · @o.TrialEndingSoon ending soon</Foot>
         </PcKpi>
-        <PcKpi Index="2" TestId="kpi-users" Label="People using it" Value="o.Users" Icon="@Icons.Material.Filled.Groups" Solid="#06B6D4">
+        <PcKpi ShowZero="true" Index="2" TestId="kpi-users" Label="People using it" Value="o.Users" Icon="@Icons.Material.Filled.Groups" Solid="#06B6D4">
             <Foot>@o.ActiveUsers7d signed in this week</Foot>
         </PcKpi>
         <PcKpi Index="3" TestId="kpi-revenue" Label="Monthly revenue" Value="o.MonthlyRevenue" Money="true" Icon="@Icons.Material.Filled.Payments" Solid="#F59E0B">

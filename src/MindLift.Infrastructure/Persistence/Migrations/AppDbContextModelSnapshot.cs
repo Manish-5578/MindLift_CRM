@@ -760,6 +760,141 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.ToTable("automation_rules", (string)null);
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.BillingEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("EventId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("event_id");
+
+                    b.Property<string>("Payload")
+                        .HasColumnType("text")
+                        .HasColumnName("payload");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("provider");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id")
+                        .HasName("pk_billing_events");
+
+                    b.HasIndex("Provider", "EventId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_billing_events_provider_event_id");
+
+                    b.ToTable("billing_events", (string)null);
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.BillingInvoice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<DateTime?>("DueAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("due_at");
+
+                    b.Property<string>("HostedUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("hosted_url");
+
+                    b.Property<string>("Interval")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("interval");
+
+                    b.Property<DateTime>("IssuedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("issued_at");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("number");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("paid_at");
+
+                    b.Property<string>("PaidVia")
+                        .HasColumnType("text")
+                        .HasColumnName("paid_via");
+
+                    b.Property<DateTime>("PeriodEnd")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("period_end");
+
+                    b.Property<DateTime>("PeriodStart")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("period_start");
+
+                    b.Property<Guid>("PlanId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("plan_id");
+
+                    b.Property<string>("ProviderInvoiceId")
+                        .HasColumnType("text")
+                        .HasColumnName("provider_invoice_id");
+
+                    b.Property<string>("Reference")
+                        .HasColumnType("text")
+                        .HasColumnName("reference");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_billing_invoices");
+
+                    b.HasIndex("Number")
+                        .IsUnique()
+                        .HasDatabaseName("ix_billing_invoices_number");
+
+                    b.HasIndex("TenantId", "IssuedAt")
+                        .HasDatabaseName("ix_billing_invoices_tenant_id_issued_at");
+
+                    b.ToTable("billing_invoices", (string)null);
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.Booking", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1287,6 +1422,12 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId")
                         .HasDatabaseName("ix_business_documents_tenant_id");
 
+                    b.HasIndex("TenantId", "AssociatedAccountId")
+                        .HasDatabaseName("ix_business_documents_tenant_id_associated_account_id");
+
+                    b.HasIndex("TenantId", "AssociatedContactId")
+                        .HasDatabaseName("ix_business_documents_tenant_id_associated_contact_id");
+
                     b.HasIndex("TenantId", "Category")
                         .HasDatabaseName("ix_business_documents_tenant_id_category");
 
@@ -1676,6 +1817,12 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.HasIndex("TenantId", "AccountId")
                         .HasDatabaseName("ix_contacts_tenant_id_account_id");
 
+                    b.HasIndex("TenantId", "NormalizedEmail")
+                        .HasDatabaseName("ix_contacts_tenant_id_normalized_email");
+
+                    b.HasIndex("TenantId", "NormalizedPhone")
+                        .HasDatabaseName("ix_contacts_tenant_id_normalized_phone");
+
                     b.ToTable("contacts", (string)null);
                 });
 
@@ -1862,6 +2009,56 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.ToTable("dashboard_layouts", (string)null);
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.DataExport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<Guid?>("RequestedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("requested_by_id");
+
+                    b.Property<long?>("SizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("size_bytes");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("StorageKey")
+                        .HasColumnType("text")
+                        .HasColumnName("storage_key");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_data_exports");
+
+                    b.HasIndex("TenantId", "CreatedAt")
+                        .HasDatabaseName("ix_data_exports_tenant_id_created_at");
+
+                    b.ToTable("data_exports", (string)null);
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.Deal", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1997,6 +2194,12 @@ namespace MindLift.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId")
                         .HasDatabaseName("ix_deals_tenant_id");
+
+                    b.HasIndex("TenantId", "AccountId")
+                        .HasDatabaseName("ix_deals_tenant_id_account_id");
+
+                    b.HasIndex("TenantId", "PrimaryContactId")
+                        .HasDatabaseName("ix_deals_tenant_id_primary_contact_id");
 
                     b.HasIndex("TenantId", "PipelineId", "StageId", "Status")
                         .HasDatabaseName("ix_deals_tenant_id_pipeline_id_stage_id_status");
@@ -2319,6 +2522,72 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasFilter("is_deleted = false");
 
                     b.ToTable("document_type_definitions", (string)null);
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.EmailSuppression", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("email");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("reason");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_email_suppressions");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_email_suppressions_tenant_id");
+
+                    b.HasIndex("TenantId", "Email")
+                        .IsUnique()
+                        .HasDatabaseName("ix_email_suppressions_tenant_id_email")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("email_suppressions", (string)null);
                 });
 
             modelBuilder.Entity("MindLift.Domain.Entities.ExchangeRate", b =>
@@ -3563,6 +3832,27 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.ToTable("notification_preferences", (string)null);
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.NumberSequence", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Key")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("key");
+
+                    b.Property<long>("LastValue")
+                        .HasColumnType("bigint")
+                        .HasColumnName("last_value");
+
+                    b.HasKey("TenantId", "Key")
+                        .HasName("pk_number_sequences");
+
+                    b.ToTable("number_sequences", (string)null);
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.PaymentRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3926,6 +4216,14 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasDefaultValue("USD")
+                        .HasColumnName("currency");
+
                     b.Property<string>("Description")
                         .HasColumnType("text")
                         .HasColumnName("description");
@@ -3961,6 +4259,11 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("price_monthly");
+
+                    b.Property<decimal?>("PriceYearly")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("price_yearly");
 
                     b.HasKey("Id")
                         .HasName("pk_plans");
@@ -5601,6 +5904,91 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.ToTable("saved_views", (string)null);
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.SendingDomain", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<bool>("DmarcOk")
+                        .HasColumnType("boolean")
+                        .HasColumnName("dmarc_ok");
+
+                    b.Property<string>("Domain")
+                        .IsRequired()
+                        .HasMaxLength(253)
+                        .HasColumnType("character varying(253)")
+                        .HasColumnName("domain");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("LastCheckMessage")
+                        .HasColumnType("text")
+                        .HasColumnName("last_check_message");
+
+                    b.Property<DateTime?>("LastCheckedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_checked_at");
+
+                    b.Property<bool>("OwnershipVerified")
+                        .HasColumnType("boolean")
+                        .HasColumnName("ownership_verified");
+
+                    b.Property<bool>("SpfOk")
+                        .HasColumnType("boolean")
+                        .HasColumnName("spf_ok");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<string>("VerificationToken")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("verification_token");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_sending_domains");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_sending_domains_tenant_id");
+
+                    b.HasIndex("TenantId", "Domain")
+                        .IsUnique()
+                        .HasDatabaseName("ix_sending_domains_tenant_id_domain")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("sending_domains", (string)null);
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.StoredFile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5691,6 +6079,154 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_files_tenant_id_entity_type_entity_id");
 
                     b.ToTable("files", (string)null);
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.Subscription", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("CancelAtPeriodEnd")
+                        .HasColumnType("boolean")
+                        .HasColumnName("cancel_at_period_end");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("CurrentPeriodEnd")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("current_period_end");
+
+                    b.Property<DateTime?>("CurrentPeriodStart")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("current_period_start");
+
+                    b.Property<string>("Interval")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("interval");
+
+                    b.Property<string>("PendingInterval")
+                        .HasColumnType("text")
+                        .HasColumnName("pending_interval");
+
+                    b.Property<Guid?>("PendingPlanId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pending_plan_id");
+
+                    b.Property<Guid>("PlanId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("plan_id");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("ProviderCustomerId")
+                        .HasColumnType("text")
+                        .HasColumnName("provider_customer_id");
+
+                    b.Property<string>("ProviderSubscriptionId")
+                        .HasColumnType("text")
+                        .HasColumnName("provider_subscription_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_subscriptions");
+
+                    b.HasIndex("ProviderSubscriptionId")
+                        .HasDatabaseName("ix_subscriptions_provider_subscription_id");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_subscriptions_tenant_id");
+
+                    b.ToTable("subscriptions", (string)null);
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.SupportSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CodeExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("code_expires_at");
+
+                    b.Property<string>("CodeHash")
+                        .HasColumnType("text")
+                        .HasColumnName("code_hash");
+
+                    b.Property<DateTime?>("EndedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ended_at");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<Guid>("PlatformUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("platform_user_id");
+
+                    b.Property<string>("PlatformUserName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("platform_user_name");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("ViewAsUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("view_as_user_id");
+
+                    b.PrimitiveCollection<string[]>("VisitedPaths")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("visited_paths");
+
+                    b.HasKey("Id")
+                        .HasName("pk_support_sessions");
+
+                    b.HasIndex("CodeHash")
+                        .HasDatabaseName("ix_support_sessions_code_hash");
+
+                    b.HasIndex("TenantId", "StartedAt")
+                        .HasDatabaseName("ix_support_sessions_tenant_id_started_at");
+
+                    b.ToTable("support_sessions", (string)null);
                 });
 
             modelBuilder.Entity("MindLift.Domain.Entities.Team", b =>

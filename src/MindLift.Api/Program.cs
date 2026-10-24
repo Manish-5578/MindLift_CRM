@@ -21,11 +21,39 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Host.UseSerilog((context, services, configuration) => configuration
-    .ReadFrom.Configuration(context.Configuration)
-    .ReadFrom.Services(services)
-    .Enrich.FromLogContext()
-    .WriteTo.Console());
+// Logs: always to the console; also to daily files (Logging:FilePath) and to a Seq server (Seq:ServerUrl) when set. Every line of a request
+// carries its correlation id, company and user (see RequestLogContextMiddleware), so one customer's problem can be found among all the others.
+builder.Host.UseSerilog((context, services, configuration) =>
+{
+    configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .ReadFrom.Services(services)
+        .Enrich.FromLogContext()
+        .Enrich.WithProperty("Application", "MindLift")
+        .WriteTo.Console();
+
+    if (context.Configuration["Logging:FilePath"] is { Length: > 0 } logPath)
+    {
+        configuration.WriteTo.File(new Serilog.Formatting.Compact.CompactJsonFormatter(), logPath, rollingInterval: RollingInterval.Day, retainedFileCountLimit: 14);
+    }
+
+    if (context.Configuration["Seq:ServerUrl"] is { Length: > 0 } seqUrl)
+    {
+        configuration.WriteTo.Seq(seqUrl, apiKey: context.Configuration["Seq:ApiKey"]);
+    }
+});
+
+// Error tracking: every unexpected error is sent to Sentry when Sentry:Dsn is set, with the request and the company it happened in.
+if (builder.Configuration["Sentry:Dsn"] is { Length: > 0 } sentryDsn)
+{
+    builder.WebHost.UseSentry(options =>
+    {
+        options.Dsn = sentryDsn;
+        options.Environment = builder.Environment.EnvironmentName;
+        options.SendDefaultPii = false;   // no personal data leaves the server
+        options.TracesSampleRate = builder.Configuration.GetValue<double?>("Sentry:TracesSampleRate") ?? 0.0;
+    });
+}
 
 var connectionString = builder.Configuration.GetConnectionString("Default") ?? string.Empty;
 var jwt = builder.Configuration.GetSection("Jwt").Get<MindLift.Infrastructure.JwtOptions>() ?? new();
@@ -117,7 +145,12 @@ builder.Services.AddRateLimiter(options =>
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddOpenApi();
-builder.Services.AddSignalR();
+// Live notifications. With more than one server, Redis carries each message to the server the person is connected to.
+var signalR = builder.Services.AddSignalR();
+if (builder.Configuration["Redis:ConnectionString"] is { Length: > 0 } redisConnection)
+{
+    signalR.AddStackExchangeRedis(redisConnection, options => options.Configuration.ChannelPrefix = StackExchange.Redis.RedisChannel.Literal("mindlift"));
+}
 builder.Services.AddSingleton<MindLift.Application.Abstractions.INotificationPusher, MindLift.Api.Hubs.SignalRNotificationPusher>();
 
 builder.Services.AddHealthChecks()
@@ -143,9 +176,14 @@ GlobalConfiguration.Configuration
 builder.Services.AddHangfire(config => config.UseStorage(hangfireStorage));
 builder.Services.AddSingleton<JobStorage>(hangfireStorage);
 builder.Services.AddSingleton<IBackgroundJobClient>(_ => new BackgroundJobClient(hangfireStorage));
+// Background work runs in this process unless Hangfire:ServerEnabled is false. Hangfire:Queues picks which work this process takes, so heavy work
+// (ocr, reports, imports) can run in a separate worker container while the web server keeps only the light queues (see docker-compose.prod.yml).
+var hangfireQueues = (builder.Configuration["Hangfire:Queues"] ?? "default,messaging,reports,imports,ocr")
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+if (builder.Configuration.GetValue<bool?>("Hangfire:ServerEnabled") ?? true)
 builder.Services.AddSingleton<IHostedService>(sp => new MindLift.Api.Hosting.HangfireServerHost(hangfireStorage, new BackgroundJobServerOptions
 {
-    Queues = ["default", "messaging", "reports", "imports", "ocr"],
+    Queues = hangfireQueues,
 
     // Hangfire's own default (5 per CPU, up to 20) stays for real runs. Tests lower it so many hosts do not exhaust the database.
     WorkerCount = builder.Configuration.GetValue<int?>("Hangfire:WorkerCount") ?? Math.Min(Environment.ProcessorCount * 5, 20),
@@ -183,20 +221,36 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await db.Database.MigrateAsync();
-    await PlanCatalog.EnsureAsync(db);
+
+    // Several servers may start together. A database-wide lock lets one of them migrate while the others wait, instead of all of them at once.
+    await MindLift.Infrastructure.Persistence.MigrationLock.RunAsync(db, async () =>
+    {
+        await db.Database.MigrateAsync();
+        await PlanCatalog.EnsureAsync(db);
+    });
 
     // Webhook secrets saved before they were encrypted are converted once.
     await MindLift.Infrastructure.Communication.WebhookSecrets.SealAllAsync(db, scope.ServiceProvider.GetRequiredService<MindLift.Infrastructure.Communication.ISecretProtector>());
 }
 
 // Behind a reverse proxy this makes the client address and scheme the real ones. Off unless ForwardedHeaders:Enabled is set.
+if (!MindLift.Api.Hosting.ForwardedHeadersSetup.IsEnabled(app.Configuration) && app.Environment.IsProduction())
+{
+    app.Logger.LogWarning("ForwardedHeaders:Enabled is false. Behind a reverse proxy every visitor shares the proxy's address, so one busy client can use up the sign-in limit for everyone. Set FORWARDED_HEADERS_ENABLED=true and the proxy address.");
+}
+
 if (MindLift.Api.Hosting.ForwardedHeadersSetup.IsEnabled(app.Configuration))
 {
     app.UseForwardedHeaders();
 }
 
-app.UseSerilogRequestLogging();
+app.UseMiddleware<MindLift.Api.Middleware.CorrelationIdMiddleware>();
+app.UseSerilogRequestLogging(options => options.EnrichDiagnosticContext = (diagnostics, http) =>
+{
+    diagnostics.Set("CorrelationId", http.TraceIdentifier);
+    diagnostics.Set("TenantId", http.User.FindFirst("tid")?.Value ?? "-");
+    diagnostics.Set("UserId", http.User.FindFirst("sub")?.Value ?? "-");
+});
 app.UseExceptionHandler();
 
 // Baseline browser protections for every response. Framing is refused and MIME sniffing is off.
@@ -247,12 +301,17 @@ app.UseStaticFiles();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseMiddleware<TenantResolutionMiddleware>();
+app.UseMiddleware<MindLift.Api.Middleware.RequestLogContextMiddleware>();
+app.UseMiddleware<MindLift.Api.Middleware.SupportSessionMiddleware>();
 app.UseMiddleware<SubscriptionGuardMiddleware>();
 app.UseAuthorization();
 
 app.MapControllers();
 app.MapHub<NotificationHub>("/hubs/notifications");
 app.MapHealthChecks("/health");
+// For a load balancer or uptime monitor: "live" says the process answers, "ready" says it can also reach the database.
+app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions { Predicate = _ => false });
+app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions { Predicate = check => check.Name == "database" });
 
 // Unknown API and hub routes return 404 (never the SPA page).
 app.MapFallback("/api/{**rest}", context => { context.Response.StatusCode = StatusCodes.Status404NotFound; return Task.CompletedTask; });
@@ -275,6 +334,8 @@ new RecurringJobManager(hangfireStorage).AddOrUpdate<MindLift.Infrastructure.Not
 new RecurringJobManager(hangfireStorage).AddOrUpdate<MindLift.Infrastructure.Notifications.DailyDigestJob>("daily-digest", job => job.RunAsync(CancellationToken.None), Cron.Hourly());
 new RecurringJobManager(hangfireStorage).AddOrUpdate<MindLift.Infrastructure.Bookings.BookingReminderJob>("booking-reminders", job => job.RunAsync(CancellationToken.None), "*/5 * * * *");
 new RecurringJobManager(hangfireStorage).AddOrUpdate<MindLift.Infrastructure.Notifications.NotificationCleanupJob>("notification-cleanup", job => job.RunAsync(CancellationToken.None), Cron.Daily(3, 30));
+new RecurringJobManager(hangfireStorage).AddOrUpdate<MindLift.Infrastructure.Billing.BillingRenewalJob>("billing-renewals", job => job.RunAsync(CancellationToken.None), Cron.Daily(5));
+new RecurringJobManager(hangfireStorage).AddOrUpdate<MindLift.Infrastructure.Persistence.AuditRetentionJob>("audit-retention", job => job.RunAsync(CancellationToken.None), Cron.Daily(2));
 new RecurringJobManager(hangfireStorage).AddOrUpdate<MindLift.Infrastructure.Cpq.DocumentExpiryJob>("document-expiry", job => job.RunAsync(CancellationToken.None), Cron.Daily(4));
 
 app.Run();

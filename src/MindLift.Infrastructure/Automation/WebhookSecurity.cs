@@ -57,6 +57,36 @@ public static class WebhookSecurity
         return true;
     }
 
+    /// <summary>True for an address a webhook may never reach (loopback, private ranges, link-local, cloud metadata).</summary>
+    public static bool IsBlockedAddress(IPAddress ip) => IPAddress.IsLoopback(ip) || IsPrivateOrRestricted(ip);
+
+    /// <summary>
+    /// Connects the way a webhook must: the name is resolved once, every address is checked, and the connection goes to the address that was checked.
+    /// The check in <see cref="IsSafeUrl"/> alone is not enough, because the name could resolve to another address a moment later.
+    /// </summary>
+    public static async ValueTask<Stream> ConnectSafelyAsync(SocketsHttpConnectionContext context, CancellationToken cancellationToken)
+    {
+        var addresses = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, cancellationToken);
+        var safe = addresses.FirstOrDefault(a => !IsBlockedAddress(a))
+            ?? throw new HttpRequestException("Webhook blocked: the address is internal, private or loopback.");
+        if (addresses.Any(IsBlockedAddress))
+        {
+            throw new HttpRequestException("Webhook blocked: the name also points to an internal address.");
+        }
+
+        var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+        try
+        {
+            await socket.ConnectAsync(new IPEndPoint(safe, context.DnsEndPoint.Port), cancellationToken);
+            return new NetworkStream(socket, ownsSocket: true);
+        }
+        catch
+        {
+            socket.Dispose();
+            throw;
+        }
+    }
+
     private static bool IsPrivateOrRestricted(IPAddress ip)
     {
         if (ip.IsIPv6LinkLocal || ip.IsIPv6SiteLocal || ip.IsIPv6Multicast)

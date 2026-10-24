@@ -167,6 +167,9 @@ public sealed class PortalCustomerController(IPortalService portalService, IDocu
         var streamResult = await ocrService.GetDocumentStreamAsync(id, ct);
         if (streamResult == null) return NotFound();
 
+        // Always a download, never shown inside the portal's own page, and the browser must not guess another type.
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        Response.Headers["Content-Security-Policy"] = "default-src 'none'; sandbox";
         return File(streamResult.Value.Stream, streamResult.Value.ContentType, streamResult.Value.FileName);
     }
 
@@ -178,6 +181,7 @@ public sealed class PortalCustomerController(IPortalService portalService, IDocu
     }
 
     [HttpPost("requests/{id:guid}/upload")]
+    [RequestSizeLimit(MindLift.Api.Hosting.UploadRules.RequestLimitBytes)]
     public async Task<ActionResult<BusinessDocumentDto>> UploadForRequest(
         Guid id,
         [FromForm] IFormFile file,
@@ -187,10 +191,9 @@ public sealed class PortalCustomerController(IPortalService portalService, IDocu
         if (file.Length > 25 * 1024 * 1024) return BadRequest("File exceeds maximum allowed size of 25 MB.");
 
         var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-        string[] blockedExtensions = [".exe", ".dll", ".bat", ".cmd", ".sh", ".ps1", ".vbs", ".msi", ".scr", ".jar"];
-        if (blockedExtensions.Contains(ext))
+        if (!MindLift.Api.Hosting.UploadRules.IsAllowed(ext))
         {
-            return BadRequest($"File extension '{ext}' is prohibited for security reasons.");
+            return BadRequest($"Files of type '{ext}' cannot be uploaded. Allowed: {MindLift.Api.Hosting.UploadRules.AllowedList}.");
         }
 
         using var ms = new MemoryStream();

@@ -24,6 +24,7 @@ public sealed class AutomationScheduledJob(
     ITenantContext tenant,
     IClock clock,
     IEmailSender emailSender,
+    MindLift.Infrastructure.Messaging.EmailGuard emailGuard,
     INotificationService notifications,
     IHttpClientFactory? httpClientFactory,
     ILogger<AutomationScheduledJob> logger
@@ -223,7 +224,11 @@ public sealed class AutomationScheduledJob(
                 {
                     var subject = action.Subject ?? $"Update from MindLift regarding {entityType}";
                     var body = action.EmailBody ?? action.NotificationMessage ?? $"Automation rule '{rule.Name}' triggered.";
-                    await emailSender.SendAsync(recipient, subject, body, cancellationToken);
+                    var (allowed, _) = await emailGuard.TryReserveAsync(recipient, cancellationToken);
+                    if (allowed)
+                    {
+                        await emailSender.SendAsync(recipient, subject, body + emailGuard.Footer(recipient), cancellationToken);
+                    }
                 }
                 break;
         }

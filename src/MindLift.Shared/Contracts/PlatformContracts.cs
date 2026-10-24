@@ -95,10 +95,10 @@ public sealed record SetCompanyLimitsRequest(int? MaxUsersOverride, bool AiReadi
 /// <summary>A module with how many companies have it, for the module catalogue.</summary>
 public sealed record PlatformModuleDto(string Key, string Name, string Description, string Category, string Icon, bool Core, bool Available, int Companies, int Total);
 
-public sealed record PlatformPlanDto(Guid Id, string Key, string Name, int MaxUsers, int MaxRecords, decimal PriceMonthly, bool IsActive, int Companies, string? Description = null, IReadOnlyList<string>? IncludedModules = null);
+public sealed record PlatformPlanDto(Guid Id, string Key, string Name, int MaxUsers, int MaxRecords, decimal PriceMonthly, bool IsActive, int Companies, string? Description = null, IReadOnlyList<string>? IncludedModules = null, decimal? PriceYearly = null, string Currency = "USD");
 
 /// <summary><c>IncludedModules</c> null leaves the plan's modules as they are; a list sets them (every switchable module, or none listed, means all).</summary>
-public sealed record SavePlanRequest(string Name, int MaxUsers, int MaxRecords, decimal PriceMonthly, bool IsActive, string? Description = null, IReadOnlyList<string>? IncludedModules = null);
+public sealed record SavePlanRequest(string Name, int MaxUsers, int MaxRecords, decimal PriceMonthly, bool IsActive, string? Description = null, IReadOnlyList<string>? IncludedModules = null, decimal? PriceYearly = null, string? Currency = null);
 
 /// <summary>A page of companies with the counts that power the filter chips (they follow the search, not the chips).</summary>
 public sealed record PlatformCompanyListDto(

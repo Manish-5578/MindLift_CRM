@@ -1,0 +1,86 @@
+@page "/settings/data"
+@implements IDisposable
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+@inject Translator T
+
+<PageTitle>@T["Your data"] · MindLift</PageTitle>
+
+<div class="ml-page ml-page--form">
+    <PageHeader Title="Your data" Subtitle="Download everything your company has in MindLift: every record and every uploaded file, in one file." />
+    <SettingsNav Current="/settings/data" />
+
+    <MlCard Title="Export all data" Subtitle="The export is prepared in the background. You get a notification when it is ready, and it can be downloaded for 7 days." Class="mb-4" TestId="data-export">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Archive" OnClick="ExportAsync" Disabled="@(_busy || Running)" data-testid="data-export-start">
+            @(Running ? T["Preparing..."] : T["Prepare an export"])
+        </MudButton>
+        <MudText Typo="Typo.caption" Class="ml-muted d-block mt-2">@T["One JSON file per table, and your uploaded files. Passwords and keys are never included."]</MudText>
+
+        @if (_exports.Count > 0)
+        {
+            <MudSimpleTable Dense="true" Style="background:transparent;margin-top:16px">
+                <thead><tr><th>@T["Prepared"]</th><th>@T["Size"]</th><th>@T["Status"]</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var e in _exports)
+                    {
+                        var export = e;
+                        var expired = export.ExpiresAt is { } until && until < DateTime.UtcNow;
+                        <tr data-testid="data-export-row">
+                            <td>@export.CreatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</td>
+                            <td>@SizeText(export.SizeBytes)</td>
+                            <td>@T[expired ? "Expired" : export.Status == "ready" ? "Ready" : export.Status == "running" ? "Preparing" : "Failed"]</td>
+                            <td>@if (export.Status == "ready" && !expired) { <MudButton Size="Size.Small" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Download" OnClick="() => DownloadAsync(export)">@T["Download"]</MudButton> }</td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        }
+    </MlCard>
+</div>
+
+@code {
+    private List<DataExportDto> _exports = [];
+    private bool _busy;
+    private Timer? _poll;
+
+    private bool Running => _exports.Any(e => e.Status == "running");
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        // While an export is being prepared, look again every few seconds.
+        _poll = new Timer(_ => InvokeAsync(async () => { if (Running) { await LoadAsync(); StateHasChanged(); } }), null, TimeSpan.FromSeconds(4), TimeSpan.FromSeconds(4));
+    }
+
+    private async Task LoadAsync()
+    {
+        try { _exports = await Http.GetFromJsonAsync<List<DataExportDto>>("api/v1/settings/data/exports") ?? []; }
+        catch (HttpRequestException) { }
+    }
+
+    private async Task ExportAsync()
+    {
+        _busy = true;
+        try
+        {
+            var response = await Http.PostAsync("api/v1/settings/data/exports", null);
+            if (!response.IsSuccessStatusCode) { Snackbar.Add(await ProblemText.FromAsync(response, T["That did not work."]), Severity.Error); return; }
+            Snackbar.Add(T["Your export is being prepared."], Severity.Info);
+            await LoadAsync();
+        }
+        finally { _busy = false; }
+    }
+
+    private async Task DownloadAsync(DataExportDto export)
+    {
+        var response = await Http.PostAsync($"api/v1/settings/data/exports/{export.Id}/link", null);
+        if (!response.IsSuccessStatusCode) { Snackbar.Add(await ProblemText.FromAsync(response, T["That did not work."]), Severity.Error); return; }
+        var link = (await response.Content.ReadFromJsonAsync<DownloadLinkDto>())!;
+        Nav.NavigateTo(link.Url, forceLoad: true);
+    }
+
+    private static string SizeText(long? bytes) => bytes is null ? "-" : bytes < 1024 * 1024 ? $"{bytes / 1024.0:0.#} KB" : $"{bytes / 1024.0 / 1024.0:0.#} MB";
+
+    public void Dispose() => _poll?.Dispose();
+}

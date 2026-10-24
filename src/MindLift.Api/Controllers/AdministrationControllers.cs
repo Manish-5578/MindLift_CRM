@@ -187,8 +187,64 @@ public sealed class AuditLogsController(AuditLogQuery audit) : ControllerBase
 [ApiController]
 [Route("api/v1/platform")]
 [Authorize(Policy = "PlatformAdmin")]
-public sealed class PlatformController(PlatformService platform, MindLift.Infrastructure.Platform.PlatformConsole console) : ControllerBase
+public sealed class PlatformController(PlatformService platform, MindLift.Infrastructure.Platform.PlatformConsole console, MindLift.Infrastructure.Billing.BillingService billing, MindLift.Infrastructure.DataPortability.CompanyDataService data) : ControllerBase
 {
+    /// <summary>Opens a read-only support view of the company, as its owner sees it. A reason is required and kept.</summary>
+    [HttpPost("companies/{id:guid}/support-sessions")]
+    public async Task<ActionResult<SupportSessionStartedDto>> StartSupport(Guid id, [FromBody] StartSupportSessionRequest request, [FromServices] MindLift.Infrastructure.Platform.SupportAccessService support, CancellationToken cancellationToken)
+        => Ok(await support.StartAsync(id, request, cancellationToken));
+
+    [HttpGet("companies/{id:guid}/support-sessions")]
+    public async Task<ActionResult<IReadOnlyList<SupportSessionDto>>> SupportSessions(Guid id, [FromServices] MindLift.Infrastructure.Platform.SupportAccessService support, CancellationToken cancellationToken)
+        => Ok(await support.SessionsAsync(id, cancellationToken));
+
+    [HttpPost("support-sessions/{sessionId:guid}/end")]
+    public async Task<IActionResult> EndSupport(Guid sessionId, [FromServices] MindLift.Infrastructure.Platform.SupportAccessService support, CancellationToken cancellationToken)
+    {
+        await support.EndAsync(sessionId, cancellationToken);
+        return NoContent();
+    }
+
+    /// <summary>All of one company's data as a download, for a backup or when it leaves.</summary>
+    [HttpPost("companies/{id:guid}/exports")]
+    public async Task<ActionResult<DataExportDto>> ExportCompany(Guid id, CancellationToken cancellationToken) => Ok(await data.RequestExportAsync(id, cancellationToken));
+
+    [HttpGet("companies/{id:guid}/exports")]
+    public async Task<ActionResult<IReadOnlyList<DataExportDto>>> CompanyExports(Guid id, CancellationToken cancellationToken) => Ok(await data.ExportsAsync(id, cancellationToken));
+
+    [HttpGet("companies/{id:guid}/exports/{exportId:guid}/download")]
+    public async Task<IActionResult> DownloadCompanyExport(Guid id, Guid exportId, CancellationToken cancellationToken)
+    {
+        var (stream, name) = await data.OpenExportAsync(id, exportId, cancellationToken);
+        return File(stream, "application/zip", name);
+    }
+
+    [HttpPost("companies/{id:guid}/exports/{exportId:guid}/link")]
+    public async Task<ActionResult<DownloadLinkDto>> CompanyExportLink(Guid id, Guid exportId, CancellationToken cancellationToken) => Ok(new DownloadLinkDto(await data.DownloadLinkAsync(id, exportId, cancellationToken)));
+
+    /// <summary>Removes a company and all its data for good. The body must name the company's address (slug).</summary>
+    [HttpDelete("companies/{id:guid}")]
+    public async Task<IActionResult> PurgeCompany(Guid id, [FromBody] PurgeCompanyRequest request, CancellationToken cancellationToken)
+    {
+        var actor = User.FindFirst("name")?.Value is { Length: > 0 } name ? name : "Platform";
+        await data.RequestPurgeAsync(id, request.Confirm, actor, cancellationToken);
+        return Accepted();
+    }
+
+    /// <summary>A company's subscription and invoices.</summary>
+    [HttpGet("companies/{id:guid}/billing")]
+    public async Task<ActionResult<PlatformBillingDto>> Billing(Guid id, CancellationToken cancellationToken)
+        => Ok(await billing.PlatformViewAsync(id, cancellationToken));
+
+    /// <summary>Records money received from a company (bank transfer, cash, cheque).</summary>
+    [HttpPost("companies/{id:guid}/billing/payments")]
+    public async Task<ActionResult<PlatformBillingDto>> RecordPayment(Guid id, [FromBody] RecordBillingPaymentRequest request, CancellationToken cancellationToken)
+        => Ok(await billing.RecordPaymentAsync(id, request, cancellationToken));
+
+    [HttpPost("companies/{id:guid}/billing/invoices/{invoiceId:guid}/void")]
+    public async Task<ActionResult<PlatformBillingDto>> VoidInvoice(Guid id, Guid invoiceId, CancellationToken cancellationToken)
+        => Ok(await billing.VoidInvoiceAsync(id, invoiceId, cancellationToken));
+
     /// <summary>The numbers for the whole platform: companies by status and plan, signups, usage, what needs attention.</summary>
     [HttpGet("overview")]
     public async Task<ActionResult<PlatformOverviewDto>> Overview(CancellationToken cancellationToken)

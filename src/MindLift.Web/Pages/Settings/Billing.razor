@@ -1,0 +1,218 @@
+@page "/settings/billing"
+@inject HttpClient Http
+@inject AppState App
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+@inject Translator T
+
+<PageTitle>@T["Billing"] · MindLift</PageTitle>
+
+<div class="ml-page ml-page--form">
+    <PageHeader Title="Billing" Subtitle="Your plan, what you use of it, and your invoices." />
+    <SettingsNav Current="/settings/billing" />
+
+    @if (_loading)
+    {
+        <MlCard Loading="true" />
+    }
+    else if (_b is null)
+    {
+        <ErrorState OnRetry="LoadAsync" />
+    }
+    else
+    {
+        var b = _b;
+        @if (b.Status == "past_due")
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4" data-testid="billing-pastdue">@T["Your subscription is past due. You can still see your data. Pay the open invoice below to make changes again."]</MudAlert>
+        }
+        else if (b.Status == "cancelled")
+        {
+            <MudAlert Severity="Severity.Warning" Class="mb-4">@T["Your subscription has ended. Choose a plan to make changes again."]</MudAlert>
+        }
+        else if (b.Status == "trialing" && b.TrialEndsAt is { } ends)
+        {
+            <MudAlert Severity="@(ends < DateTime.UtcNow.AddDays(4) ? Severity.Warning : Severity.Info)" Class="mb-4" data-testid="billing-trial">
+                @T["Your free trial ends on {0}. Choose a plan below to keep working without interruption.", ends.ToLocalTime().ToString("dd MMM yyyy")]
+            </MudAlert>
+        }
+
+        @if (b.PendingPlanName is not null)
+        {
+            <MudAlert Severity="Severity.Info" Class="mb-4" data-testid="billing-pending">
+                @T["You chose the {0} plan ({1}). It starts as soon as your payment is received.", b.PendingPlanName, T[b.PendingInterval == "yearly" ? "yearly" : "monthly"]]
+            </MudAlert>
+        }
+
+        <div class="ch-kpis" style="margin-bottom:20px">
+            <ChartKpi Label="@T["Plan"]" Value="@(string.IsNullOrEmpty(b.PlanName) ? "-" : b.PlanName)" Icon="@Icons.Material.Filled.WorkspacePremium" Color="#4F46E5"
+                      Hint="@(b.Status == "active" ? $"{Money(b.Price, b.Currency)} / {T[b.Interval == "yearly" ? "year" : "month"]}" : T[StatusLabel(b.Status)])" TestId="billing-plan" />
+            <ChartKpi Label="@T[b.Status == "trialing" ? "Trial ends" : "Renews on"]" Value="@(RenewalDate(b))" Icon="@Icons.Material.Filled.Event" Color="#06B6D4"
+                      Hint="@(b.CancelAtPeriodEnd ? T["Cancelled: ends then"] : null)" />
+            <ChartKpi Label="@T["Users"]" Value="@($"{b.Users} / {b.MaxUsers}")" Icon="@Icons.Material.Filled.Groups" Color="#10B981" Ring="@(Pct(b.Users, b.MaxUsers))" />
+            <ChartKpi Label="@T["Records"]" Value="@($"{b.Records:N0}")" Icon="@Icons.Material.Filled.Storage" Color="#F59E0B" Ring="@(Pct(b.Records, b.MaxRecords))" Hint="@($"{T["of"]} {b.MaxRecords:N0}")" />
+        </div>
+
+        <MlCard Title="Choose a plan" Subtitle="@(b.OnlinePayment ? T["Pay online by card."] : T["Pay by bank transfer. Your plan starts when the payment is received."])" Class="mb-4" TestId="billing-plans">
+            <HeaderActions>
+                <MudButtonGroup Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary">
+                    <MudButton Variant="@(_interval == "monthly" ? Variant.Filled : Variant.Outlined)" OnClick="@(() => _interval = "monthly")" data-testid="interval-monthly">@T["Monthly"]</MudButton>
+                    <MudButton Variant="@(_interval == "yearly" ? Variant.Filled : Variant.Outlined)" OnClick="@(() => _interval = "yearly")" data-testid="interval-yearly">@T["Yearly"]</MudButton>
+                </MudButtonGroup>
+            </HeaderActions>
+            <ChildContent>
+                <MudGrid Spacing="3">
+                    @foreach (var p in b.Plans)
+                    {
+                        var plan = p;
+                        var price = _interval == "yearly" ? plan.PriceYearly : plan.PriceMonthly;
+                        var isCurrent = plan.IsCurrent && b.Status == "active" && b.Interval == _interval;
+                        <MudItem xs="12" sm="6" md="4">
+                            <div class="ch-kpi" style="--c:@(isCurrent ? "#16A34A" : "#4F46E5");height:100%;display:flex;flex-direction:column;gap:8px" data-testid="@($"plan-{plan.Key}")">
+                                <div class="ch-kpi__top"><span class="ch-kpi__icon"><MudIcon Icon="@Icons.Material.Filled.Diamond" Size="Size.Small" /></span><span class="ch-kpi__label" style="font-size:15px;color:var(--ml-text)">@plan.Name</span>
+                                    @if (isCurrent) { <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Text" Style="margin-inline-start:auto">@T["Current"]</MudChip> }</div>
+                                @if (!string.IsNullOrWhiteSpace(plan.Description)) { <MudText Typo="Typo.body2" Class="ml-muted">@plan.Description</MudText> }
+                                <div class="ch-kpi__value">@Money(price, plan.Currency)<span class="ch-kpi__hint">/ @T[_interval == "yearly" ? "year" : "month"]</span></div>
+                                @if (_interval == "yearly" && plan.PriceMonthly * 12 > plan.PriceYearly && plan.PriceMonthly > 0)
+                                {
+                                    <span class="ch-trend is-good" style="width:fit-content">@T["Save {0}%", Math.Round(100 - 100 * plan.PriceYearly / (plan.PriceMonthly * 12))]</span>
+                                }
+                                <MudText Typo="Typo.body2">@T["{0} users · {1} records · {2} modules", plan.MaxUsers, plan.MaxRecords.ToString("N0"), plan.ModuleCount]</MudText>
+                                <div style="margin-top:auto">
+                                    <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Disabled="@(isCurrent || _busy)" OnClick="() => CheckoutAsync(plan)" data-testid="@($"choose-{plan.Key}")">
+                                        @(isCurrent ? T["Your plan"] : T["Choose {0}", plan.Name])
+                                    </MudButton>
+                                </div>
+                            </div>
+                        </MudItem>
+                    }
+                </MudGrid>
+                @if (!b.OnlinePayment && !string.IsNullOrWhiteSpace(b.PaymentInstructions))
+                {
+                    <MudAlert Severity="Severity.Normal" Class="mt-4" Icon="@Icons.Material.Filled.AccountBalance">
+                        <b>@T["How to pay"]</b><div style="white-space:pre-line">@b.PaymentInstructions</div>
+                    </MudAlert>
+                }
+            </ChildContent>
+        </MlCard>
+
+        <MlCard Title="Invoices" Flush="true" Class="mb-4" TestId="billing-invoices">
+            @if (b.Invoices.Count == 0)
+            {
+                <div style="padding:20px"><MudText Typo="Typo.body2" Class="ml-muted">@T["No invoices yet."]</MudText></div>
+            }
+            else
+            {
+                <MudSimpleTable Dense="true" Hover="true" Style="background:transparent">
+                    <thead><tr><th>@T["Invoice"]</th><th>@T["Plan"]</th><th>@T["Period"]</th><th>@T["Amount"]</th><th>@T["Status"]</th></tr></thead>
+                    <tbody>
+                        @foreach (var i in b.Invoices)
+                        {
+                            <tr data-testid="billing-invoice">
+                                <td><b>@i.Number</b><div class="ml-muted" style="font-size:12px">@i.IssuedAt.ToLocalTime().ToString("dd MMM yyyy")</div></td>
+                                <td>@i.PlanName (@T[i.Interval])</td>
+                                <td>@i.PeriodStart.ToLocalTime().ToString("dd MMM yyyy") - @i.PeriodEnd.ToLocalTime().ToString("dd MMM yyyy")</td>
+                                <td>@Money(i.Amount, i.Currency)</td>
+                                <td>
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="@(i.Status == "paid" ? Color.Success : Color.Warning)">@T[i.Status == "paid" ? "Paid" : "Open"]</MudChip>
+                                    @if (i.HostedUrl is { Length: > 0 }) { <MudLink Href="@i.HostedUrl" Target="_blank" Typo="Typo.caption">@T["View"]</MudLink> }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+            }
+        </MlCard>
+
+        @if (b.Status == "active")
+        {
+            <MlCard Title="Cancel subscription" TestId="billing-cancel">
+                @if (b.CancelAtPeriodEnd)
+                {
+                    <MudText Typo="Typo.body2" Class="mb-3">@T["Your subscription ends on {0}. You can keep it instead.", RenewalDate(b)]</MudText>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="ResumeAsync" Disabled="_busy" data-testid="billing-resume">@T["Keep my subscription"]</MudButton>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2" Class="mb-3">@T["You keep everything until the end of the period you paid for. Your data stays available to view afterwards."]</MudText>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="CancelAsync" Disabled="_busy" data-testid="billing-cancel-button">@T["Cancel at the end of the period"]</MudButton>
+                }
+            </MlCard>
+        }
+    }
+</div>
+
+@code {
+    private BillingOverviewDto? _b;
+    private bool _loading = true;
+    private bool _busy;
+    private string _interval = "monthly";
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _b = await Http.GetFromJsonAsync<BillingOverviewDto>("api/v1/billing");
+            if (_b is { Status: "active" }) _interval = _b.Interval;
+            if (Nav.Uri.Contains("paid=1")) Snackbar.Add(T["Thank you. Your payment is being confirmed."], Severity.Success);
+        }
+        catch (HttpRequestException) { _b = null; }
+        finally { _loading = false; }
+    }
+
+    private async Task CheckoutAsync(BillingPlanOption plan)
+    {
+        _busy = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/v1/billing/checkout", new StartCheckoutRequest(plan.Key, _interval));
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add(await ProblemText.FromAsync(response, T["We could not start that."]), Severity.Error);
+                return;
+            }
+
+            var result = (await response.Content.ReadFromJsonAsync<CheckoutResultDto>())!;
+            if (result.RedirectUrl is { Length: > 0 } url)
+            {
+                Nav.NavigateTo(url, forceLoad: true);
+                return;
+            }
+
+            Snackbar.Add(result.Message, Severity.Success);
+            await LoadAsync();
+        }
+        finally { _busy = false; }
+    }
+
+    private async Task CancelAsync() => await Change("api/v1/billing/cancel", T["Your subscription will end at the end of the period."]);
+    private async Task ResumeAsync() => await Change("api/v1/billing/resume", T["Your subscription continues."]);
+
+    private async Task Change(string url, string done)
+    {
+        _busy = true;
+        try
+        {
+            var response = await Http.PostAsync(url, null);
+            if (response.IsSuccessStatusCode) { _b = await response.Content.ReadFromJsonAsync<BillingOverviewDto>(); Snackbar.Add(done, Severity.Success); }
+            else Snackbar.Add(await ProblemText.FromAsync(response, T["That did not work."]), Severity.Error);
+        }
+        finally { _busy = false; }
+    }
+
+    private string RenewalDate(BillingOverviewDto b)
+        => (b.Status == "trialing" ? b.TrialEndsAt : b.CurrentPeriodEnd)?.ToLocalTime().ToString("dd MMM yyyy") ?? "-";
+
+    private static string StatusLabel(string status) => status switch
+    {
+        "trialing" => "Free trial", "active" => "Active", "past_due" => "Past due", "cancelled" => "Cancelled", _ => status
+    };
+
+    private static double? Pct(int used, int max) => max <= 0 ? null : Math.Min(100, 100.0 * used / max);
+
+    private static string Money(decimal amount, string currency)
+        => $"{currency} {amount.ToString(amount % 1 == 0 ? "N0" : "N2", System.Globalization.CultureInfo.InvariantCulture)}";
+}

@@ -33,7 +33,8 @@ public sealed class DealService(
     IDataScopeService scope,
     IEnumerable<IDealWonHandler> wonHandlers,
     INotificationService notifications,
-    IRecordSavePipeline savePipeline)
+    IRecordSavePipeline savePipeline,
+    MindLift.Infrastructure.Common.BulkQueue bulkQueue)
 {
     private const int BoardCardsPerStage = 50;
     private const int ClosedDealDays = 30;
@@ -99,6 +100,11 @@ public sealed class DealService(
         }
 
         var ids = await BulkRunner.TargetsAsync(request.Ids, request.AllMatching, MatchingIdsAsync, cancellationToken);
+        if (bulkQueue.ShouldQueue(ids))
+        {
+            return bulkQueue.Queue("deals", request, ids);
+        }
+
         return await BulkRunner.RunAsync(db, ids, async (id, ct) =>
         {
             var current = await GetAsync(id, ct);
@@ -109,6 +115,11 @@ public sealed class DealService(
     public async Task<BulkActionResult> BulkDeleteAsync(BulkDeleteRequest request, CancellationToken cancellationToken = default)
     {
         var ids = await BulkRunner.TargetsAsync(request.Ids, request.AllMatching, MatchingIdsAsync, cancellationToken);
+        if (bulkQueue.ShouldQueue(ids))
+        {
+            return bulkQueue.QueueDelete("deals", ids);
+        }
+
         return await BulkRunner.RunAsync(db, ids, DeleteAsync, cancellationToken);
     }
 
@@ -165,7 +176,7 @@ public sealed class DealService(
         await LoadScopedAsync(id, cancellationToken);
         var rows = await db.DealStageHistory.AsNoTracking().Where(h => h.DealId == id).OrderByDescending(h => h.ChangedAt).ToListAsync(cancellationToken);
         var stageIds = rows.SelectMany(r => new[] { r.FromStageId, r.ToStageId }).Where(s => s != null).Select(s => s!.Value).Distinct().ToList();
-        var stages = await db.PipelineStages.AsNoTracking().IgnoreQueryFilters().Where(s => stageIds.Contains(s.Id)).ToDictionaryAsync(s => s.Id, s => (s.Name, s.NameAr), cancellationToken);
+        var stages = await db.PipelineStages.AsNoTracking().IgnoreQueryFilters().Where(s => s.TenantId == tenant.TenantId && stageIds.Contains(s.Id)).ToDictionaryAsync(s => s.Id, s => (s.Name, s.NameAr), cancellationToken);
         var users = await RecordHelpers.OwnerNamesAsync(db, rows.Where(r => r.ChangedById != null).Select(r => r.ChangedById!.Value).Distinct(), cancellationToken);
 
         return rows.Select(r => new DealStageHistoryDto(

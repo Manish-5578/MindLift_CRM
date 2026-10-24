@@ -3,6 +3,7 @@
 @inject HttpClient Http
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
+@inject IJSRuntime JS
 
 <PageTitle>@(_d?.Company.Name ?? "Company") · MindLift platform</PageTitle>
 
@@ -42,6 +43,7 @@ else
                     <PcRing Value="c.Health" Size="72" Color="#fff" Title="Health score" />
                     <div style="font-size:11px;opacity:.85;margin-top:4px;font-weight:650">HEALTH</div>
                 </div>
+                <button class="pc-btn" @onclick="() => _supportOpen = true" data-testid="support-open"><MudIcon Icon="@Icons.Material.Filled.SupportAgent" Size="Size.Small" />Support view</button>
                 <div style="position:relative">
                     <button class="pc-btn" @onclick="() => _statusOpen = !_statusOpen" data-testid="status-menu"><MudIcon Icon="@Icons.Material.Filled.Tune" Size="Size.Small" />Status</button>
                     @if (_statusOpen)
@@ -59,20 +61,40 @@ else
         </div>
     </section>
 
+    @if (_supportOpen)
+    {
+        <div class="pc-slide" data-testid="support-panel">
+            <div class="pc-slide__scrim" @onclick="() => _supportOpen = false"></div>
+            <div class="pc-slide__panel">
+                <div class="pc-slide__head"><div class="pc-card__title" style="font-size:18px">Support view of @c.Name</div><button class="pc-btn pc-btn--icon pc-btn--ghost" @onclick="() => _supportOpen = false" aria-label="Close"><MudIcon Icon="@Icons.Material.Filled.Close" /></button></div>
+                <div class="pc-slide__body">
+                    <div class="pc-card__hint">You will see the workspace as its owner sees it, in a new tab, for up to 30 minutes. It is read-only: nothing can be changed. Your reason, and every page you look at, is recorded in the audit trail.</div>
+                    <div class="pc-field"><label for="support-reason">Why do you need to look?</label><textarea id="support-reason" class="pc-textarea" style="min-height:90px" @bind="_supportReason" @bind:event="oninput" placeholder="For example: the customer says the lead list is empty" data-testid="support-reason"></textarea></div>
+                </div>
+                <div class="pc-slide__foot">
+                    <button class="pc-btn" @onclick="() => _supportOpen = false">Cancel</button>
+                    <button class="pc-btn pc-btn--primary" disabled="@((_supportReason ?? "").Trim().Length < 5 || _saving)" @onclick="StartSupportAsync" data-testid="support-start-button">Open support view</button>
+                </div>
+            </div>
+        </div>
+    }
+
     <div class="pc-tabs" role="tablist" data-testid="company-tabs">
         <button role="tab" class="@Tab("overview")" @onclick='() => _tab = "overview"' data-testid="tab-overview"><MudIcon Icon="@Icons.Material.Filled.Dashboard" Size="Size.Small" />Overview</button>
         <button role="tab" class="@Tab("modules")" @onclick='() => _tab = "modules"' data-testid="tab-modules"><MudIcon Icon="@Icons.Material.Filled.Widgets" Size="Size.Small" />Modules <span class="pc-chip pc-chip--brand">@(ModulesOn)/@(Switchable.Count + CoreCount)</span></button>
         <button role="tab" class="@Tab("plan")" @onclick='() => _tab = "plan"' data-testid="tab-plan"><MudIcon Icon="@Icons.Material.Filled.Diamond" Size="Size.Small" />Plan &amp; limits</button>
+        <button role="tab" class="@Tab("billing")" @onclick="OpenBillingAsync" data-testid="tab-billing"><MudIcon Icon="@Icons.Material.Filled.ReceiptLong" Size="Size.Small" />Billing</button>
+        <button role="tab" class="@Tab("data")" @onclick="OpenDataAsync" data-testid="tab-data"><MudIcon Icon="@Icons.Material.Filled.Storage" Size="Size.Small" />Data</button>
         <button role="tab" class="@Tab("history")" @onclick='() => _tab = "history"' data-testid="tab-history"><MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small" />History</button>
     </div>
 
     @if (_tab == "overview")
     {
         <div class="pc-grid pc-grid--kpi">
-            <PcKpi Index="0" Label="Users" Value="c.Users" Icon="@Icons.Material.Filled.Groups" Solid="#6366F1"><Foot>@c.ActiveUsers7d signed in this week</Foot></PcKpi>
-            <PcKpi Index="1" Label="Leads and contacts" Value="c.Leads + c.Contacts" Icon="@Icons.Material.Filled.Contacts" Solid="#06B6D4"><Foot>@c.Leads leads · @c.Contacts contacts</Foot></PcKpi>
-            <PcKpi Index="2" Label="Accounts and deals" Value="c.Accounts + c.Deals" Icon="@Icons.Material.Filled.Handshake" Solid="#10B981"><Foot>@c.Accounts accounts · @c.Deals deals</Foot></PcKpi>
-            <PcKpi Index="3" Label="Documents" Value="c.Documents" Icon="@Icons.Material.Filled.DocumentScanner" Solid="#F59E0B"><Foot>@(c.AiAllowed ? (c.AiEnabled ? "AI reading is on" : "AI reading is allowed") : "AI reading is off")</Foot></PcKpi>
+            <PcKpi ShowZero="true" Index="0" Label="Users" Value="c.Users" Icon="@Icons.Material.Filled.Groups" Solid="#6366F1"><Foot>@c.ActiveUsers7d signed in this week</Foot></PcKpi>
+            <PcKpi ShowZero="true" Index="1" Label="Leads and contacts" Value="c.Leads + c.Contacts" Icon="@Icons.Material.Filled.Contacts" Solid="#06B6D4"><Foot>@c.Leads leads · @c.Contacts contacts</Foot></PcKpi>
+            <PcKpi ShowZero="true" Index="2" Label="Accounts and deals" Value="c.Accounts + c.Deals" Icon="@Icons.Material.Filled.Handshake" Solid="#10B981"><Foot>@c.Accounts accounts · @c.Deals deals</Foot></PcKpi>
+            <PcKpi ShowZero="true" Index="3" Label="Documents" Value="c.Documents" Icon="@Icons.Material.Filled.DocumentScanner" Solid="#F59E0B"><Foot>@(c.AiAllowed ? (c.AiEnabled ? "AI reading is on" : "AI reading is allowed") : "AI reading is off")</Foot></PcKpi>
         </div>
         <div class="pc-grid pc-grid--two">
             <div class="pc-card pc-rise">
@@ -218,6 +240,105 @@ else
             </div>
         </div>
     }
+    else if (_tab == "billing")
+    {
+        @if (_bill is null)
+        {
+            <div class="pc-skel" style="height:240px"></div>
+        }
+        else
+        {
+            var bill = _bill;
+            <div class="pc-grid pc-grid--kpi">
+                <PcKpi Index="0" Label="Subscription" Value="0" Icon="@Icons.Material.Filled.Verified" Solid="#10B981" TestId="bill-status">
+                    <Foot><b style="font-size:18px;color:var(--pc-text)">@BillStatus(bill.Status)</b>&nbsp;· @bill.PlanName @bill.Interval</Foot>
+                </PcKpi>
+                <PcKpi Index="1" Label="Paid until" Value="0" Icon="@Icons.Material.Filled.Event" Solid="#06B6D4">
+                    <Foot><b style="font-size:18px;color:var(--pc-text)">@Pc.Date(bill.CurrentPeriodEnd)</b>@(bill.CancelAtPeriodEnd ? " · cancelled" : "")</Foot>
+                </PcKpi>
+                <PcKpi Index="2" Label="Paid in total" Value="bill.LifetimePaid" Money="true" Icon="@Icons.Material.Filled.Payments" Solid="#F59E0B"><Foot>Via @bill.Provider</Foot></PcKpi>
+            </div>
+            @if (bill.PendingPlanName is not null)
+            {
+                <div class="pc-attn pc-attn--warning" style="margin-bottom:20px;cursor:default" data-testid="bill-pending">
+                    <div class="pc-attn__icon"><MudIcon Icon="@Icons.Material.Filled.HourglassTop" /></div>
+                    <div><div class="pc-attn__name">Waiting for payment</div><div class="pc-attn__msg">They chose the @bill.PendingPlanName plan (@bill.PendingInterval). Mark the open invoice paid when the money arrives.</div></div>
+                </div>
+            }
+            <div class="pc-grid pc-grid--main">
+                <div class="pc-card pc-card--flush" style="overflow-x:auto">
+                    <div class="pc-card__head" style="padding:22px 22px 0"><div class="pc-card__title">Invoices</div></div>
+                    @if (bill.Invoices.Count == 0) { <div class="pc-card__hint" style="padding:0 22px 22px">No invoices yet.</div> }
+                    else
+                    {
+                        <table class="pc-table" data-testid="bill-invoices">
+                            <thead><tr><th>Invoice</th><th>Plan</th><th>Period</th><th>Amount</th><th>Status</th><th></th></tr></thead>
+                            <tbody>
+                            @foreach (var i in bill.Invoices)
+                            {
+                                var invoice = i;
+                                <tr style="cursor:default">
+                                    <td><b>@invoice.Number</b><div class="pc-card__hint">@Pc.Date(invoice.IssuedAt)</div></td>
+                                    <td>@invoice.PlanName · @invoice.Interval</td>
+                                    <td>@Pc.Date(invoice.PeriodStart) - @Pc.Date(invoice.PeriodEnd)</td>
+                                    <td class="pc-num">@invoice.Currency @invoice.Amount.ToString("N2")</td>
+                                    <td><span class="pc-chip @(invoice.Status == "paid" ? "pc-chip--brand" : "")">@(invoice.Status == "paid" ? "Paid" : "Open")</span>@if (invoice.Reference is not null) { <div class="pc-card__hint">@invoice.Reference</div> }</td>
+                                    <td class="end">
+                                        @if (invoice.Status == "open")
+                                        {
+                                            <button class="pc-btn pc-btn--sm pc-btn--primary" @onclick="() => MarkPaidAsync(invoice)" data-testid="bill-mark-paid">Mark paid</button>
+                                            <button class="pc-btn pc-btn--sm pc-btn--ghost" @onclick="() => VoidAsync(invoice)">Cancel</button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    }
+                </div>
+                <div class="pc-card">
+                    <div class="pc-card__head"><div class="pc-card__title">Record a payment</div></div>
+                    <div class="pc-field" style="margin-bottom:14px"><label for="pay-plan">Plan</label>
+                        <select id="pay-plan" class="pc-select" @bind="_payPlan" data-testid="pay-plan">@foreach (var p in _plans.Where(p => p.IsActive)) { <option value="@p.Key">@p.Name</option> }</select></div>
+                    <div class="d-flex" style="gap:12px;margin-bottom:14px">
+                        <div class="pc-field" style="flex:1"><label for="pay-interval">Period</label>
+                            <select id="pay-interval" class="pc-select" @bind="_payInterval"><option value="monthly">One month</option><option value="yearly">One year</option></select></div>
+                        <div class="pc-field" style="flex:1"><label for="pay-amount">Amount</label><input id="pay-amount" class="pc-input" type="number" min="0" step="0.01" placeholder="Plan price" @bind="_payAmount" data-testid="pay-amount" /></div>
+                    </div>
+                    <div class="pc-field" style="margin-bottom:18px"><label for="pay-ref">Reference</label><input id="pay-ref" class="pc-input" placeholder="Bank transfer reference, cheque number" @bind="_payRef" data-testid="pay-ref" /></div>
+                    <button class="pc-btn pc-btn--primary" @onclick="RecordAsync" disabled="@_saving" data-testid="pay-record"><MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />Record payment</button>
+                    <div class="pc-card__hint" style="margin-top:10px">The company becomes active on this plan for the period, and its owner gets a receipt.</div>
+                </div>
+            </div>
+        }
+    }
+    else if (_tab == "data")
+    {
+        <div class="pc-grid pc-grid--two">
+            <div class="pc-card pc-rise">
+                <div class="pc-card__head"><div class="pc-card__title">Export all data</div><span class="pc-card__hint">Every record and file, in one ZIP</span></div>
+                <button class="pc-btn pc-btn--primary" @onclick="ExportAsync" disabled="@_saving" data-testid="pc-export"><MudIcon Icon="@Icons.Material.Filled.Archive" Size="Size.Small" />Prepare an export</button>
+                <div class="pc-card__hint" style="margin:10px 0 14px">For a backup of this one company, or when it leaves. Passwords and keys are never included.</div>
+                @foreach (var e in _exports)
+                {
+                    var export = e;
+                    <div class="pc-kv">
+                        <span>@Pc.Date(export.CreatedAt) · @(export.SizeBytes is { } b ? $"{b / 1024.0 / 1024.0:0.#} MB" : "-")</span>
+                        <span>
+                            @if (export.Status == "ready" && export.ExpiresAt > DateTime.UtcNow) { <button class="pc-btn pc-btn--sm" @onclick="() => DownloadAsync(export)">Download</button> }
+                            else { @export.Status }
+                        </span>
+                    </div>
+                }
+            </div>
+            <div class="pc-card pc-rise" style="--i:1;border-color:color-mix(in srgb, var(--pc-bad) 40%, var(--pc-border))" data-testid="pc-danger">
+                <div class="pc-card__head"><div class="pc-card__title" style="color:var(--pc-bad)">Remove this company for good</div></div>
+                <div class="pc-card__hint" style="margin-bottom:14px">Deletes every record, user and file of @c.Name. This cannot be undone. Prepare an export first if anything may be needed later.</div>
+                <div class="pc-field" style="margin-bottom:14px"><label for="purge-confirm">Type <b>@c.Slug</b> to confirm</label><input id="purge-confirm" class="pc-input" @bind="_purgeConfirm" @bind:event="oninput" data-testid="purge-confirm" /></div>
+                <button class="pc-btn pc-btn--danger" disabled="@(_purgeConfirm != c.Slug || _saving)" @onclick="PurgeAsync" data-testid="purge-button"><MudIcon Icon="@Icons.Material.Filled.DeleteForever" Size="Size.Small" />Remove permanently</button>
+            </div>
+        </div>
+    }
     else
     {
         <div class="pc-card pc-rise" data-testid="history">
@@ -252,6 +373,112 @@ else
     private bool _statusOpen;
 
     private HashSet<string> _off = [];
+
+    private bool _supportOpen;
+    private string? _supportReason;
+
+    private async Task StartSupportAsync()
+    {
+        _saving = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"api/v1/platform/companies/{Id}/support-sessions", new StartSupportSessionRequest(_supportReason ?? ""));
+            if (!response.IsSuccessStatusCode) { Snackbar.Add(await Problem(response), Severity.Error); return; }
+            var started = (await response.Content.ReadFromJsonAsync<SupportSessionStartedDto>())!;
+            await JS.InvokeVoidAsync("open", $"/support/{started.Code}", "_blank");
+            _supportOpen = false;
+            _supportReason = null;
+            Snackbar.Add("The support view opened in a new tab.", Severity.Info);
+        }
+        finally { _saving = false; }
+    }
+
+    private List<DataExportDto> _exports = [];
+    private string _purgeConfirm = "";
+
+    private async Task OpenDataAsync()
+    {
+        _tab = "data";
+        _exports = await Http.GetFromJsonAsync<List<DataExportDto>>($"api/v1/platform/companies/{Id}/exports") ?? [];
+    }
+
+    private async Task ExportAsync()
+    {
+        _saving = true;
+        try
+        {
+            var response = await Http.PostAsync($"api/v1/platform/companies/{Id}/exports", null);
+            if (response.IsSuccessStatusCode) { Snackbar.Add("The export is being prepared.", Severity.Info); await OpenDataAsync(); }
+            else Snackbar.Add(await Problem(response), Severity.Error);
+        }
+        finally { _saving = false; }
+    }
+
+    private async Task DownloadAsync(DataExportDto export)
+    {
+        var response = await Http.PostAsync($"api/v1/platform/companies/{Id}/exports/{export.Id}/link", null);
+        if (!response.IsSuccessStatusCode) { Snackbar.Add(await Problem(response), Severity.Error); return; }
+        var link = (await response.Content.ReadFromJsonAsync<DownloadLinkDto>())!;
+        await JS.InvokeVoidAsync("open", link.Url, "_self");
+    }
+
+    private async Task PurgeAsync()
+    {
+        _saving = true;
+        try
+        {
+            var request = new HttpRequestMessage(HttpMethod.Delete, $"api/v1/platform/companies/{Id}") { Content = JsonContent.Create(new PurgeCompanyRequest(_purgeConfirm)) };
+            var response = await Http.SendAsync(request);
+            if (response.IsSuccessStatusCode) { Snackbar.Add($"{_d!.Company.Name} is being removed.", Severity.Success); Nav.NavigateTo("/platform/companies"); }
+            else Snackbar.Add(await Problem(response), Severity.Error);
+        }
+        finally { _saving = false; }
+    }
+
+    private PlatformBillingDto? _bill;
+    private string _payPlan = "";
+    private string _payInterval = "monthly";
+    private decimal? _payAmount;
+    private string? _payRef;
+
+    private static string BillStatus(string s) => s switch { "trialing" => "On trial", "active" => "Active", "past_due" => "Past due", "cancelled" => "Cancelled", _ => s };
+
+    private async Task OpenBillingAsync()
+    {
+        _tab = "billing";
+        _bill = await Http.GetFromJsonAsync<PlatformBillingDto>($"api/v1/platform/companies/{Id}/billing");
+        if (_payPlan == "") _payPlan = _d?.Company.PlanKey ?? "";
+    }
+
+    private Task MarkPaidAsync(BillingInvoiceDto invoice) => PayAsync(new RecordBillingPaymentRequest(invoice.Id, null, null, null, null, null), $"{invoice.Number} marked paid.");
+
+    private Task RecordAsync() => PayAsync(new RecordBillingPaymentRequest(null, _payPlan, _payInterval, _payAmount, _payRef, null), "Payment recorded.");
+
+    private async Task PayAsync(RecordBillingPaymentRequest request, string done)
+    {
+        _saving = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"api/v1/platform/companies/{Id}/billing/payments", request);
+            if (response.IsSuccessStatusCode)
+            {
+                _bill = await response.Content.ReadFromJsonAsync<PlatformBillingDto>();
+                _payAmount = null; _payRef = null;
+                Snackbar.Add(done, Severity.Success);
+                await LoadAsync();
+                _tab = "billing";
+            }
+            else Snackbar.Add(await Problem(response), Severity.Error);
+        }
+        finally { _saving = false; }
+    }
+
+    private async Task VoidAsync(BillingInvoiceDto invoice)
+    {
+        var response = await Http.PostAsync($"api/v1/platform/companies/{Id}/billing/invoices/{invoice.Id}/void", null);
+        if (response.IsSuccessStatusCode) { _bill = await response.Content.ReadFromJsonAsync<PlatformBillingDto>(); Snackbar.Add($"{invoice.Number} cancelled.", Severity.Success); }
+        else Snackbar.Add(await Problem(response), Severity.Error);
+    }
     private HashSet<string> _savedOff = [];
 
     private int? _maxUsers;

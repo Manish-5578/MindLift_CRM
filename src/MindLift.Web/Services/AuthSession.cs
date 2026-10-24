@@ -16,6 +16,17 @@ public sealed class AuthSession
 
     public bool IsSignedIn => AccessToken is not null && ExpiresAtUtc > DateTime.UtcNow;
 
+    /// <summary>Set in a support view: the platform owner's name. A support view is read-only and is never refreshed.</summary>
+    public string? SupportBy { get; private set; }
+
+    public bool IsSupport => SupportBy is not null;
+
+    public void StartSupport(TokenResponse tokens, string openedBy)
+    {
+        SupportBy = openedBy;
+        SetTokens(tokens);
+    }
+
     public event Action? Changed;
 
     public void SetTokens(TokenResponse tokens)
@@ -36,6 +47,7 @@ public sealed class AuthSession
         AccessToken = null;
         ExpiresAtUtc = null;
         Me = null;
+        SupportBy = null;
         Changed?.Invoke();
     }
 }

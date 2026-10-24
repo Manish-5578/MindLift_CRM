@@ -28,6 +28,7 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
         if (problem.Status == StatusCodes.Status500InternalServerError)
         {
             logger.LogError(exception, "Unhandled exception for {Method} {Path}", httpContext.Request.Method, httpContext.Request.Path);
+            Sentry.SentrySdk.CaptureException(exception);   // does nothing unless Sentry:Dsn is set
         }
 
         httpContext.Response.StatusCode = problem.Status ?? StatusCodes.Status500InternalServerError;

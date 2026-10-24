@@ -20,8 +20,14 @@ public sealed class HangfireServerHost(JobStorage storage, BackgroundJobServerOp
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
-        _server?.SendStop();
-        return Task.CompletedTask;
+        if (_server is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        _server.SendStop();
+        // Give running jobs a short while to finish instead of killing them part-way (for example during an upgrade).
+        return Task.Run(() => _server.WaitForShutdown(TimeSpan.FromSeconds(20)), CancellationToken.None);
     }
 
     public void Dispose() => _server?.Dispose();

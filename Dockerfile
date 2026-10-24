@@ -46,6 +46,9 @@ ENV Ocr__Languages=eng+ara
 # Copy published application
 COPY --from=build /app/publish .
 
+# The app runs as a non-root user, so the folder for uploaded files must belong to that user (and be mounted as a volume in production).
+RUN mkdir -p /app/App_Data/files /app/logs && chown -R $APP_UID:$APP_UID /app/App_Data /app/logs
+
 # Run as non-root user
 USER $APP_UID
 

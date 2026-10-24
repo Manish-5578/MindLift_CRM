@@ -16,7 +16,7 @@ public static class Workspaces
     public const string Password = "Str0ngPass";
 
     /// <summary>Creates a new company with an Admin owner. Uses the mobile client mode so the refresh token is in the body.</summary>
-    public static async Task<Session> SignupAsync(MindLiftApiFactory factory, string? company = null)
+    public static async Task<Session> SignupAsync(Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> factory, string? company = null)
     {
         var email = $"owner-{Guid.NewGuid():N}@example.test";
         var client = MobileClient(factory);
@@ -27,7 +27,7 @@ public static class Workspaces
         return WithToken(factory, email, tokens!);
     }
 
-    public static async Task<Session> LoginAsync(MindLiftApiFactory factory, string email, string password)
+    public static async Task<Session> LoginAsync(Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> factory, string email, string password)
     {
         var response = await MobileClient(factory).PostAsJsonAsync("/api/v1/auth/login", new LoginRequest(email, password));
         response.StatusCode.ShouldBe(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
@@ -52,14 +52,14 @@ public static class Workspaces
         return WithToken(factory, email, (await accept.Content.ReadFromJsonAsync<TokenResponse>())!);
     }
 
-    public static HttpClient MobileClient(MindLiftApiFactory factory)
+    public static HttpClient MobileClient(Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> factory)
     {
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add("X-Client", "mobile");
         return client;
     }
 
-    private static Session WithToken(MindLiftApiFactory factory, string email, TokenResponse tokens)
+    private static Session WithToken(Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> factory, string email, TokenResponse tokens)
     {
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);

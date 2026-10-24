@@ -27,7 +27,8 @@ public sealed class AutomationEngine(
     IAutomationExecutionContext executionContext,
     IHttpClientFactory? httpClientFactory,
     ILogger<AutomationEngine> logger,
-    IPlatformEntitlements? entitlements = null
+    IPlatformEntitlements? entitlements = null,
+    MindLift.Infrastructure.Messaging.EmailGuard? emailGuard = null
 ) : IAutomationEngine
 {
     public Task ProcessTriggersAsync<T>(
@@ -391,6 +392,26 @@ public sealed class AutomationEngine(
         var subject = action.Subject ?? $"Update regarding {entityType}";
         var body = action.EmailBody ?? action.NotificationMessage ?? $"Automation rule '{rule.Name}' was triggered.";
 
+        if (emailGuard is not null)
+        {
+            var (allowed, reason) = await emailGuard.TryReserveAsync(recipient, cancellationToken);
+            if (!allowed)
+            {
+                logger.LogInformation("Automation email to {Recipient} not sent: {Reason}", recipient, reason);
+                return;
+            }
+
+            body += emailGuard.Footer(recipient);
+        }
+
+        // Inside a database transaction (a public booking, for example) the mail goes out from a background job,
+        // so the transaction and its locks are never held open while a mail server answers.
+        if (db.Database.CurrentTransaction is not null)
+        {
+            backgroundJobs.Enqueue<AutomationOutboxJob>("messaging", job => job.SendEmailAsync(recipient, subject, body, CancellationToken.None));
+            return;
+        }
+
         await emailSender.SendAsync(recipient, subject, body, cancellationToken);
         logger.LogInformation("Automation email sent to {Recipient} for {EntityType} {Id}", recipient, entityType, entity.Id);
     }
@@ -416,8 +437,6 @@ public sealed class AutomationEngine(
 
         try
         {
-            var client = httpClientFactory.CreateClient("AutomationWebhooks");
-            client.Timeout = TimeSpan.FromSeconds(5);
             var payload = new
             {
                 EntityType = entityType,
@@ -425,6 +444,17 @@ public sealed class AutomationEngine(
                 Timestamp = clock.UtcNow,
                 Data = entity
             };
+
+            // As with mail: never call another server while a database transaction is open.
+            if (db.Database.CurrentTransaction is not null)
+            {
+                var json = System.Text.Json.JsonSerializer.Serialize(payload, AutomationOutboxJob.Json);
+                backgroundJobs.Enqueue<AutomationOutboxJob>("messaging", job => job.PostWebhookAsync(action.WebhookUrl, json, CancellationToken.None));
+                return;
+            }
+
+            var client = httpClientFactory.CreateClient("AutomationWebhooks");
+            client.Timeout = TimeSpan.FromSeconds(5);
             await client.PostAsJsonAsync(action.WebhookUrl, payload, cancellationToken);
         }
         catch (Exception ex) when (ex is not InvalidOperationException)

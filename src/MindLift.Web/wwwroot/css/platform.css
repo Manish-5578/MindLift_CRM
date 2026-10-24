@@ -475,3 +475,5 @@
 
 .pc-act--auth { background: rgba(14, 165, 233, .15); color: #0284C7; }
 .pc-act--audit { background: rgba(139, 92, 246, .15); color: #7C3AED; }
+.pc-act--billing { background: rgba(16, 185, 129, .15); color: #059669; }
+.pc-act--support { background: rgba(236, 72, 153, .14); color: #DB2777; }
