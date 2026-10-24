@@ -253,15 +253,8 @@ app.UseSerilogRequestLogging(options => options.EnrichDiagnosticContext = (diagn
 });
 app.UseExceptionHandler();
 
-// Baseline browser protections for every response. Framing is refused and MIME sniffing is off.
-app.Use(async (context, next) =>
-{
-    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
-    context.Response.Headers["X-Frame-Options"] = "DENY";
-    context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
-    context.Response.Headers["Content-Security-Policy"] = "frame-ancestors 'none'";
-    await next();
-});
+// Baseline browser protections for every response: framing refused, MIME sniffing off, a Content-Security-Policy, and HTTPS enforced with HSTS in production.
+MindLift.Api.Hosting.SecurityHeaders.UseMindLiftSecurityHeaders(app);
 
 if (app.Environment.IsDevelopment())
 {

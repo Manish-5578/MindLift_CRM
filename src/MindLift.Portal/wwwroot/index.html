@@ -30,16 +30,7 @@
         <span class="dismiss">🗙</span>
     </div>
 
-    <script>
-        window.mindliftPortal = {
-            setTheme: function (theme) { document.documentElement.setAttribute('data-theme', theme); },
-            setLanguage: function (lang) {
-                document.documentElement.setAttribute('lang', lang);
-                document.documentElement.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
-                localStorage.setItem('ml.portal.lang', lang);
-            }
-        };
-    </script>
+    <script src="js/portal.js"></script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
     <script src="_framework/blazor.webassembly.js"></script>
 </body>

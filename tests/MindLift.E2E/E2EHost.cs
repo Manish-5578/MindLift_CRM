@@ -72,6 +72,7 @@ public sealed class E2EHost : IAsyncLifetime
         start.Environment["ConnectionStrings__Default"] = _postgres.GetConnectionString();
         start.Environment["Database__MigrateOnStartup"] = "true";
         start.Environment["Hangfire__WorkerCount"] = "2";
+        start.Environment["Security__CspMode"] = "Enforce";
         start.Environment["RateLimiting__PublicPermitsPerMinute"] = "100000";
         start.Environment["App__BaseUrl"] = BaseUrl;
         start.Environment["Storage__LocalPath"] = Path.Combine(Path.GetTempPath(), "mindlift-e2e-files");
@@ -88,7 +89,7 @@ public sealed class E2EHost : IAsyncLifetime
         Assertions.SetDefaultExpectTimeout(45_000);
         _playwright = await Playwright.CreateAsync();
         // Edge is installed with Windows, so no browser has to be downloaded.
-        Browser = await _playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions { Channel = "msedge", Headless = true });
+        Browser = await _playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions { Channel = Environment.GetEnvironmentVariable("MINDLIFT_E2E_CHANNEL") is { Length: > 0 } channel ? (channel == "chromium" ? null : channel) : "msedge", Headless = true });
     }
 
     public async Task DisposeAsync()

@@ -51,8 +51,12 @@ services:
       Communication__WhatsAppVerifyToken: "${WHATSAPP_VERIFY_TOKEN:-}"
       # Behind a reverse proxy, set FORWARDED_HEADERS_ENABLED=true and name the proxy so rate limits count each customer.
       # If this stays false behind a proxy, every customer shares one address and the sign-in limit locks everyone out together.
-      ForwardedHeaders__Enabled: "${FORWARDED_HEADERS_ENABLED:-false}"
+      # The bundled proxy (caddy) ends TLS; only it, inside this compose network, is trusted. The app redirects plain HTTP and sends HSTS.
+      ForwardedHeaders__Enabled: "${FORWARDED_HEADERS_ENABLED:-true}"
       ForwardedHeaders__KnownProxies__0: "${FORWARDED_PROXY_ADDRESS:-127.0.0.1}"
+      ForwardedHeaders__KnownNetworks__0: "172.28.0.0/16"
+      Security__RequireHttps: "${REQUIRE_HTTPS:-true}"
+      Security__CspMode: "${CSP_MODE:-Enforce}"
       # Uploaded files (documents, scans, attachments). Kept on the api-files volume so they survive a restart or an upgrade.
       Storage__LocalPath: "/app/App_Data/files"
       # Outgoing mail (sign-up, password reset, invitations, reports). Without a mail server nothing can be sent.
@@ -92,14 +96,35 @@ services:
     volumes:
       - api-files:/app/App_Data/files
       - logs:/app/logs
-    ports:
-      - "8080:8080"
+    expose:
+      - "8080"
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3
       start_period: 30s
+    networks:
+      - mindlift-network
+
+  # TLS in front of the app: certificates are fetched and renewed automatically for DOMAIN (a real address pointing at this server, ports 80 and 443 open).
+  # Use DOMAIN=localhost to try the stack on one machine with a local certificate.
+  caddy:
+    image: caddy:2
+    container_name: mindlift-prod-caddy
+    restart: always
+    environment:
+      DOMAIN: "${DOMAIN:?Public host name required, for example crm.example.com}"
+    command: ["caddy", "reverse-proxy", "--from", "${DOMAIN}", "--to", "api:8080"]
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      api:
+        condition: service_healthy
     networks:
       - mindlift-network
 
@@ -205,16 +230,48 @@ services:
         done
     volumes:
       - backups:/backups
+      - ./scripts:/scripts:ro
     networks:
       - mindlift-network
 
+  # Optional off-site copy of the backups (docker compose --profile offsite up -d). A backup on the server's own disk does not survive that disk.
+  # Any rclone remote works; it is described with OFFSITE_* settings, for example an S3-compatible bucket with server-side encryption switched on.
+  backup-offsite:
+    image: rclone/rclone:1.68
+    profiles: ["offsite"]
+    container_name: mindlift-prod-backup-offsite
+    restart: always
+    environment:
+      RCLONE_CONFIG_OFFSITE_TYPE: "${OFFSITE_TYPE:-s3}"
+      RCLONE_CONFIG_OFFSITE_PROVIDER: "${OFFSITE_PROVIDER:-AWS}"
+      RCLONE_CONFIG_OFFSITE_ACCESS_KEY_ID: "${OFFSITE_ACCESS_KEY:?Access key for the off-site bucket required}"
+      RCLONE_CONFIG_OFFSITE_SECRET_ACCESS_KEY: "${OFFSITE_SECRET_KEY:?Secret key for the off-site bucket required}"
+      RCLONE_CONFIG_OFFSITE_REGION: "${OFFSITE_REGION:-}"
+      RCLONE_CONFIG_OFFSITE_ENDPOINT: "${OFFSITE_ENDPOINT:-}"
+      RCLONE_CONFIG_OFFSITE_SERVER_SIDE_ENCRYPTION: "${OFFSITE_SSE:-AES256}"
+      OFFSITE_PATH: "${OFFSITE_PATH:?Bucket and folder for the off-site copy required, for example my-bucket/mindlift}"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          rclone copy /backups offsite:$$OFFSITE_PATH --include 'mindlift-*.dump' && echo "off-site copy done" || echo "off-site copy FAILED"
+          sleep 21600
+        done
+    volumes:
+      - backups:/backups:ro
+
 networks:
   mindlift-network:
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
     driver: bridge
 
 volumes:
   postgres-data:
   api-files:
   redis-data:
+  caddy-data:
+  caddy-config:
   backups:
   logs:

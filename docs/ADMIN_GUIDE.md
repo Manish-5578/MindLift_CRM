@@ -197,7 +197,7 @@ The OCR pipeline extracts structured information from uploaded receipts, trade l
 - [x] **Webhook Authentication:** WhatsApp (Meta) webhooks must carry a valid `X-Hub-Signature-256`, and Twilio webhooks a valid `X-Twilio-Signature`, checked against the secret saved on that channel. A channel with no secret never accepts webhooks, and a verified request can only reach its own workspace.
 - [x] **Encrypted Secrets:** Mail passwords, provider tokens and webhook secrets are encrypted at rest with AES-256 and an integrity check, using `Security__SecretKey`. Set it explicitly in production.
 - [x] **Upload Checks:** Document uploads accept only listed file types, check that the file contents match the type, and are stored with the content type of their extension.
-- [x] **Security Headers:** Every response carries `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` and `frame-ancestors 'none'`. A full Content-Security-Policy is not set.
+- [x] **Security Headers:** Every response carries `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` and a Content-Security-Policy that allows only the app's own scripts (`Security__CspMode`: `Enforce` by default in production, `ReportOnly` or `Off`). Behind a TLS proxy the app also redirects plain HTTP to HTTPS and sends `Strict-Transport-Security` (`Security__RequireHttps`).
 
 ---
 

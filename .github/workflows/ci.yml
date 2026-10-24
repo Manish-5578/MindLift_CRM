@@ -62,3 +62,21 @@ jobs:
 
     - name: Run Integration Tests
       run: dotnet test tests/MindLift.IntegrationTests/MindLift.IntegrationTests.csproj --configuration Release --no-build --logger "trx;LogFileName=integration-results.trx"
+
+    - name: Dependency vulnerability scan
+      run: |
+        dotnet list MindLift.slnx package --vulnerable --include-transitive 2>&1 | tee vulnerabilities.txt
+        if grep -q "has the following vulnerable packages" vulnerabilities.txt; then echo "Vulnerable packages found"; exit 1; fi
+
+    - name: Install browser for end-to-end tests
+      run: pwsh tests/MindLift.E2E/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+
+    - name: Run End-to-End Tests (browser)
+      env:
+        MINDLIFT_E2E: "1"
+        MINDLIFT_E2E_CHANNEL: chromium
+      run: dotnet test tests/MindLift.E2E/MindLift.E2E.csproj --configuration Release --no-build --logger "trx;LogFileName=e2e-results.trx"
+
+    - name: Production compose file is valid
+      run: |
+        POSTGRES_PASSWORD=x JWT_SIGNING_KEY=x SECRET_KEY=x APP_BASE_URL=https://crm.example.com DOMAIN=crm.example.com SMTP_HOST=x SMTP_FROM_ADDRESS=a@example.com           docker compose -f docker-compose.prod.yml config -q

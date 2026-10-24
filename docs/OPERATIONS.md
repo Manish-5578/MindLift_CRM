@@ -8,6 +8,7 @@ How the production setup in `docker-compose.prod.yml` fits together, what to set
 | --- | --- |
 | `api` | The web app and API. Runs the light background work (`default`, `messaging` queues) and migrates the database on start. |
 | `worker` | The same image, taking only the heavy background work: reading documents (OCR, AI), reports and imports (`ocr`, `reports`, `imports` queues). It never slows the web app down. |
+| `caddy` | The front door: ends TLS (certificates fetched and renewed automatically for `DOMAIN`) and passes traffic to the api. Ports 80 and 443; the api itself is not published. |
 | `postgres` | The database. `max_connections=200`; the api pool is capped at 60 and the worker's at 40. |
 | `redis` | Shared cache and live notifications across servers. Needed once more than one api runs. |
 | `backup` | A full database dump every night, kept `BACKUP_KEEP_DAYS` days (14 by default) in the `backups` volume. |
@@ -16,11 +17,12 @@ Volumes: `postgres-data` (the database), `api-files` (uploaded files, unless S3 
 
 ## Settings you must give
 
-`POSTGRES_PASSWORD`, `JWT_SIGNING_KEY`, `SECRET_KEY` (a different long random value), `APP_BASE_URL` (for example `https://crm.example.com`),
+`DOMAIN` (the host name, for example `crm.example.com`, pointing at this server; `localhost` to try the stack on one machine), `POSTGRES_PASSWORD`, `JWT_SIGNING_KEY`, `SECRET_KEY` (a different long random value), `APP_BASE_URL` (for example `https://crm.example.com`),
 `SMTP_HOST` and `SMTP_FROM_ADDRESS` (plus `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_PORT` as your mail service needs).
 The containers refuse to start without them.
 
-Behind a reverse proxy (nginx, Traefik, a load balancer, Cloudflare) also set `FORWARDED_HEADERS_ENABLED=true` and `FORWARDED_PROXY_ADDRESS`.
+The bundled caddy is trusted as the proxy by default, so visitor addresses and HTTPS are recognised. With a different proxy (nginx, Traefik, a load balancer, Cloudflare) set `FORWARDED_PROXY_ADDRESS` to it.
+The app sends plain-HTTP requests to HTTPS and adds `Strict-Transport-Security` (`REQUIRE_HTTPS`, on by default here), and sends a Content-Security-Policy (`CSP_MODE`: `Enforce`, `ReportOnly` or `Off`).
 Without it every visitor appears to come from the proxy, and the sign-in rate limit is shared by everyone. The app logs a warning at start when it is off.
 
 ## Optional settings
@@ -49,6 +51,15 @@ Restore a dump into an empty database:
 ```
 docker compose -f docker-compose.prod.yml exec backup pg_restore --clean --if-exists --dbname="$PGDATABASE" /backups/mindlift-YYYYMMDD-HHMMSS.dump
 ```
+
+**Prove it works.** Run the restore drill after setting up, and again every month. It loads a dump into a scratch database, checks the key tables have rows, and reports how long it took (your recovery time):
+
+```
+docker compose -f docker-compose.prod.yml exec backup sh /scripts/restore-drill.sh /backups/mindlift-YYYYMMDD-HHMMSS.dump
+```
+
+**Off-site copy.** `docker compose -f docker-compose.prod.yml --profile offsite up -d` also starts `backup-offsite`, which copies new dumps to any rclone-supported bucket every 6 hours
+(set `OFFSITE_ACCESS_KEY`, `OFFSITE_SECRET_KEY`, `OFFSITE_PATH`, and `OFFSITE_REGION` or `OFFSITE_ENDPOINT`; server-side encryption is on by default).
 
 For one company only, use its data export (below) instead of restoring the whole database.
 

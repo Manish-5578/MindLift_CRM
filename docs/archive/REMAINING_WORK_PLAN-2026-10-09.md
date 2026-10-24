@@ -1,3 +1,5 @@
+> **Historical.** This plan was written on 2026-10-09 and is out of date: every milestone in it has since been built. See `PROGRESS.md` for what exists and `docs/OPERATIONS.md` for running it.
+
 # MindLift CRM: Remaining Work Plan
 
 **Date:** 2026-10-09
