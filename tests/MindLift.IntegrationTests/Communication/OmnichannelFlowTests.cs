@@ -23,7 +23,7 @@ public sealed class OmnichannelFlowTests(MindLiftApiFactory factory) : IClassFix
             IsActive: true,
             AutoCreateLeads: true,
             PhoneNumberId: "test_phone_id_123",
-            Password: "super_secret_access_token"
+            Password: "test_access_token"
         );
 
         var createResp = await owner.Client.PostAsJsonAsync("/api/v1/channels", createRequest);

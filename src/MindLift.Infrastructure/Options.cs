@@ -13,6 +13,9 @@ public sealed class JwtOptions
 /// <summary>Bound from the "Smtp" section. Mailpit listens on localhost:1025 in development.</summary>
 public sealed class SmtpOptions
 {
+    /// <summary>Allows a mail server that offers no encryption when it is not on this machine. Off by default; mail passwords and messages should not cross a network in clear text.</summary>
+    public bool AllowInsecure { get; set; }
+
     public string Host { get; set; } = "localhost";
     public int Port { get; set; } = 1025;
     public bool UseStartTls { get; set; }

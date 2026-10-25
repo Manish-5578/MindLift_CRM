@@ -79,7 +79,7 @@ public sealed class EmailChannelSender(
                 : defaultSmtpOptions.Value.Password;
 
             using var client = new SmtpClient();
-            var security = defaultSmtpOptions.Value.UseStartTls ? SecureSocketOptions.StartTls : SecureSocketOptions.None;
+            var security = SmtpSecurity.Choose(host, port, defaultSmtpOptions.Value);
             await client.ConnectAsync(host, port, security, ct);
 
             if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
@@ -112,7 +112,7 @@ public sealed class EmailChannelSender(
                 : defaultSmtpOptions.Value.Password;
 
             using var client = new SmtpClient();
-            var security = defaultSmtpOptions.Value.UseStartTls ? SecureSocketOptions.StartTls : SecureSocketOptions.None;
+            var security = SmtpSecurity.Choose(host, port, defaultSmtpOptions.Value);
             await client.ConnectAsync(host, port, security, ct);
 
             if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
@@ -196,24 +196,43 @@ public sealed class WhatsAppChannelSender(
         }
     }
 
-    public Task<TestConnectionResult> TestAsync(ChannelAccount account, CancellationToken ct = default)
+    public async Task<TestConnectionResult> TestAsync(ChannelAccount account, CancellationToken ct = default)
     {
         var rawToken = secretProtector.Unprotect(account.EncryptedAuthToken ?? account.EncryptedPassword);
         if (string.IsNullOrWhiteSpace(account.PhoneNumberId))
         {
-            return Task.FromResult(new TestConnectionResult(false, "WhatsApp Phone Number ID is required."));
+            return new TestConnectionResult(false, "WhatsApp Phone Number ID is required.");
         }
         if (string.IsNullOrWhiteSpace(rawToken))
         {
-            return Task.FromResult(new TestConnectionResult(false, "WhatsApp Access Token is required."));
+            return new TestConnectionResult(false, "WhatsApp Access Token is required.");
         }
 
         if (rawToken.StartsWith("mock_") || rawToken.StartsWith("test_") || hostEnv.EnvironmentName == "Testing")
         {
-            return Task.FromResult(new TestConnectionResult(true, "Simulated WhatsApp connection valid."));
+            return new TestConnectionResult(true, "Simulated WhatsApp connection valid.");
         }
 
-        return Task.FromResult(new TestConnectionResult(true, "WhatsApp account configuration formatted correctly."));
+        return await CheckLiveAsync(phoneNumberId: account.PhoneNumberId!, rawToken, ct);
+    }
+
+    // A real call to the provider: the number's details are read with the token, so a wrong id, a wrong or expired token and an unreachable service all show up.
+    private async Task<TestConnectionResult> CheckLiveAsync(string phoneNumberId, string rawToken, CancellationToken ct)
+    {
+        try
+        {
+            var client = httpClientFactory.CreateClient("WhatsAppClient");
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"https://graph.facebook.com/v18.0/{Uri.EscapeDataString(phoneNumberId)}?fields=id,display_phone_number");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", rawToken);
+            using var response = await client.SendAsync(request, ct);
+            return response.IsSuccessStatusCode
+                ? new TestConnectionResult(true, "WhatsApp accepted the number and token (live check).")
+                : new TestConnectionResult(false, $"WhatsApp rejected the credentials ({(int)response.StatusCode}). Check the phone number id and access token.");
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            return new TestConnectionResult(false, $"WhatsApp could not be reached: {ex.Message}");
+        }
     }
 }
 
@@ -280,24 +299,38 @@ public sealed class TwilioSmsSender(
         }
     }
 
-    public Task<TestConnectionResult> TestAsync(ChannelAccount account, CancellationToken ct = default)
+    public async Task<TestConnectionResult> TestAsync(ChannelAccount account, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(account.AccountSid))
         {
-            return Task.FromResult(new TestConnectionResult(false, "Twilio Account SID is required."));
+            return new TestConnectionResult(false, "Twilio Account SID is required.");
         }
 
         var authToken = secretProtector.Unprotect(account.EncryptedAuthToken ?? account.EncryptedPassword);
         if (string.IsNullOrWhiteSpace(authToken))
         {
-            return Task.FromResult(new TestConnectionResult(false, "Twilio Auth Token is required."));
+            return new TestConnectionResult(false, "Twilio Auth Token is required.");
         }
 
         if (authToken.StartsWith("mock_") || authToken.StartsWith("test_") || hostEnv.EnvironmentName == "Testing")
         {
-            return Task.FromResult(new TestConnectionResult(true, "Simulated Twilio connection valid."));
+            return new TestConnectionResult(true, "Simulated Twilio connection valid.");
         }
 
-        return Task.FromResult(new TestConnectionResult(true, "Twilio credentials configuration formatted correctly."));
+        // A real call to the provider: the account is read with the credentials, so a wrong SID or token and an unreachable service both show up.
+        try
+        {
+            var client = httpClientFactory.CreateClient("TwilioClient");
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.twilio.com/2010-04-01/Accounts/{Uri.EscapeDataString(account.AccountSid!)}.json");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes($"{account.AccountSid}:{authToken}")));
+            using var response = await client.SendAsync(request, ct);
+            return response.IsSuccessStatusCode
+                ? new TestConnectionResult(true, "Twilio accepted the account and token (live check).")
+                : new TestConnectionResult(false, $"Twilio rejected the credentials ({(int)response.StatusCode}). Check the account SID and auth token.");
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            return new TestConnectionResult(false, $"Twilio could not be reached: {ex.Message}");
+        }
     }
 }

@@ -32,6 +32,8 @@ Without it every visitor appears to come from the proxy, and the sign-in rate li
 - **Error tracking**: `SENTRY_DSN`. Every unexpected error is sent with the request and the company it happened in (no personal data).
 - **Searchable logs**: `SEQ_URL` (and `SEQ_API_KEY`). Logs also go to daily JSON files in the `logs` volume, kept 14 days.
   Every log line of a request carries `CorrelationId`, `TenantId` and `UserId`. The correlation id is returned to the browser in the `X-Correlation-Id` header, so a customer can quote it.
+- **Mail encryption**: port 465 is encrypted from the start, and `SMTP_STARTTLS=true` (the default here) requires STARTTLS. A mail server on another machine is never used without encryption unless `Smtp__AllowInsecure=true`.
+  The WhatsApp and Twilio "Test connection" buttons make a real call to the provider and report what it answers; with test credentials (starting `test_` or `mock_`) they only simulate.
 - **Billing**: `BILLING_CURRENCY` and `BILLING_PAYMENT_INSTRUCTIONS` (your bank details, shown to companies on their Billing page until a payment gateway is connected).
 - **Email protection**: `EMAIL_DAILY_LIMIT` (automated mail per company per day, 500 by default) and `EMAIL_SPF_INCLUDE` (the SPF include your mail service gives you, shown to companies when they verify their sending domain).
 
