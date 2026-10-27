@@ -282,6 +282,35 @@ if (MindLift.Api.Hosting.ForwardedHeadersSetup.IsEnabled(app.Configuration))
     app.UseForwardedHeaders();
 }
 
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
+
+// In non-development environments, refuse plaintext HTTP requests on authentication and portal endpoints.
+app.Use(async (context, next) =>
+{
+    if (!app.Environment.IsDevelopment() && !context.Request.IsHttps)
+    {
+        var path = context.Request.Path.Value ?? string.Empty;
+        if (path.StartsWith("/api/v1/auth", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/api/v1/portal/", StringComparison.OrdinalIgnoreCase) && path.Contains("/auth/", StringComparison.OrdinalIgnoreCase))
+        {
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            context.Response.ContentType = "application/problem+json";
+            await context.Response.WriteAsJsonAsync(new
+            {
+                type = "https://httpstatuses.io/400",
+                title = "HTTPS Required",
+                status = 400,
+                detail = "HTTPS is required for authentication endpoints."
+            });
+            return;
+        }
+    }
+    await next();
+});
+
 app.UseMiddleware<MindLift.Api.Middleware.CorrelationIdMiddleware>();
 app.UseSerilogRequestLogging(options => options.EnrichDiagnosticContext = (diagnostics, http) =>
 {
@@ -300,7 +329,7 @@ app.Use(async (context, next) =>
     context.Response.Headers["Content-Security-Policy"] = "frame-ancestors 'none'";
     if (!app.Environment.IsDevelopment())
     {
-        context.Response.Headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains";
+        context.Response.Headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload";
     }
     await next();
 });

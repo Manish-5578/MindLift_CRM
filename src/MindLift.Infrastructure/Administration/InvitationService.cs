@@ -83,6 +83,12 @@ public sealed class InvitationService(
             throw new ConflictException("invitation_closed", "This invitation has already been accepted or revoked.");
         }
 
+        var role = await EnsureRoleAndTeamAsync(invitation.RoleId, invitation.TeamId, cancellationToken);
+        if (role.IsAdmin && !await IsCallerAdminAsync(cancellationToken))
+        {
+            throw new ForbiddenException("Only administrators can resend invitations with the Admin role.", "admin_role_required");
+        }
+
         var raw = TokenService.NewRefreshToken();
         invitation.TokenHash = TokenService.Hash(raw);
         invitation.ExpiresAt = clock.UtcNow.AddDays(ValidDays);
@@ -95,6 +101,12 @@ public sealed class InvitationService(
     {
         var invitation = await db.Invitations.FirstOrDefaultAsync(i => i.Id == id, cancellationToken)
             ?? throw new NotFoundException("Invitation", id);
+
+        var role = await EnsureRoleAndTeamAsync(invitation.RoleId, invitation.TeamId, cancellationToken);
+        if (role.IsAdmin && !await IsCallerAdminAsync(cancellationToken))
+        {
+            throw new ForbiddenException("Only administrators can revoke invitations with the Admin role.", "admin_role_required");
+        }
 
         invitation.RevokedAt = clock.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
@@ -113,6 +125,15 @@ public sealed class InvitationService(
     {
         var invitation = await FindValidAsync(token, cancellationToken);
         using var scope = tenant.Use(invitation.TenantId);
+
+        var now = clock.UtcNow;
+        var claimed = await db.Invitations.IgnoreQueryFilters()
+            .Where(i => i.Id == invitation.Id && i.AcceptedAt == null && i.RevokedAt == null && i.ExpiresAt > now && !i.IsDeleted)
+            .ExecuteUpdateAsync(s => s.SetProperty(i => i.AcceptedAt, now), cancellationToken);
+        if (claimed == 0)
+        {
+            throw new ConflictException("invitation_accepted", "This invitation has already been used or expired.");
+        }
 
         await planLimits.EnsureSeatAvailableAsync(cancellationToken);
 
@@ -147,9 +168,6 @@ public sealed class InvitationService(
                     ["password"] = result.Errors.Select(e => e.Description).ToArray(),
                 });
             }
-
-            invitation.AcceptedAt = clock.UtcNow;
-            await db.SaveChangesAsync(cancellationToken);
         }
         catch (DbUpdateException)
         {

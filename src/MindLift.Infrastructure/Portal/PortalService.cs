@@ -226,9 +226,22 @@ public sealed class PortalService(
         if (!user.IsActive)
             throw new UnauthorizedException("account_inactive", "Your portal account is deactivated.");
 
+        if (user.ActivatedAt.HasValue)
+            throw new ConflictException("already_activated", "This portal account has already been activated. Please sign in or use password reset.");
+
+        var now = DateTime.UtcNow;
+
+        // Atomically revoke all sibling unused invite tokens for this portal user
+        await db.PortalTokens.IgnoreQueryFilters()
+            .Where(x => x.TenantId == t.Id && x.PortalUserId == user.Id && x.Purpose == "Invite" && x.UsedAt == null)
+            .ExecuteUpdateAsync(set => set.SetProperty(x => x.UsedAt, now), ct);
+
+        // Invalidate any existing refresh sessions so stale credentials cannot persist
+        await RevokeRefreshTokensAsync(t.Id, user.Id, ct);
+
         user.PasswordHash = Hasher.HashPassword(user, req.Password);
-        user.ActivatedAt = DateTime.UtcNow;
-        user.LastLoginAt = DateTime.UtcNow;
+        user.ActivatedAt = now;
+        user.LastLoginAt = now;
 
         return await IssueAsync(t.Id, user, ct);
     }
@@ -405,12 +418,12 @@ public sealed class PortalService(
         }
     }
 
-    /// <summary>Marks a token used in one database step. False means someone else used it first.</summary>
+    /// <summary>Marks a token used in one database step. False means someone else used it first or it expired.</summary>
     private async Task<bool> TryConsumeAsync(PortalToken token, CancellationToken ct)
     {
         var now = DateTime.UtcNow;
         var rows = await db.PortalTokens.IgnoreQueryFilters()
-            .Where(x => x.Id == token.Id && x.TenantId == token.TenantId && x.UsedAt == null)
+            .Where(x => x.Id == token.Id && x.TenantId == token.TenantId && x.UsedAt == null && x.ExpiresAt > now && !x.IsDeleted)
             .ExecuteUpdateAsync(set => set.SetProperty(x => x.UsedAt, now), ct);
         return rows == 1;
     }
@@ -806,6 +819,11 @@ public sealed class PortalService(
             throw new ConflictException("portal_email_taken", "This email already has portal access for another contact.");
         }
 
+        if (user != null && user.ActivatedAt.HasValue)
+        {
+            throw new ConflictException("already_activated", "This contact already has an active portal account. Please sign in or use password reset to manage credentials.");
+        }
+
         if (user == null)
         {
             user = new PortalUser
@@ -825,6 +843,11 @@ public sealed class PortalService(
             user.InvitedAt = DateTime.UtcNow;
             user.IsActive = true;
         }
+
+        // Atomically revoke all existing unused invite tokens for this user before issuing a fresh one
+        await db.PortalTokens.IgnoreQueryFilters()
+            .Where(x => x.TenantId == CurrentTenantId && x.PortalUserId == user.Id && x.Purpose == "Invite" && x.UsedAt == null)
+            .ExecuteUpdateAsync(set => set.SetProperty(x => x.UsedAt, DateTime.UtcNow), ct);
 
         var plainToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
         var tokenHash = TokenService.Hash(plainToken);

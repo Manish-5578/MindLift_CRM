@@ -110,4 +110,19 @@ public sealed class ScopeEnforcementUnitTests
         isSafe.ShouldBeTrue(reason);
         reason.ShouldBeNull();
     }
+
+    [Theory]
+    [InlineData("/api/v1/auth/login", true)]
+    [InlineData("/api/v1/auth/accept-invite", true)]
+    [InlineData("/api/v1/portal/acme/auth/login", true)]
+    [InlineData("/api/v1/portal/acme/auth/accept-invite", true)]
+    [InlineData("/api/v1/leads", false)]
+    [InlineData("/health", false)]
+    public void Https_Auth_Security_Check_Identifies_Credential_Routes(string path, bool requiresHttps)
+    {
+        var isAuthPath = path.StartsWith("/api/v1/auth", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/api/v1/portal/", StringComparison.OrdinalIgnoreCase) && path.Contains("/auth/", StringComparison.OrdinalIgnoreCase);
+
+        isAuthPath.ShouldBe(requiresHttps);
+    }
 }

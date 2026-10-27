@@ -93,7 +93,9 @@ services:
       - api-files:/app/App_Data/files
       - logs:/app/logs
     ports:
-      - "8080:8080"
+      # Bound to localhost so unencrypted traffic cannot be reached directly from external interfaces;
+      # external client traffic must terminate TLS at the reverse proxy.
+      - "127.0.0.1:8080:8080"
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
       interval: 15s

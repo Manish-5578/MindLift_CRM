@@ -10,7 +10,7 @@ namespace MindLift.IntegrationTests.Security;
 
 /// <summary>
 /// Integration tests verifying that row-level data scope, role hierarchy, module permissions,
-/// and relationship constraints are strictly enforced across CRM modules.
+/// relationship constraints, and portal token/HTTPS security are strictly enforced.
 /// </summary>
 public sealed class ScopeEnforcementTests(MindLiftApiFactory factory) : IClassFixture<MindLiftApiFactory>
 {
@@ -21,7 +21,7 @@ public sealed class ScopeEnforcementTests(MindLiftApiFactory factory) : IClassFi
 
         // 1. Create a lead owned by admin
         var leadRes = await admin.Client.PostAsJsonAsync("/api/v1/leads",
-            new SaveLeadRequest("Alice", "Smith", "alice@example.test", "+123456789", "Acme", "New", "Web", "Hot", null, null));
+            new SaveLeadRequest("Alice", "Smith", "alice@example.test", "+123456789", "Acme", "New", "Web", "Hot", null, null, null, null));
         leadRes.StatusCode.ShouldBe(HttpStatusCode.OK);
         var lead = await leadRes.Content.ReadFromJsonAsync<LeadDto>();
 
@@ -34,7 +34,7 @@ public sealed class ScopeEnforcementTests(MindLiftApiFactory factory) : IClassFi
 
         // 4. Staff user attempts to PUT admin's lead -> 404 NotFound
         var putRes = await staff.Client.PutAsJsonAsync($"/api/v1/leads/{lead.Id}",
-            new SaveLeadRequest("Alice", "Modified", "alice@example.test", "+123456789", "Acme", "Contacted", "Web", "Warm", null, null));
+            new SaveLeadRequest("Alice", "Modified", "alice@example.test", "+123456789", "Acme", "Contacted", "Web", "Warm", null, null, null, null));
         putRes.StatusCode.ShouldBe(HttpStatusCode.NotFound);
 
         // 5. Staff user attempts to DELETE admin's lead -> 403 or 404
@@ -49,11 +49,11 @@ public sealed class ScopeEnforcementTests(MindLiftApiFactory factory) : IClassFi
 
         // Admin creates primary lead and duplicate lead
         var primaryRes = await admin.Client.PostAsJsonAsync("/api/v1/leads",
-            new SaveLeadRequest("Primary", "User", "p@example.test", null, "Acme", "New", "Web", null, null, null));
+            new SaveLeadRequest("Primary", "User", "p@example.test", null, "Acme", "New", "Web", null, null, null, null, null));
         var primary = await primaryRes.Content.ReadFromJsonAsync<LeadDto>();
 
         var dupRes = await admin.Client.PostAsJsonAsync("/api/v1/leads",
-            new SaveLeadRequest("Dup", "User", "d@example.test", null, "Acme", "New", "Web", null, null, null));
+            new SaveLeadRequest("Dup", "User", "d@example.test", null, "Acme", "New", "Web", null, null, null, null, null));
         var dup = await dupRes.Content.ReadFromJsonAsync<LeadDto>();
 
         // Create an edit-only role without Delete permission
@@ -68,7 +68,7 @@ public sealed class ScopeEnforcementTests(MindLiftApiFactory factory) : IClassFi
 
         // Editor attempts to merge leads (which deletes duplicates)
         var mergeRes = await editor.Client.PostAsJsonAsync($"/api/v1/leads/{primary!.Id}/merge",
-            new MergeLeadsRequest([dup!.Id], []));
+            new MergeLeadsRequest([dup!.Id]));
 
         // Must be forbidden because caller lacks Delete permission
         mergeRes.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
@@ -85,7 +85,7 @@ public sealed class ScopeEnforcementTests(MindLiftApiFactory factory) : IClassFi
 
         // Staff 1 creates a deal
         var dealRes = await staff1.Client.PostAsJsonAsync("/api/v1/deals",
-            new SaveDealRequest("Staff Deal", 5000, "USD", null, null, null, null, null, null, null));
+            new SaveDealRequest("Staff Deal", null, null, 5000, "USD", null, null, null, null, null, null, null));
         dealRes.StatusCode.ShouldBe(HttpStatusCode.OK);
         var deal = await dealRes.Content.ReadFromJsonAsync<DealDto>();
 
@@ -94,8 +94,8 @@ public sealed class ScopeEnforcementTests(MindLiftApiFactory factory) : IClassFi
         var staff2UserId = usersList!.Items.Single().Id;
 
         // Staff 1 (Own scope) tries to reassign deal owner to Staff 2 (outside Staff 1's scope)
-        var reassignRes = await staff1.Client.PutAsJsonAsync($"/api/v1/deals/{deal!.Id}/owner",
-            new ReassignDealOwnerRequest(staff2UserId));
+        var reassignRes = await staff1.Client.PutAsJsonAsync($"/api/v1/deals/{deal!.Id}",
+            new SaveDealRequest("Staff Deal", null, null, 5000, "USD", null, null, null, null, null, staff2UserId, null));
 
         // Must fail with NotFound or Forbidden (cannot assign to out-of-scope owner)
         reassignRes.StatusCode.ShouldBeOneOf(HttpStatusCode.NotFound, HttpStatusCode.Forbidden);
@@ -121,10 +121,10 @@ public sealed class ScopeEnforcementTests(MindLiftApiFactory factory) : IClassFi
         var webhookReq = new SaveAutomationRuleRequest(
             "Exfiltrate Lead Data",
             "leads",
-            AutomationTriggerType.Created,
+            AutomationTriggerType.RecordCreated,
             null,
             null,
-            [new AutomationActionDefinition { Type = AutomationActionType.Webhook, WebhookUrl = "https://example.com/webhook" }],
+            [new AutomationActionDefinition(AutomationActionType.Webhook, WebhookUrl: "https://example.com/webhook")],
             true,
             1
         );
@@ -173,12 +173,12 @@ public sealed class ScopeEnforcementTests(MindLiftApiFactory factory) : IClassFi
 
         // Admin sets user A's manager to user B
         var setAManager = await admin.Client.PutAsJsonAsync($"/api/v1/users/{uA.Id}",
-            new UpdateUserRequest(uA.FirstName, uA.LastName, null, "Staff", "en", uA.RoleId, null, null, uB.Id));
+            new UpdateUserRequest("User", "A", null, "Staff", "en", uA.RoleId, null, null, uB.Id));
         setAManager.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         // Admin now tries to set user B's manager to user A -> creates cycle A -> B -> A
         var setBManager = await admin.Client.PutAsJsonAsync($"/api/v1/users/{uB.Id}",
-            new UpdateUserRequest(uB.FirstName, uB.LastName, null, "Staff", "en", uB.RoleId, null, null, uA.Id));
+            new UpdateUserRequest("User", "B", null, "Staff", "en", uB.RoleId, null, null, uA.Id));
 
         // Must fail with Conflict (409)
         setBManager.StatusCode.ShouldBe(HttpStatusCode.Conflict);
