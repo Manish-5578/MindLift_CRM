@@ -1,7 +1,7 @@
 @page "/{Slug}/magic"
 @inherits PortalPageBase
 
-<PageTitle>@T["magic.checking"] · @Session.Branding?.TenantName</PageTitle>
+<PageTitle>@T["magic.confirm"] · @Session.Branding?.TenantName</PageTitle>
 
 @if (!Ready)
 {
@@ -27,6 +27,14 @@ else if (!string.IsNullOrEmpty(_error))
         </MudButton>
     </AuthCard>
 }
+else
+{
+    <AuthCard Title='@T["login.title"]' Subtitle='@T["magic.prompt"]'>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" OnClick="VerifyAsync" Class="mt-4" id="magic-confirm">
+            @T["magic.confirm"]
+        </MudButton>
+    </AuthCard>
+}
 
 @code {
     protected override bool RequiresSignIn => false;
@@ -36,7 +44,16 @@ else if (!string.IsNullOrEmpty(_error))
     private bool _verifying;
     private string? _error;
 
-    protected override async Task LoadAsync()
+    protected override Task LoadAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Token))
+        {
+            _error = T["magic.failed"];
+        }
+        return Task.CompletedTask;
+    }
+
+    private async Task VerifyAsync()
     {
         if (string.IsNullOrWhiteSpace(Token))
         {

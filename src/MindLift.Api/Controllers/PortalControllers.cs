@@ -102,6 +102,7 @@ public sealed class PortalAuthController(IPortalService portalService) : Control
 [ApiController]
 [Authorize(AuthenticationSchemes = "Portal", Policy = "PortalUser")]
 [Route("api/v1/portal")]
+[EnableRateLimiting("public")]
 public sealed class PortalCustomerController(IPortalService portalService, IDocumentOcrService ocrService) : ControllerBase
 {
     private Guid GetPortalUserId() => Guid.Parse(User.FindFirstValue("sub") ?? throw new UnauthorizedException("invalid_portal_token", "Invalid token."));
@@ -219,6 +220,7 @@ public sealed class PortalCustomerController(IPortalService portalService, IDocu
 [ApiController]
 [Authorize]
 [Route("api/v1")]
+[EnableRateLimiting("public")]
 public sealed class PortalStaffController(IPortalService portalService) : ControllerBase
 {
     [HttpGet("settings/portal")]

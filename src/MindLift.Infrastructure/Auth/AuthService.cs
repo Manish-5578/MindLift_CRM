@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MindLift.Application.Abstractions;
 using MindLift.Application.Common.Exceptions;
@@ -30,6 +30,7 @@ public sealed class AuthService(
     Microsoft.Extensions.Options.IOptions<AppOptions> app)
 {
     private const string GenericLoginFailure = "Email or password is incorrect.";
+    private static readonly string StandInHash = new PasswordHasher<AppUser>().HashPassword(new AppUser(), Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16)));
 
     public async Task<AuthResult> SignUpAsync(SignupRequest request, CancellationToken cancellationToken = default)
     {
@@ -39,8 +40,12 @@ public sealed class AuthService(
 
     public async Task<AuthResult> LoginAsync(string emailAddress, string password, CancellationToken cancellationToken = default)
     {
-        var user = await FindUserAcrossTenantsAsync(emailAddress, cancellationToken)
-            ?? throw new UnauthorizedException("invalid_credentials", GenericLoginFailure);
+        var user = await FindUserAcrossTenantsAsync(emailAddress, cancellationToken);
+        if (user == null)
+        {
+            _ = users.PasswordHasher.VerifyHashedPassword(new AppUser(), StandInHash, password);
+            throw new UnauthorizedException("invalid_credentials", GenericLoginFailure);
+        }
 
         using var scope = tenant.Use(user.TenantId, user.Id);
 

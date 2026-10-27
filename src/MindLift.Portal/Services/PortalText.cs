@@ -58,6 +58,8 @@ public sealed class PortalText(IJSRuntime js, Translator translator)
         ["login.unknownCompany"] = ("We could not find this company's portal. Use the link from your email.", "تعذر العثور على بوابة هذه الشركة. استخدم الرابط الموجود في بريدك."),
 
         ["magic.checking"] = ("Signing you in…", "جارٍ تسجيل دخولك…"),
+        ["magic.prompt"] = ("Click below to complete sign-in to your portal.", "انقر أدناه لإكمال تسجيل الدخول إلى بوابتك."),
+        ["magic.confirm"] = ("Sign In to Portal", "الدخول إلى البوابة"),
         ["magic.failed"] = ("This sign-in link has expired or was already used. Ask for a new one.", "انتهت صلاحية رابط الدخول أو تم استخدامه. اطلب رابطاً جديداً."),
         ["magic.back"] = ("Back to sign in", "العودة لتسجيل الدخول"),
 

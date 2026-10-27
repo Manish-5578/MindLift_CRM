@@ -93,6 +93,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                     return;
                 }
 
+                var tokenStamp = context.Principal?.FindFirst("sst")?.Value;
+                if (!string.IsNullOrEmpty(tokenStamp) && !string.IsNullOrEmpty(userState.SecurityStamp) && tokenStamp != userState.SecurityStamp)
+                {
+                    context.Fail("session_expired");
+                    return;
+                }
+
                 var claimsPlat = context.Principal?.FindFirst("plat")?.Value is "true";
                 if (claimsPlat && !userState.IsPlatformAdmin)
                 {
