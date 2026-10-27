@@ -15,7 +15,7 @@ namespace MindLift.Infrastructure.Files;
 /// or anything else that decides what is served back: those come from the server.
 /// Record permission is checked at the module level. Row-level data scope is added when each module owns its record screens.
 /// </summary>
-public sealed class FileService(AppDbContext db, IFileStorage storage, ITenantContext tenant, IPermissionService permissions, IConfiguration configuration)
+public sealed class FileService(AppDbContext db, IFileStorage storage, ITenantContext tenant, IPermissionService permissions, IDataScopeService scope, IConfiguration configuration)
 {
     /// <summary>Allowed extensions and the content type we serve them with.</summary>
     private static readonly Dictionary<string, string> AllowedTypes = new(StringComparer.OrdinalIgnoreCase)
@@ -54,9 +54,14 @@ public sealed class FileService(AppDbContext db, IFileStorage storage, ITenantCo
 
         var module = await AuthorizeEntityAsync(entityType, entityId, PermissionAction.Edit, cancellationToken);
 
+        var limit = MaxBytes;
+        if (content.CanSeek && content.Length > limit)
+        {
+            throw Invalid($"The file is larger than {limit / 1024 / 1024} MB.");
+        }
+
         // Read at most MaxBytes + 1 so an oversized upload is rejected without buffering the whole body.
         using var buffer = new MemoryStream();
-        var limit = MaxBytes;
         var chunk = new byte[81920];
         int read;
         while ((read = await content.ReadAsync(chunk, cancellationToken)) > 0)
@@ -156,6 +161,19 @@ public sealed class FileService(AppDbContext db, IFileStorage storage, ITenantCo
                 throw new ForbiddenException();
             }
 
+            if (row.EntityId is { } entityId)
+            {
+                var scopeIds = await scope.GetScopeUserIdsAsync(module, cancellationToken);
+                if (scopeIds is not null)
+                {
+                    var ownerId = await GetEntityOwnerIdAsync(type, entityId, cancellationToken);
+                    if (ownerId is null || !scopeIds.Contains(ownerId.Value))
+                    {
+                        throw new ForbiddenException();
+                    }
+                }
+            }
+
             return;
         }
 
@@ -166,7 +184,7 @@ public sealed class FileService(AppDbContext db, IFileStorage storage, ITenantCo
         }
     }
 
-    /// <summary>Checks the entity key, that the record exists in this tenant, and that the user has the action on its module.</summary>
+    /// <summary>Checks the entity key, that the record exists in this tenant, and that the user has the action and scope on it.</summary>
     private async Task<AppModule?> AuthorizeEntityAsync(string? entityType, Guid? entityId, PermissionAction action, CancellationToken cancellationToken)
     {
         if (entityType is null && entityId is null)
@@ -185,21 +203,30 @@ public sealed class FileService(AppDbContext db, IFileStorage storage, ITenantCo
         }
 
         var id = entityId.Value;
-        var exists = entityType.ToLowerInvariant() switch
-        {
-            "leads" => await db.Leads.AnyAsync(e => e.Id == id, cancellationToken),
-            "contacts" => await db.Contacts.AnyAsync(e => e.Id == id, cancellationToken),
-            "accounts" => await db.Accounts.AnyAsync(e => e.Id == id, cancellationToken),
-            "deals" => await db.Deals.AnyAsync(e => e.Id == id, cancellationToken),
-            _ => await db.Activities.AnyAsync(e => e.Id == id, cancellationToken),
-        };
-        if (!exists)
+        var ownerId = await GetEntityOwnerIdAsync(entityType, id, cancellationToken);
+        if (ownerId is null)
         {
             throw new NotFoundException(entityType, id);
         }
 
+        var scopeIds = await scope.GetScopeUserIdsAsync(module, cancellationToken);
+        if (scopeIds is not null && !scopeIds.Contains(ownerId.Value))
+        {
+            throw new ForbiddenException();
+        }
+
         return module;
     }
+
+    private async Task<Guid?> GetEntityOwnerIdAsync(string entityType, Guid id, CancellationToken cancellationToken)
+        => entityType.ToLowerInvariant() switch
+        {
+            "leads" => await db.Leads.Where(e => e.Id == id).Select(e => (Guid?)e.OwnerId).FirstOrDefaultAsync(cancellationToken),
+            "contacts" => await db.Contacts.Where(e => e.Id == id).Select(e => (Guid?)e.OwnerId).FirstOrDefaultAsync(cancellationToken),
+            "accounts" => await db.Accounts.Where(e => e.Id == id).Select(e => (Guid?)e.OwnerId).FirstOrDefaultAsync(cancellationToken),
+            "deals" => await db.Deals.Where(e => e.Id == id).Select(e => (Guid?)e.OwnerId).FirstOrDefaultAsync(cancellationToken),
+            _ => await db.Activities.Where(e => e.Id == id).Select(e => (Guid?)e.OwnerId).FirstOrDefaultAsync(cancellationToken),
+        };
 
     /// <summary>Checks the first bytes against the claimed type so a renamed executable is not stored as a PDF.</summary>
     internal static bool SignatureMatches(string extension, ReadOnlySpan<byte> bytes)
@@ -234,7 +261,8 @@ public sealed class FileService(AppDbContext db, IFileStorage storage, ITenantCo
     internal static string SafeFileName(string fileName)
     {
         var name = Path.GetFileName(fileName.Replace('\\', '/'));
-        name = new string(name.Where(c => !char.IsControl(c) && c != '"').ToArray()).Trim();
+        var invalid = Path.GetInvalidFileNameChars();
+        name = new string(name.Where(c => !char.IsControl(c) && c != '"' && !invalid.Contains(c)).ToArray()).Trim();
         if (name.Length == 0)
         {
             name = "file";

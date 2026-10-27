@@ -133,6 +133,10 @@ public static class FilterSqlCompiler
                         parameters.Add(pDateTo, range.EndUtc);
                         parts.Add($"({expr} >= @{pDateFrom} AND {expr} < @{pDateTo})");
                     }
+                    else
+                    {
+                        throw new ValidationException($"Invalid date preset '{presetName}'.");
+                    }
                     break;
             }
         }

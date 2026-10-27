@@ -51,6 +51,24 @@ public sealed class DocumentTypesController(DocumentTypeService types) : Control
     public async Task<ActionResult<IReadOnlyList<DocumentTypeDto>>> AddStarters(CancellationToken cancellationToken)
         => Ok(await types.AddStartersAsync(cancellationToken));
 
+    private static readonly HashSet<string> AllowedSampleExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".pdf", ".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff", ".txt"
+    };
+
+    private static string GetSafeExtension(string? fileName)
+    {
+        var ext = Path.GetExtension(fileName ?? string.Empty).ToLowerInvariant();
+        if (string.IsNullOrEmpty(ext) || !AllowedSampleExtensions.Contains(ext))
+        {
+            throw new MindLift.Application.Common.Exceptions.ValidationException(new Dictionary<string, string[]>
+            {
+                ["file"] = ["Invalid file extension. Supported extensions are PDF, PNG, JPG, JPEG, WEBP, TIF, TIFF, TXT."]
+            });
+        }
+        return ext;
+    }
+
     /// <summary>Reads a sample file and proposes the fields to take from documents like it. Needs AI reading on.</summary>
     [HasPermission(AppModule.Settings, PermissionAction.Edit)]
     [HttpPost("suggest-fields")]
@@ -67,7 +85,8 @@ public sealed class DocumentTypesController(DocumentTypeService types) : Control
             throw new MindLift.Application.Common.Exceptions.ValidationException(new Dictionary<string, string[]> { ["file"] = ["The sample is larger than 25 MB."] });
         }
 
-        var path = Path.Combine(Path.GetTempPath(), $"sample_{Guid.NewGuid():N}{Path.GetExtension(file.FileName).ToLowerInvariant()}");
+        var extension = GetSafeExtension(file.FileName);
+        var path = Path.Combine(Path.GetTempPath(), $"sample_{Guid.NewGuid():N}{extension}");
         try
         {
             await using (var target = System.IO.File.Create(path))
@@ -114,7 +133,7 @@ public sealed class DocumentTypesController(DocumentTypeService types) : Control
             throw new MindLift.Application.Common.Exceptions.ValidationException(new Dictionary<string, string[]> { ["file"] = ["The sample is larger than 25 MB."] });
         }
 
-        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        var extension = GetSafeExtension(file.FileName);
         var path = Path.Combine(Path.GetTempPath(), $"sample_{Guid.NewGuid():N}{extension}");
         try
         {

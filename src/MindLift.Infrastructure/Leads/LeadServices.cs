@@ -308,6 +308,12 @@ public sealed class LeadService(
         {
             account = await db.Accounts.FirstOrDefaultAsync(a => a.Id == request.ExistingAccountId, cancellationToken)
                 ?? throw new NotFoundException("Account", request.ExistingAccountId);
+
+            var accScope = await scope.GetScopeUserIdsAsync(AppModule.Accounts, cancellationToken);
+            if (accScope is not null && !accScope.Contains(account.OwnerId))
+            {
+                throw new ForbiddenException("You do not have permission to link this account.", "account_forbidden");
+            }
         }
 
         Contact contact;
@@ -315,6 +321,12 @@ public sealed class LeadService(
         {
             contact = await db.Contacts.FirstOrDefaultAsync(c => c.Id == request.ExistingContactId, cancellationToken)
                 ?? throw new NotFoundException("Contact", request.ExistingContactId);
+
+            var conScope = await scope.GetScopeUserIdsAsync(AppModule.Contacts, cancellationToken);
+            if (conScope is not null && !conScope.Contains(contact.OwnerId))
+            {
+                throw new ForbiddenException("You do not have permission to link this contact.", "contact_forbidden");
+            }
         }
         else
         {

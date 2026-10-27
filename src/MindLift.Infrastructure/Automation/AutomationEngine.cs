@@ -269,9 +269,27 @@ public sealed class AutomationEngine(
         }
     }
 
+    private static readonly HashSet<string> BlockedFieldUpdateProperties = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Id",
+        "TenantId",
+        "CreatedAt",
+        "CreatedById",
+        "UpdatedAt",
+        "UpdatedById",
+        "IsDeleted",
+        "DeletedAt",
+        "DeletedById",
+        "RowVersion",
+        "SecurityStamp",
+        "PasswordHash",
+        "NormalizedEmail",
+        "NormalizedPhone",
+    };
+
     private void ApplyFieldUpdate<T>(T entity, AutomationActionDefinition action) where T : TenantEntity
     {
-        if (string.IsNullOrWhiteSpace(action.FieldKey) || action.FieldValue is null)
+        if (string.IsNullOrWhiteSpace(action.FieldKey) || action.FieldValue is null || BlockedFieldUpdateProperties.Contains(action.FieldKey.Trim()))
         {
             return;
         }
@@ -508,6 +526,21 @@ public sealed class AutomationEngine(
 
     public async Task<AutomationRuleDto> SaveRuleAsync(Guid? id, SaveAutomationRuleRequest request, CancellationToken cancellationToken = default)
     {
+        foreach (var action in request.Actions)
+        {
+            if (action.Type == AutomationActionType.UpdateField && !string.IsNullOrWhiteSpace(action.FieldKey))
+            {
+                var key = action.FieldKey.Trim();
+                if (BlockedFieldUpdateProperties.Contains(key))
+                {
+                    throw new ValidationException(new Dictionary<string, string[]>
+                    {
+                        ["actions"] = [$"Updating system field '{key}' is not allowed."]
+                    });
+                }
+            }
+        }
+
         var rule = id is null
             ? new AutomationRule()
             : await db.AutomationRules.FirstOrDefaultAsync(r => r.Id == id, cancellationToken)

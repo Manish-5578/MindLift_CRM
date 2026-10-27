@@ -132,17 +132,30 @@ public sealed class InvitationService(
             CreatedAt = clock.UtcNow,
         };
 
-        var result = await users.CreateAsync(user, password);
-        if (!result.Succeeded)
+        try
         {
-            throw new ValidationException(new Dictionary<string, string[]>
+            var result = await users.CreateAsync(user, password);
+            if (!result.Succeeded)
             {
-                ["password"] = result.Errors.Select(e => e.Description).ToArray(),
-            });
+                if (result.Errors.Any(e => e.Code is "DuplicateUserName" or "DuplicateEmail"))
+                {
+                    throw new ConflictException("invitation_accepted", "This invitation has already been accepted.");
+                }
+
+                throw new ValidationException(new Dictionary<string, string[]>
+                {
+                    ["password"] = result.Errors.Select(e => e.Description).ToArray(),
+                });
+            }
+
+            invitation.AcceptedAt = clock.UtcNow;
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            throw new ConflictException("invitation_accepted", "This invitation has already been accepted.");
         }
 
-        invitation.AcceptedAt = clock.UtcNow;
-        await db.SaveChangesAsync(cancellationToken);
         return await auth.IssueForUserAsync(user, cancellationToken);
     }
 
