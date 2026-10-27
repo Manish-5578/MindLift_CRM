@@ -13,7 +13,7 @@ public sealed record Session(string Email, string Password, string AccessToken, 
 /// <summary>Helpers that drive the real API: sign-up, sign-in, invitations and role changes.</summary>
 public static class Workspaces
 {
-    public const string Password = "Str0ngPass";
+    public static readonly string Password = $"FixturePass_{Guid.NewGuid():N}!Aa1";
 
     /// <summary>Creates a new company with an Admin owner. Uses the mobile client mode so the refresh token is in the body.</summary>
     public static async Task<Session> SignupAsync(Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> factory, string? company = null)

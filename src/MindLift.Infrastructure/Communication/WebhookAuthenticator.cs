@@ -120,7 +120,11 @@ public sealed class WebhookAuthenticator(AppDbContext db, ISecretProtector secre
         return FixedTimeEquals(Encoding.ASCII.GetBytes(expected), Encoding.ASCII.GetBytes(header[prefix.Length..].Trim().ToLowerInvariant()));
     }
 
-    /// <summary>Twilio signs the full URL followed by every form key and value in key order, with HMAC-SHA1 and the auth token, as base64.</summary>
+    /// <summary>
+    /// Twilio signs the full URL followed by every form key and value in key order.
+    /// Modern webhooks support HMAC-SHA256, while standard Twilio webhooks supply HMAC-SHA1.
+    /// </summary>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Security", "CA5350:Do Not Use Weak Cryptographic Algorithms", Justification = "Twilio X-Twilio-Signature specification mandates HMAC-SHA1 for legacy webhook compatibility.")]
     public static bool VerifyTwilioSignature(string url, IReadOnlyDictionary<string, string> form, string header, string authToken)
     {
         var data = new StringBuilder(url);
@@ -129,8 +133,17 @@ public sealed class WebhookAuthenticator(AppDbContext db, ISecretProtector secre
             data.Append(pair.Key).Append(pair.Value);
         }
 
-        var expected = Convert.ToBase64String(HMACSHA1.HashData(Encoding.UTF8.GetBytes(authToken), Encoding.UTF8.GetBytes(data.ToString())));
-        return FixedTimeEquals(Encoding.UTF8.GetBytes(expected), Encoding.UTF8.GetBytes(header.Trim()));
+        var keyBytes = Encoding.UTF8.GetBytes(authToken);
+        var dataBytes = Encoding.UTF8.GetBytes(data.ToString());
+
+        var expectedSha256 = Convert.ToBase64String(HMACSHA256.HashData(keyBytes, dataBytes));
+        if (FixedTimeEquals(Encoding.UTF8.GetBytes(expectedSha256), Encoding.UTF8.GetBytes(header.Trim())))
+        {
+            return true;
+        }
+
+        var expectedSha1 = Convert.ToBase64String(HMACSHA1.HashData(keyBytes, dataBytes));
+        return FixedTimeEquals(Encoding.UTF8.GetBytes(expectedSha1), Encoding.UTF8.GetBytes(header.Trim()));
     }
 
     private static bool Matches(string sender, string? number)

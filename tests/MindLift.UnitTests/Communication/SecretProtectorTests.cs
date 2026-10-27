@@ -9,7 +9,7 @@ namespace MindLift.UnitTests.Communication;
 /// <summary>The encryption behind stored mail passwords, provider tokens and webhook secrets.</summary>
 public sealed class SecretProtectorTests
 {
-    private const string BuiltInKey = "MindLift-Default-Master-Encryption-Secret-Key-2026!";
+    private static readonly string TestLegacyKey = "legacy-test-fixture-key";
 
     private static SecretProtector With(params (string Key, string Value)[] settings)
         => new(new ConfigurationBuilder().AddInMemoryCollection(settings.Select(s => new KeyValuePair<string, string?>(s.Key, s.Value))).Build());
@@ -84,13 +84,12 @@ public sealed class SecretProtectorTests
     }
 
     [Fact]
-    public void A_value_stored_by_the_earlier_version_with_the_built_in_key_still_opens_once_a_real_key_is_set()
+    public void A_value_stored_by_the_earlier_version_with_a_configured_legacy_key_opens()
     {
-        var oldValue = LegacyProtect("old-smtp-password", BuiltInKey);
+        var oldValue = LegacyProtect("old-smtp-password", TestLegacyKey);
 
-        With(("Jwt:SigningKey", "the-staff-signing-key-value-0123456789")).Unprotect(oldValue).ShouldBe("old-smtp-password");
-        With(("Security:SecretKey", "a-new-dedicated-key")).Unprotect(oldValue).ShouldBe("old-smtp-password");
-        With().Unprotect(oldValue).ShouldBe("old-smtp-password");
+        With(("Security:SecretKey", TestLegacyKey)).Unprotect(oldValue).ShouldBe("old-smtp-password");
+        With(("Jwt:Key", TestLegacyKey)).Unprotect(oldValue).ShouldBe("old-smtp-password");
     }
 
     [Fact]

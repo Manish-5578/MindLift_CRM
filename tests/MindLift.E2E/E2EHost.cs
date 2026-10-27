@@ -145,7 +145,7 @@ public sealed class E2EHost : IAsyncLifetime
     public async Task<Workspace> NewWorkspaceAsync(bool finishSetup = true, string? company = null, string language = "en")
     {
         var email = $"e2e-{Guid.NewGuid():N}@example.test";
-        const string password = "Str0ngPass1";
+        var password = $"E2ETestPass_{Guid.NewGuid():N}!Aa1";
         using var http = new HttpClient { BaseAddress = new Uri(BaseUrl) };
         http.DefaultRequestHeaders.Add("X-Client", "mobile");
 
@@ -168,7 +168,7 @@ public sealed class E2EHost : IAsyncLifetime
     public async Task<Workspace> NewPlatformOwnerAsync()
     {
         var email = $"owner-{Guid.NewGuid():N}@platform.test";
-        const string password = "Pl4tformOwner!9";
+        var password = $"E2EOwnerPass_{Guid.NewGuid():N}!Aa1";
         var start = new ProcessStartInfo("dotnet", $"run --project \"{Path.Combine(RepoRoot(), "src", "MindLift.Api")}\" --no-build --no-launch-profile -- seed-platform-admin --email {email} --password {password} --first Priya --last Owner")
         {
             WorkingDirectory = RepoRoot(),

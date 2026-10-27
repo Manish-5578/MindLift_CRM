@@ -17,7 +17,7 @@ public sealed class RateLimitTests(MindLiftApiFactory factory) : IClassFixture<M
         var statuses = new List<HttpStatusCode>();
         for (var i = 0; i < 6; i++)
         {
-            var response = await client.PostAsJsonAsync("/api/v1/auth/login", new { email = "nobody@example.test", password = "Wrong-Passw0rd-1" });
+            var response = await client.PostAsJsonAsync("/api/v1/auth/login", new { email = "nobody@example.test", password = $"fixture_bad_pass_{i}" });
             statuses.Add(response.StatusCode);
         }
 

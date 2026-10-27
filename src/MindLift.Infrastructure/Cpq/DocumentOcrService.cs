@@ -115,14 +115,15 @@ public sealed class DocumentOcrService(
 
         await EnsureLinkedRecordsExistAsync(accountId, dealId, quoteId, invoiceId, contactId, ct);
 
-        var storageKey = $"docs/{CurrentTenantId}/{Guid.NewGuid():N}_{Path.GetFileName(fileName)}";
+        var cleanFileName = Path.GetFileName(fileName);
+        var storageKey = $"docs/{CurrentTenantId}/{Guid.NewGuid():N}_{cleanFileName}";
         using var stream = new MemoryStream(fileBytes);
         await fileStorage.SaveAsync(storageKey, stream, ct);
 
         var doc = new BusinessDocument
         {
             TenantId = CurrentTenantId,
-            FileName = fileName,
+            FileName = cleanFileName,
             ContentType = storedContentType,
             FileSizeBytes = fileSize,
             StorageKey = storageKey,
