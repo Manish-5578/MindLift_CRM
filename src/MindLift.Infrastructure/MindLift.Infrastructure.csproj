@@ -8,6 +8,10 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="MindLift.UnitTests" />
+    <InternalsVisibleTo Include="MindLift.IntegrationTests" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="AWSSDK.S3" />
     <PackageReference Include="DnsClient" />
     <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" />

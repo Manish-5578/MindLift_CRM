@@ -61,16 +61,38 @@ public sealed class UserAdministrationService(
     public async Task<UserDetail> GetAsync(Guid id, CancellationToken cancellationToken = default)
         => Map(await LoadAsync(id, cancellationToken));
 
+    private async Task<bool> IsCallerAdminAsync(CancellationToken cancellationToken)
+    {
+        if (tenant.IsPlatformAdmin) return true;
+        if (tenant.UserId is not { } callerId) return false;
+        var caller = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == callerId, cancellationToken);
+        if (caller == null) return false;
+        if (caller.IsTenantOwner) return true;
+        if (caller.RoleId is null) return false;
+        return await db.Roles.AsNoTracking().AnyAsync(r => r.Id == caller.RoleId && r.IsAdmin, cancellationToken);
+    }
+
     public async Task<UserDetail> UpdateAsync(Guid id, UpdateUserRequest request, CancellationToken cancellationToken = default)
     {
         var user = await LoadAsync(id, cancellationToken);
+        var isCallerAdmin = await IsCallerAdminAsync(cancellationToken);
+
+        var currentRole = user.RoleId is null ? null : await db.Roles.AsNoTracking().FirstOrDefaultAsync(r => r.Id == user.RoleId, cancellationToken);
+        if ((user.IsTenantOwner || currentRole?.IsAdmin == true) && !isCallerAdmin)
+        {
+            throw new ForbiddenException("Only administrators can modify administrator accounts.", "cannot_modify_admin");
+        }
 
         if (request.RoleId is { } roleId && roleId != user.RoleId)
         {
             var role = await db.Roles.AsNoTracking().FirstOrDefaultAsync(r => r.Id == roleId, cancellationToken)
                 ?? throw new NotFoundException("Role", roleId);
 
-            var currentRole = user.RoleId is null ? null : await db.Roles.AsNoTracking().FirstOrDefaultAsync(r => r.Id == user.RoleId, cancellationToken);
+            if (role.IsAdmin && !isCallerAdmin)
+            {
+                throw new ForbiddenException("Only administrators can assign the Admin role.", "admin_role_required");
+            }
+
             if (currentRole?.IsAdmin == true && !role.IsAdmin)
             {
                 await EnsureAnotherAdminAsync(user.Id, cancellationToken);
@@ -114,6 +136,13 @@ public sealed class UserAdministrationService(
         if (user.Id == tenant.UserId)
         {
             throw new ConflictException("cannot_deactivate_self", "You cannot deactivate your own account.");
+        }
+
+        var isCallerAdmin = await IsCallerAdminAsync(cancellationToken);
+        var targetRole = user.RoleId is null ? null : await db.Roles.AsNoTracking().FirstOrDefaultAsync(r => r.Id == user.RoleId, cancellationToken);
+        if (targetRole?.IsAdmin == true && !isCallerAdmin)
+        {
+            throw new ForbiddenException("Only administrators can deactivate administrator accounts.", "admin_required");
         }
 
         if (reassignToUserId is { } target && !await db.Users.AnyAsync(u => u.Id == target && u.IsActive, cancellationToken))

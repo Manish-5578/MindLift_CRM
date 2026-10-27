@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using MindLift.Application.Abstractions;
@@ -47,7 +47,11 @@ public sealed class InvitationService(
         }
 
         await planLimits.EnsureSeatAvailableAsync(cancellationToken);
-        await EnsureRoleAndTeamAsync(request.RoleId, request.TeamId, cancellationToken);
+        var role = await EnsureRoleAndTeamAsync(request.RoleId, request.TeamId, cancellationToken);
+        if (role.IsAdmin && !await IsCallerAdminAsync(cancellationToken))
+        {
+            throw new ForbiddenException("Only administrators can invite users with the Admin role.", "admin_role_required");
+        }
 
         var raw = TokenService.NewRefreshToken();
         var invitation = new Invitation
@@ -166,17 +170,28 @@ public sealed class InvitationService(
         return invitation;
     }
 
-    private async Task EnsureRoleAndTeamAsync(Guid roleId, Guid? teamId, CancellationToken cancellationToken)
+    private async Task<bool> IsCallerAdminAsync(CancellationToken cancellationToken)
     {
-        if (!await db.Roles.AnyAsync(r => r.Id == roleId, cancellationToken))
-        {
-            throw new NotFoundException("Role", roleId);
-        }
+        if (tenant.IsPlatformAdmin) return true;
+        if (tenant.UserId is not { } callerId) return false;
+        var caller = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == callerId, cancellationToken);
+        if (caller == null) return false;
+        if (caller.IsTenantOwner) return true;
+        if (caller.RoleId is null) return false;
+        return await db.Roles.AsNoTracking().AnyAsync(r => r.Id == caller.RoleId && r.IsAdmin, cancellationToken);
+    }
+
+    private async Task<Role> EnsureRoleAndTeamAsync(Guid roleId, Guid? teamId, CancellationToken cancellationToken)
+    {
+        var role = await db.Roles.FirstOrDefaultAsync(r => r.Id == roleId, cancellationToken)
+            ?? throw new NotFoundException("Role", roleId);
 
         if (teamId is { } team && !await db.Teams.AnyAsync(t => t.Id == team, cancellationToken))
         {
             throw new NotFoundException("Team", team);
         }
+
+        return role;
     }
 
     private async Task SendInviteEmailAsync(Invitation invitation, string raw, CancellationToken cancellationToken)

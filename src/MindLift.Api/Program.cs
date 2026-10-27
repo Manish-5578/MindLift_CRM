@@ -65,7 +65,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
         options.MapInboundClaims = false;
-        // Browsers cannot put a header on a WebSocket, so the hub reads the token from the query string.
         options.Events = new JwtBearerEvents
         {
             OnMessageReceived = context =>
@@ -76,6 +75,30 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 }
 
                 return Task.CompletedTask;
+            },
+            OnTokenValidated = async context =>
+            {
+                var sub = context.Principal?.FindFirst("sub")?.Value;
+                if (!Guid.TryParse(sub, out var userId))
+                {
+                    context.Fail("invalid_token");
+                    return;
+                }
+
+                var stateCache = context.HttpContext.RequestServices.GetRequiredService<MindLift.Infrastructure.Caching.RequestStateCache>();
+                var userState = await stateCache.UserAsync(userId, context.HttpContext.RequestAborted);
+                if (userState is null || !userState.IsActive)
+                {
+                    context.Fail("user_deactivated");
+                    return;
+                }
+
+                var claimsPlat = context.Principal?.FindFirst("plat")?.Value is "true";
+                if (claimsPlat && !userState.IsPlatformAdmin)
+                {
+                    context.Fail("platform_admin_revoked");
+                    return;
+                }
             },
         };
         options.TokenValidationParameters = new TokenValidationParameters
@@ -189,11 +212,26 @@ builder.Services.AddSingleton<IHostedService>(sp => new MindLift.Api.Hosting.Han
     WorkerCount = builder.Configuration.GetValue<int?>("Hangfire:WorkerCount") ?? Math.Min(Environment.ProcessorCount * 5, 20),
     Activator = sp.GetRequiredService<JobActivator>()
 }));
-builder.Services.AddCors(options => options.AddPolicy("dev", policy =>
-    policy.SetIsOriginAllowed(origin => new Uri(origin).Host is "localhost" or "127.0.0.1")
-          .AllowAnyHeader()
-          .AllowAnyMethod()
-          .AllowCredentials()));
+var allowedOrigins = (builder.Configuration["Cors:AllowedOrigins"] ?? string.Empty)
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("dev", policy =>
+        policy.SetIsOriginAllowed(origin => new Uri(origin).Host is "localhost" or "127.0.0.1")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials());
+
+    if (allowedOrigins.Length > 0)
+    {
+        options.AddPolicy("prod", policy =>
+            policy.WithOrigins(allowedOrigins)
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .AllowCredentials());
+    }
+});
 
 var app = builder.Build();
 
@@ -260,6 +298,10 @@ app.Use(async (context, next) =>
     context.Response.Headers["X-Frame-Options"] = "DENY";
     context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
     context.Response.Headers["Content-Security-Policy"] = "frame-ancestors 'none'";
+    if (!app.Environment.IsDevelopment())
+    {
+        context.Response.Headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains";
+    }
     await next();
 });
 
@@ -291,6 +333,10 @@ if (app.Environment.IsDevelopment())
 
         await next();
     });
+}
+else if (allowedOrigins.Length > 0)
+{
+    app.UseCors("prod");
 }
 
 // Staff web app (Blazor WebAssembly) served at "/", customer portal at "/portal".

@@ -35,7 +35,9 @@ public sealed class SmtpEmailSender(IOptions<SmtpOptions> options) : IEmailSende
         message.Body = body.ToMessageBody();
 
         using var client = new SmtpClient();
-        var security = _options.UseStartTls ? SecureSocketOptions.StartTls : SecureSocketOptions.None;
+        var security = _options.Port == 465
+            ? SecureSocketOptions.SslOnConnect
+            : (_options.UseStartTls ? SecureSocketOptions.StartTls : SecureSocketOptions.Auto);
         await client.ConnectAsync(_options.Host, _options.Port, security, cancellationToken);
 
         if (!string.IsNullOrEmpty(_options.Username))

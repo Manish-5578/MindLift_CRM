@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using MindLift.Application.Abstractions;
@@ -197,8 +197,9 @@ public sealed partial class FieldSettingsService(AppDbContext db, ITenantContext
         if (used > 0)
         {
             var table = TableOf(entity);
+            var sql = $"UPDATE \"{table}\" SET custom_fields = custom_fields - {{1}}::text WHERE tenant_id = {{0}} AND custom_fields -> {{1}}::text IS NOT NULL";
             await db.Database.ExecuteSqlRawAsync(
-                $"UPDATE \"{table}\" SET custom_fields = custom_fields - {{1}}::text WHERE tenant_id = {{0}} AND custom_fields -> {{1}}::text IS NOT NULL",
+                sql,
                 [tenant.TenantId!.Value, definition.Key],
                 cancellationToken);
         }

@@ -11,7 +11,7 @@ using MindLift.Shared.Enums;
 namespace MindLift.Infrastructure.Administration;
 
 /// <summary>Roles, the permission matrix and teams (plan 7.1). Changes invalidate the cached matrix.</summary>
-public sealed class RoleAdministrationService(AppDbContext db, IPermissionService permissions)
+public sealed class RoleAdministrationService(AppDbContext db, IPermissionService permissions, ITenantContext tenant)
 {
     public async Task<IReadOnlyList<RoleDto>> ListAsync(CancellationToken cancellationToken = default)
     {
@@ -68,8 +68,24 @@ public sealed class RoleAdministrationService(AppDbContext db, IPermissionServic
         return new RoleDto(role.Id, role.Name, role.Description, role.IsSystem, role.IsAdmin, role.DashboardView, 0);
     }
 
+    private async Task<bool> IsCallerAdminAsync(CancellationToken cancellationToken)
+    {
+        if (tenant.IsPlatformAdmin) return true;
+        if (tenant.UserId is not { } callerId) return false;
+        var caller = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == callerId, cancellationToken);
+        if (caller == null) return false;
+        if (caller.IsTenantOwner) return true;
+        if (caller.RoleId is null) return false;
+        return await db.Roles.AsNoTracking().AnyAsync(r => r.Id == caller.RoleId && r.IsAdmin, cancellationToken);
+    }
+
     public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
+        if (!await IsCallerAdminAsync(cancellationToken))
+        {
+            throw new ForbiddenException("Only administrators can delete roles.", "admin_required");
+        }
+
         var role = await LoadAsync(id, cancellationToken);
         if (role.IsSystem)
         {
@@ -104,6 +120,11 @@ public sealed class RoleAdministrationService(AppDbContext db, IPermissionServic
 
     public async Task<IReadOnlyList<RolePermissionDto>> SavePermissionsAsync(Guid roleId, IReadOnlyList<RolePermissionDto> matrix, CancellationToken cancellationToken = default)
     {
+        if (!await IsCallerAdminAsync(cancellationToken))
+        {
+            throw new ForbiddenException("Only administrators can modify role permissions.", "admin_required");
+        }
+
         var role = await LoadAsync(roleId, cancellationToken);
         if (role.IsAdmin)
         {
@@ -136,6 +157,11 @@ public sealed class RoleAdministrationService(AppDbContext db, IPermissionServic
 
     public async Task<RoleDto> CloneAsync(Guid roleId, string newName, CancellationToken cancellationToken = default)
     {
+        if (!await IsCallerAdminAsync(cancellationToken))
+        {
+            throw new ForbiddenException("Only administrators can clone roles.", "admin_required");
+        }
+
         var source = await LoadAsync(roleId, cancellationToken);
         var matrix = await GetPermissionsAsync(roleId, cancellationToken);
         var clone = await CreateAsync(new SaveRoleRequest(newName, $"Copy of {source.Name}", source.DashboardView), cancellationToken);

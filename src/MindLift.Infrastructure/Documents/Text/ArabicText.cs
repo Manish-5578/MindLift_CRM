@@ -69,7 +69,7 @@ public static partial class ArabicText
     private static partial Regex MixedNumber();
 
     private static bool IsDirectionMark(char c)
-        => c is '‎' or '‏' or '؜' || (c >= '‪' && c <= '‮') || (c >= '⁦' && c <= '⁩');
+        => c is '\u200E' or '\u200F' or '\u061C' || (c >= '\u202A' && c <= '\u202E') || (c >= '\u2066' && c <= '\u2069');
 
     /// <summary>
     /// An engine can hand back the parts of a number written with dashes in the wrong order inside a right-to-left line.

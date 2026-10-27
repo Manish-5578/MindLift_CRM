@@ -24,7 +24,8 @@ public sealed class PortalService(
     ISecretProtector secretProtector,
     IOptions<AppOptions> app,
     IDocumentOcrService ocrService,
-    INotificationService notifications) : IPortalService
+    INotificationService notifications,
+    IDataScopeService scope) : IPortalService
 {
     private Guid CurrentTenantId => tenant.TenantId ?? throw new UnauthorizedAccessException("Tenant context required.");
     private static readonly PasswordHasher<PortalUser> Hasher = new();
@@ -770,6 +771,12 @@ public sealed class PortalService(
         var contact = await db.Contacts.FirstOrDefaultAsync(c => c.Id == req.ContactId && !c.IsDeleted, ct)
             ?? throw new NotFoundException("Contact", req.ContactId);
 
+        var allowedUsers = await scope.GetScopeUserIdsAsync(AppModule.Contacts, ct);
+        if (allowedUsers is not null && !allowedUsers.Contains(contact.OwnerId))
+        {
+            throw new ForbiddenException("You cannot manage portal access for contacts outside your data scope.", "forbidden");
+        }
+
         if (string.IsNullOrWhiteSpace(req.Email))
         {
             throw new ValidationException(new Dictionary<string, string[]> { ["email"] = ["An email address is required."] });
@@ -828,9 +835,13 @@ public sealed class PortalService(
 
     public async Task<PortalAccessStatusDto> GetContactAccessAsync(Guid contactId, CancellationToken ct = default)
     {
-        if (!await db.Contacts.AnyAsync(c => c.Id == contactId && !c.IsDeleted, ct))
+        var contact = await db.Contacts.FirstOrDefaultAsync(c => c.Id == contactId && !c.IsDeleted, ct)
+            ?? throw new NotFoundException("Contact", contactId);
+
+        var allowedUsers = await scope.GetScopeUserIdsAsync(AppModule.Contacts, ct);
+        if (allowedUsers is not null && !allowedUsers.Contains(contact.OwnerId))
         {
-            throw new NotFoundException("Contact", contactId);
+            throw new ForbiddenException("You cannot view portal access for contacts outside your data scope.", "forbidden");
         }
 
         var user = await db.PortalUsers.AsNoTracking()
