@@ -12,7 +12,7 @@
         {
             var y = Top + (H - Top - Bottom) * g / 4.0;
             <line class="ch-grid" x1="@Left" x2="@(W - 6)" y1="@F(y)" y2="@F(y)" />
-            @((MarkupString)$"<text class=\"ch-axis\" x=\"{Left - 8}\" y=\"{F(y + 4)}\" text-anchor=\"end\">{Short(Max * (4 - g) / 4m)}</text>")
+            @RenderSvgText("ch-axis", Left - 8, y + 4, "end", Short(Max * (4 - g) / 4m))
         }
         @for (var i = 0; i < Data.Count; i++)
         {
@@ -30,7 +30,7 @@
                     <line x1="@F(x - 3)" x2="@F(x + bw + 3)" y1="@F(ty)" y2="@F(ty)" stroke="var(--ml-warning)" stroke-width="2.5" stroke-linecap="round" />
                 }
             </g>
-            @((MarkupString)$"<text class=\"ch-axis\" x=\"{F(Left + SlotW * i + SlotW / 2)}\" y=\"{H - 6}\" text-anchor=\"middle\">{System.Net.WebUtility.HtmlEncode(Data[i].Label)}</text>")
+            @RenderSvgText("ch-axis", Left + SlotW * i + SlotW / 2, H - 6, "middle", Data[i].Label)
         }
     </svg>
     @if (_hot >= 0 && _hot < Data.Count)
@@ -80,4 +80,15 @@
 
     private static string Short(decimal v) => v >= 1_000_000 ? (v / 1_000_000).ToString("0.#", CultureInfo.InvariantCulture) + "M" : v >= 1000 ? (v / 1000).ToString("0.#", CultureInfo.InvariantCulture) + "k" : v.ToString("0.#", CultureInfo.InvariantCulture);
     private static string F(double v) => v.ToString("0.##", CultureInfo.InvariantCulture);
+
+    private static RenderFragment RenderSvgText(string cssClass, double x, double y, string anchor, string content) => builder =>
+    {
+        builder.OpenElement(0, "text");
+        builder.AddAttribute(1, "class", cssClass);
+        builder.AddAttribute(2, "x", F(x));
+        builder.AddAttribute(3, "y", F(y));
+        builder.AddAttribute(4, "text-anchor", anchor);
+        builder.AddContent(5, content);
+        builder.CloseElement();
+    };
 }

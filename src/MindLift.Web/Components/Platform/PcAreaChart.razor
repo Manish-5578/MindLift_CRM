@@ -15,13 +15,13 @@
         {
             var y = Top + (H - Top - Bottom) * g / 3.0;
             <line class="pc-gridline" x1="@Left" x2="@(W - 8)" y1="@F(y)" y2="@F(y)" />
-            @((MarkupString)$"<text class=\"pc-axis\" x=\"{Left - 8}\" y=\"{F(y + 4)}\" text-anchor=\"end\">{Math.Round(Max * (3 - g) / 3.0)}</text>")
+            @RenderSvgText("pc-axis", Left - 8, y + 4, "end", Math.Round(Max * (3 - g) / 3.0).ToString())
         }
         <path d="@AreaPath" fill="url(#@_id)" class="pc-area-fade" />
         <path d="@LinePath" fill="none" stroke="url(#@(_id)s)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="pc-line-draw" />
         @for (var i = 0; i < Pts.Count; i += Math.Max(1, Pts.Count / 6))
         {
-            @((MarkupString)$"<text class=\"pc-axis\" x=\"{F(Pts[i].x)}\" y=\"{H - 6}\" text-anchor=\"middle\">{System.Net.WebUtility.HtmlEncode(Data[i].Label)}</text>")
+            @RenderSvgText("pc-axis", Pts[i].x, H - 6, "middle", Data[i].Label)
         }
         @for (var i = 0; i < Pts.Count; i++)
         {
@@ -72,4 +72,15 @@
     }
 
     private string AreaPath => Pts.Count == 0 ? "" : $"{LinePath} L{F(Pts[^1].x)} {H - Bottom} L{F(Pts[0].x)} {H - Bottom} Z";
+
+    private static RenderFragment RenderSvgText(string cssClass, double x, double y, string anchor, string content) => builder =>
+    {
+        builder.OpenElement(0, "text");
+        builder.AddAttribute(1, "class", cssClass);
+        builder.AddAttribute(2, "x", F(x));
+        builder.AddAttribute(3, "y", F(y));
+        builder.AddAttribute(4, "text-anchor", anchor);
+        builder.AddContent(5, content);
+        builder.CloseElement();
+    };
 }
