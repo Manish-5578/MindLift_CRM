@@ -2,6 +2,7 @@ using System.Data;
 using System.Diagnostics;
 using Dapper;
 using Microsoft.EntityFrameworkCore;
+using MindLift.Application.Abstractions;
 using MindLift.Application.Common.Time;
 using MindLift.Domain.Entities;
 using MindLift.Infrastructure.Persistence;
@@ -37,7 +38,7 @@ public sealed class SystemReportRegistry : ISystemReportRegistry
 {
     private readonly Dictionary<string, ISystemReport> _reports;
 
-    public SystemReportRegistry(AppDbContext db)
+    public SystemReportRegistry(AppDbContext db, IDataScopeService scope)
     {
         var reports = new ISystemReport[]
         {
@@ -53,7 +54,7 @@ public sealed class SystemReportRegistry : ISystemReportRegistry
             new OverdueTasksReport(db),
             new ActivitiesByUserReport(db),
             new TargetVsActualReport(db),
-            new NewCustomersReport(db)
+            new NewCustomersReport(db, scope)
         };
 
         _reports = reports.ToDictionary(r => r.Key, StringComparer.OrdinalIgnoreCase);
@@ -861,7 +862,7 @@ ORDER BY progress_pct DESC;";
 }
 
 // 13. New customers
-public sealed class NewCustomersReport(AppDbContext db) : ISystemReport
+public sealed class NewCustomersReport(AppDbContext db, IDataScopeService scope) : ISystemReport
 {
     public string Key => "new_customers";
     public string Name => "New Customers (First Win)";
@@ -891,6 +892,7 @@ SELECT
 FROM first_wins fw
 JOIN accounts a ON a.id = fw.account_id AND a.tenant_id = @tenantId AND a.is_deleted = false
 LEFT JOIN deals d ON d.account_id = a.id AND d.closed_at = fw.first_won_at AND d.status = 'Won'
+  AND d.is_deleted = false AND (@allDealScope OR d.owner_id = ANY(@dealScopeUserIds))
 WHERE fw.first_won_at >= @from AND fw.first_won_at < @to
   AND (@allScope OR a.owner_id = ANY(@scopeUserIds))
 GROUP BY 1
@@ -902,6 +904,10 @@ ORDER BY 1 ASC;";
         p.Add("from", ctx.DateRange.StartUtc);
         p.Add("to", ctx.DateRange.EndUtc);
         p.Add("allScope", ctx.ScopeUserIds == null);
+        // Revenue comes from deals, so it follows the Deals scope, not the Contacts scope.
+        var dealScope = await scope.GetScopeUserIdsAsync(AppModule.Deals, ct);
+        p.Add("allDealScope", dealScope == null);
+        p.Add("dealScopeUserIds", dealScope?.ToArray() ?? []);
         p.Add("scopeUserIds", ctx.ScopeUserIds?.ToArray() ?? []);
 
         var rawRows = (await conn.QueryAsync(sql, p)).ToList();

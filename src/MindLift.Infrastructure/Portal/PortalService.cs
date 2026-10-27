@@ -382,6 +382,27 @@ public sealed class PortalService(
         {
             throw new ForbiddenException("The customer portal is not available for this company.", "portal_disabled");
         }
+
+        // The platform owner (or the plan) can take the Portal module away; that must stop portal access too.
+        var t = await db.Tenants.IgnoreQueryFilters().AsNoTracking().FirstOrDefaultAsync(x => x.Id == tenantId, ct);
+        if (t is not null)
+        {
+            var plan = await db.Plans.AsNoTracking().FirstOrDefaultAsync(p => p.Id == t.PlanId, ct);
+            if (MindLift.Infrastructure.Platform.PlanModules.Disabled(t, plan).Contains(nameof(MindLift.Shared.Enums.AppModule.Portal)))
+            {
+                throw new ForbiddenException("The customer portal is not available for this company.", "portal_disabled");
+            }
+        }
+    }
+
+    public async Task EnsureCustomerAccessAsync(Guid portalUserId, CancellationToken ct = default)
+    {
+        await EnsurePortalEnabledAsync(CurrentTenantId, ct);
+        var active = await db.PortalUsers.AsNoTracking().AnyAsync(u => u.Id == portalUserId && u.IsActive && !u.IsDeleted, ct);
+        if (!active)
+        {
+            throw new UnauthorizedException("portal_session_revoked", "Your portal access has ended. Please sign in again.");
+        }
     }
 
     /// <summary>Marks a token used in one database step. False means someone else used it first.</summary>
@@ -770,6 +791,7 @@ public sealed class PortalService(
     {
         var contact = await db.Contacts.FirstOrDefaultAsync(c => c.Id == req.ContactId && !c.IsDeleted, ct)
             ?? throw new NotFoundException("Contact", req.ContactId);
+        await EnsureInScopeAsync(AppModule.Contacts, contact.OwnerId, "Contact", contact.Id, ct);
 
         if (string.IsNullOrWhiteSpace(req.Email))
         {
@@ -831,6 +853,7 @@ public sealed class PortalService(
     {
         var contact = await db.Contacts.FirstOrDefaultAsync(c => c.Id == contactId && !c.IsDeleted, ct)
             ?? throw new NotFoundException("Contact", contactId);
+        await EnsureInScopeAsync(AppModule.Contacts, contact.OwnerId, "Contact", contact.Id, ct);
 
         var user = await db.PortalUsers.AsNoTracking()
             .Where(u => u.ContactId == contactId && !u.IsDeleted)
@@ -855,6 +878,8 @@ public sealed class PortalService(
 
         var entity = await db.DocumentRequests.FirstOrDefaultAsync(r => r.Id == id && !r.IsDeleted, ct)
             ?? throw new NotFoundException("DocumentRequest", id);
+        var ownerId = await db.Contacts.Where(c => c.Id == entity.ContactId).Select(c => (Guid?)c.OwnerId).FirstOrDefaultAsync(ct);
+        if (ownerId is { } oid) await EnsureInScopeAsync(AppModule.Contacts, oid, "DocumentRequest", id, ct);
 
         entity.Status = status;
 
@@ -893,6 +918,16 @@ public sealed class PortalService(
     private static PortalDocumentRequestDto ToDto(DocumentRequest r) =>
         new(r.Id, r.ContactId, r.AccountId, r.DealId, r.Title, r.Description, r.DueDate, r.Status, r.CreatedAt);
 
+    /// <summary>404s when a CRM record is outside the staff caller's row scope for its module.</summary>
+    private async Task EnsureInScopeAsync(AppModule module, Guid ownerId, string entity, Guid id, CancellationToken ct)
+    {
+        var ids = await scope.GetScopeUserIdsAsync(module, ct);
+        if (ids is not null && !ids.Contains(ownerId))
+        {
+            throw new NotFoundException(entity, id);
+        }
+    }
+
     public async Task<IReadOnlyList<PortalDocumentRequestDto>> GetDocumentRequestsForRecordAsync(
         Guid? contactId,
         Guid? accountId,
@@ -903,6 +938,11 @@ public sealed class PortalService(
         if (contactId.HasValue) q = q.Where(r => r.ContactId == contactId.Value);
         if (accountId.HasValue) q = q.Where(r => r.AccountId == accountId.Value);
         if (dealId.HasValue) q = q.Where(r => r.DealId == dealId.Value);
+        var contactScope = await scope.GetScopeUserIdsAsync(AppModule.Contacts, ct);
+        if (contactScope is not null)
+        {
+            q = q.Where(r => db.Contacts.Any(c => c.Id == r.ContactId && contactScope.Contains(c.OwnerId)));
+        }
 
         return await q.OrderByDescending(r => r.CreatedAt).Select(r => new PortalDocumentRequestDto(
             r.Id,
@@ -926,23 +966,39 @@ public sealed class PortalService(
 
         var contact = await db.Contacts.AsNoTracking().FirstOrDefaultAsync(c => c.Id == req.ContactId && !c.IsDeleted, ct)
             ?? throw new ValidationException(new Dictionary<string, string[]> { ["contactId"] = ["Choose an existing contact."] });
+        await EnsureInScopeAsync(AppModule.Contacts, contact.OwnerId, "Contact", contact.Id, ct);
 
-        // The account and deal must be this company's own. The database only checks that an id exists somewhere.
-        if (req.AccountId is { } accountId && !await db.Accounts.AnyAsync(a => a.Id == accountId && !a.IsDeleted, ct))
+        // The account and deal must be this company's own, belong to this contact and be visible to the caller.
+        // Otherwise a customer's upload could land on an unrelated account or deal.
+        if (req.AccountId is { } accountId)
         {
-            throw new ValidationException(new Dictionary<string, string[]> { ["accountId"] = ["Choose an existing account."] });
+            var account = await db.Accounts.AsNoTracking().FirstOrDefaultAsync(a => a.Id == accountId && !a.IsDeleted, ct);
+            if (account is null || contact.AccountId != accountId)
+            {
+                throw new ValidationException(new Dictionary<string, string[]> { ["accountId"] = ["Choose the contact's own account."] });
+            }
+            await EnsureInScopeAsync(AppModule.Accounts, account.OwnerId, "Account", account.Id, ct);
         }
 
-        if (req.DealId is { } dealId && !await db.Deals.AnyAsync(d => d.Id == dealId && !d.IsDeleted, ct))
+        var effectiveAccountId = req.AccountId ?? contact.AccountId;
+        if (req.DealId is { } dealId)
         {
-            throw new ValidationException(new Dictionary<string, string[]> { ["dealId"] = ["Choose an existing deal."] });
+            var deal = await db.Deals.AsNoTracking().FirstOrDefaultAsync(d => d.Id == dealId && !d.IsDeleted, ct);
+            var related = deal is not null
+                && ((effectiveAccountId is { } accId && deal.AccountId == accId)
+                    || await db.DealContacts.AnyAsync(dc => dc.DealId == dealId && dc.ContactId == contact.Id, ct));
+            if (!related)
+            {
+                throw new ValidationException(new Dictionary<string, string[]> { ["dealId"] = ["Choose a deal linked to this contact or its account."] });
+            }
+            await EnsureInScopeAsync(AppModule.Deals, deal!.OwnerId, "Deal", deal.Id, ct);
         }
 
         var entity = new DocumentRequest
         {
             TenantId = CurrentTenantId,
             ContactId = contact.Id,
-            AccountId = req.AccountId ?? contact.AccountId,
+            AccountId = effectiveAccountId,
             DealId = req.DealId,
             Title = req.Title.Trim(),
             Description = req.Description,

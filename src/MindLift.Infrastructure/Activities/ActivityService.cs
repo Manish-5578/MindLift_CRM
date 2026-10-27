@@ -376,6 +376,10 @@ public sealed class ActivityService(AppDbContext db, ITenantContext tenant, IClo
         var contactId = request.ContactId;
         var accountId = request.AccountId;
         var dealId = request.DealId;
+        await EnsureLinkInScopeAsync(request.LeadId, activity.LeadId, db.Leads.AsNoTracking(), AppModule.Leads, x => x.OwnerId, x => x.Id, "leadId", cancellationToken);
+        await EnsureLinkInScopeAsync(request.ContactId, activity.ContactId, db.Contacts.AsNoTracking(), AppModule.Contacts, x => x.OwnerId, x => x.Id, "contactId", cancellationToken);
+        await EnsureLinkInScopeAsync(request.AccountId, activity.AccountId, db.Accounts.AsNoTracking(), AppModule.Accounts, x => x.OwnerId, x => x.Id, "accountId", cancellationToken);
+        await EnsureLinkInScopeAsync(request.DealId, activity.DealId, db.Deals.AsNoTracking(), AppModule.Deals, x => x.OwnerId, x => x.Id, "dealId", cancellationToken);
         if (leadId is { } l && !await db.Leads.AnyAsync(x => x.Id == l, cancellationToken)) throw RecordHelpers.Invalid("leadId", "That lead no longer exists.");
         if (dealId is { } d)
         {
@@ -450,6 +454,11 @@ public sealed class ActivityService(AppDbContext db, ITenantContext tenant, IClo
         activity.DealId = dealId;
         if (request.OwnerId is { } owner)
         {
+            if (owner != activity.OwnerId)
+            {
+                await RecordHelpers.EnsureOwnerAsync(db, scope, AppModule.Activities, owner, cancellationToken);
+            }
+
             activity.OwnerId = owner;
         }
 
@@ -666,4 +675,22 @@ public sealed class ActivityService(AppDbContext db, ITenantContext tenant, IClo
 
     private async Task<Activity> LoadScopedAsync(Guid id, CancellationToken cancellationToken)
         => await (await ScopedAsync(cancellationToken)).FirstOrDefaultAsync(a => a.Id == id, cancellationToken) ?? throw new NotFoundException("Activity", id);
+
+    /// <summary>A record linked by the caller (not inherited from a deal or contact) must be one they can see. Links already on the activity may stay.</summary>
+    private async Task EnsureLinkInScopeAsync<T>(Guid? requested, Guid? current, IQueryable<T> source, AppModule module,
+        System.Linq.Expressions.Expression<Func<T, Guid>> owner, System.Linq.Expressions.Expression<Func<T, Guid>> key, string field, CancellationToken cancellationToken)
+    {
+        if (requested is not { } wanted || wanted == current)
+        {
+            return;
+        }
+
+        var visible = await RecordHelpers.InScopeAsync(source, scope, module, owner, cancellationToken);
+        var match = System.Linq.Expressions.Expression.Lambda<Func<T, bool>>(
+            System.Linq.Expressions.Expression.Equal(key.Body, System.Linq.Expressions.Expression.Constant(wanted)), key.Parameters);
+        if (!await visible.AnyAsync(match, cancellationToken))
+        {
+            throw RecordHelpers.Invalid(field, "That record no longer exists.");
+        }
+    }
 }

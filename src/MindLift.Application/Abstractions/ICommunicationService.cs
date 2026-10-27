@@ -34,7 +34,7 @@ public interface ICommunicationService
     Task HandleInboundMessageAsync(InboundMessagePayload payload, Guid? channelAccountId = null, CancellationToken ct = default);
 
     /// <summary>Updates a delivery status. When <paramref name="tenantId"/> is given (a verified webhook), only that workspace's messages can change.</summary>
-    Task UpdateMessageStatusAsync(string externalMessageId, MessageStatus status, DateTime? timestamp = null, string? error = null, Guid? tenantId = null, CancellationToken ct = default);
+    Task UpdateMessageStatusAsync(string externalMessageId, MessageStatus status, DateTime? timestamp = null, string? error = null, Guid? tenantId = null, Guid? channelAccountId = null, CancellationToken ct = default);
 }
 
 public interface IChannelAccountService

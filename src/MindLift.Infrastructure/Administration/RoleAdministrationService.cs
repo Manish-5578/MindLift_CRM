@@ -163,6 +163,11 @@ public sealed class RoleAdministrationService(AppDbContext db, IPermissionServic
         }
 
         var source = await LoadAsync(roleId, cancellationToken);
+        if (source.IsAdmin)
+        {
+            throw new ConflictException("admin_role_not_cloneable", "The Admin role cannot be cloned. Create a new role and grant the access it needs.");
+        }
+
         var matrix = await GetPermissionsAsync(roleId, cancellationToken);
         var clone = await CreateAsync(new SaveRoleRequest(newName, $"Copy of {source.Name}", source.DashboardView), cancellationToken);
         await SavePermissionsAsync(clone.Id, matrix, cancellationToken);

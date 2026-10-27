@@ -54,7 +54,8 @@ public sealed class TimelineService(AppDbContext db, IPermissionService permissi
         var userIds = new HashSet<Guid>();
 
         // Activities linked to the record. Linking a deal or contact also links its company, so a company's page gathers theirs too.
-        var activities = await db.Activities.AsNoTracking()
+        var scopedActivities = await RecordHelpers.InScopeAsync(db.Activities.AsNoTracking(), scope, AppModule.Activities, a => a.OwnerId, cancellationToken);
+        var activities = await scopedActivities
             .Where(a => kind == "leads" ? a.LeadId == entityId : kind == "contacts" ? a.ContactId == entityId : kind == "accounts" ? a.AccountId == entityId : a.DealId == entityId)
             .OrderByDescending(a => a.CompletedAt ?? a.DueAt ?? a.CreatedAt).Take(MaxEntries).ToListAsync(cancellationToken);
         foreach (var a in activities)
@@ -95,7 +96,8 @@ public sealed class TimelineService(AppDbContext db, IPermissionService permissi
 
         if (kind == "contacts")
         {
-            var lead = await db.Leads.AsNoTracking().FirstOrDefaultAsync(l => l.ConvertedContactId == entityId, cancellationToken);
+            var scopedLeads = await RecordHelpers.InScopeAsync(db.Leads.AsNoTracking(), scope, AppModule.Leads, l => l.OwnerId, cancellationToken);
+            var lead = await scopedLeads.FirstOrDefaultAsync(l => l.ConvertedContactId == entityId, cancellationToken);
             if (lead is not null)
             {
                 entries.Add(new TimelineEntryDto("converted", lead.ConvertedAt ?? lead.CreatedAt, $"Converted from lead {lead.FirstName} {lead.LastName}".Trim(), lead.Source is null ? null : $"Source: {lead.Source}", null, "/leads/" + lead.Id, null));
@@ -105,9 +107,11 @@ public sealed class TimelineService(AppDbContext db, IPermissionService permissi
 
         if (kind == "accounts")
         {
-            var contacts = await db.Contacts.AsNoTracking().Where(c => c.AccountId == entityId).OrderByDescending(c => c.CreatedAt).Take(50).ToListAsync(cancellationToken);
+            var scopedContacts = await RecordHelpers.InScopeAsync(db.Contacts.AsNoTracking(), scope, AppModule.Contacts, c => c.OwnerId, cancellationToken);
+            var contacts = await scopedContacts.Where(c => c.AccountId == entityId).OrderByDescending(c => c.CreatedAt).Take(50).ToListAsync(cancellationToken);
             entries.AddRange(contacts.Select(c => new TimelineEntryDto("contact", c.CreatedAt, $"Contact added: {c.FirstName} {c.LastName}".Trim(), c.JobTitle, null, "/contacts/" + c.Id, null)));
-            var deals = await db.Deals.AsNoTracking().Where(d => d.AccountId == entityId).OrderByDescending(d => d.CreatedAt).Take(50).ToListAsync(cancellationToken);
+            var scopedDeals = await RecordHelpers.InScopeAsync(db.Deals.AsNoTracking(), scope, AppModule.Deals, d => d.OwnerId, cancellationToken);
+            var deals = await scopedDeals.Where(d => d.AccountId == entityId).OrderByDescending(d => d.CreatedAt).Take(50).ToListAsync(cancellationToken);
             entries.AddRange(deals.Select(d => new TimelineEntryDto("deal", d.CreatedAt, $"Deal created: {d.Name}", $"{d.Amount:N0} {d.Currency}", null, "/deals/" + d.Id, null)));
         }
 

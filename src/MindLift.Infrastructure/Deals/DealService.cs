@@ -326,7 +326,7 @@ public sealed class DealService(
             async (cell, ct) =>
             {
                 var name = cell("name")!.ToLower();
-                return await db.Deals.AnyAsync(d => d.Name.ToLower() == name && d.Status == "Open", ct);
+                return await (await ScopedAsync(ct)).AnyAsync(d => d.Name.ToLower() == name && d.Status == "Open", ct);
             },
             async (cell, ct) =>
             {
@@ -412,7 +412,8 @@ public sealed class DealService(
         var stages = await db.PipelineStages.AsNoTracking().Where(s => s.PipelineId == pipelineId).OrderBy(s => s.SortOrder).ToListAsync(cancellationToken);
         var pipelineChanged = !isNew && pipelineId != deal.PipelineId;
 
-        if (request.AccountId is { } accountId && !await db.Accounts.AnyAsync(a => a.Id == accountId, cancellationToken))
+        if (request.AccountId is { } accountId && accountId != deal.AccountId
+            && !await (await RecordHelpers.InScopeAsync(db.Accounts.AsNoTracking(), scope, AppModule.Accounts, a => a.OwnerId, cancellationToken)).AnyAsync(a => a.Id == accountId, cancellationToken))
         {
             throw RecordHelpers.Invalid("accountId", "Choose an existing account.");
         }
@@ -424,7 +425,7 @@ public sealed class DealService(
             throw new ValidationException(customErrors);
         }
 
-        var contacts = await ResolveContactsAsync(request.Contacts, cancellationToken);
+        var contacts = await ResolveContactsAsync(deal.Id, request.Contacts, cancellationToken);
 
         deal.Name = request.Name.Trim();
         deal.Amount = request.Amount;
@@ -438,7 +439,7 @@ public sealed class DealService(
         {
             if (owner != deal.OwnerId)
             {
-                await RecordHelpers.EnsureOwnerAsync(db, owner, cancellationToken);
+                await RecordHelpers.EnsureOwnerAsync(db, scope, AppModule.Deals, owner, cancellationToken);
             }
 
             deal.OwnerId = owner;
@@ -496,7 +497,7 @@ public sealed class DealService(
         }
     }
 
-    private async Task<List<DealContactInput>> ResolveContactsAsync(IReadOnlyList<DealContactInput>? input, CancellationToken cancellationToken)
+    private async Task<List<DealContactInput>> ResolveContactsAsync(Guid dealId, IReadOnlyList<DealContactInput>? input, CancellationToken cancellationToken)
     {
         var list = (input ?? []).GroupBy(c => c.ContactId).Select(g => g.First()).ToList();
         if (list.Count > 25)
@@ -508,6 +509,18 @@ public sealed class DealService(
         if (await db.Contacts.CountAsync(c => ids.Contains(c.Id), cancellationToken) != ids.Count)
         {
             throw RecordHelpers.Invalid("contacts", "One of the contacts no longer exists.");
+        }
+
+        // Contacts already on the deal may stay; any newly linked contact must be one the caller can see.
+        var alreadyLinked = await db.DealContacts.AsNoTracking().Where(l => l.DealId == dealId).Select(l => l.ContactId).ToListAsync(cancellationToken);
+        var added = ids.Except(alreadyLinked).ToList();
+        if (added.Count > 0)
+        {
+            var visible = await RecordHelpers.InScopeAsync(db.Contacts.AsNoTracking(), scope, AppModule.Contacts, c => c.OwnerId, cancellationToken);
+            if (await visible.CountAsync(c => added.Contains(c.Id), cancellationToken) != added.Count)
+            {
+                throw RecordHelpers.Invalid("contacts", "One of the contacts no longer exists.");
+            }
         }
 
         if (list.Count(c => c.IsPrimary) > 1)
@@ -620,7 +633,8 @@ public sealed class DealService(
             return;
         }
 
-        var contact = await db.Contacts.FirstOrDefaultAsync(c => c.Id == contactId, cancellationToken);
+        var visible = await RecordHelpers.InScopeAsync(db.Contacts, scope, AppModule.Contacts, c => c.OwnerId, cancellationToken);
+        var contact = await visible.FirstOrDefaultAsync(c => c.Id == contactId, cancellationToken);
         if (contact is { Type: "prospect" or null })
         {
             contact.Type = "client";
@@ -695,10 +709,12 @@ public sealed class DealService(
         var settings = await db.TenantSettings.AsNoTracking().FirstAsync(cancellationToken);
         var rates = await RatesAsync(settings.BaseCurrency, cancellationToken);
         var stage = await db.PipelineStages.AsNoTracking().FirstOrDefaultAsync(s => s.Id == d.StageId, cancellationToken);
-        var accountName = d.AccountId is { } a ? await db.Accounts.AsNoTracking().Where(x => x.Id == a).Select(x => x.Name).FirstOrDefaultAsync(cancellationToken) : null;
+        var visibleAccounts = await RecordHelpers.InScopeAsync(db.Accounts.AsNoTracking(), scope, AppModule.Accounts, x => x.OwnerId, cancellationToken);
+        var accountName = d.AccountId is { } a ? await visibleAccounts.Where(x => x.Id == a).Select(x => x.Name).FirstOrDefaultAsync(cancellationToken) : null;
         var links = await db.DealContacts.AsNoTracking().Where(c => c.DealId == d.Id).ToListAsync(cancellationToken);
         var ids = links.Select(c => c.ContactId).ToList();
-        var names = await db.Contacts.AsNoTracking().Where(c => ids.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => (c.FirstName + " " + c.LastName).Trim(), cancellationToken);
+        var visibleContacts = await RecordHelpers.InScopeAsync(db.Contacts.AsNoTracking(), scope, AppModule.Contacts, c => c.OwnerId, cancellationToken);
+        var names = await visibleContacts.Where(c => ids.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => (c.FirstName + " " + c.LastName).Trim(), cancellationToken);
         var contacts = links.OrderByDescending(c => c.IsPrimary).ThenBy(c => names.GetValueOrDefault(c.ContactId))
             .Select(c => new DealContactDto(c.ContactId, names.GetValueOrDefault(c.ContactId) ?? "—", c.Role, c.IsPrimary)).ToList();
 

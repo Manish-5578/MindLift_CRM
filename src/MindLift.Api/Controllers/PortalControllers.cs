@@ -10,6 +10,27 @@ using MindLift.Shared.Enums;
 
 namespace MindLift.Api.Controllers;
 
+/// <summary>
+/// A portal token outlives the moment it was issued. Re-check on every request that the portal is still
+/// entitled and switched on, the company is not suspended, and the customer has not been deactivated.
+/// </summary>
+[AttributeUsage(AttributeTargets.Class)]
+public sealed class PortalAccessFilterAttribute : Attribute, Microsoft.AspNetCore.Mvc.Filters.IAsyncActionFilter
+{
+    public async Task OnActionExecutionAsync(Microsoft.AspNetCore.Mvc.Filters.ActionExecutingContext context, Microsoft.AspNetCore.Mvc.Filters.ActionExecutionDelegate next)
+    {
+        var sub = context.HttpContext.User.FindFirstValue("sub");
+        if (!Guid.TryParse(sub, out var portalUserId))
+        {
+            throw new UnauthorizedException("invalid_portal_token", "Invalid token.");
+        }
+
+        var portal = context.HttpContext.RequestServices.GetRequiredService<IPortalService>();
+        await portal.EnsureCustomerAccessAsync(portalUserId, context.HttpContext.RequestAborted);
+        await next();
+    }
+}
+
 // ================= PUBLIC / ANONYMOUS PORTAL AUTH =================
 
 [ApiController]
@@ -103,6 +124,7 @@ public sealed class PortalAuthController(IPortalService portalService) : Control
 [Authorize(AuthenticationSchemes = "Portal", Policy = "PortalUser")]
 [Route("api/v1/portal")]
 [EnableRateLimiting("public")]
+[PortalAccessFilter]
 public sealed class PortalCustomerController(IPortalService portalService, IDocumentOcrService ocrService) : ControllerBase
 {
     private Guid GetPortalUserId() => Guid.Parse(User.FindFirstValue("sub") ?? throw new UnauthorizedException("invalid_portal_token", "Invalid token."));

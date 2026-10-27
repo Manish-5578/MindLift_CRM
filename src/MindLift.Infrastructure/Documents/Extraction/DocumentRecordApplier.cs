@@ -18,8 +18,23 @@ namespace MindLift.Infrastructure.Documents.Extraction;
 /// target as "contacts.first_name" (entity, then a standard or custom field key). Each record is saved through its own service, so the same validation,
 /// automation and audit apply as when a person edits it, and only the fields named change.
 /// </summary>
-public sealed class DocumentRecordApplier(AppDbContext db, ContactService contacts, AccountService accounts, DealService deals, FieldSettingsService fields)
+public sealed class DocumentRecordApplier(AppDbContext db, ContactService contacts, AccountService accounts, DealService deals, FieldSettingsService fields, MindLift.Application.Abstractions.IPermissionService permissions)
 {
+    /// <summary>A reviewer with only Documents rights must not be able to change CRM records they cannot edit directly.</summary>
+    private async Task RequireEditAsync(string entity, CancellationToken cancellationToken)
+    {
+        var module = entity switch
+        {
+            Contacts => MindLift.Shared.Enums.AppModule.Contacts,
+            Accounts => MindLift.Shared.Enums.AppModule.Accounts,
+            _ => MindLift.Shared.Enums.AppModule.Deals,
+        };
+        if (!await permissions.HasAsync(module, MindLift.Shared.Enums.PermissionAction.Edit, cancellationToken))
+        {
+            throw new ForbiddenException();
+        }
+    }
+
     public const string Contacts = "contacts";
     public const string Accounts = "accounts";
     public const string Deals = "deals";
@@ -128,6 +143,11 @@ public sealed class DocumentRecordApplier(AppDbContext db, ContactService contac
         }
 
         // All records or none: if one cannot take its value, the ones already saved are rolled back.
+        foreach (var entity in grouped.Keys)
+        {
+            await RequireEditAsync(entity, cancellationToken);
+        }
+
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         foreach (var (entity, list) in grouped)
         {
@@ -161,6 +181,8 @@ public sealed class DocumentRecordApplier(AppDbContext db, ContactService contac
             return;
         }
 
+        await RequireEditAsync(Accounts, cancellationToken);
+        await accounts.GetAsync(accountId, cancellationToken); // 404s when the account is outside the caller's scope.
         var account = await db.Set<Account>().FirstOrDefaultAsync(a => a.Id == accountId && !a.IsDeleted, cancellationToken);
         if (account is not null)
         {

@@ -14,8 +14,52 @@ public sealed class CommunicationService(
     IOptOutService optOutService,
     IMessageTemplateService templateService,
     ITenantContext tenant,
-    ILogger<CommunicationService> logger) : ICommunicationService
+    ILogger<CommunicationService> logger,
+    IDataScopeService scope,
+    MindLift.Infrastructure.Files.FileService files) : ICommunicationService
 {
+    /// <summary>
+    /// Messages the caller may read. A message linked to a lead, contact, account or deal follows that record's data scope;
+    /// a message linked to nothing is visible to its sender and to people with All scope on Communication.
+    /// </summary>
+    private async Task<IQueryable<Message>> VisibleMessagesAsync(CancellationToken ct)
+    {
+        var leads = await scope.GetScopeUserIdsAsync(MindLift.Shared.Enums.AppModule.Leads, ct);
+        var contacts = await scope.GetScopeUserIdsAsync(MindLift.Shared.Enums.AppModule.Contacts, ct);
+        var accounts = await scope.GetScopeUserIdsAsync(MindLift.Shared.Enums.AppModule.Accounts, ct);
+        var deals = await scope.GetScopeUserIdsAsync(MindLift.Shared.Enums.AppModule.Deals, ct);
+        var comms = await scope.GetScopeUserIdsAsync(MindLift.Shared.Enums.AppModule.Communication, ct);
+
+        bool allLeads = leads is null, allContacts = contacts is null, allAccounts = accounts is null, allDeals = deals is null, allComms = comms is null;
+        var leadIds = leads?.ToList() ?? [];
+        var contactIds = contacts?.ToList() ?? [];
+        var accountIds = accounts?.ToList() ?? [];
+        var dealIds = deals?.ToList() ?? [];
+        var commIds = comms?.ToList() ?? [];
+
+        return dbContext.Messages.Where(m =>
+            (m.LeadId != null && (allLeads || dbContext.Leads.Any(l => l.Id == m.LeadId && leadIds.Contains(l.OwnerId))))
+            || (m.LeadId == null && m.ContactId != null && (allContacts || dbContext.Contacts.Any(c => c.Id == m.ContactId && contactIds.Contains(c.OwnerId))))
+            || (m.LeadId == null && m.ContactId == null && m.AccountId != null && (allAccounts || dbContext.Accounts.Any(a => a.Id == m.AccountId && accountIds.Contains(a.OwnerId))))
+            || (m.LeadId == null && m.ContactId == null && m.AccountId == null && m.DealId != null && (allDeals || dbContext.Deals.Any(d => d.Id == m.DealId && dealIds.Contains(d.OwnerId))))
+            || (m.LeadId == null && m.ContactId == null && m.AccountId == null && m.DealId == null && (allComms || (m.SentByUserId != null && commIds.Contains(m.SentByUserId.Value)))));
+    }
+
+    private async Task EnsureLinkVisibleAsync<T>(Guid? id, IQueryable<T> source, MindLift.Shared.Enums.AppModule module, System.Linq.Expressions.Expression<Func<T, Guid>> owner, System.Linq.Expressions.Expression<Func<T, Guid>> key, string what, CancellationToken ct)
+    {
+        if (id is not { } wanted)
+        {
+            return;
+        }
+
+        var visible = await MindLift.Infrastructure.Contacts.RecordHelpers.InScopeAsync(source, scope, module, owner, ct);
+        var match = System.Linq.Expressions.Expression.Lambda<Func<T, bool>>(System.Linq.Expressions.Expression.Equal(key.Body, System.Linq.Expressions.Expression.Constant(wanted)), key.Parameters);
+        if (!await visible.AnyAsync(match, ct))
+        {
+            throw new MindLift.Application.Common.Exceptions.NotFoundException(what, wanted);
+        }
+    }
+
     public async Task<MessageDto> SendMessageAsync(SendMessageRequest request, Guid userId, CancellationToken ct = default)
     {
         // 1. Opt-out validation
@@ -24,6 +68,15 @@ public sealed class CommunicationService(
             throw new InvalidOperationException($"Recipient '{request.To}' has opted out of communication via {request.Channel}.");
         }
 
+        // Records named by the caller must be ones they can see, and attachments must be files they can read.
+        await EnsureLinkVisibleAsync(request.LeadId, dbContext.Leads.AsNoTracking(), MindLift.Shared.Enums.AppModule.Leads, x => x.OwnerId, x => x.Id, "Lead", ct);
+        await EnsureLinkVisibleAsync(request.ContactId, dbContext.Contacts.AsNoTracking(), MindLift.Shared.Enums.AppModule.Contacts, x => x.OwnerId, x => x.Id, "Contact", ct);
+        await EnsureLinkVisibleAsync(request.AccountId, dbContext.Accounts.AsNoTracking(), MindLift.Shared.Enums.AppModule.Accounts, x => x.OwnerId, x => x.Id, "Account", ct);
+        await EnsureLinkVisibleAsync(request.DealId, dbContext.Deals.AsNoTracking(), MindLift.Shared.Enums.AppModule.Deals, x => x.OwnerId, x => x.Id, "Deal", ct);
+        if (request.AttachmentFileIds is { Count: > 0 } attachmentIds)
+        {
+            await files.EnsureReadableAsync(attachmentIds, ct);
+        }
         // 2. Resolve Channel Account
         ChannelAccount? account = null;
         if (request.ChannelAccountId.HasValue)
@@ -60,15 +113,18 @@ public sealed class CommunicationService(
 
         if (!leadId.HasValue && !contactId.HasValue)
         {
+            // Auto-linking by address only looks at records the sender can see.
             var normalizedTarget = OptOutService.NormalizeTarget(request.To, request.Channel);
-            var lead = await dbContext.Leads.FirstOrDefaultAsync(l => l.NormalizedEmail == normalizedTarget || l.NormalizedPhone == normalizedTarget, ct);
+            var visibleLeads = await MindLift.Infrastructure.Contacts.RecordHelpers.InScopeAsync(dbContext.Leads.AsQueryable(), scope, MindLift.Shared.Enums.AppModule.Leads, l => l.OwnerId, ct);
+            var lead = await visibleLeads.FirstOrDefaultAsync(l => l.NormalizedEmail == normalizedTarget || l.NormalizedPhone == normalizedTarget, ct);
             if (lead != null)
             {
                 leadId = lead.Id;
             }
             else
             {
-                var contact = await dbContext.Contacts.FirstOrDefaultAsync(c => c.NormalizedEmail == normalizedTarget || c.NormalizedPhone == normalizedTarget, ct);
+                var visibleContacts = await MindLift.Infrastructure.Contacts.RecordHelpers.InScopeAsync(dbContext.Contacts.AsQueryable(), scope, MindLift.Shared.Enums.AppModule.Contacts, c => c.OwnerId, ct);
+                var contact = await visibleContacts.FirstOrDefaultAsync(c => c.NormalizedEmail == normalizedTarget || c.NormalizedPhone == normalizedTarget, ct);
                 if (contact != null)
                 {
                     contactId = contact.Id;
@@ -78,7 +134,7 @@ public sealed class CommunicationService(
         }
 
         // 5. Thread ID resolution
-        var existingMessage = await dbContext.Messages
+        var existingMessage = await (await VisibleMessagesAsync(ct))
             .Where(m => m.Channel == request.Channel && (m.To == request.To || m.From == request.To))
             .OrderByDescending(m => m.CreatedAt)
             .FirstOrDefaultAsync(ct);
@@ -166,7 +222,7 @@ public sealed class CommunicationService(
 
     public async Task<List<MessageDto>> GetThreadMessagesAsync(Guid threadId, CancellationToken ct = default)
     {
-        var messages = await dbContext.Messages
+        var messages = await (await VisibleMessagesAsync(ct))
             .Where(m => m.ThreadId == threadId)
             .OrderBy(m => m.CreatedAt)
             .ToListAsync(ct);
@@ -189,7 +245,7 @@ public sealed class CommunicationService(
 
     public async Task<List<InboxThreadDto>> GetInboxThreadsAsync(CommunicationChannel? channel = null, string? search = null, CancellationToken ct = default)
     {
-        var query = dbContext.Messages.AsQueryable();
+        var query = await VisibleMessagesAsync(ct);
         if (channel.HasValue)
         {
             query = query.Where(m => m.Channel == channel.Value);
@@ -251,7 +307,7 @@ public sealed class CommunicationService(
     public async Task<List<MessageDto>> GetRecordMessagesAsync(string entityType, Guid entityId, CancellationToken ct = default)
     {
         var type = entityType.Trim().ToLowerInvariant();
-        IQueryable<Message> query = dbContext.Messages;
+        IQueryable<Message> query = await VisibleMessagesAsync(ct);
 
         if (type is "lead" or "leads") query = query.Where(m => m.LeadId == entityId);
         else if (type is "contact" or "contacts") query = query.Where(m => m.ContactId == entityId);
@@ -265,7 +321,7 @@ public sealed class CommunicationService(
 
     public async Task MarkThreadReadAsync(Guid threadId, CancellationToken ct = default)
     {
-        var unread = await dbContext.Messages
+        var unread = await (await VisibleMessagesAsync(ct))
             .Where(m => m.ThreadId == threadId && m.Direction == MessageDirection.Inbound && m.ReadAt == null)
             .ToListAsync(ct);
 
@@ -379,10 +435,13 @@ public sealed class CommunicationService(
         await dbContext.SaveChangesAsync(ct);
     }
 
-    public async Task UpdateMessageStatusAsync(string externalMessageId, MessageStatus status, DateTime? timestamp = null, string? error = null, Guid? tenantId = null, CancellationToken ct = default)
+    public async Task UpdateMessageStatusAsync(string externalMessageId, MessageStatus status, DateTime? timestamp = null, string? error = null, Guid? tenantId = null, Guid? channelAccountId = null, CancellationToken ct = default)
     {
+        // A verified webhook names its channel account; only that account's messages may change.
         var message = await dbContext.Messages.IgnoreQueryFilters()
-            .FirstOrDefaultAsync(m => m.ExternalMessageId == externalMessageId && (tenantId == null || m.TenantId == tenantId), ct);
+            .FirstOrDefaultAsync(m => m.ExternalMessageId == externalMessageId
+                && (tenantId == null || m.TenantId == tenantId)
+                && (channelAccountId == null || m.ChannelAccountId == channelAccountId), ct);
 
         if (message == null) return;
 

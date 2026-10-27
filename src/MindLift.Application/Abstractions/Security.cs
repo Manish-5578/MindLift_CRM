@@ -31,6 +31,9 @@ public interface IDataScopeService
 {
     /// <summary>Owner ids in scope, or null when the scope is All (no filter needed).</summary>
     Task<IReadOnlyList<Guid>?> GetScopeUserIdsAsync(AppModule module, CancellationToken cancellationToken = default);
+
+    /// <summary>The people a user's Team scope covers: the user, their team's members and everyone who reports to them.</summary>
+    Task<IReadOnlyList<Guid>> TeamOfAsync(Guid userId, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Sends transactional email (plan 20.8, 4.3). Implemented with SMTP (Mailpit in development).</summary>

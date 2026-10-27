@@ -8,6 +8,7 @@ namespace MindLift.Infrastructure.Security;
 /// <summary>
 /// Computes which owners the current user may see (plan 4.4.5):
 /// Own = me; Team = me, my team's members and everyone who reports to me (directly or indirectly); All = no filter.
+/// Fails closed: a user without View on the module (or with no permission row) sees nobody.
 /// </summary>
 public sealed class DataScopeService(IAppDbContext db, ITenantContext tenant, IPermissionService permissions) : IDataScopeService
 {
@@ -16,7 +17,12 @@ public sealed class DataScopeService(IAppDbContext db, ITenantContext tenant, IP
     public async Task<IReadOnlyList<Guid>?> GetScopeUserIdsAsync(AppModule module, CancellationToken cancellationToken = default)
     {
         var permission = await permissions.GetModulePermissionAsync(module, cancellationToken);
-        var scope = permission?.Scope ?? DataScope.Own;
+        if (permission is null || !permission.CanView)
+        {
+            return [];
+        }
+
+        var scope = permission.Scope;
 
         if (scope == DataScope.All)
         {
@@ -36,6 +42,8 @@ public sealed class DataScopeService(IAppDbContext db, ITenantContext tenant, IP
         return await TeamScopeAsync(me, cancellationToken);
     }
 
+    public Task<IReadOnlyList<Guid>> TeamOfAsync(Guid userId, CancellationToken cancellationToken = default) => TeamScopeAsync(userId, cancellationToken);
+
     private async Task<IReadOnlyList<Guid>> TeamScopeAsync(Guid me, CancellationToken cancellationToken)
     {
         var users = db.Set<AppUser>().AsNoTracking();
@@ -49,7 +57,8 @@ public sealed class DataScopeService(IAppDbContext db, ITenantContext tenant, IP
             ids.UnionWith(members);
         }
 
-        var frontier = ids.ToList();
+        var visited = new HashSet<Guid> { me };
+        var frontier = new List<Guid> { me };
         for (var depth = 0; depth < MaxReportingDepth && frontier.Count > 0; depth++)
         {
             var reports = await users
@@ -57,7 +66,8 @@ public sealed class DataScopeService(IAppDbContext db, ITenantContext tenant, IP
                 .Select(u => u.Id)
                 .ToListAsync(cancellationToken);
 
-            frontier = reports.Where(ids.Add).ToList();
+            frontier = reports.Where(visited.Add).ToList();
+            ids.UnionWith(frontier);
         }
 
         return ids.ToList();

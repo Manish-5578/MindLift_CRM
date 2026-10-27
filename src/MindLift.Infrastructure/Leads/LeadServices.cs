@@ -52,7 +52,8 @@ public sealed class LeadService(
     AssignmentService assignment,
     INotificationService notifications,
     IRecordSavePipeline savePipeline,
-    MindLift.Infrastructure.Common.BulkQueue bulkQueue)
+    MindLift.Infrastructure.Common.BulkQueue bulkQueue,
+    IPermissionService permissions)
 {
     private const int MaxImportRows = 5000;
     private const int MaxExportRows = 10000;
@@ -282,6 +283,10 @@ public sealed class LeadService(
             throw new BusinessRuleException("lead_disqualified", "A disqualified lead cannot be converted. Reopen it first.");
         }
 
+        await RequireAsync(AppModule.Accounts, request.AccountMode == "create" ? PermissionAction.Create : PermissionAction.Edit, request.AccountMode is "create" or "existing", cancellationToken);
+        await RequireAsync(AppModule.Contacts, request.ContactMode == "existing" ? PermissionAction.Edit : PermissionAction.Create, true, cancellationToken);
+        await RequireAsync(AppModule.Deals, PermissionAction.Create, request.CreateDeal, cancellationToken);
+
         var settings = await db.TenantSettings.AsNoTracking().FirstAsync(cancellationToken);
 
         await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
@@ -400,7 +405,14 @@ public sealed class LeadService(
         var contactId = contact.Id;
         var accountId = account?.Id;
         var dealId = deal?.Id;
-        await db.Activities.Where(a => a.LeadId == lead.Id).ExecuteUpdateAsync(s => s
+        var activityScope = await scope.GetScopeUserIdsAsync(AppModule.Activities, cancellationToken);
+        var movable = db.Activities.Where(a => a.LeadId == lead.Id);
+        if (activityScope is not null)
+        {
+            movable = movable.Where(a => activityScope.Contains(a.OwnerId));
+        }
+
+        await movable.ExecuteUpdateAsync(s => s
             .SetProperty(a => a.ContactId, contactId)
             .SetProperty(a => a.AccountId, accountId)
             .SetProperty(a => a.DealId, dealId), cancellationToken);
@@ -424,7 +436,14 @@ public sealed class LeadService(
         results.AddRange(leads.Select(l => new DuplicateCandidateDto(l.Id, "lead", $"{l.FirstName} {l.LastName}".Trim(), l.Email, l.Phone,
             email != null && l.NormalizedEmail == email ? "Same email" : "Same phone")));
 
-        var contacts = await db.Contacts.AsNoTracking()
+        var contactScope = await scope.GetScopeUserIdsAsync(AppModule.Contacts, cancellationToken);
+        var contactQuery = db.Contacts.AsNoTracking().AsQueryable();
+        if (contactScope is not null)
+        {
+            contactQuery = contactQuery.Where(c => contactScope.Contains(c.OwnerId));
+        }
+
+        var contacts = await contactQuery
             .Where(c => (email != null && c.NormalizedEmail == email) || (phone != null && c.NormalizedPhone == phone))
             .ToListAsync(cancellationToken);
         results.AddRange(contacts.Select(c => new DuplicateCandidateDto(c.Id, "contact", $"{c.FirstName} {c.LastName}".Trim(), c.Email, c.Phone,
@@ -446,15 +465,24 @@ public sealed class LeadService(
     /// <summary>Moves the useful values of the duplicates into the master and removes the duplicates (soft delete).</summary>
     public async Task<LeadDto> MergeAsync(Guid masterId, IReadOnlyList<Guid> duplicateIds, CancellationToken cancellationToken = default)
     {
+        // Merging removes the duplicates, so it needs the right to delete leads, and every duplicate must be in scope.
+        await RequireAsync(AppModule.Leads, PermissionAction.Delete, true, cancellationToken);
+
         var master = await LoadScopedAsync(masterId, cancellationToken);
         if (master.ConvertedAt is not null)
         {
             throw new ForbiddenException("Converted leads cannot be merged.", "lead_converted");
         }
 
+        var requested = duplicateIds.Where(d => d != masterId).Distinct().ToList();
         var duplicates = await (await ScopedLeadsAsync(cancellationToken))
-            .Where(l => duplicateIds.Contains(l.Id) && l.Id != masterId && l.ConvertedAt == null)
+            .Where(l => requested.Contains(l.Id) && l.ConvertedAt == null)
             .ToListAsync(cancellationToken);
+
+        if (duplicates.Count != requested.Count)
+        {
+            throw new NotFoundException("Lead", requested.First(r => duplicates.All(d => d.Id != r)));
+        }
 
         foreach (var duplicate in duplicates)
         {
@@ -623,7 +651,7 @@ public sealed class LeadService(
         {
             if (owner != lead.OwnerId)
             {
-                await RecordHelpers.EnsureOwnerAsync(db, owner, cancellationToken);
+                await RecordHelpers.EnsureOwnerAsync(db, scope, AppModule.Leads, owner, cancellationToken);
             }
 
             lead.OwnerId = owner;
@@ -632,6 +660,14 @@ public sealed class LeadService(
         if (request.CustomFields is not null)
         {
             lead.CustomFields = JsonDocument.Parse(JsonSerializer.Serialize(request.CustomFields));
+        }
+    }
+
+    private async Task RequireAsync(AppModule module, PermissionAction action, bool when, CancellationToken cancellationToken)
+    {
+        if (when && !await permissions.HasAsync(module, action, cancellationToken))
+        {
+            throw new ForbiddenException($"You need {action} permission on {module} for this.", "forbidden");
         }
     }
 

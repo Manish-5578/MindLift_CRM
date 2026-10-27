@@ -546,6 +546,11 @@ public sealed class AutomationEngine(
             : await db.AutomationRules.FirstOrDefaultAsync(r => r.Id == id, cancellationToken)
                 ?? throw new NotFoundException("Automation rule", id);
 
+        if (request.Actions.Any(a => a.Type == AutomationActionType.Webhook) || (id is not null && HasWebhook(rule)))
+        {
+            await RequireAdminAsync(cancellationToken);
+        }
+
         rule.Name = request.Name.Trim();
         rule.EntityType = request.EntityType.Trim().ToLowerInvariant();
         rule.TriggerType = request.TriggerType;
@@ -572,6 +577,7 @@ public sealed class AutomationEngine(
     {
         var rule = await db.AutomationRules.FirstOrDefaultAsync(r => r.Id == id, cancellationToken)
             ?? throw new NotFoundException("Automation rule", id);
+        if (HasWebhook(rule)) await RequireAdminAsync(cancellationToken);
         db.AutomationRules.Remove(rule);
         await db.SaveChangesAsync(cancellationToken);
     }
@@ -580,9 +586,46 @@ public sealed class AutomationEngine(
     {
         var rule = await db.AutomationRules.FirstOrDefaultAsync(r => r.Id == id, cancellationToken)
             ?? throw new NotFoundException("Automation rule", id);
+        if (HasWebhook(rule)) await RequireAdminAsync(cancellationToken);
         rule.IsActive = !rule.IsActive;
         await db.SaveChangesAsync(cancellationToken);
         return MapRule(rule);
+    }
+
+    /// <summary>True when the stored rule has a Webhook action.</summary>
+    private static bool HasWebhook(AutomationRule rule)
+    {
+        if (rule.Actions is null) return false;
+        try
+        {
+            var actions = JsonSerializer.Deserialize<List<AutomationActionDefinition>>(rule.Actions.RootElement.GetRawText()) ?? [];
+            return actions.Any(a => a.Type == AutomationActionType.Webhook);
+        }
+        catch (JsonException)
+        {
+            // Unreadable actions: treat as sensitive.
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Webhooks post record data to any outside address, so only a company admin (owner or admin role)
+    /// or the platform owner may set them up. Settings.Edit alone is not enough.
+    /// </summary>
+    private async Task RequireAdminAsync(CancellationToken cancellationToken)
+    {
+        if (tenant.IsPlatformAdmin) return;
+        if (tenant.UserId is { } userId)
+        {
+            var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+            if (user is not null && (user.IsTenantOwner
+                || (user.RoleId is { } roleId && await db.Roles.AsNoTracking().AnyAsync(r => r.Id == roleId && r.IsAdmin, cancellationToken))))
+            {
+                return;
+            }
+        }
+
+        throw new ForbiddenException("Only an administrator can set up webhook actions.", "webhook_admin_only");
     }
 
     public async Task<IReadOnlyList<AutomationExecutionLogDto>> ListLogsAsync(int limit = 50, CancellationToken cancellationToken = default)

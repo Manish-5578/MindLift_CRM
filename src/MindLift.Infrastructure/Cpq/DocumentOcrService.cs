@@ -32,9 +32,48 @@ public sealed class DocumentOcrService(
     DocumentRecordApplier applier,
     IBackgroundJobClient jobs,
     IPlatformEntitlements entitlements,
+    IDataScopeService scope,
+    ICpqService cpq,
     ILogger<DocumentOcrService> logger) : IDocumentOcrService
 {
     private Guid CurrentTenantId => tenant.TenantId ?? throw new UnauthorizedAccessException("Tenant context required.");
+
+    private sealed record Scopes(IReadOnlyList<Guid>? Deals, IReadOnlyList<Guid>? Accounts, IReadOnlyList<Guid>? Contacts);
+
+    private async Task<Scopes> ScopesAsync(CancellationToken ct) => new(
+        await scope.GetScopeUserIdsAsync(MindLift.Shared.Enums.AppModule.Deals, ct),
+        await scope.GetScopeUserIdsAsync(MindLift.Shared.Enums.AppModule.Accounts, ct),
+        await scope.GetScopeUserIdsAsync(MindLift.Shared.Enums.AppModule.Contacts, ct));
+
+    // A document follows the record it belongs to: the deal when there is one, otherwise the account,
+    // otherwise the contact. One with no link is visible to everyone who can open Documents.
+    private IQueryable<BusinessDocument> ScopeDocuments(IQueryable<BusinessDocument> q, Scopes s)
+    {
+        if (s.Deals is null && s.Accounts is null && s.Contacts is null) return q;
+        var d = s.Deals; var a = s.Accounts; var c = s.Contacts;
+        return q.Where(x =>
+            x.AssociatedDealId != null ? (d == null || db.Set<Deal>().Any(r => r.Id == x.AssociatedDealId && d.Contains(r.OwnerId)))
+            : x.AssociatedAccountId != null ? (a == null || db.Set<Account>().Any(r => r.Id == x.AssociatedAccountId && a.Contains(r.OwnerId)))
+            : x.AssociatedContactId != null ? (c == null || db.Set<Contact>().Any(r => r.Id == x.AssociatedContactId && c.Contains(r.OwnerId)))
+            : true);
+    }
+
+    public async Task EnsureDocumentInScopeAsync(Guid id, CancellationToken ct = default)
+    {
+        var visible = await ScopeDocuments(db.Set<BusinessDocument>().AsNoTracking(), await ScopesAsync(ct))
+            .AnyAsync(d => d.Id == id && !d.IsDeleted, ct);
+        if (!visible) throw new NotFoundException("Document", id);
+    }
+
+    public async Task EnsureLinksInScopeAsync(Guid? accountId, Guid? dealId, Guid? contactId, Guid? quoteId = null, Guid? invoiceId = null, CancellationToken ct = default)
+    {
+        var s = await ScopesAsync(ct);
+        if (dealId is { } did && s.Deals is { } ds && !await db.Set<Deal>().AnyAsync(r => r.Id == did && ds.Contains(r.OwnerId), ct)) throw new NotFoundException("Deal", did);
+        if (accountId is { } aid && s.Accounts is { } accs && !await db.Set<Account>().AnyAsync(r => r.Id == aid && accs.Contains(r.OwnerId), ct)) throw new NotFoundException("Account", aid);
+        if (contactId is { } cid && s.Contacts is { } cs && !await db.Set<Contact>().AnyAsync(r => r.Id == cid && cs.Contains(r.OwnerId), ct)) throw new NotFoundException("Contact", cid);
+        if (quoteId is { } qid && await cpq.GetQuoteByIdAsync(qid, ct) is null) throw new NotFoundException("Quote", qid);
+        if (invoiceId is { } iid && await cpq.GetInvoiceByIdAsync(iid, ct) is null) throw new NotFoundException("Invoice", iid);
+    }
 
     /// <summary>Copies the stored file to a temporary path that keeps its real extension, so the reader knows whether it is a PDF or an image.</summary>
     private async Task<string> SaveTempCopyAsync(BusinessDocument doc, CancellationToken ct)
@@ -776,6 +815,7 @@ public sealed class DocumentOcrService(
         if (accountId.HasValue) q = q.Where(d => d.AssociatedAccountId == accountId.Value);
         if (dealId.HasValue) q = q.Where(d => d.AssociatedDealId == dealId.Value);
         if (contactId.HasValue) q = q.Where(d => d.AssociatedContactId == contactId.Value);
+        q = ScopeDocuments(q, await ScopesAsync(ct));
 
         var list = await q.OrderByDescending(d => d.CreatedAt).ToListAsync(ct);
         return list.Select(MapDocument).ToList();

@@ -13,6 +13,9 @@ public interface IPortalService
     Task<PortalLoginResponse> RefreshAsync(string tenantSlug, string refreshToken, CancellationToken ct = default);
     Task LogoutAsync(string tenantSlug, string refreshToken, CancellationToken ct = default);
     Task<PortalProfileDto> GetProfileAsync(Guid portalUserId, CancellationToken ct = default);
+
+    /// <summary>Throws unless the portal module is entitled and switched on, the company is not suspended, and the portal user is still active.</summary>
+    Task EnsureCustomerAccessAsync(Guid portalUserId, CancellationToken ct = default);
     Task<PortalProfileDto> UpdateProfileAsync(Guid portalUserId, UpdatePortalProfileRequest req, CancellationToken ct = default);
     Task ChangePasswordAsync(Guid portalUserId, ChangePortalPasswordRequest req, CancellationToken ct = default);
 

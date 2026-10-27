@@ -248,7 +248,7 @@ public sealed class WebhooksController(
 
                     if (!string.IsNullOrEmpty(id))
                     {
-                        await communication.UpdateMessageStatusAsync(id, status, tenantId: channel.TenantId, ct: ct);
+                        await communication.UpdateMessageStatusAsync(id, status, tenantId: channel.TenantId, channelAccountId: channel.AccountId, ct: ct);
                     }
                 }
             }
@@ -307,7 +307,7 @@ public sealed class WebhooksController(
                 _ => MessageStatus.Sent
             };
 
-            await communication.UpdateMessageStatusAsync(messageSid, status, tenantId: channel.TenantId, ct: ct);
+            await communication.UpdateMessageStatusAsync(messageSid, status, tenantId: channel.TenantId, channelAccountId: channel.AccountId, ct: ct);
             return Ok();
         }
 

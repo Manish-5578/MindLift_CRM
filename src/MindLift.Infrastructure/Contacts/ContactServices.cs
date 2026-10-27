@@ -40,6 +40,33 @@ internal static class RecordHelpers
         }
     }
 
+    /// <summary>As above, and the new owner must be inside the caller's data scope for the module, so an Own-scoped user cannot hand records to anyone.</summary>
+    public static async Task EnsureOwnerAsync(AppDbContext db, IDataScopeService scope, AppModule module, Guid ownerId, CancellationToken cancellationToken)
+    {
+        await EnsureOwnerAsync(db, ownerId, cancellationToken);
+        var allowed = await scope.GetScopeUserIdsAsync(module, cancellationToken);
+        if (allowed is not null && !allowed.Contains(ownerId))
+        {
+            throw new ForbiddenException("You can only assign records to people inside your data scope.", "owner_out_of_scope");
+        }
+    }
+
+    /// <summary>Limits a query of owned records to the caller's data scope for a module.</summary>
+    public static async Task<IQueryable<T>> InScopeAsync<T>(IQueryable<T> query, IDataScopeService scope, AppModule module, System.Linq.Expressions.Expression<Func<T, Guid>> owner, CancellationToken cancellationToken)
+    {
+        var allowed = await scope.GetScopeUserIdsAsync(module, cancellationToken);
+        if (allowed is null)
+        {
+            return query;
+        }
+
+        var parameter = owner.Parameters[0];
+        var contains = System.Linq.Expressions.Expression.Call(
+            typeof(Enumerable), nameof(Enumerable.Contains), [typeof(Guid)],
+            System.Linq.Expressions.Expression.Constant(allowed.ToList()), owner.Body);
+        return query.Where(System.Linq.Expressions.Expression.Lambda<Func<T, bool>>(contains, parameter));
+    }
+
     public static async Task<Dictionary<Guid, string>> OwnerNamesAsync(AppDbContext db, IEnumerable<Guid> ids, CancellationToken cancellationToken)
     {
         var list = ids.ToList();
@@ -121,7 +148,7 @@ internal static class RecordHelpers
 
 /// <summary>Contact records: list, read, create, edit, delete, duplicates, merge, import, export and the contact summary.</summary>
 public sealed class ContactService(AppDbContext db, ITenantContext tenant, IClock clock, FieldSettingsService fields, IDataScopeService scope, INotificationService notifications, IRecordSavePipeline savePipeline,
-    MindLift.Infrastructure.Common.BulkQueue bulkQueue)
+    MindLift.Infrastructure.Common.BulkQueue bulkQueue, IPermissionService permissions)
 {
     private const int MaxExportRows = 10000;
 
@@ -223,13 +250,16 @@ public sealed class ContactService(AppDbContext db, ITenantContext tenant, ICloc
     public async Task<ContactSummaryDto> SummaryAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var contact = await LoadScopedAsync(id, cancellationToken);
-        var lead = await db.Leads.AsNoTracking().Where(l => l.ConvertedContactId == id).FirstOrDefaultAsync(cancellationToken);
+        var leads = await RecordHelpers.InScopeAsync(db.Leads.AsNoTracking(), scope, AppModule.Leads, l => l.OwnerId, cancellationToken);
+        var lead = await leads.Where(l => l.ConvertedContactId == id).FirstOrDefaultAsync(cancellationToken);
         var converted = lead is null ? null : new ConvertedLeadDto(lead.Id, $"{lead.FirstName} {lead.LastName}".Trim(), lead.Source, lead.CreatedAt, lead.ConvertedAt!.Value);
 
-        // Deals the contact takes part in.
-        var deals = await db.Deals.AsNoTracking().Where(d => db.DealContacts.Any(l => l.DealId == d.Id && l.ContactId == id)).OrderByDescending(d => d.CreatedAt).Take(50)
+        // Deals the contact takes part in, limited to the deals the caller may see.
+        var scopedDeals = await RecordHelpers.InScopeAsync(db.Deals.AsNoTracking(), scope, AppModule.Deals, d => d.OwnerId, cancellationToken);
+        var deals = await scopedDeals.Where(d => db.DealContacts.Any(l => l.DealId == d.Id && l.ContactId == id)).OrderByDescending(d => d.CreatedAt).Take(50)
                 .Select(d => new DealLinkDto(d.Id, d.Name, d.Status, d.Amount, d.Currency)).ToListAsync(cancellationToken);
-        var activities = await db.Activities.CountAsync(a => a.ContactId == id, cancellationToken);
+        var scopedActivities = await RecordHelpers.InScopeAsync(db.Activities.AsNoTracking(), scope, AppModule.Activities, a => a.OwnerId, cancellationToken);
+        var activities = await scopedActivities.CountAsync(a => a.ContactId == id, cancellationToken);
         return new ContactSummaryDto(await MapAsync(contact, cancellationToken), converted, deals.Count, activities, deals);
     }
 
@@ -304,8 +334,18 @@ public sealed class ContactService(AppDbContext db, ITenantContext tenant, ICloc
     /// <summary>Moves what is useful from the duplicates into the master, repoints their activities, and removes the duplicates.</summary>
     public async Task<ContactDto> MergeAsync(Guid masterId, IReadOnlyList<Guid> duplicateIds, CancellationToken cancellationToken = default)
     {
+        if (!await permissions.HasAsync(AppModule.Contacts, PermissionAction.Delete, cancellationToken))
+        {
+            throw new ForbiddenException("Merging removes contacts, so it needs permission to delete contacts.", "forbidden");
+        }
+
         var master = await LoadScopedAsync(masterId, cancellationToken);
-        var duplicates = await (await ScopedAsync(cancellationToken)).Where(c => duplicateIds.Contains(c.Id) && c.Id != masterId).ToListAsync(cancellationToken);
+        var requested = duplicateIds.Where(d => d != masterId).Distinct().ToList();
+        var duplicates = await (await ScopedAsync(cancellationToken)).Where(c => requested.Contains(c.Id)).ToListAsync(cancellationToken);
+        if (duplicates.Count != requested.Count)
+        {
+            throw new NotFoundException("Contact", requested.First(r => duplicates.All(d => d.Id != r)));
+        }
 
         foreach (var duplicate in duplicates)
         {
@@ -380,7 +420,8 @@ public sealed class ContactService(AppDbContext db, ITenantContext tenant, ICloc
             throw RecordHelpers.Invalid("type", "Choose a valid type.");
         }
 
-        if (request.AccountId is { } accountId && !await db.Accounts.AnyAsync(a => a.Id == accountId, cancellationToken))
+        if (request.AccountId is { } accountId && accountId != contact.AccountId
+            && !await (await RecordHelpers.InScopeAsync(db.Accounts.AsNoTracking(), scope, AppModule.Accounts, a => a.OwnerId, cancellationToken)).AnyAsync(a => a.Id == accountId, cancellationToken))
         {
             throw RecordHelpers.Invalid("accountId", "Choose an existing account.");
         }
@@ -406,7 +447,7 @@ public sealed class ContactService(AppDbContext db, ITenantContext tenant, ICloc
         {
             if (owner != contact.OwnerId)
             {
-                await RecordHelpers.EnsureOwnerAsync(db, owner, cancellationToken);
+                await RecordHelpers.EnsureOwnerAsync(db, scope, AppModule.Contacts, owner, cancellationToken);
             }
 
             contact.OwnerId = owner;
@@ -554,12 +595,16 @@ public sealed class AccountService(AppDbContext db, ITenantContext tenant, ICloc
     public async Task<AccountSummaryDto> SummaryAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var account = await LoadScopedAsync(id, cancellationToken);
-        var contacts = await db.Contacts.AsNoTracking().Where(c => c.AccountId == id).OrderBy(c => c.FirstName).Take(200)
+        var scopedContacts = await RecordHelpers.InScopeAsync(db.Contacts.AsNoTracking(), scope, AppModule.Contacts, c => c.OwnerId, cancellationToken);
+        var contacts = await scopedContacts.Where(c => c.AccountId == id).OrderBy(c => c.FirstName).Take(200)
             .Select(c => new AccountContactDto(c.Id, (c.FirstName + " " + c.LastName).Trim(), c.Email, c.Phone, c.JobTitle)).ToListAsync(cancellationToken);
-        var children = await db.Accounts.AsNoTracking().Where(a => a.ParentAccountId == id).OrderBy(a => a.Name).Select(a => new AccountChildDto(a.Id, a.Name)).ToListAsync(cancellationToken);
-        var deals = await db.Deals.AsNoTracking().Where(d => d.AccountId == id).OrderByDescending(d => d.CreatedAt).Take(100)
+        var scopedAccounts = await ScopedAsync(cancellationToken);
+        var children = await scopedAccounts.AsNoTracking().Where(a => a.ParentAccountId == id).OrderBy(a => a.Name).Select(a => new AccountChildDto(a.Id, a.Name)).ToListAsync(cancellationToken);
+        var scopedDeals = await RecordHelpers.InScopeAsync(db.Deals.AsNoTracking(), scope, AppModule.Deals, d => d.OwnerId, cancellationToken);
+        var deals = await scopedDeals.Where(d => d.AccountId == id).OrderByDescending(d => d.CreatedAt).Take(100)
             .Select(d => new DealLinkDto(d.Id, d.Name, d.Status, d.Amount, d.Currency)).ToListAsync(cancellationToken);
-        var activities = await db.Activities.CountAsync(a => a.AccountId == id || (a.ContactId != null && db.Contacts.Any(c => c.Id == a.ContactId && c.AccountId == id)), cancellationToken);
+        var scopedActivities = await RecordHelpers.InScopeAsync(db.Activities.AsNoTracking(), scope, AppModule.Activities, a => a.OwnerId, cancellationToken);
+        var activities = await scopedActivities.CountAsync(a => a.AccountId == id || (a.ContactId != null && db.Contacts.Any(c => c.Id == a.ContactId && c.AccountId == id)), cancellationToken);
         return new AccountSummaryDto(await MapAsync(account, cancellationToken), contacts, children, deals,
             deals.Where(d => d.Status == "Open").Sum(d => d.Amount), deals.Where(d => d.Status == "Won").Sum(d => d.Amount), activities);
     }
@@ -625,8 +670,15 @@ public sealed class AccountService(AppDbContext db, ITenantContext tenant, ICloc
             throw new BusinessRuleException("account_has_children", "This account is the parent of other accounts. Change their parent first.");
         }
 
-        // Contacts stay; they just no longer belong to a company.
-        await db.Contacts.Where(c => c.AccountId == id).ExecuteUpdateAsync(s => s.SetProperty(c => c.AccountId, (Guid?)null), cancellationToken);
+        // Contacts stay; they just no longer belong to a company. Contacts the caller cannot see must not be changed behind their back.
+        var linked = db.Contacts.Where(c => c.AccountId == id);
+        var inScope = await RecordHelpers.InScopeAsync(linked, scope, AppModule.Contacts, c => c.OwnerId, cancellationToken);
+        if (await linked.CountAsync(cancellationToken) != await inScope.CountAsync(cancellationToken))
+        {
+            throw new BusinessRuleException("account_has_other_contacts", "This account has contacts you cannot manage. Ask their owner or an administrator to move them first.");
+        }
+
+        await inScope.ExecuteUpdateAsync(s => s.SetProperty(c => c.AccountId, (Guid?)null), cancellationToken);
         db.Accounts.Remove(account);
         await db.SaveChangesAsync(cancellationToken);
     }
@@ -683,6 +735,11 @@ public sealed class AccountService(AppDbContext db, ITenantContext tenant, ICloc
                 throw RecordHelpers.Invalid("parentAccountId", "An account cannot be its own parent.");
             }
 
+            if (parentId != account.ParentAccountId && !await (await ScopedAsync(cancellationToken)).AnyAsync(a => a.Id == parentId, cancellationToken))
+            {
+                throw RecordHelpers.Invalid("parentAccountId", "Choose an existing account as the parent.");
+            }
+
             // Walk up from the chosen parent: if it reaches this account, saving would create a loop.
             var cursor = (Guid?)parentId;
             for (var depth = 0; cursor is not null && depth < 50; depth++)
@@ -715,7 +772,7 @@ public sealed class AccountService(AppDbContext db, ITenantContext tenant, ICloc
         {
             if (owner != account.OwnerId)
             {
-                await RecordHelpers.EnsureOwnerAsync(db, owner, cancellationToken);
+                await RecordHelpers.EnsureOwnerAsync(db, scope, AppModule.Accounts, owner, cancellationToken);
             }
 
             account.OwnerId = owner;

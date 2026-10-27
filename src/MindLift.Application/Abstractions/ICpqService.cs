@@ -53,6 +53,12 @@ public interface IDocumentOcrService
 
     Task<OcrResultDto> ProcessOcrAsync(Guid documentId, CancellationToken ct = default);
     Task<IReadOnlyList<BusinessDocumentDto>> GetDocumentsAsync(Guid? accountId = null, Guid? dealId = null, Guid? contactId = null, CancellationToken ct = default);
+
+    /// <summary>Staff only: 404s unless the document's linked CRM record (deal, else account, else contact) is in the caller's row scope.</summary>
+    Task EnsureDocumentInScopeAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>Staff only: 404s unless every CRM record named here is in the caller's row scope.</summary>
+    Task EnsureLinksInScopeAsync(Guid? accountId, Guid? dealId, Guid? contactId, Guid? quoteId = null, Guid? invoiceId = null, CancellationToken ct = default);
     Task<BusinessDocumentDto?> GetDocumentByIdAsync(Guid id, CancellationToken ct = default);
     Task<(Stream Stream, string ContentType, string FileName)?> GetDocumentStreamAsync(Guid id, CancellationToken ct = default);
 

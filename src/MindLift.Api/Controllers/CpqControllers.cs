@@ -233,7 +233,8 @@ public sealed class InvoicesController(ICpqService cpqService) : ControllerBase
 [ApiController]
 [Authorize]
 [Route("api/v1/documents")]
-public sealed class DocumentsController(IDocumentOcrService ocrService, MindLift.Infrastructure.Documents.Extraction.DocumentTypeService documentTypes) : ControllerBase
+[DocumentScopeFilter]
+public sealed class DocumentsController(IDocumentOcrService ocrService, MindLift.Infrastructure.Documents.Extraction.DocumentTypeService documentTypes, IPermissionService permissions) : ControllerBase
 {
     /// <summary>The active document types, to choose from when uploading or reviewing.</summary>
     [HttpGet("types")]
@@ -257,7 +258,10 @@ public sealed class DocumentsController(IDocumentOcrService ocrService, MindLift
     [HttpPut("{id:guid}/links")]
     [HasPermission(AppModule.Documents, PermissionAction.Edit)]
     public async Task<ActionResult<BusinessDocumentDto>> Link(Guid id, [FromBody] LinkDocumentRequest request, CancellationToken ct = default)
-        => Ok(await ocrService.LinkAsync(id, request, ct));
+    {
+        await ocrService.EnsureLinksInScopeAsync(request.AccountId, request.DealId, request.ContactId, ct: ct);
+        return Ok(await ocrService.LinkAsync(id, request, ct));
+    }
 
     [HttpGet]
     [HasPermission(AppModule.Documents, PermissionAction.View)]
@@ -311,6 +315,14 @@ public sealed class DocumentsController(IDocumentOcrService ocrService, MindLift
     {
         if (file == null || file.Length == 0) return BadRequest("File is empty.");
         if (file.Length > 25 * 1024 * 1024) return BadRequest("File exceeds maximum allowed size of 25 MB.");
+
+        // Sharing with customers is an edit on the document; Create alone must not publish to the portal.
+        if (sharedWithPortal && !await permissions.HasAsync(AppModule.Documents, PermissionAction.Edit, ct))
+        {
+            throw new MindLift.Application.Common.Exceptions.ForbiddenException();
+        }
+
+        await ocrService.EnsureLinksInScopeAsync(accountId, dealId, contactId, quoteId, invoiceId, ct);
 
         var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
         if (!MindLift.Api.Hosting.UploadRules.IsAllowed(ext))
@@ -387,5 +399,21 @@ public sealed class DocumentsController(IDocumentOcrService ocrService, MindLift
         var val = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
             ?? User.FindFirst("sub")?.Value;
         return Guid.TryParse(val, out var id) ? id : Guid.Empty;
+    }
+}
+
+/// <summary>For every document action addressed by id, the document's linked record must be in the caller's row scope (else 404).</summary>
+[AttributeUsage(AttributeTargets.Class)]
+public sealed class DocumentScopeFilterAttribute : Attribute, Microsoft.AspNetCore.Mvc.Filters.IAsyncActionFilter
+{
+    public async Task OnActionExecutionAsync(Microsoft.AspNetCore.Mvc.Filters.ActionExecutingContext context, Microsoft.AspNetCore.Mvc.Filters.ActionExecutionDelegate next)
+    {
+        if (context.ActionArguments.TryGetValue("id", out var raw) && raw is Guid id)
+        {
+            var docs = context.HttpContext.RequestServices.GetRequiredService<IDocumentOcrService>();
+            await docs.EnsureDocumentInScopeAsync(id, context.HttpContext.RequestAborted);
+        }
+
+        await next();
     }
 }

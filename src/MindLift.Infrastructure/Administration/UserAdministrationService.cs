@@ -17,8 +17,11 @@ public sealed class UserAdministrationService(
     ITenantContext tenant,
     IClock clock,
     IPlanLimitService planLimits,
-    RefreshTokenService refreshTokens)
+    RefreshTokenService refreshTokens,
+    IDataScopeService scope)
 {
+    private const int MaxManagerChainDepth = 50;
+
     private const int MaxPageSize = 200;
 
     public async Task<PagedResult<UserListItem>> ListAsync(string? search, int page, int pageSize, CancellationToken cancellationToken = default)
@@ -27,6 +30,11 @@ public sealed class UserAdministrationService(
         page = Math.Max(page, 1);
 
         var query = db.Users.AsNoTracking().AsQueryable();
+        var visible = await VisibleUserIdsAsync(cancellationToken);
+        if (visible is not null)
+        {
+            query = query.Where(u => visible.Contains(u.Id));
+        }
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim().ToLowerInvariant();
@@ -59,7 +67,52 @@ public sealed class UserAdministrationService(
     }
 
     public async Task<UserDetail> GetAsync(Guid id, CancellationToken cancellationToken = default)
-        => Map(await LoadAsync(id, cancellationToken));
+    {
+        await EnsureInScopeAsync(id, cancellationToken);
+        return Map(await LoadAsync(id, cancellationToken));
+    }
+
+    /// <summary>Null = every user. Admins see everyone; others are limited to their Users-module data scope.</summary>
+    private async Task<IReadOnlyList<Guid>?> VisibleUserIdsAsync(CancellationToken cancellationToken)
+        => await IsCallerAdminAsync(cancellationToken) ? null : await scope.GetScopeUserIdsAsync(MindLift.Shared.Enums.AppModule.Users, cancellationToken);
+
+    private async Task EnsureInScopeAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var visible = await VisibleUserIdsAsync(cancellationToken);
+        if (visible is not null && !visible.Contains(userId))
+        {
+            throw new NotFoundException("User", userId);
+        }
+    }
+
+    private async Task EnsureValidManagerAsync(Guid userId, Guid? managerId, CancellationToken cancellationToken)
+    {
+        if (managerId is not { } current)
+        {
+            return;
+        }
+
+        if (current == userId)
+        {
+            throw new ConflictException("invalid_manager", "A user cannot be their own manager.");
+        }
+
+        if (!await db.Users.AnyAsync(u => u.Id == current && u.IsActive, cancellationToken))
+        {
+            throw new NotFoundException("User", current);
+        }
+
+        // Walk up the chain: the new manager must not (indirectly) report to this user.
+        Guid? cursor = current;
+        for (var depth = 0; cursor is { } step && depth < MaxManagerChainDepth; depth++)
+        {
+            cursor = await db.Users.AsNoTracking().Where(u => u.Id == step).Select(u => u.ManagerId).FirstOrDefaultAsync(cancellationToken);
+            if (cursor == userId)
+            {
+                throw new ConflictException("invalid_manager", "This would create a reporting loop.");
+            }
+        }
+    }
 
     private async Task<bool> IsCallerAdminAsync(CancellationToken cancellationToken)
     {
@@ -74,8 +127,31 @@ public sealed class UserAdministrationService(
 
     public async Task<UserDetail> UpdateAsync(Guid id, UpdateUserRequest request, CancellationToken cancellationToken = default)
     {
+        await EnsureInScopeAsync(id, cancellationToken);
         var user = await LoadAsync(id, cancellationToken);
         var isCallerAdmin = await IsCallerAdminAsync(cancellationToken);
+
+        // Team, branch and manager drive Team-scoped data access, so only administrators may change them.
+        var hierarchyChanged = request.TeamId != user.TeamId || request.BranchId != user.BranchId || request.ManagerId != user.ManagerId;
+        if (hierarchyChanged && !isCallerAdmin)
+        {
+            throw new ForbiddenException("Only administrators can change a user's team, branch or manager.", "admin_required");
+        }
+
+        if (request.ManagerId != user.ManagerId)
+        {
+            await EnsureValidManagerAsync(user.Id, request.ManagerId, cancellationToken);
+        }
+
+        if (request.TeamId is { } newTeam && newTeam != user.TeamId && !await db.Teams.AnyAsync(t => t.Id == newTeam, cancellationToken))
+        {
+            throw new NotFoundException("Team", newTeam);
+        }
+
+        if (request.BranchId is { } newBranch && newBranch != user.BranchId && !await db.Branches.AnyAsync(b => b.Id == newBranch, cancellationToken))
+        {
+            throw new NotFoundException("Branch", newBranch);
+        }
 
         var currentRole = user.RoleId is null ? null : await db.Roles.AsNoTracking().FirstOrDefaultAsync(r => r.Id == user.RoleId, cancellationToken);
         if ((user.IsTenantOwner || currentRole?.IsAdmin == true) && !isCallerAdmin)
@@ -126,6 +202,7 @@ public sealed class UserAdministrationService(
     /// <summary>Deactivates a user. Their refresh tokens are revoked immediately. Open records are reassigned in M6+.</summary>
     public async Task DeactivateAsync(Guid id, Guid? reassignToUserId, CancellationToken cancellationToken = default)
     {
+        await EnsureInScopeAsync(id, cancellationToken);
         var user = await LoadAsync(id, cancellationToken);
 
         if (user.IsTenantOwner)
@@ -157,6 +234,7 @@ public sealed class UserAdministrationService(
 
     public async Task ReactivateAsync(Guid id, CancellationToken cancellationToken = default)
     {
+        await EnsureInScopeAsync(id, cancellationToken);
         var user = await LoadAsync(id, cancellationToken);
         if (user.IsActive)
         {

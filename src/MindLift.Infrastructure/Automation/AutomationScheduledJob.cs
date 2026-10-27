@@ -27,7 +27,8 @@ public sealed class AutomationScheduledJob(
     MindLift.Infrastructure.Messaging.EmailGuard emailGuard,
     INotificationService notifications,
     IHttpClientFactory? httpClientFactory,
-    ILogger<AutomationScheduledJob> logger
+    ILogger<AutomationScheduledJob> logger,
+    IPlatformEntitlements? entitlements = null
 )
 {
     public async Task ExecuteScheduledAsync(
@@ -48,6 +49,12 @@ public sealed class AutomationScheduledJob(
         }
 
         using var scope = tenant.Use(tenantId);
+
+        if (entitlements is not null && !await entitlements.IsModuleAllowedAsync(AppModule.Automation, cancellationToken))
+        {
+            logger.LogInformation("Scheduled action dropped: Automation module is disabled for tenant {TenantId}.", tenantId);
+            return;
+        }
 
         var rule = await db.AutomationRules.FirstOrDefaultAsync(r => r.Id == ruleId, cancellationToken);
         if (rule is null || !rule.IsActive)

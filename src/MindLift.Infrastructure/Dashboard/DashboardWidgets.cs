@@ -338,8 +338,10 @@ public sealed class SalesTrendWidget(AppDbContext db, IClock clock) : IDashboard
         var now = clock.UtcNow;
         var start = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc).AddMonths(-11);
 
-        var deals = await db.Deals.AsNoTracking()
-            .Where(d => d.Status == "Won" && d.ClosedAt != null && d.ClosedAt >= start)
+        var dealQuery = db.Deals.AsNoTracking()
+            .Where(d => d.Status == "Won" && d.ClosedAt != null && d.ClosedAt >= start);
+        if (ctx.ScopeUserIds is not null) dealQuery = dealQuery.Where(d => ctx.ScopeUserIds.Contains(d.OwnerId));
+        var deals = await dealQuery
             .Select(d => new { d.Amount, d.ClosedAt })
             .ToListAsync(ct);
 
@@ -394,7 +396,9 @@ public sealed class PipelineFunnelWidget(AppDbContext db, IClock clock) : IDashb
         var start = now.AddDays(-90);
 
         var stages = await db.PipelineStages.AsNoTracking().OrderBy(s => s.SortOrder).ToListAsync(ct);
-        var deals = await db.Deals.AsNoTracking().Where(d => d.CreatedAt >= start).ToListAsync(ct);
+        var dealQuery = db.Deals.AsNoTracking().Where(d => d.CreatedAt >= start);
+        if (ctx.ScopeUserIds is not null) dealQuery = dealQuery.Where(d => ctx.ScopeUserIds.Contains(d.OwnerId));
+        var deals = await dealQuery.ToListAsync(ct);
 
         var funnel = stages.Select(s =>
         {
@@ -531,12 +535,15 @@ public sealed class ActivitySummaryWidget(AppDbContext db) : IDashboardWidget
 
     public async Task<WidgetResult> ComputeAsync(DashboardContext ctx, CancellationToken ct)
     {
-        var actsNow = await db.Activities.AsNoTracking()
-            .Where(a => a.Status == "Completed" && a.CompletedAt != null && a.CompletedAt >= ctx.Period.StartUtc && a.CompletedAt < ctx.Period.EndUtc)
+        var scoped = db.Activities.AsNoTracking().Where(a => a.Status == "Completed" && a.CompletedAt != null);
+        if (ctx.ScopeUserIds is not null) scoped = scoped.Where(a => ctx.ScopeUserIds.Contains(a.OwnerId));
+
+        var actsNow = await scoped
+            .Where(a => a.CompletedAt >= ctx.Period.StartUtc && a.CompletedAt < ctx.Period.EndUtc)
             .ToListAsync(ct);
 
-        var actsPrev = await db.Activities.AsNoTracking()
-            .Where(a => a.Status == "Completed" && a.CompletedAt != null && a.CompletedAt >= ctx.PreviousPeriod.StartUtc && a.CompletedAt < ctx.PreviousPeriod.EndUtc)
+        var actsPrev = await scoped
+            .Where(a => a.CompletedAt >= ctx.PreviousPeriod.StartUtc && a.CompletedAt < ctx.PreviousPeriod.EndUtc)
             .ToListAsync(ct);
 
         var types = new[] { "Task", "Call", "Meeting", "Note" };

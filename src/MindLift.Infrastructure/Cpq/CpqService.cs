@@ -12,9 +12,78 @@ using MindLift.Shared.Contracts;
 
 namespace MindLift.Infrastructure.Cpq;
 
-public sealed class CpqService(IAppDbContext db, ITenantContext tenant, MindLift.Infrastructure.Tenancy.NumberSequences numbers) : ICpqService
+public sealed class CpqService(IAppDbContext db, ITenantContext tenant, MindLift.Infrastructure.Tenancy.NumberSequences numbers, IDataScopeService scope) : ICpqService
 {
     private Guid CurrentTenantId => tenant.TenantId ?? throw new UnauthorizedAccessException("Tenant context required.");
+
+    // Quotes and invoices have no owner of their own. They follow the record they belong to: the deal when
+    // there is one, otherwise the account, otherwise the contact. A document with no link is visible to all
+    // users who can open the module (the controller already checks module permission).
+    private sealed record Scopes(IReadOnlyList<Guid>? Deals, IReadOnlyList<Guid>? Accounts, IReadOnlyList<Guid>? Contacts);
+
+    private async Task<Scopes> ScopesAsync(CancellationToken ct) => new(
+        await scope.GetScopeUserIdsAsync(MindLift.Shared.Enums.AppModule.Deals, ct),
+        await scope.GetScopeUserIdsAsync(MindLift.Shared.Enums.AppModule.Accounts, ct),
+        await scope.GetScopeUserIdsAsync(MindLift.Shared.Enums.AppModule.Contacts, ct));
+
+    private IQueryable<Quote> ScopeQuotes(IQueryable<Quote> q, Scopes s)
+    {
+        if (s.Deals is null && s.Accounts is null && s.Contacts is null) return q;
+        var d = s.Deals; var a = s.Accounts; var c = s.Contacts;
+        return q.Where(x =>
+            x.DealId != null ? (d == null || db.Set<Deal>().Any(r => r.Id == x.DealId && d.Contains(r.OwnerId)))
+            : x.AccountId != null ? (a == null || db.Set<Account>().Any(r => r.Id == x.AccountId && a.Contains(r.OwnerId)))
+            : x.ContactId != null ? (c == null || db.Set<Contact>().Any(r => r.Id == x.ContactId && c.Contains(r.OwnerId)))
+            : true);
+    }
+
+    private IQueryable<Invoice> ScopeInvoices(IQueryable<Invoice> q, Scopes s)
+    {
+        if (s.Deals is null && s.Accounts is null && s.Contacts is null) return q;
+        var d = s.Deals; var a = s.Accounts; var c = s.Contacts;
+        return q.Where(x =>
+            x.DealId != null ? (d == null || db.Set<Deal>().Any(r => r.Id == x.DealId && d.Contains(r.OwnerId)))
+            : x.AccountId != null ? (a == null || db.Set<Account>().Any(r => r.Id == x.AccountId && a.Contains(r.OwnerId)))
+            : x.ContactId != null ? (c == null || db.Set<Contact>().Any(r => r.Id == x.ContactId && c.Contains(r.OwnerId)))
+            : true);
+    }
+
+    /// <summary>Every record a quote or invoice is linked to must exist and be in the caller's scope.</summary>
+    private async Task EnsureLinksInScopeAsync(Guid? dealId, Guid? accountId, Guid? contactId, CancellationToken ct)
+    {
+        var s = await ScopesAsync(ct);
+        if (dealId is { } did)
+        {
+            var owner = await db.Set<Deal>().Where(r => r.Id == did && !r.IsDeleted).Select(r => (Guid?)r.OwnerId).FirstOrDefaultAsync(ct);
+            if (owner is null || (s.Deals is not null && !s.Deals.Contains(owner.Value))) throw new NotFoundException("Deal", did);
+        }
+        if (accountId is { } aid)
+        {
+            var owner = await db.Set<Account>().Where(r => r.Id == aid && !r.IsDeleted).Select(r => (Guid?)r.OwnerId).FirstOrDefaultAsync(ct);
+            if (owner is null || (s.Accounts is not null && !s.Accounts.Contains(owner.Value))) throw new NotFoundException("Account", aid);
+        }
+        if (contactId is { } cid)
+        {
+            var owner = await db.Set<Contact>().Where(r => r.Id == cid && !r.IsDeleted).Select(r => (Guid?)r.OwnerId).FirstOrDefaultAsync(ct);
+            if (owner is null || (s.Contacts is not null && !s.Contacts.Contains(owner.Value))) throw new NotFoundException("Contact", cid);
+        }
+    }
+
+    private async Task<Quote> FindQuoteAsync(Guid id, bool withLines, CancellationToken ct)
+    {
+        IQueryable<Quote> q = db.Set<Quote>();
+        if (withLines) q = q.Include(x => x.LineItems);
+        q = ScopeQuotes(q, await ScopesAsync(ct));
+        return await q.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct) ?? throw new NotFoundException("Quote", id);
+    }
+
+    private async Task<Invoice?> FindInvoiceAsync(Guid id, bool withPayments, CancellationToken ct)
+    {
+        IQueryable<Invoice> q = db.Set<Invoice>();
+        if (withPayments) q = q.Include(x => x.Payments);
+        q = ScopeInvoices(q, await ScopesAsync(ct));
+        return await q.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct);
+    }
 
     // ================= PRODUCT CATALOG =================
 
@@ -210,6 +279,7 @@ public sealed class CpqService(IAppDbContext db, ITenantContext tenant, MindLift
 
         if (dealId.HasValue) q = q.Where(x => x.DealId == dealId.Value);
         if (accountId.HasValue) q = q.Where(x => x.AccountId == accountId.Value);
+        q = ScopeQuotes(q, await ScopesAsync(ct));
 
         var list = await q.OrderByDescending(x => x.CreatedAt).ToListAsync(ct);
         return list.Select(MapQuote).ToList();
@@ -217,12 +287,13 @@ public sealed class CpqService(IAppDbContext db, ITenantContext tenant, MindLift
 
     public async Task<QuoteDto?> GetQuoteByIdAsync(Guid id, CancellationToken ct = default)
     {
-        var q = await db.Set<Quote>()
+        var baseQuery = db.Set<Quote>()
             .AsNoTracking()
             .Include(x => x.Deal)
             .Include(x => x.Account)
             .Include(x => x.Contact)
-            .Include(x => x.LineItems.Where(li => !li.IsDeleted))
+            .Include(x => x.LineItems.Where(li => !li.IsDeleted));
+        var q = await ScopeQuotes(baseQuery, await ScopesAsync(ct))
             .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct);
 
         return q == null ? null : MapQuote(q);
@@ -231,6 +302,7 @@ public sealed class CpqService(IAppDbContext db, ITenantContext tenant, MindLift
     public async Task<QuoteDto> CreateQuoteAsync(SaveQuoteRequest req, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(req.Title)) throw new ValidationException("Title", "Quote title is required.");
+        await EnsureLinksInScopeAsync(req.DealId, req.AccountId, req.ContactId, ct);
 
         var quoteNumber = $"Q-{await numbers.NextAsync(MindLift.Infrastructure.Tenancy.NumberSequences.Quote, async () => 10001 + await db.Set<Quote>().IgnoreQueryFilters().CountAsync(x => x.TenantId == CurrentTenantId, ct), ct)}";
 
@@ -261,12 +333,10 @@ public sealed class CpqService(IAppDbContext db, ITenantContext tenant, MindLift
 
     public async Task<QuoteDto> UpdateQuoteAsync(Guid id, SaveQuoteRequest req, CancellationToken ct = default)
     {
-        var quote = await db.Set<Quote>()
-            .Include(q => q.LineItems)
-            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct)
-            ?? throw new NotFoundException("Quote", id);
+        var quote = await FindQuoteAsync(id, withLines: true, ct);
 
         if (string.IsNullOrWhiteSpace(req.Title)) throw new ValidationException("Title", "Quote title is required.");
+        await EnsureLinksInScopeAsync(req.DealId, req.AccountId, req.ContactId, ct);
 
         quote.Title = req.Title.Trim();
         quote.DealId = req.DealId;
@@ -291,7 +361,7 @@ public sealed class CpqService(IAppDbContext db, ITenantContext tenant, MindLift
 
     public async Task<bool> DeleteQuoteAsync(Guid id, CancellationToken ct = default)
     {
-        var quote = await db.Set<Quote>().FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct);
+        var quote = await ScopeQuotes(db.Set<Quote>(), await ScopesAsync(ct)).FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct);
         if (quote == null) return false;
 
         quote.IsDeleted = true;
@@ -302,15 +372,13 @@ public sealed class CpqService(IAppDbContext db, ITenantContext tenant, MindLift
 
     public async Task<QuoteDto> SyncQuoteToDealAsync(Guid quoteId, CancellationToken ct = default)
     {
-        var quote = await db.Set<Quote>()
-            .Include(q => q.LineItems)
-            .FirstOrDefaultAsync(x => x.Id == quoteId && !x.IsDeleted, ct)
-            ?? throw new NotFoundException("Quote", quoteId);
+        var quote = await FindQuoteAsync(quoteId, withLines: true, ct);
 
         if (!quote.DealId.HasValue)
         {
             throw new ValidationException("DealId", "This quote is not associated with any deal.");
         }
+        await EnsureLinksInScopeAsync(quote.DealId, null, null, ct);
 
         var deal = await db.Set<Deal>().FirstOrDefaultAsync(d => d.Id == quote.DealId.Value && !d.IsDeleted, ct)
             ?? throw new NotFoundException("Deal", quote.DealId.Value);
@@ -330,10 +398,7 @@ public sealed class CpqService(IAppDbContext db, ITenantContext tenant, MindLift
 
     public async Task<QuoteDto> UpdateQuoteStatusAsync(Guid quoteId, QuoteStatus status, CancellationToken ct = default)
     {
-        var quote = await db.Set<Quote>()
-            .Include(q => q.LineItems)
-            .FirstOrDefaultAsync(x => x.Id == quoteId && !x.IsDeleted, ct)
-            ?? throw new NotFoundException("Quote", quoteId);
+        var quote = await FindQuoteAsync(quoteId, withLines: true, ct);
 
         quote.Status = (int)status;
         quote.UpdatedAt = DateTime.UtcNow;
@@ -343,10 +408,7 @@ public sealed class CpqService(IAppDbContext db, ITenantContext tenant, MindLift
 
     public async Task<InvoiceDto> ConvertQuoteToInvoiceAsync(Guid quoteId, CancellationToken ct = default)
     {
-        var quote = await db.Set<Quote>()
-            .Include(q => q.LineItems)
-            .FirstOrDefaultAsync(x => x.Id == quoteId && !x.IsDeleted, ct)
-            ?? throw new NotFoundException("Quote", quoteId);
+        var quote = await FindQuoteAsync(quoteId, withLines: true, ct);
 
         var invoiceNumber = await NextInvoiceNumberAsync(ct);
 
@@ -411,6 +473,7 @@ public sealed class CpqService(IAppDbContext db, ITenantContext tenant, MindLift
 
         if (dealId.HasValue) q = q.Where(x => x.DealId == dealId.Value);
         if (accountId.HasValue) q = q.Where(x => x.AccountId == accountId.Value);
+        q = ScopeInvoices(q, await ScopesAsync(ct));
 
         var list = await q.OrderByDescending(x => x.CreatedAt).ToListAsync(ct);
         return list.Select(MapInvoice).ToList();
@@ -418,14 +481,15 @@ public sealed class CpqService(IAppDbContext db, ITenantContext tenant, MindLift
 
     public async Task<InvoiceDto?> GetInvoiceByIdAsync(Guid id, CancellationToken ct = default)
     {
-        var inv = await db.Set<Invoice>()
+        var baseQuery = db.Set<Invoice>()
             .AsNoTracking()
             .Include(x => x.Quote)
             .Include(x => x.Deal)
             .Include(x => x.Account)
             .Include(x => x.Contact)
             .Include(x => x.LineItems.Where(li => !li.IsDeleted))
-            .Include(x => x.Payments.Where(p => !p.IsDeleted))
+            .Include(x => x.Payments.Where(p => !p.IsDeleted));
+        var inv = await ScopeInvoices(baseQuery, await ScopesAsync(ct))
             .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct);
 
         return inv == null ? null : MapInvoice(inv);
@@ -436,6 +500,8 @@ public sealed class CpqService(IAppDbContext db, ITenantContext tenant, MindLift
 
     public async Task<InvoiceDto> CreateInvoiceAsync(SaveInvoiceRequest req, CancellationToken ct = default)
     {
+        await EnsureLinksInScopeAsync(req.DealId, req.AccountId, req.ContactId, ct);
+        if (req.QuoteId is { } linkedQuote) await FindQuoteAsync(linkedQuote, withLines: false, ct);
         var invoiceNumber = await NextInvoiceNumberAsync(ct);
 
         var inv = new Invoice
@@ -497,9 +563,7 @@ public sealed class CpqService(IAppDbContext db, ITenantContext tenant, MindLift
 
     public async Task<PaymentDto> RecordPaymentAsync(Guid invoiceId, RecordPaymentRequest req, CancellationToken ct = default)
     {
-        var inv = await db.Set<Invoice>()
-            .Include(i => i.Payments)
-            .FirstOrDefaultAsync(x => x.Id == invoiceId && !x.IsDeleted, ct)
+        var inv = await FindInvoiceAsync(invoiceId, withPayments: true, ct)
             ?? throw new NotFoundException("Invoice", invoiceId);
 
         if (req.Amount <= 0) throw new ValidationException("Amount", "Payment amount must be greater than zero.");
@@ -548,7 +612,7 @@ public sealed class CpqService(IAppDbContext db, ITenantContext tenant, MindLift
 
     public async Task<bool> CancelInvoiceAsync(Guid invoiceId, CancellationToken ct = default)
     {
-        var inv = await db.Set<Invoice>().FirstOrDefaultAsync(x => x.Id == invoiceId && !x.IsDeleted, ct);
+        var inv = await FindInvoiceAsync(invoiceId, withPayments: false, ct);
         if (inv == null) return false;
 
         inv.Status = (int)InvoiceStatus.Cancelled;

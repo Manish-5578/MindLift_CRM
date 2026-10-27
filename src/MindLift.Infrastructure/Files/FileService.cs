@@ -152,6 +152,15 @@ public sealed class FileService(AppDbContext db, IFileStorage storage, ITenantCo
     private async Task<StoredFile> LoadAsync(Guid id, CancellationToken cancellationToken)
         => await db.Files.FirstOrDefaultAsync(f => f.Id == id, cancellationToken) ?? throw new NotFoundException("File", id);
 
+    /// <summary>Throws unless the current user may read every one of these files (used before sending them as email attachments).</summary>
+    public async Task EnsureReadableAsync(IEnumerable<Guid> ids, CancellationToken cancellationToken = default)
+    {
+        foreach (var id in ids.Distinct())
+        {
+            await EnsureCanReadAsync(await LoadAsync(id, cancellationToken), cancellationToken);
+        }
+    }
+
     private async Task EnsureCanReadAsync(StoredFile row, CancellationToken cancellationToken)
     {
         // An attachment on a record can be read by anyone who can view that record's module.

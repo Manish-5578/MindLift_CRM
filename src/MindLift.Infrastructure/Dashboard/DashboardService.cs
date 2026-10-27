@@ -17,9 +17,32 @@ public sealed class DashboardService(
     ITenantContext tenant,
     IClock clock,
     IEnumerable<IDashboardWidget> widgets,
-    ILogger<DashboardService> logger
+    ILogger<DashboardService> logger,
+    IPermissionService permissions,
+    IDataScopeService scope
 ) : IDashboardService
 {
+    /// <summary>
+    /// A widget is shown only to people who can view its module, and its numbers are limited to the intersection of the
+    /// dashboard selection and the person's data scope for that module.
+    /// </summary>
+    private async Task<DashboardContext?> WidgetContextAsync(IDashboardWidget widget, DashboardContext context, CancellationToken ct)
+    {
+        if (!await permissions.HasAsync(widget.Module, PermissionAction.View, ct))
+        {
+            return null;
+        }
+
+        var moduleScope = await scope.GetScopeUserIdsAsync(widget.Module, ct);
+        if (moduleScope is null)
+        {
+            return context;
+        }
+
+        var narrowed = context.ScopeUserIds is null ? moduleScope.ToList() : context.ScopeUserIds.Intersect(moduleScope).ToList();
+        return context with { ScopeUserIds = narrowed };
+    }
+
     public async Task<DashboardResponse> GetDashboardAsync(
         DashboardView? requestedView,
         string? periodPreset,
@@ -92,7 +115,13 @@ public sealed class DashboardService(
 
             try
             {
-                var result = await widget.ComputeAsync(context, ct);
+                var widgetContext = await WidgetContextAsync(widget, context, ct);
+                if (widgetContext is null)
+                {
+                    continue;
+                }
+
+                var result = await widget.ComputeAsync(widgetContext, ct);
                 var json = result.Data is null ? (JsonElement?)null : JsonSerializer.SerializeToElement(result.Data);
 
                 computedWidgets.Add(new DashboardWidgetDto(
@@ -171,7 +200,8 @@ public sealed class DashboardService(
             tz
         );
 
-        var result = await widget.ComputeAsync(context, ct);
+        var widgetContext = await WidgetContextAsync(widget, context, ct) ?? throw new ForbiddenException();
+        var result = await widget.ComputeAsync(widgetContext, ct);
         var json = result.Data is null ? (JsonElement?)null : JsonSerializer.SerializeToElement(result.Data);
 
         return new DashboardWidgetDto(
@@ -261,8 +291,16 @@ public sealed class DashboardService(
             return [currentUserId];
         }
 
+        // A manager sees their Team (themselves, their team and everyone reporting to them); the Admin view is company-wide.
+        IReadOnlyList<Guid>? allowed = view == DashboardView.Manager ? await scope.TeamOfAsync(currentUserId, ct) : null;
+
         if (userId is not null)
         {
+            if (allowed is not null && !allowed.Contains(userId.Value))
+            {
+                throw new ForbiddenException("That person is outside your team.", "out_of_scope");
+            }
+
             return [userId.Value];
         }
 
@@ -272,27 +310,10 @@ public sealed class DashboardService(
                 .Where(u => u.IsActive && u.TeamId == teamId)
                 .Select(u => u.Id)
                 .ToListAsync(ct);
-            return members;
+            return allowed is null ? members : members.Intersect(allowed).ToList();
         }
 
-        if (view == DashboardView.Manager)
-        {
-            // Scope to all teams the manager belongs to
-            var currentUser = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == currentUserId, ct);
-            if (currentUser?.TeamId is not null)
-            {
-                var teamMembers = await db.Users.AsNoTracking()
-                    .Where(u => u.IsActive && u.TeamId == currentUser.TeamId)
-                    .Select(u => u.Id)
-                    .ToListAsync(ct);
-                return teamMembers;
-            }
-
-            return [currentUserId];
-        }
-
-        // Admin view with no filter = company wide (null)
-        return null;
+        return allowed;
     }
 
     private static (DateRange Period, DateRange PreviousPeriod) ResolvePeriods(string? preset, DateTime? fromUtc, DateTime? toUtc, DateTime nowUtc, TimeZoneInfo zone)
@@ -398,11 +419,38 @@ public sealed class DashboardService(
     };
 }
 
-public sealed class SalesTargetService(AppDbContext db) : ISalesTargetService
+public sealed class SalesTargetService(AppDbContext db, ITenantContext tenant, IDataScopeService scope) : ISalesTargetService
 {
+    // Access model: admins manage every target. Other callers see targets for
+    // their own team (me + reports) and their own team-wide targets, and may only
+    // create/edit/delete per-user targets for people who report to them.
+    private sealed record Access(bool IsAdmin, Guid? CallerId, Guid? CallerTeamId, HashSet<Guid> Team);
+
+    private async Task<Access> AccessAsync(CancellationToken ct)
+    {
+        if (tenant.IsPlatformAdmin) return new Access(true, tenant.UserId, null, []);
+        if (tenant.UserId is not { } callerId) throw new ForbiddenException();
+        var caller = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == callerId, ct)
+            ?? throw new ForbiddenException();
+        var isAdmin = caller.IsTenantOwner
+            || (caller.RoleId is { } rid && await db.Roles.AsNoTracking().AnyAsync(r => r.Id == rid && r.IsAdmin, ct));
+        var team = isAdmin ? [] : (await scope.TeamOfAsync(callerId, ct)).ToHashSet();
+        return new Access(isAdmin, callerId, caller.TeamId, team);
+    }
+
+    private static bool CanSee(Access a, SalesTarget t) =>
+        a.IsAdmin
+        || (t.UserId is { } uid && a.Team.Contains(uid))
+        || (t.UserId is null && t.TeamId is { } tid && tid == a.CallerTeamId);
+
+    private static bool CanManage(Access a, Guid? userId, Guid? teamId) =>
+        a.IsAdmin
+        || (teamId is null && userId is { } uid && uid != a.CallerId && a.Team.Contains(uid));
+
     public async Task<IReadOnlyList<SalesTargetDto>> ListAsync(CancellationToken ct = default)
     {
-        var targets = await db.SalesTargets.AsNoTracking().ToListAsync(ct);
+        var access = await AccessAsync(ct);
+        var targets = (await db.SalesTargets.AsNoTracking().ToListAsync(ct)).Where(t => CanSee(access, t)).ToList();
         var users = await db.Users.AsNoTracking().ToDictionaryAsync(u => u.Id, u => $"{u.FirstName} {u.LastName}".Trim(), ct);
         var teams = await db.Teams.AsNoTracking().ToDictionaryAsync(t => t.Id, t => t.Name, ct);
 
@@ -424,6 +472,7 @@ public sealed class SalesTargetService(AppDbContext db) : ISalesTargetService
     {
         var t = await db.SalesTargets.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct)
             ?? throw new NotFoundException("Sales target", id);
+        if (!CanSee(await AccessAsync(ct), t)) throw new NotFoundException("Sales target", id);
 
         var userName = t.UserId is { } uid ? await db.Users.Where(u => u.Id == uid).Select(u => $"{u.FirstName} {u.LastName}".Trim()).FirstOrDefaultAsync(ct) : null;
         var teamName = t.TeamId is { } tid ? await db.Teams.Where(team => team.Id == tid).Select(team => team.Name).FirstOrDefaultAsync(ct) : null;
@@ -433,6 +482,13 @@ public sealed class SalesTargetService(AppDbContext db) : ISalesTargetService
 
     public async Task<SalesTargetDto> SaveAsync(Guid? id, SaveSalesTargetRequest request, CancellationToken ct = default)
     {
+        var access = await AccessAsync(ct);
+        if (request.UserId is { } reqUser && !await db.Users.AnyAsync(u => u.Id == reqUser, ct))
+            throw new NotFoundException("User", reqUser);
+        if (request.TeamId is { } reqTeam && !await db.Teams.AnyAsync(t => t.Id == reqTeam, ct))
+            throw new NotFoundException("Team", reqTeam);
+        if (!CanManage(access, request.UserId, request.TeamId)) throw new ForbiddenException();
+
         SalesTarget target;
         if (id is null)
         {
@@ -443,6 +499,8 @@ public sealed class SalesTargetService(AppDbContext db) : ISalesTargetService
         {
             target = await db.SalesTargets.FirstOrDefaultAsync(x => x.Id == id, ct)
                 ?? throw new NotFoundException("Sales target", id);
+            if (!CanSee(access, target)) throw new NotFoundException("Sales target", id);
+            if (!CanManage(access, target.UserId, target.TeamId)) throw new ForbiddenException();
         }
 
         target.UserId = request.UserId;
@@ -461,6 +519,9 @@ public sealed class SalesTargetService(AppDbContext db) : ISalesTargetService
     {
         var target = await db.SalesTargets.FirstOrDefaultAsync(x => x.Id == id, ct)
             ?? throw new NotFoundException("Sales target", id);
+        var access = await AccessAsync(ct);
+        if (!CanSee(access, target)) throw new NotFoundException("Sales target", id);
+        if (!CanManage(access, target.UserId, target.TeamId)) throw new ForbiddenException();
         db.SalesTargets.Remove(target);
         await db.SaveChangesAsync(ct);
     }

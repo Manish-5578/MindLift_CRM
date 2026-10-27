@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
 using MindLift.Application.Abstractions;
@@ -8,6 +8,7 @@ using MindLift.Application.Common.Time;
 using MindLift.Domain.Entities;
 using MindLift.Infrastructure.Persistence;
 using MindLift.Shared.Contracts;
+using MindLift.Shared.Enums;
 using MindLift.Shared.Filtering;
 using MindLift.Shared.Validation;
 
@@ -221,11 +222,31 @@ public sealed class CompanySettingsService(AppDbContext db, ITenantContext tenan
 }
 
 /// <summary>Saved list views (plan 4.6.6). Shared views are visible to everyone with access to the entity.</summary>
-public sealed class SavedViewService(AppDbContext db, ITenantContext tenant, SettingsVersion version)
+public sealed class SavedViewService(AppDbContext db, ITenantContext tenant, SettingsVersion version, IPermissionService permissions)
 {
+    private static AppModule ModuleOf(string entityKey) => entityKey.Trim().ToLowerInvariant() switch
+    {
+        "leads" or "lead" => AppModule.Leads,
+        "contacts" or "contact" => AppModule.Contacts,
+        "accounts" or "account" => AppModule.Accounts,
+        "deals" or "deal" => AppModule.Deals,
+        "activities" or "activity" => AppModule.Activities,
+        _ => throw new NotFoundException("Entity", entityKey)
+    };
+
+    private async Task EnsurePermissionAsync(string entityKey, PermissionAction action, CancellationToken cancellationToken)
+    {
+        var module = ModuleOf(entityKey);
+        if (!await permissions.HasAsync(module, action, cancellationToken))
+        {
+            throw new ForbiddenException();
+        }
+    }
+
     public async Task<IReadOnlyList<SavedViewDto>> ListAsync(string entityKey, CancellationToken cancellationToken = default)
     {
         SystemFields.Get(entityKey);
+        await EnsurePermissionAsync(entityKey, PermissionAction.View, cancellationToken);
         var me = tenant.UserId;
         var rows = await db.SavedViews.AsNoTracking()
             .Where(v => v.EntityType == entityKey && (v.IsShared || v.OwnerUserId == me))
@@ -237,6 +258,12 @@ public sealed class SavedViewService(AppDbContext db, ITenantContext tenant, Set
     public async Task<SavedViewDto> CreateAsync(SaveSavedViewRequest request, CancellationToken cancellationToken = default)
     {
         SystemFields.Get(request.EntityType);
+        await EnsurePermissionAsync(request.EntityType, PermissionAction.View, cancellationToken);
+        if (request.IsShared)
+        {
+            await EnsurePermissionAsync(request.EntityType, PermissionAction.Edit, cancellationToken);
+        }
+
         var view = new SavedView
         {
             EntityType = request.EntityType,
@@ -260,6 +287,7 @@ public sealed class SavedViewService(AppDbContext db, ITenantContext tenant, Set
     public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var view = await db.SavedViews.FirstOrDefaultAsync(v => v.Id == id, cancellationToken) ?? throw new NotFoundException("View", id);
+        await EnsurePermissionAsync(view.EntityType, PermissionAction.View, cancellationToken);
         if (view.OwnerUserId != tenant.UserId)
         {
             throw new ForbiddenException("You can only delete views you created.");
