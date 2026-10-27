@@ -154,24 +154,12 @@ public sealed class FileService(AppDbContext db, IFileStorage storage, ITenantCo
 
     private async Task EnsureCanReadAsync(StoredFile row, CancellationToken cancellationToken)
     {
+        // An attachment on a record can be read by anyone who can view that record's module.
         if (row.EntityType is { } type && EntityModules.TryGetValue(type, out var module))
         {
             if (!await permissions.HasAsync(module, PermissionAction.View, cancellationToken))
             {
                 throw new ForbiddenException();
-            }
-
-            if (row.EntityId is { } entityId)
-            {
-                var scopeIds = await scope.GetScopeUserIdsAsync(module, cancellationToken);
-                if (scopeIds is not null)
-                {
-                    var ownerId = await GetEntityOwnerIdAsync(type, entityId, cancellationToken);
-                    if (ownerId is null || !scopeIds.Contains(ownerId.Value))
-                    {
-                        throw new ForbiddenException();
-                    }
-                }
             }
 
             return;
@@ -184,7 +172,7 @@ public sealed class FileService(AppDbContext db, IFileStorage storage, ITenantCo
         }
     }
 
-    /// <summary>Checks the entity key, that the record exists in this tenant, and that the user has the action and scope on it.</summary>
+    /// <summary>Checks the entity key, that the record exists in this tenant, and that the user has the action on its module.</summary>
     private async Task<AppModule?> AuthorizeEntityAsync(string? entityType, Guid? entityId, PermissionAction action, CancellationToken cancellationToken)
     {
         if (entityType is null && entityId is null)
@@ -203,30 +191,21 @@ public sealed class FileService(AppDbContext db, IFileStorage storage, ITenantCo
         }
 
         var id = entityId.Value;
-        var ownerId = await GetEntityOwnerIdAsync(entityType, id, cancellationToken);
-        if (ownerId is null)
+        var exists = entityType.ToLowerInvariant() switch
+        {
+            "leads" => await db.Leads.AnyAsync(e => e.Id == id, cancellationToken),
+            "contacts" => await db.Contacts.AnyAsync(e => e.Id == id, cancellationToken),
+            "accounts" => await db.Accounts.AnyAsync(e => e.Id == id, cancellationToken),
+            "deals" => await db.Deals.AnyAsync(e => e.Id == id, cancellationToken),
+            _ => await db.Activities.AnyAsync(e => e.Id == id, cancellationToken),
+        };
+        if (!exists)
         {
             throw new NotFoundException(entityType, id);
         }
 
-        var scopeIds = await scope.GetScopeUserIdsAsync(module, cancellationToken);
-        if (scopeIds is not null && !scopeIds.Contains(ownerId.Value))
-        {
-            throw new ForbiddenException();
-        }
-
         return module;
     }
-
-    private async Task<Guid?> GetEntityOwnerIdAsync(string entityType, Guid id, CancellationToken cancellationToken)
-        => entityType.ToLowerInvariant() switch
-        {
-            "leads" => await db.Leads.Where(e => e.Id == id).Select(e => (Guid?)e.OwnerId).FirstOrDefaultAsync(cancellationToken),
-            "contacts" => await db.Contacts.Where(e => e.Id == id).Select(e => (Guid?)e.OwnerId).FirstOrDefaultAsync(cancellationToken),
-            "accounts" => await db.Accounts.Where(e => e.Id == id).Select(e => (Guid?)e.OwnerId).FirstOrDefaultAsync(cancellationToken),
-            "deals" => await db.Deals.Where(e => e.Id == id).Select(e => (Guid?)e.OwnerId).FirstOrDefaultAsync(cancellationToken),
-            _ => await db.Activities.Where(e => e.Id == id).Select(e => (Guid?)e.OwnerId).FirstOrDefaultAsync(cancellationToken),
-        };
 
     /// <summary>Checks the first bytes against the claimed type so a renamed executable is not stored as a PDF.</summary>
     internal static bool SignatureMatches(string extension, ReadOnlySpan<byte> bytes)

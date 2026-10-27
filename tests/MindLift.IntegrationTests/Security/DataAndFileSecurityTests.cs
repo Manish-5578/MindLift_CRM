@@ -20,8 +20,8 @@ public sealed class DataAndFileSecurityTests(MindLiftApiFactory factory) : IClas
         var admin = await Workspaces.SignupAsync(factory, "FileSecurity Corp");
         (await admin.Client.PostAsJsonAsync("/api/v1/onboarding/industry", new ApplyIndustryRequest("general"))).EnsureSuccessStatusCode();
 
-        // 1. Admin creates a role "Sales Rep" with DataScope.Own on Deals
-        var createRoleRes = await admin.Client.PostAsJsonAsync("/api/v1/roles", new SaveRoleRequest("Sales Rep", "Can only access own deals", DashboardView.Staff));
+        // 1. Admin creates a role "Sales Rep" with Deals access, and "Support Rep" without Deals access
+        var createRoleRes = await admin.Client.PostAsJsonAsync("/api/v1/roles", new SaveRoleRequest("Sales Rep", "Has deals access", DashboardView.Staff));
         createRoleRes.StatusCode.ShouldBe(HttpStatusCode.OK);
         var salesRole = await createRoleRes.Content.ReadFromJsonAsync<RoleDto>();
 
@@ -30,9 +30,13 @@ public sealed class DataAndFileSecurityTests(MindLiftApiFactory factory) : IClas
         ]));
         savePermRes.StatusCode.ShouldBe(HttpStatusCode.OK);
 
+        var createSupportRes = await admin.Client.PostAsJsonAsync("/api/v1/roles", new SaveRoleRequest("Support Rep", "No deals access", DashboardView.Staff));
+        createSupportRes.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var supportRole = await createSupportRes.Content.ReadFromJsonAsync<RoleDto>();
+
         // 2. Invite Rep A and Rep B
         var repA = await Workspaces.InviteAndAcceptAsync(factory, admin, "Sales Rep", "repa");
-        var repB = await Workspaces.InviteAndAcceptAsync(factory, admin, "Sales Rep", "repb");
+        var repB = await Workspaces.InviteAndAcceptAsync(factory, admin, "Support Rep", "repb");
 
         // 3. Rep A creates Deal A
         var dealARes = await repA.Client.PostAsJsonAsync("/api/v1/deals", new SaveDealRequest(
@@ -73,7 +77,7 @@ public sealed class DataAndFileSecurityTests(MindLiftApiFactory factory) : IClas
         var repADownloadRes = await repA.Client.GetAsync($"/api/v1/files/{uploadedFile.Id}");
         repADownloadRes.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        // 6. IDOR ATTACK: Rep B (who only has DataScope.Own on Deals) tries to list files for Deal A
+        // 6. IDOR ATTACK: Rep B (who has no Deals permission) tries to list files for Deal A
         var repBListRes = await repB.Client.GetAsync($"/api/v1/files?entityType=deals&entityId={dealA.Id}");
         repBListRes.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
 
@@ -91,6 +95,18 @@ public sealed class DataAndFileSecurityTests(MindLiftApiFactory factory) : IClas
 
         var attackUploadRes = await repB.Client.PostAsync("/api/v1/files", attackForm);
         attackUploadRes.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+
+        // 9. IDOR ATTACK: Rep A uploads an unattached private file, which Rep B cannot access
+        using var unattachedForm = new MultipartFormDataContent();
+        var unattachedContent = new ByteArrayContent(fileBytes);
+        unattachedContent.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+        unattachedForm.Add(unattachedContent, "file", "private_unattached.pdf");
+        var unattachedRes = await repA.Client.PostAsync("/api/v1/files", unattachedForm);
+        unattachedRes.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var unattachedFile = await unattachedRes.Content.ReadFromJsonAsync<StoredFileDto>();
+
+        var unattachedDownloadRes = await repB.Client.GetAsync($"/api/v1/files/{unattachedFile!.Id}");
+        unattachedDownloadRes.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
 
     [Fact]
