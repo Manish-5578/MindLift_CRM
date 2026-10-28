@@ -5914,6 +5914,117 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.ToTable("lead_scoring_rules", (string)null);
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.LeadSlaTracker", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("BreachedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("breached_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<DateTime>("DueAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("due_at");
+
+                    b.Property<bool>("Escalated")
+                        .HasColumnType("boolean")
+                        .HasColumnName("escalated");
+
+                    b.Property<DateTime?>("EscalatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("escalated_at");
+
+                    b.Property<Guid?>("EscalatedToUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("escalated_to_user_id");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<Guid>("LeadId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lead_id");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("notes");
+
+                    b.Property<Guid>("PolicyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("policy_id");
+
+                    b.Property<string>("PolicyName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("policy_name");
+
+                    b.Property<DateTime?>("RespondedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("responded_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("Pending")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.Property<DateTime?>("WarningNotifiedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("warning_notified_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_lead_sla_trackers");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_lead_sla_trackers_tenant_id");
+
+                    b.HasIndex("TenantId", "LeadId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_lead_sla_trackers_tenant_id_lead_id");
+
+                    b.HasIndex("TenantId", "Status", "DueAt")
+                        .HasDatabaseName("ix_lead_sla_trackers_tenant_id_status_due_at");
+
+                    b.ToTable("lead_sla_trackers", (string)null);
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.Message", b =>
                 {
                     b.Property<Guid>("Id")
@@ -9021,6 +9132,106 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasFilter("is_deleted = false");
 
                     b.ToTable("sending_domains", (string)null);
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.SlaPolicy", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
+                    b.Property<string>("EscalationAction")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("ReassignAndNotify")
+                        .HasColumnName("escalation_action");
+
+                    b.Property<Guid?>("EscalationUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("escalation_user_id");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<int>("MaxResponseMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_response_minutes");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("integer")
+                        .HasColumnName("priority");
+
+                    b.PrimitiveCollection<string[]>("Ratings")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("ratings");
+
+                    b.PrimitiveCollection<string[]>("Sources")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("sources");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.Property<int>("WarningThresholdPercentage")
+                        .HasColumnType("integer")
+                        .HasColumnName("warning_threshold_percentage");
+
+                    b.HasKey("Id")
+                        .HasName("pk_sla_policies");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_sla_policies_tenant_id");
+
+                    b.HasIndex("TenantId", "IsActive", "Priority")
+                        .HasDatabaseName("ix_sla_policies_tenant_id_is_active_priority");
+
+                    b.ToTable("sla_policies", (string)null);
                 });
 
             modelBuilder.Entity("MindLift.Domain.Entities.StoredFile", b =>

@@ -180,6 +180,8 @@ public static class DependencyInjection
         services.AddScoped<MindLift.Infrastructure.Automation.RoutingService>();
         services.AddScoped<MindLift.Application.Abstractions.ILeadScoringService, MindLift.Infrastructure.Automation.LeadScoringService>();
         services.AddScoped<MindLift.Infrastructure.Automation.LeadScoringService>();
+        services.AddScoped<MindLift.Application.Abstractions.ISlaService, MindLift.Infrastructure.Automation.SlaService>();
+        services.AddScoped<MindLift.Infrastructure.Automation.SlaService>();
         services.AddScoped<MindLift.Infrastructure.Activities.ActivityService>();
         services.AddScoped<MindLift.Infrastructure.Activities.QuickLogService>();
         services.AddScoped<MindLift.Infrastructure.Activities.ChecklistService>();

@@ -127,6 +127,8 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<LeadRoutingLog> LeadRoutingLogs { get; set; } = null!;
     public DbSet<LeadScoringRule> LeadScoringRules { get; set; } = null!;
     public DbSet<LeadScoreLog> LeadScoreLogs { get; set; } = null!;
+    public DbSet<SlaPolicy> SlaPolicies { get; set; } = null!;
+    public DbSet<LeadSlaTracker> LeadSlaTrackers { get; set; } = null!;
 
     /// <summary>Tenant used by query filters. Guid.Empty when no tenant is set, so no rows match.</summary>
     protected Guid CurrentTenantId => tenant.TenantId ?? Guid.Empty;
@@ -1152,6 +1154,24 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.Property(x => x.RuleName).HasMaxLength(200);
             b.Property(x => x.Reason).HasMaxLength(1000);
             b.HasIndex(x => new { x.TenantId, x.LeadId, x.ScoredAt });
+        });
+
+        builder.Entity<SlaPolicy>(b =>
+        {
+            b.ToTable("sla_policies");
+            b.Property(x => x.Name).HasMaxLength(200);
+            b.Property(x => x.EscalationAction).HasMaxLength(50).HasDefaultValue("ReassignAndNotify");
+            b.HasIndex(x => new { x.TenantId, x.IsActive, x.Priority });
+        });
+
+        builder.Entity<LeadSlaTracker>(b =>
+        {
+            b.ToTable("lead_sla_trackers");
+            b.Property(x => x.PolicyName).HasMaxLength(200);
+            b.Property(x => x.Status).HasMaxLength(50).HasDefaultValue("Pending");
+            b.Property(x => x.Notes).HasMaxLength(1000);
+            b.HasIndex(x => new { x.TenantId, x.LeadId }).IsUnique();
+            b.HasIndex(x => new { x.TenantId, x.Status, x.DueAt });
         });
     }
 
