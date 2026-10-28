@@ -91,6 +91,7 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<PriceBookEntry> PriceBookEntries { get; set; } = null!;
     public DbSet<Quote> Quotes { get; set; } = null!;
     public DbSet<QuoteLineItem> QuoteLineItems { get; set; } = null!;
+    public DbSet<QuoteSignatureLog> QuoteSignatureLogs { get; set; } = null!;
     public DbSet<Invoice> Invoices { get; set; } = null!;
     public DbSet<InvoiceLineItem> InvoiceLineItems { get; set; } = null!;
     public DbSet<PaymentRecord> Payments { get; set; } = null!;
@@ -637,7 +638,18 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.Property(x => x.QuoteNumber).HasMaxLength(50);
             b.Property(x => x.Title).HasMaxLength(200);
             b.Property(x => x.Currency).HasMaxLength(3);
+            b.Property(x => x.ESignStatus).HasMaxLength(30).HasDefaultValue("Draft");
+            b.Property(x => x.SignerEmail).HasMaxLength(255);
+            b.Property(x => x.SignerName).HasMaxLength(150);
+            b.Property(x => x.SignerTitle).HasMaxLength(100);
+            b.Property(x => x.SigningToken).HasMaxLength(100);
+            b.Property(x => x.SignatureData).HasColumnType("text");
+            b.Property(x => x.SignerIpAddress).HasMaxLength(64);
+            b.Property(x => x.DeclineReason).HasMaxLength(1000);
+            b.Property(x => x.SecurityHash).HasMaxLength(64);
             b.HasIndex(x => new { x.TenantId, x.QuoteNumber });
+            b.HasIndex(x => new { x.TenantId, x.ESignStatus });
+            b.HasIndex(x => x.SigningToken);
             b.HasOne(x => x.Deal)
                 .WithMany()
                 .HasForeignKey(x => x.DealId)
@@ -650,6 +662,22 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
                 .WithMany()
                 .HasForeignKey(x => x.ContactId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        builder.Entity<QuoteSignatureLog>(b =>
+        {
+            b.ToTable("quote_signature_logs");
+            b.Property(x => x.Action).HasMaxLength(50);
+            b.Property(x => x.ActorEmail).HasMaxLength(255);
+            b.Property(x => x.ActorName).HasMaxLength(150);
+            b.Property(x => x.IpAddress).HasMaxLength(64);
+            b.Property(x => x.UserAgent).HasMaxLength(500);
+            b.Property(x => x.Details).HasMaxLength(2000);
+            b.HasIndex(x => new { x.TenantId, x.QuoteId, x.Timestamp });
+            b.HasOne(x => x.Quote)
+                .WithMany(q => q.SignatureLogs)
+                .HasForeignKey(x => x.QuoteId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         builder.Entity<QuoteLineItem>(b =>

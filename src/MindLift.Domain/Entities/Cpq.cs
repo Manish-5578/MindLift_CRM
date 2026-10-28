@@ -69,7 +69,21 @@ public sealed class Quote : TenantEntity, ISampleData
     public bool IsSyncedToDeal { get; set; }
     public bool IsSample { get; set; }
 
+    // E-Signature
+    public string ESignStatus { get; set; } = "Draft"; // Draft, Sent, Viewed, Signed, Declined, Revoked, Expired
+    public string? SignerEmail { get; set; }
+    public string? SignerName { get; set; }
+    public string? SignerTitle { get; set; }
+    public string? SigningToken { get; set; }
+    public DateTime? SignedAt { get; set; }
+    public string? SignatureData { get; set; }
+    public string? SignerIpAddress { get; set; }
+    public DateTime? SigningExpiresAt { get; set; }
+    public string? DeclineReason { get; set; }
+    public string? SecurityHash { get; set; }
+
     public ICollection<QuoteLineItem> LineItems { get; set; } = new List<QuoteLineItem>();
+    public ICollection<QuoteSignatureLog> SignatureLogs { get; set; } = new List<QuoteSignatureLog>();
 }
 
 [Audited]
@@ -89,6 +103,20 @@ public sealed class QuoteLineItem : TenantEntity
     public decimal SubTotal { get; set; }
     public decimal TotalAmount { get; set; }
     public int SortOrder { get; set; }
+}
+
+[Audited]
+public sealed class QuoteSignatureLog : TenantEntity
+{
+    public Guid QuoteId { get; set; }
+    public Quote Quote { get; set; } = null!;
+    public string Action { get; set; } = string.Empty; // Sent, Viewed, Signed, Declined, Revoked
+    public string? ActorEmail { get; set; }
+    public string? ActorName { get; set; }
+    public string? IpAddress { get; set; }
+    public string? UserAgent { get; set; }
+    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+    public string? Details { get; set; }
 }
 
 [Audited]

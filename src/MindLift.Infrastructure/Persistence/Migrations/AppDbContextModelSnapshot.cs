@@ -6826,6 +6826,11 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("deal_id");
 
+                    b.Property<string>("DeclineReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("decline_reason");
+
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at");
@@ -6837,6 +6842,14 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.Property<decimal>("DiscountPercent")
                         .HasColumnType("numeric")
                         .HasColumnName("discount_percent");
+
+                    b.Property<string>("ESignStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Draft")
+                        .HasColumnName("e_sign_status");
 
                     b.Property<DateTime?>("ExpirationDate")
                         .HasColumnType("timestamp with time zone")
@@ -6871,6 +6884,48 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("quote_number");
+
+                    b.Property<string>("SecurityHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("security_hash");
+
+                    b.Property<string>("SignatureData")
+                        .HasColumnType("text")
+                        .HasColumnName("signature_data");
+
+                    b.Property<DateTime?>("SignedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("signed_at");
+
+                    b.Property<string>("SignerEmail")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("signer_email");
+
+                    b.Property<string>("SignerIpAddress")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("signer_ip_address");
+
+                    b.Property<string>("SignerName")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("signer_name");
+
+                    b.Property<string>("SignerTitle")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("signer_title");
+
+                    b.Property<DateTime?>("SigningExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("signing_expires_at");
+
+                    b.Property<string>("SigningToken")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("signing_token");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer")
@@ -6923,8 +6978,14 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.HasIndex("DealId")
                         .HasDatabaseName("ix_quotes_deal_id");
 
+                    b.HasIndex("SigningToken")
+                        .HasDatabaseName("ix_quotes_signing_token");
+
                     b.HasIndex("TenantId")
                         .HasDatabaseName("ix_quotes_tenant_id");
+
+                    b.HasIndex("TenantId", "ESignStatus")
+                        .HasDatabaseName("ix_quotes_tenant_id_e_sign_status");
 
                     b.HasIndex("TenantId", "QuoteNumber")
                         .HasDatabaseName("ix_quotes_tenant_id_quote_number");
@@ -7035,6 +7096,100 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_quote_line_items_tenant_id");
 
                     b.ToTable("quote_line_items", (string)null);
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.QuoteSignatureLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("action");
+
+                    b.Property<string>("ActorEmail")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("actor_email");
+
+                    b.Property<string>("ActorName")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("actor_name");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("Details")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("details");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("ip_address");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<Guid>("QuoteId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("quote_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("timestamp");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("user_agent");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_quote_signature_logs");
+
+                    b.HasIndex("QuoteId")
+                        .HasDatabaseName("ix_quote_signature_logs_quote_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_quote_signature_logs_tenant_id");
+
+                    b.HasIndex("TenantId", "QuoteId", "Timestamp")
+                        .HasDatabaseName("ix_quote_signature_logs_tenant_id_quote_id_timestamp");
+
+                    b.ToTable("quote_signature_logs", (string)null);
                 });
 
             modelBuilder.Entity("MindLift.Domain.Entities.RefreshToken", b =>
@@ -9483,6 +9638,18 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.Navigation("Quote");
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.QuoteSignatureLog", b =>
+                {
+                    b.HasOne("MindLift.Domain.Entities.Quote", "Quote")
+                        .WithMany("SignatureLogs")
+                        .HasForeignKey("QuoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_quote_signature_logs_quotes_quote_id");
+
+                    b.Navigation("Quote");
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.ReportDefinition", b =>
                 {
                     b.HasOne("MindLift.Domain.Entities.ReportFolder", "Folder")
@@ -9558,6 +9725,8 @@ namespace MindLift.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("MindLift.Domain.Entities.Quote", b =>
                 {
                     b.Navigation("LineItems");
+
+                    b.Navigation("SignatureLogs");
                 });
 
             modelBuilder.Entity("MindLift.Domain.Entities.ReportDefinition", b =>
