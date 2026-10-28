@@ -5102,6 +5102,10 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("normalized_email");
 
+                    b.Property<DateTime?>("PasswordChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("password_changed_at");
+
                     b.Property<string>("PasswordHash")
                         .HasColumnType("text")
                         .HasColumnName("password_hash");
