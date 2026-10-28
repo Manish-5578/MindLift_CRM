@@ -145,6 +145,9 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<TrackedEmailLink> TrackedEmailLinks { get; set; } = null!;
     public DbSet<TrackedEmailEvent> TrackedEmailEvents { get; set; } = null!;
     public DbSet<EmailTrackingSettings> EmailTrackingSettings { get; set; } = null!;
+    public DbSet<BccDropboxAddress> BccDropboxAddresses { get; set; } = null!;
+    public DbSet<BccDropboxSettings> BccDropboxSettings { get; set; } = null!;
+    public DbSet<BccDropboxLog> BccDropboxLogs { get; set; } = null!;
 
     /// <summary>Tenant used by query filters. Guid.Empty when no tenant is set, so no rows match.</summary>
     protected Guid CurrentTenantId => tenant.TenantId ?? Guid.Empty;
@@ -1377,6 +1380,34 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.ToTable("email_tracking_settings");
             b.Property(x => x.CustomTrackingDomain).HasMaxLength(255);
             b.HasIndex(x => x.TenantId).IsUnique();
+        });
+
+        builder.Entity<BccDropboxAddress>(b =>
+        {
+            b.ToTable("bcc_dropbox_addresses");
+            b.Property(x => x.DropboxToken).HasMaxLength(100);
+            b.Property(x => x.DropboxEmail).HasMaxLength(255);
+            b.HasIndex(x => x.DropboxToken).IsUnique();
+            b.HasIndex(x => new { x.TenantId, x.UserId }).IsUnique();
+        });
+
+        builder.Entity<BccDropboxSettings>(b =>
+        {
+            b.ToTable("bcc_dropbox_settings");
+            b.Property(x => x.DropboxDomain).HasMaxLength(255).HasDefaultValue("bcc.mindlift.crm");
+            b.Property(x => x.DefaultPrivacy).HasMaxLength(50).HasDefaultValue("Public");
+            b.HasIndex(x => x.TenantId).IsUnique();
+        });
+
+        builder.Entity<BccDropboxLog>(b =>
+        {
+            b.ToTable("bcc_dropbox_logs");
+            b.Property(x => x.MessageId).HasMaxLength(255);
+            b.Property(x => x.FromAddress).HasMaxLength(255);
+            b.Property(x => x.Subject).HasMaxLength(500);
+            b.Property(x => x.ActionTaken).HasMaxLength(100);
+            b.HasIndex(x => new { x.TenantId, x.UserId });
+            b.HasIndex(x => new { x.TenantId, x.ReceivedAtUtc });
         });
     }
 

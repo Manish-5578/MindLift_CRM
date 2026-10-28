@@ -956,6 +956,294 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.ToTable("backup_schedule_configs", (string)null);
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.BccDropboxAddress", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("DropboxEmail")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("dropbox_email");
+
+                    b.Property<string>("DropboxToken")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("dropbox_token");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<DateTime?>("LastReceivedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_received_at_utc");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<int>("TotalEmailsReceived")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_emails_received");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_bcc_dropbox_addresses");
+
+                    b.HasIndex("DropboxToken")
+                        .IsUnique()
+                        .HasDatabaseName("ix_bcc_dropbox_addresses_dropbox_token");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_bcc_dropbox_addresses_tenant_id");
+
+                    b.HasIndex("TenantId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_bcc_dropbox_addresses_tenant_id_user_id");
+
+                    b.ToTable("bcc_dropbox_addresses", (string)null);
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.BccDropboxLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ActionTaken")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("action_taken");
+
+                    b.Property<Guid>("BccDropboxAddressId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("bcc_dropbox_address_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<Guid?>("CreatedMessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_message_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("FromAddress")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("from_address");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<Guid?>("MatchedAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("matched_account_id");
+
+                    b.Property<Guid?>("MatchedContactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("matched_contact_id");
+
+                    b.Property<Guid?>("MatchedDealId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("matched_deal_id");
+
+                    b.Property<Guid?>("MatchedLeadId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("matched_lead_id");
+
+                    b.Property<string>("MessageId")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("message_id");
+
+                    b.Property<DateTime>("ReceivedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at_utc");
+
+                    b.PrimitiveCollection<string[]>("RecipientAddresses")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("recipient_addresses");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("subject");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_bcc_dropbox_logs");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_bcc_dropbox_logs_tenant_id");
+
+                    b.HasIndex("TenantId", "ReceivedAtUtc")
+                        .HasDatabaseName("ix_bcc_dropbox_logs_tenant_id_received_at_utc");
+
+                    b.HasIndex("TenantId", "UserId")
+                        .HasDatabaseName("ix_bcc_dropbox_logs_tenant_id_user_id");
+
+                    b.ToTable("bcc_dropbox_logs", (string)null);
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.BccDropboxSettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("AutoCreateContact")
+                        .HasColumnType("boolean")
+                        .HasColumnName("auto_create_contact");
+
+                    b.Property<bool>("AutoCreateLead")
+                        .HasColumnType("boolean")
+                        .HasColumnName("auto_create_lead");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<string>("DefaultPrivacy")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("Public")
+                        .HasColumnName("default_privacy");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("DropboxDomain")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasDefaultValue("bcc.mindlift.crm")
+                        .HasColumnName("dropbox_domain");
+
+                    b.PrimitiveCollection<string[]>("ExcludedDomains")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("excluded_domains");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<bool>("LogNonMatched")
+                        .HasColumnType("boolean")
+                        .HasColumnName("log_non_matched");
+
+                    b.Property<bool>("MatchDeals")
+                        .HasColumnType("boolean")
+                        .HasColumnName("match_deals");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_bcc_dropbox_settings");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_bcc_dropbox_settings_tenant_id");
+
+                    b.ToTable("bcc_dropbox_settings", (string)null);
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.BillingEvent", b =>
                 {
                     b.Property<Guid>("Id")
