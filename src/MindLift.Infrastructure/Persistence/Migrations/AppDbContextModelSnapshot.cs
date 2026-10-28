@@ -4252,6 +4252,108 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.ToTable("layouts", (string)null);
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.LayoutRule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ConditionJson")
+                        .HasMaxLength(8000)
+                        .HasColumnType("character varying(8000)")
+                        .HasColumnName("condition_json");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("entity_type");
+
+                    b.PrimitiveCollection<string[]>("HideFields")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("hide_fields");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.PrimitiveCollection<string[]>("MandatoryFields")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("mandatory_fields");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("integer")
+                        .HasColumnName("priority");
+
+                    b.PrimitiveCollection<string[]>("ReadOnlyFields")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("read_only_fields");
+
+                    b.PrimitiveCollection<string[]>("ShowFields")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("show_fields");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_layout_rules");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_layout_rules_tenant_id");
+
+                    b.HasIndex("TenantId", "EntityType", "IsActive", "Priority")
+                        .HasDatabaseName("ix_layout_rules_tenant_id_entity_type_is_active_priority");
+
+                    b.ToTable("layout_rules", (string)null);
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.Lead", b =>
                 {
                     b.Property<Guid>("Id")
