@@ -2591,6 +2591,10 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
 
+                    b.Property<bool>("IsRecordingDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_recording_deleted");
+
                     b.Property<Guid?>("LeadId")
                         .HasColumnType("uuid")
                         .HasColumnName("lead_id");
@@ -2630,12 +2634,26 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("to_number");
 
+                    b.PrimitiveCollection<string[]>("TranscriptionActionItems")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("transcription_action_items");
+
+                    b.Property<string>("TranscriptionSentiment")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("transcription_sentiment");
+
                     b.Property<string>("TranscriptionStatus")
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasDefaultValue("None")
                         .HasColumnName("transcription_status");
+
+                    b.Property<string>("TranscriptionSummary")
+                        .HasColumnType("text")
+                        .HasColumnName("transcription_summary");
 
                     b.Property<string>("TranscriptionText")
                         .HasColumnType("text")
@@ -11112,6 +11130,14 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasDefaultValue("+18005550199")
                         .HasColumnName("caller_id");
 
+                    b.Property<string>("ConsentMode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("Prompt")
+                        .HasColumnName("consent_mode");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -11123,6 +11149,10 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at");
+
+                    b.Property<bool>("DualPartyNotification")
+                        .HasColumnType("boolean")
+                        .HasColumnName("dual_party_notification");
 
                     b.Property<string>("EncryptedAuthToken")
                         .HasColumnType("text")
@@ -11147,6 +11177,10 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.Property<bool>("RecordCallsDefault")
                         .HasColumnType("boolean")
                         .HasColumnName("record_calls_default");
+
+                    b.Property<int>("RetentionDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("retention_days");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")

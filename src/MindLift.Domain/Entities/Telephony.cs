@@ -17,10 +17,13 @@ public sealed class TelephonySettings : TenantEntity
     public bool RecordCallsDefault { get; set; }
     public bool WebRtcEnabled { get; set; } = true;
     public string? TwilioAppSid { get; set; }
+    public string ConsentMode { get; set; } = "Prompt"; // "Always", "Prompt", "None"
+    public bool DualPartyNotification { get; set; } = true;
+    public int RetentionDays { get; set; } = 90;
 }
 
 /// <summary>
-/// Phase 5 / #32: Call session tracking every initiated, ringing, active, and completed call.
+/// Phase 5 / #32 & #33: Call session tracking and call recording/transcription.
 /// </summary>
 [Audited]
 public sealed class CallSession : TenantEntity
@@ -44,9 +47,13 @@ public sealed class CallSession : TenantEntity
     public string? Notes { get; set; }
     public string? Disposition { get; set; } // "Connected", "Left Voicemail", "Wrong Number", "Busy", "Not Interested"
 
-    // Prepared for Phase 5 / #33 Call recording & transcription
+    // Phase 5 / #33 Call recording & transcription
     public string? RecordingUrl { get; set; }
     public int? RecordingDurationSeconds { get; set; }
     public string? TranscriptionText { get; set; }
-    public string? TranscriptionStatus { get; set; } // "None", "Pending", "Completed", "Failed"
+    public string? TranscriptionStatus { get; set; } = "None"; // "None", "Pending", "Processing", "Completed", "Failed"
+    public string? TranscriptionSummary { get; set; }
+    public string? TranscriptionSentiment { get; set; } // "Positive", "Neutral", "Negative"
+    public string[] TranscriptionActionItems { get; set; } = [];
+    public bool IsRecordingDeleted { get; set; }
 }

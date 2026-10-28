@@ -198,6 +198,8 @@ public static class DependencyInjection
         services.AddScoped<MindLift.Infrastructure.Communication.BccDropboxService>();
         services.AddScoped<MindLift.Application.Abstractions.ITelephonyService, MindLift.Infrastructure.Communication.TelephonyService>();
         services.AddScoped<MindLift.Infrastructure.Communication.TelephonyService>();
+        services.AddScoped<MindLift.Application.Abstractions.ICallRecordingService, MindLift.Infrastructure.Communication.CallRecordingService>();
+        services.AddScoped<MindLift.Infrastructure.Communication.CallRecordingService>();
         services.AddScoped<MindLift.Infrastructure.Activities.ActivityService>();
         services.AddScoped<MindLift.Infrastructure.Activities.QuickLogService>();
         services.AddScoped<MindLift.Infrastructure.Activities.ChecklistService>();

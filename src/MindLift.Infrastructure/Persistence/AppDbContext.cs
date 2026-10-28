@@ -1418,6 +1418,7 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.Property(x => x.Provider).HasMaxLength(50).HasDefaultValue("MockTelephony");
             b.Property(x => x.AccountSid).HasMaxLength(100);
             b.Property(x => x.CallerId).HasMaxLength(50).HasDefaultValue("+18005550199");
+            b.Property(x => x.ConsentMode).HasMaxLength(50).HasDefaultValue("Prompt");
             b.HasIndex(x => x.TenantId).IsUnique();
         });
 
@@ -1432,6 +1433,7 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.Property(x => x.Disposition).HasMaxLength(100);
             b.Property(x => x.RecordingUrl).HasMaxLength(2048);
             b.Property(x => x.TranscriptionStatus).HasMaxLength(50).HasDefaultValue("None");
+            b.Property(x => x.TranscriptionSentiment).HasMaxLength(50);
             b.HasIndex(x => x.CallSid).IsUnique();
             b.HasIndex(x => new { x.TenantId, x.UserId });
             b.HasIndex(x => new { x.TenantId, x.StartedAtUtc });
