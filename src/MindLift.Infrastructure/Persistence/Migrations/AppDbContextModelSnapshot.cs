@@ -3194,6 +3194,15 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("version");
 
+                    b.Property<string>("WinNotes")
+                        .HasColumnType("text")
+                        .HasColumnName("win_notes");
+
+                    b.Property<string>("WinReason")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("win_reason");
+
                     b.HasKey("Id")
                         .HasName("pk_deals");
 
@@ -3208,6 +3217,9 @@ namespace MindLift.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId", "PrimaryContactId")
                         .HasDatabaseName("ix_deals_tenant_id_primary_contact_id");
+
+                    b.HasIndex("TenantId", "WinReason")
+                        .HasDatabaseName("ix_deals_tenant_id_win_reason");
 
                     b.HasIndex("TenantId", "PipelineId", "StageId", "Status")
                         .HasDatabaseName("ix_deals_tenant_id_pipeline_id_stage_id_status");

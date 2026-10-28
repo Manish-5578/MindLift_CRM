@@ -168,6 +168,8 @@ public static class DependencyInjection
         services.AddScoped<MindLift.Infrastructure.Currencies.FxSyncService>();
         services.AddScoped<MindLift.Application.Abstractions.ICompetitorService, MindLift.Infrastructure.Deals.CompetitorService>();
         services.AddScoped<MindLift.Infrastructure.Deals.CompetitorService>();
+        services.AddScoped<MindLift.Application.Abstractions.IWinLossAnalysisService, MindLift.Infrastructure.Deals.WinLossAnalysisService>();
+        services.AddScoped<MindLift.Infrastructure.Deals.WinLossAnalysisService>();
         services.AddScoped<MindLift.Infrastructure.Activities.ActivityService>();
         services.AddScoped<MindLift.Infrastructure.Activities.QuickLogService>();
         services.AddScoped<MindLift.Infrastructure.Activities.ChecklistService>();

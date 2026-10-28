@@ -925,7 +925,9 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
         builder.Entity<Deal>(b =>
         {
             b.Property(d => d.ForecastCategory).HasMaxLength(30).HasDefaultValue("Pipeline");
+            b.Property(d => d.WinReason).HasMaxLength(50);
             b.HasIndex(d => new { d.TenantId, d.ForecastCategory });
+            b.HasIndex(d => new { d.TenantId, d.WinReason });
         });
 
         builder.Entity<FxSyncLog>(b =>

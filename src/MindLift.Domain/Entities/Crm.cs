@@ -108,8 +108,11 @@ public sealed class Deal : TenantEntity, IOwnedEntity, IHasCustomFields, ISample
 
     /// <summary>Picklist value code from lost_reason. Required when Status is Lost.</summary>
     public string? LostReason { get; set; }
-
     public string? LostNotes { get; set; }
+
+    /// <summary>Picklist value code from win_reason. Optional when Status is Won.</summary>
+    public string? WinReason { get; set; }
+    public string? WinNotes { get; set; }
     public string? Description { get; set; }
     public Guid? PrimaryContactId { get; set; }
 
