@@ -150,6 +150,9 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<BccDropboxLog> BccDropboxLogs { get; set; } = null!;
     public DbSet<TelephonySettings> TelephonySettings { get; set; } = null!;
     public DbSet<CallSession> CallSessions { get; set; } = null!;
+    public DbSet<WhatsAppSettings> WhatsAppSettings { get; set; } = null!;
+    public DbSet<WhatsAppConversation> WhatsAppConversations { get; set; } = null!;
+    public DbSet<WhatsAppMessage> WhatsAppMessages { get; set; } = null!;
 
     /// <summary>Tenant used by query filters. Guid.Empty when no tenant is set, so no rows match.</summary>
     protected Guid CurrentTenantId => tenant.TenantId ?? Guid.Empty;
@@ -1437,6 +1440,42 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.HasIndex(x => x.CallSid).IsUnique();
             b.HasIndex(x => new { x.TenantId, x.UserId });
             b.HasIndex(x => new { x.TenantId, x.StartedAtUtc });
+        });
+
+        builder.Entity<WhatsAppSettings>(b =>
+        {
+            b.ToTable("whatsapp_settings");
+            b.Property(x => x.PhoneNumberId).HasMaxLength(100);
+            b.Property(x => x.WabaId).HasMaxLength(100);
+            b.Property(x => x.DisplayPhoneNumber).HasMaxLength(50);
+            b.Property(x => x.AccessToken).HasMaxLength(1024);
+            b.Property(x => x.WebhookVerifyToken).HasMaxLength(256);
+            b.HasIndex(x => x.TenantId).IsUnique();
+            b.HasIndex(x => x.PhoneNumberId);
+        });
+
+        builder.Entity<WhatsAppConversation>(b =>
+        {
+            b.ToTable("whatsapp_conversations");
+            b.Property(x => x.CustomerPhoneNumber).HasMaxLength(50);
+            b.HasIndex(x => new { x.TenantId, x.CustomerPhoneNumber }).IsUnique();
+            b.HasIndex(x => new { x.TenantId, x.LastMessageAtUtc });
+        });
+
+        builder.Entity<WhatsAppMessage>(b =>
+        {
+            b.ToTable("whatsapp_messages");
+            b.Property(x => x.MessageId).HasMaxLength(100);
+            b.Property(x => x.Direction).HasMaxLength(20).HasDefaultValue("Inbound");
+            b.Property(x => x.FromNumber).HasMaxLength(50);
+            b.Property(x => x.ToNumber).HasMaxLength(50);
+            b.Property(x => x.MessageType).HasMaxLength(50).HasDefaultValue("text");
+            b.Property(x => x.Status).HasMaxLength(50).HasDefaultValue("sent");
+            b.Property(x => x.TemplateName).HasMaxLength(100);
+            b.Property(x => x.TemplateLanguage).HasMaxLength(20);
+            b.HasIndex(x => x.MessageId);
+            b.HasIndex(x => new { x.TenantId, x.ConversationId });
+            b.HasIndex(x => new { x.TenantId, x.SentAtUtc });
         });
     }
 
