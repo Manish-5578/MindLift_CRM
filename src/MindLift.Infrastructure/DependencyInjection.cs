@@ -206,6 +206,8 @@ public static class DependencyInjection
         services.AddScoped<MindLift.Infrastructure.Communication.SharedInboxService>();
         services.AddScoped<MindLift.Application.Abstractions.IMeetingLinkService, MindLift.Infrastructure.Communication.MeetingLinkService>();
         services.AddScoped<MindLift.Infrastructure.Communication.MeetingLinkService>();
+        services.AddScoped<MindLift.Application.Abstractions.IAccountHierarchyService, MindLift.Infrastructure.Contacts.AccountHierarchyService>();
+        services.AddScoped<MindLift.Infrastructure.Contacts.AccountHierarchyService>();
         services.AddScoped<MindLift.Infrastructure.Activities.ActivityService>();
         services.AddScoped<MindLift.Infrastructure.Activities.QuickLogService>();
         services.AddScoped<MindLift.Infrastructure.Activities.ChecklistService>();
