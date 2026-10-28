@@ -132,6 +132,7 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<WebsiteTracker> WebsiteTrackers { get; set; } = null!;
     public DbSet<VisitorSession> VisitorSessions { get; set; } = null!;
     public DbSet<VisitorPageView> VisitorPageViews { get; set; } = null!;
+    public DbSet<EmailTemplate> EmailTemplates { get; set; } = null!;
 
     /// <summary>Tenant used by query filters. Guid.Empty when no tenant is set, so no rows match.</summary>
     protected Guid CurrentTenantId => tenant.TenantId ?? Guid.Empty;
@@ -1211,6 +1212,20 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
                 .WithMany(s => s.PageViews)
                 .HasForeignKey(x => x.SessionId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<EmailTemplate>(b =>
+        {
+            b.ToTable("email_templates");
+            b.Property(x => x.Name).HasMaxLength(200);
+            b.Property(x => x.Subject).HasMaxLength(500);
+            b.Property(x => x.PreheaderText).HasMaxLength(300);
+            b.Property(x => x.Category).HasMaxLength(100).HasDefaultValue("General");
+            b.Property(x => x.Description).HasMaxLength(1000);
+            b.Property(x => x.LayoutJson).HasColumnType("jsonb");
+            b.Property(x => x.ThumbnailUrl).HasMaxLength(2048);
+            b.HasIndex(x => new { x.TenantId, x.Category, x.IsActive });
+            b.HasIndex(x => new { x.TenantId, x.Name });
         });
     }
 

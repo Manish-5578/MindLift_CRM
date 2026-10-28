@@ -4477,6 +4477,124 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.ToTable("email_suppressions", (string)null);
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.EmailTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasDefaultValue("General")
+                        .HasColumnName("category");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<bool>("IsPreset")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_preset");
+
+                    b.Property<string>("LayoutJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("layout_json");
+
+                    b.PrimitiveCollection<string[]>("MergeTags")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("merge_tags");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("PlainTextBody")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("plain_text_body");
+
+                    b.Property<string>("PreheaderText")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("preheader_text");
+
+                    b.Property<string>("RenderedHtml")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("rendered_html");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("subject");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("ThumbnailUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("thumbnail_url");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_email_templates");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_email_templates_tenant_id");
+
+                    b.HasIndex("TenantId", "Name")
+                        .HasDatabaseName("ix_email_templates_tenant_id_name");
+
+                    b.HasIndex("TenantId", "Category", "IsActive")
+                        .HasDatabaseName("ix_email_templates_tenant_id_category_is_active");
+
+                    b.ToTable("email_templates", (string)null);
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.ExchangeRate", b =>
                 {
                     b.Property<Guid>("Id")
