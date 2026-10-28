@@ -111,6 +111,7 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<VisualWorkflowExecution> VisualWorkflowExecutions { get; set; } = null!;
     public DbSet<BackupScheduleConfig> BackupScheduleConfigs { get; set; } = null!;
     public DbSet<BackupArchiveRecord> BackupArchiveRecords { get; set; } = null!;
+    public DbSet<DealSplit> DealSplits { get; set; } = null!;
 
     /// <summary>Tenant used by query filters. Guid.Empty when no tenant is set, so no rows match.</summary>
     protected Guid CurrentTenantId => tenant.TenantId ?? Guid.Empty;
@@ -901,6 +902,21 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.Property(x => x.PayloadContent).HasColumnType("text");
             b.Property(x => x.DownloadToken).HasMaxLength(64);
             b.HasIndex(x => new { x.TenantId, x.CreatedAt });
+        });
+
+        builder.Entity<DealSplit>(b =>
+        {
+            b.ToTable("deal_splits");
+            b.Property(x => x.SplitType).HasMaxLength(30);
+            b.Property(x => x.Percentage).HasPrecision(5, 2);
+            b.Property(x => x.Amount).HasPrecision(18, 2);
+            b.Property(x => x.Note).HasMaxLength(500);
+            b.HasIndex(x => new { x.TenantId, x.DealId });
+            b.HasIndex(x => new { x.TenantId, x.UserId });
+            b.HasOne(x => x.Deal)
+                .WithMany(d => d.Splits)
+                .HasForeignKey(x => x.DealId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 

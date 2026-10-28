@@ -124,6 +124,7 @@ public sealed class Deal : TenantEntity, IOwnedEntity, IHasCustomFields, ISample
     public bool IsSample { get; set; }
 
     public ICollection<DealLineItem> LineItems { get; set; } = new List<DealLineItem>();
+    public ICollection<DealSplit> Splits { get; set; } = new List<DealSplit>();
 }
 
 [Audited]

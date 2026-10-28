@@ -3315,6 +3315,93 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.ToTable("deal_line_items", (string)null);
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.DealSplit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<Guid>("DealId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deal_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("note");
+
+                    b.Property<decimal>("Percentage")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("percentage");
+
+                    b.Property<string>("SplitType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("split_type");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_deal_splits");
+
+                    b.HasIndex("DealId")
+                        .HasDatabaseName("ix_deal_splits_deal_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_deal_splits_tenant_id");
+
+                    b.HasIndex("TenantId", "DealId")
+                        .HasDatabaseName("ix_deal_splits_tenant_id_deal_id");
+
+                    b.HasIndex("TenantId", "UserId")
+                        .HasDatabaseName("ix_deal_splits_tenant_id_user_id");
+
+                    b.ToTable("deal_splits", (string)null);
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.DealStageGate", b =>
                 {
                     b.Property<Guid>("Id")
@@ -8946,6 +9033,18 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.DealSplit", b =>
+                {
+                    b.HasOne("MindLift.Domain.Entities.Deal", "Deal")
+                        .WithMany("Splits")
+                        .HasForeignKey("DealId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_deal_splits_deals_deal_id");
+
+                    b.Navigation("Deal");
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.Invoice", b =>
                 {
                     b.HasOne("MindLift.Domain.Entities.Account", "Account")
@@ -9130,6 +9229,8 @@ namespace MindLift.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("MindLift.Domain.Entities.Deal", b =>
                 {
                     b.Navigation("LineItems");
+
+                    b.Navigation("Splits");
                 });
 
             modelBuilder.Entity("MindLift.Domain.Entities.Invoice", b =>
