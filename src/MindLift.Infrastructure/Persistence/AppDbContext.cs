@@ -105,6 +105,8 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<DealStageGate> DealStageGates { get; set; } = null!;
     public DbSet<DependentPicklistMap> DependentPicklistMaps { get; set; } = null!;
     public DbSet<LayoutRule> LayoutRules { get; set; } = null!;
+    public DbSet<CustomObjectDefinition> CustomObjectDefinitions { get; set; } = null!;
+    public DbSet<CustomObjectRecord> CustomObjectRecords { get; set; } = null!;
 
     /// <summary>Tenant used by query filters. Guid.Empty when no tenant is set, so no rows match.</summary>
     protected Guid CurrentTenantId => tenant.TenantId ?? Guid.Empty;
@@ -831,6 +833,28 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.Property(x => x.Description).HasMaxLength(500);
             b.Property(x => x.ConditionJson).HasMaxLength(8000);
             b.HasIndex(x => new { x.TenantId, x.EntityType, x.IsActive, x.Priority });
+        });
+
+        builder.Entity<CustomObjectDefinition>(b =>
+        {
+            b.ToTable("custom_object_definitions");
+            b.Property(x => x.Name).HasMaxLength(150);
+            b.Property(x => x.PluralName).HasMaxLength(150);
+            b.Property(x => x.Slug).HasMaxLength(100);
+            b.Property(x => x.Description).HasMaxLength(500);
+            b.Property(x => x.Icon).HasMaxLength(50);
+            b.Property(x => x.TitleField).HasMaxLength(100);
+            b.Property(x => x.FieldsJson).HasColumnType("jsonb");
+            b.HasIndex(x => new { x.TenantId, x.Slug });
+        });
+
+        builder.Entity<CustomObjectRecord>(b =>
+        {
+            b.ToTable("custom_object_records");
+            b.Property(x => x.DisplayName).HasMaxLength(250);
+            b.Property(x => x.DataJson).HasColumnType("jsonb");
+            b.HasIndex(x => new { x.TenantId, x.ObjectDefinitionId, x.RecordNumber });
+            b.HasIndex(x => new { x.TenantId, x.ObjectDefinitionId, x.CreatedAt });
         });
     }
 

@@ -127,6 +127,8 @@ public static class DependencyInjection
         services.AddScoped<MindLift.Infrastructure.Settings.DependentPicklistService>();
         services.AddScoped<MindLift.Application.Abstractions.ILayoutRuleService, MindLift.Infrastructure.Settings.LayoutRuleService>();
         services.AddScoped<MindLift.Infrastructure.Settings.LayoutRuleService>();
+        services.AddScoped<MindLift.Application.Abstractions.ICustomObjectService, MindLift.Infrastructure.Settings.CustomObjectService>();
+        services.AddScoped<MindLift.Infrastructure.Settings.CustomObjectService>();
         services.AddScoped<SavedViewService>();
         services.AddScoped<BootstrapService>();
 
