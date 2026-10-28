@@ -118,6 +118,10 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<BackupScheduleConfig> BackupScheduleConfigs { get; set; } = null!;
     public DbSet<BackupArchiveRecord> BackupArchiveRecords { get; set; } = null!;
     public DbSet<DealSplit> DealSplits { get; set; } = null!;
+    public DbSet<Cadence> Cadences { get; set; } = null!;
+    public DbSet<CadenceStep> CadenceSteps { get; set; } = null!;
+    public DbSet<CadenceEnrollment> CadenceEnrollments { get; set; } = null!;
+    public DbSet<CadenceStepExecution> CadenceStepExecutions { get; set; } = null!;
 
     /// <summary>Tenant used by query filters. Guid.Empty when no tenant is set, so no rows match.</summary>
     protected Guid CurrentTenantId => tenant.TenantId ?? Guid.Empty;
@@ -1043,6 +1047,57 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.HasOne(x => x.Competitor)
                 .WithMany(c => c.DealAssociations)
                 .HasForeignKey(x => x.CompetitorId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<Cadence>(b =>
+        {
+            b.ToTable("cadences");
+            b.Property(x => x.Name).HasMaxLength(150);
+            b.Property(x => x.Description).HasMaxLength(500);
+            b.Property(x => x.TargetType).HasMaxLength(30).HasDefaultValue("Lead");
+            b.Property(x => x.Status).HasMaxLength(30).HasDefaultValue("Draft");
+            b.HasIndex(x => new { x.TenantId, x.Status });
+            b.HasIndex(x => new { x.TenantId, x.TargetType });
+        });
+
+        builder.Entity<CadenceStep>(b =>
+        {
+            b.ToTable("cadence_steps");
+            b.Property(x => x.StepType).HasMaxLength(30).HasDefaultValue("Email");
+            b.Property(x => x.Subject).HasMaxLength(250);
+            b.Property(x => x.Content).HasColumnType("text");
+            b.Property(x => x.ActionType).HasMaxLength(50).HasDefaultValue("ManualEmail");
+            b.HasIndex(x => new { x.TenantId, x.CadenceId, x.StepNumber });
+            b.HasOne(x => x.Cadence)
+                .WithMany(c => c.Steps)
+                .HasForeignKey(x => x.CadenceId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<CadenceEnrollment>(b =>
+        {
+            b.ToTable("cadence_enrollments");
+            b.Property(x => x.TargetType).HasMaxLength(30);
+            b.Property(x => x.Status).HasMaxLength(30).HasDefaultValue("Active");
+            b.HasIndex(x => new { x.TenantId, x.CadenceId, x.Status });
+            b.HasIndex(x => new { x.TenantId, x.TargetType, x.TargetId });
+            b.HasIndex(x => new { x.TenantId, x.NextStepDueAt });
+            b.HasOne(x => x.Cadence)
+                .WithMany(c => c.Enrollments)
+                .HasForeignKey(x => x.CadenceId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<CadenceStepExecution>(b =>
+        {
+            b.ToTable("cadence_step_executions");
+            b.Property(x => x.Result).HasMaxLength(30).HasDefaultValue("Completed");
+            b.Property(x => x.Notes).HasMaxLength(1000);
+            b.HasIndex(x => new { x.TenantId, x.EnrollmentId, x.StepNumber });
+            b.HasOne(x => x.Enrollment)
+                .WithMany(e => e.StepExecutions)
+                .HasForeignKey(x => x.EnrollmentId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

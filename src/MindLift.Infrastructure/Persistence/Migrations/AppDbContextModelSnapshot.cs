@@ -1630,6 +1630,379 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.ToTable("business_documents", (string)null);
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.Cadence", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("ActiveEnrollmentCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("active_enrollment_count");
+
+                    b.Property<int>("CompletedEnrollmentCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("completed_enrollment_count");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid?>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Draft")
+                        .HasColumnName("status");
+
+                    b.Property<string>("TargetType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Lead")
+                        .HasColumnName("target_type");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_cadences");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_cadences_tenant_id");
+
+                    b.HasIndex("TenantId", "Status")
+                        .HasDatabaseName("ix_cadences_tenant_id_status");
+
+                    b.HasIndex("TenantId", "TargetType")
+                        .HasDatabaseName("ix_cadences_tenant_id_target_type");
+
+                    b.ToTable("cadences", (string)null);
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.CadenceEnrollment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CadenceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cadence_id");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<int>("CurrentStepNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("current_step_number");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<DateTime>("EnrolledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("enrolled_at");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<DateTime?>("NextStepDueAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_step_due_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Active")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TargetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_id");
+
+                    b.Property<string>("TargetType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("target_type");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_cadence_enrollments");
+
+                    b.HasIndex("CadenceId")
+                        .HasDatabaseName("ix_cadence_enrollments_cadence_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_cadence_enrollments_tenant_id");
+
+                    b.HasIndex("TenantId", "NextStepDueAt")
+                        .HasDatabaseName("ix_cadence_enrollments_tenant_id_next_step_due_at");
+
+                    b.HasIndex("TenantId", "CadenceId", "Status")
+                        .HasDatabaseName("ix_cadence_enrollments_tenant_id_cadence_id_status");
+
+                    b.HasIndex("TenantId", "TargetType", "TargetId")
+                        .HasDatabaseName("ix_cadence_enrollments_tenant_id_target_type_target_id");
+
+                    b.ToTable("cadence_enrollments", (string)null);
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.CadenceStep", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ActionType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("ManualEmail")
+                        .HasColumnName("action_type");
+
+                    b.Property<Guid>("CadenceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cadence_id");
+
+                    b.Property<string>("Content")
+                        .HasColumnType("text")
+                        .HasColumnName("content");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<int>("StepNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("step_number");
+
+                    b.Property<string>("StepType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Email")
+                        .HasColumnName("step_type");
+
+                    b.Property<string>("Subject")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("subject");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.Property<int>("WaitDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("wait_days");
+
+                    b.HasKey("Id")
+                        .HasName("pk_cadence_steps");
+
+                    b.HasIndex("CadenceId")
+                        .HasDatabaseName("ix_cadence_steps_cadence_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_cadence_steps_tenant_id");
+
+                    b.HasIndex("TenantId", "CadenceId", "StepNumber")
+                        .HasDatabaseName("ix_cadence_steps_tenant_id_cadence_id_step_number");
+
+                    b.ToTable("cadence_steps", (string)null);
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.CadenceStepExecution", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<Guid>("EnrollmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("enrollment_id");
+
+                    b.Property<DateTime>("ExecutedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("executed_at");
+
+                    b.Property<Guid?>("ExecutedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("executed_by_user_id");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("notes");
+
+                    b.Property<string>("Result")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Completed")
+                        .HasColumnName("result");
+
+                    b.Property<Guid?>("StepId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("step_id");
+
+                    b.Property<int>("StepNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("step_number");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_cadence_step_executions");
+
+                    b.HasIndex("EnrollmentId")
+                        .HasDatabaseName("ix_cadence_step_executions_enrollment_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_cadence_step_executions_tenant_id");
+
+                    b.HasIndex("TenantId", "EnrollmentId", "StepNumber")
+                        .HasDatabaseName("ix_cadence_step_executions_tenant_id_enrollment_id_step_number");
+
+                    b.ToTable("cadence_step_executions", (string)null);
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.CalendarConnection", b =>
                 {
                     b.Property<Guid>("Id")
@@ -9705,6 +10078,42 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_asp_net_user_tokens_asp_net_users_user_id");
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.CadenceEnrollment", b =>
+                {
+                    b.HasOne("MindLift.Domain.Entities.Cadence", "Cadence")
+                        .WithMany("Enrollments")
+                        .HasForeignKey("CadenceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_cadence_enrollments_cadences_cadence_id");
+
+                    b.Navigation("Cadence");
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.CadenceStep", b =>
+                {
+                    b.HasOne("MindLift.Domain.Entities.Cadence", "Cadence")
+                        .WithMany("Steps")
+                        .HasForeignKey("CadenceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_cadence_steps_cadences_cadence_id");
+
+                    b.Navigation("Cadence");
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.CadenceStepExecution", b =>
+                {
+                    b.HasOne("MindLift.Domain.Entities.CadenceEnrollment", "Enrollment")
+                        .WithMany("StepExecutions")
+                        .HasForeignKey("EnrollmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_cadence_step_executions_cadence_enrollments_enrollment_id");
+
+                    b.Navigation("Enrollment");
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.DealCompetitor", b =>
                 {
                     b.HasOne("MindLift.Domain.Entities.Competitor", "Competitor")
@@ -9976,6 +10385,18 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_report_schedules_report_definitions_report_id");
 
                     b.Navigation("Report");
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.Cadence", b =>
+                {
+                    b.Navigation("Enrollments");
+
+                    b.Navigation("Steps");
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.CadenceEnrollment", b =>
+                {
+                    b.Navigation("StepExecutions");
                 });
 
             modelBuilder.Entity("MindLift.Domain.Entities.Competitor", b =>
