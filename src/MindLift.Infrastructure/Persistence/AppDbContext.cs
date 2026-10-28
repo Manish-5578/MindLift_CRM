@@ -68,6 +68,7 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<Layout> Layouts { get; set; } = null!;
     public DbSet<SavedView> SavedViews { get; set; } = null!;
     public DbSet<ExchangeRate> ExchangeRates { get; set; } = null!;
+    public DbSet<FxSyncLog> FxSyncLogs { get; set; } = null!;
     public DbSet<AssignmentRule> AssignmentRules { get; set; } = null!;
     public DbSet<WebForm> WebForms { get; set; } = null!;
     public DbSet<AutomationRule> AutomationRules { get; set; } = null!;
@@ -923,6 +924,16 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
         {
             b.Property(d => d.ForecastCategory).HasMaxLength(30).HasDefaultValue("Pipeline");
             b.HasIndex(d => new { d.TenantId, d.ForecastCategory });
+        });
+
+        builder.Entity<FxSyncLog>(b =>
+        {
+            b.ToTable("fx_sync_logs");
+            b.Property(x => x.Provider).HasMaxLength(50);
+            b.Property(x => x.BaseCurrency).HasMaxLength(10);
+            b.Property(x => x.Status).HasMaxLength(30);
+            b.Property(x => x.ErrorMessage).HasMaxLength(1000);
+            b.HasIndex(x => new { x.TenantId, x.SyncedAt });
         });
     }
 

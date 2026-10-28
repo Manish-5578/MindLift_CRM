@@ -292,6 +292,17 @@ public sealed class ExchangeRate : TenantEntity
     public DateTime EffectiveDate { get; set; }
 }
 
+[Audited]
+public sealed class FxSyncLog : TenantEntity
+{
+    public string Provider { get; set; } = string.Empty;
+    public string BaseCurrency { get; set; } = "USD";
+    public int CurrenciesSynced { get; set; }
+    public string Status { get; set; } = "Success";
+    public string? ErrorMessage { get; set; }
+    public DateTime SyncedAt { get; set; }
+}
+
 
 
 
