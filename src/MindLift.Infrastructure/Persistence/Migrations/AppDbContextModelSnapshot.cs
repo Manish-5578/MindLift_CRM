@@ -5038,6 +5038,77 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.ToTable("email_templates", (string)null);
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.EmailTrackingSettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<string>("CustomTrackingDomain")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("custom_tracking_domain");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<bool>("NotifyOnFirstOpen")
+                        .HasColumnType("boolean")
+                        .HasColumnName("notify_on_first_open");
+
+                    b.Property<bool>("NotifyOnLinkClick")
+                        .HasColumnType("boolean")
+                        .HasColumnName("notify_on_link_click");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<bool>("TrackClicks")
+                        .HasColumnType("boolean")
+                        .HasColumnName("track_clicks");
+
+                    b.Property<bool>("TrackOpens")
+                        .HasColumnType("boolean")
+                        .HasColumnName("track_opens");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_email_tracking_settings");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_email_tracking_settings_tenant_id");
+
+                    b.ToTable("email_tracking_settings", (string)null);
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.EnrichmentConfig", b =>
                 {
                     b.Property<Guid>("Id")
@@ -11371,6 +11442,348 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.ToTable("timeline_events", (string)null);
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.TrackedEmail", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<string>("BounceReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("bounce_reason");
+
+                    b.Property<int>("ClickCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("click_count");
+
+                    b.Property<Guid?>("ContactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("contact_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<Guid?>("DealId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deal_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<DateTime?>("FirstClickedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_clicked_at_utc");
+
+                    b.Property<DateTime?>("FirstOpenedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_opened_at_utc");
+
+                    b.Property<bool>("IsBounced")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_bounced");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<DateTime?>("LastClickedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_clicked_at_utc");
+
+                    b.Property<DateTime?>("LastOpenedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_opened_at_utc");
+
+                    b.Property<Guid?>("LeadId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lead_id");
+
+                    b.Property<Guid?>("MessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("message_id");
+
+                    b.Property<int>("OpenCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("open_count");
+
+                    b.Property<string>("RecipientEmail")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("recipient_email");
+
+                    b.Property<string>("SenderEmail")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("sender_email");
+
+                    b.Property<DateTime>("SentAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at_utc");
+
+                    b.Property<Guid?>("SentByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sent_by_user_id");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("subject");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("TrackingToken")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("tracking_token");
+
+                    b.Property<int>("UniqueClickCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("unique_click_count");
+
+                    b.Property<int>("UniqueOpenCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("unique_open_count");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_tracked_emails");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_tracked_emails_tenant_id");
+
+                    b.HasIndex("TrackingToken")
+                        .IsUnique()
+                        .HasDatabaseName("ix_tracked_emails_tracking_token");
+
+                    b.HasIndex("TenantId", "ContactId")
+                        .HasDatabaseName("ix_tracked_emails_tenant_id_contact_id");
+
+                    b.HasIndex("TenantId", "LeadId")
+                        .HasDatabaseName("ix_tracked_emails_tenant_id_lead_id");
+
+                    b.HasIndex("TenantId", "RecipientEmail")
+                        .HasDatabaseName("ix_tracked_emails_tenant_id_recipient_email");
+
+                    b.HasIndex("TenantId", "SentAtUtc")
+                        .HasDatabaseName("ix_tracked_emails_tenant_id_sent_at_utc");
+
+                    b.ToTable("tracked_emails", (string)null);
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.TrackedEmailEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("DeviceType")
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("Desktop")
+                        .HasColumnName("device_type");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("Open")
+                        .HasColumnName("event_type");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("ip_address");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("LinkToken")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("link_token");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at_utc");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrackedEmailId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tracked_email_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<string>("Url")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("url");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("user_agent");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_tracked_email_events");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_tracked_email_events_tenant_id");
+
+                    b.HasIndex("TrackedEmailId")
+                        .HasDatabaseName("ix_tracked_email_events_tracked_email_id");
+
+                    b.HasIndex("TenantId", "TrackedEmailId", "OccurredAtUtc")
+                        .HasDatabaseName("ix_tracked_email_events_tenant_id_tracked_email_id_occurred_at");
+
+                    b.ToTable("tracked_email_events", (string)null);
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.TrackedEmailLink", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("ClickCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("click_count");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<DateTime?>("FirstClickedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_clicked_at_utc");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<DateTime?>("LastClickedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_clicked_at_utc");
+
+                    b.Property<string>("LinkToken")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("link_token");
+
+                    b.Property<string>("OriginalUrl")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("original_url");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrackedEmailId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tracked_email_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_tracked_email_links");
+
+                    b.HasIndex("LinkToken")
+                        .IsUnique()
+                        .HasDatabaseName("ix_tracked_email_links_link_token");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_tracked_email_links_tenant_id");
+
+                    b.HasIndex("TrackedEmailId")
+                        .HasDatabaseName("ix_tracked_email_links_tracked_email_id");
+
+                    b.HasIndex("TenantId", "TrackedEmailId")
+                        .HasDatabaseName("ix_tracked_email_links_tenant_id_tracked_email_id");
+
+                    b.ToTable("tracked_email_links", (string)null);
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.VisitorPageView", b =>
                 {
                     b.Property<Guid>("Id")
@@ -12478,6 +12891,30 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.Navigation("Territory");
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.TrackedEmailEvent", b =>
+                {
+                    b.HasOne("MindLift.Domain.Entities.TrackedEmail", "TrackedEmail")
+                        .WithMany("Events")
+                        .HasForeignKey("TrackedEmailId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_tracked_email_events_tracked_emails_tracked_email_id");
+
+                    b.Navigation("TrackedEmail");
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.TrackedEmailLink", b =>
+                {
+                    b.HasOne("MindLift.Domain.Entities.TrackedEmail", "TrackedEmail")
+                        .WithMany("Links")
+                        .HasForeignKey("TrackedEmailId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_tracked_email_links_tracked_emails_tracked_email_id");
+
+                    b.Navigation("TrackedEmail");
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.VisitorPageView", b =>
                 {
                     b.HasOne("MindLift.Domain.Entities.VisitorSession", "Session")
@@ -12552,6 +12989,13 @@ namespace MindLift.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("MindLift.Domain.Entities.Territory", b =>
                 {
                     b.Navigation("Members");
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.TrackedEmail", b =>
+                {
+                    b.Navigation("Events");
+
+                    b.Navigation("Links");
                 });
 
             modelBuilder.Entity("MindLift.Domain.Entities.VisitorSession", b =>

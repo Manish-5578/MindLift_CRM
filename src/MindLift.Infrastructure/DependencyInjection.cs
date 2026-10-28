@@ -192,6 +192,8 @@ public static class DependencyInjection
         services.AddScoped<MindLift.Infrastructure.Automation.DataEnrichmentService>();
         services.AddScoped<MindLift.Application.Abstractions.IEmailSyncService, MindLift.Infrastructure.Communication.EmailSyncService>();
         services.AddScoped<MindLift.Infrastructure.Communication.EmailSyncService>();
+        services.AddScoped<MindLift.Application.Abstractions.IEmailTrackingService, MindLift.Infrastructure.Communication.EmailTrackingService>();
+        services.AddScoped<MindLift.Infrastructure.Communication.EmailTrackingService>();
         services.AddScoped<MindLift.Infrastructure.Activities.ActivityService>();
         services.AddScoped<MindLift.Infrastructure.Activities.QuickLogService>();
         services.AddScoped<MindLift.Infrastructure.Activities.ChecklistService>();

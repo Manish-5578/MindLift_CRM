@@ -141,6 +141,10 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<EmailSyncAccount> EmailSyncAccounts { get; set; } = null!;
     public DbSet<EmailSyncMessage> EmailSyncMessages { get; set; } = null!;
     public DbSet<EmailSyncLog> EmailSyncLogs { get; set; } = null!;
+    public DbSet<TrackedEmail> TrackedEmails { get; set; } = null!;
+    public DbSet<TrackedEmailLink> TrackedEmailLinks { get; set; } = null!;
+    public DbSet<TrackedEmailEvent> TrackedEmailEvents { get; set; } = null!;
+    public DbSet<EmailTrackingSettings> EmailTrackingSettings { get; set; } = null!;
 
     /// <summary>Tenant used by query filters. Guid.Empty when no tenant is set, so no rows match.</summary>
     protected Guid CurrentTenantId => tenant.TenantId ?? Guid.Empty;
@@ -1328,6 +1332,51 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.ToTable("email_sync_logs");
             b.Property(x => x.Status).HasMaxLength(50).HasDefaultValue("Success");
             b.HasIndex(x => new { x.TenantId, x.EmailSyncAccountId, x.StartedAt });
+        });
+
+        builder.Entity<TrackedEmail>(b =>
+        {
+            b.ToTable("tracked_emails");
+            b.Property(x => x.TrackingToken).HasMaxLength(100);
+            b.Property(x => x.RecipientEmail).HasMaxLength(320);
+            b.Property(x => x.Subject).HasMaxLength(500);
+            b.Property(x => x.SenderEmail).HasMaxLength(320);
+            b.Property(x => x.BounceReason).HasMaxLength(500);
+            b.HasIndex(x => x.TrackingToken).IsUnique();
+            b.HasIndex(x => new { x.TenantId, x.SentAtUtc });
+            b.HasIndex(x => new { x.TenantId, x.RecipientEmail });
+            b.HasIndex(x => new { x.TenantId, x.LeadId });
+            b.HasIndex(x => new { x.TenantId, x.ContactId });
+            b.HasMany(x => x.Links).WithOne(x => x.TrackedEmail).HasForeignKey(x => x.TrackedEmailId).OnDelete(DeleteBehavior.Cascade);
+            b.HasMany(x => x.Events).WithOne(x => x.TrackedEmail).HasForeignKey(x => x.TrackedEmailId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<TrackedEmailLink>(b =>
+        {
+            b.ToTable("tracked_email_links");
+            b.Property(x => x.LinkToken).HasMaxLength(100);
+            b.Property(x => x.OriginalUrl).HasMaxLength(2048);
+            b.HasIndex(x => x.LinkToken).IsUnique();
+            b.HasIndex(x => new { x.TenantId, x.TrackedEmailId });
+        });
+
+        builder.Entity<TrackedEmailEvent>(b =>
+        {
+            b.ToTable("tracked_email_events");
+            b.Property(x => x.EventType).HasMaxLength(50).HasDefaultValue("Open");
+            b.Property(x => x.LinkToken).HasMaxLength(100);
+            b.Property(x => x.Url).HasMaxLength(2048);
+            b.Property(x => x.IpAddress).HasMaxLength(100);
+            b.Property(x => x.UserAgent).HasMaxLength(500);
+            b.Property(x => x.DeviceType).HasMaxLength(50).HasDefaultValue("Desktop");
+            b.HasIndex(x => new { x.TenantId, x.TrackedEmailId, x.OccurredAtUtc });
+        });
+
+        builder.Entity<EmailTrackingSettings>(b =>
+        {
+            b.ToTable("email_tracking_settings");
+            b.Property(x => x.CustomTrackingDomain).HasMaxLength(255);
+            b.HasIndex(x => x.TenantId).IsUnique();
         });
     }
 
