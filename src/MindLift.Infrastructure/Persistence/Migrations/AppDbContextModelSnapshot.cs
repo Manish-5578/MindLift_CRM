@@ -7449,6 +7449,12 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("manager_id");
 
+                    b.Property<bool>("MustChangePassword")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("must_change_password");
+
                     b.Property<string>("NormalizedEmail")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)")

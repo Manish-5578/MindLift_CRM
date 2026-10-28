@@ -14,7 +14,8 @@ public sealed record UserListItem(
     Guid? RoleId,
     string? RoleName,
     Guid? TeamId,
-    DateTime? LastLoginAtUtc);
+    DateTime? LastLoginAtUtc,
+    bool MustChangePassword = false);
 
 public sealed record UserDetail(
     Guid Id,
@@ -31,7 +32,19 @@ public sealed record UserDetail(
     Guid? BranchId,
     Guid? ManagerId,
     DateTime? LastLoginAtUtc,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAtUtc,
+    bool MustChangePassword = false);
+
+public sealed record CreateUserRequest(
+    string Email,
+    string FirstName,
+    string LastName,
+    Guid RoleId,
+    string Password,
+    Guid? TeamId = null,
+    Guid? BranchId = null,
+    string? Phone = null,
+    string? JobTitle = null);
 
 public sealed record UpdateUserRequest(
     string FirstName,

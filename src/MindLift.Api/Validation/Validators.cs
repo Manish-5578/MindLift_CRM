@@ -39,6 +39,26 @@ public sealed class CreateInvitationRequestValidator : AbstractValidator<CreateI
     }
 }
 
+public sealed class CreateUserRequestValidator : AbstractValidator<CreateUserRequest>
+{
+    public CreateUserRequestValidator()
+    {
+        RuleFor(x => x.Email).NotEmpty().EmailAddress().MaximumLength(320);
+        RuleFor(x => x.FirstName).NotEmpty().MaximumLength(100);
+        RuleFor(x => x.LastName).NotEmpty().MaximumLength(100);
+        RuleFor(x => x.RoleId).NotEmpty();
+        RuleFor(x => x.Password).NotEmpty().MinimumLength(8).MaximumLength(128);
+    }
+}
+
+public sealed class FirstLoginChangePasswordRequestValidator : AbstractValidator<FirstLoginChangePasswordRequest>
+{
+    public FirstLoginChangePasswordRequestValidator()
+    {
+        RuleFor(x => x.NewPassword).NotEmpty().MinimumLength(8).MaximumLength(128);
+    }
+}
+
 public sealed class AcceptInvitationRequestValidator : AbstractValidator<AcceptInvitationRequest>
 {
     public AcceptInvitationRequestValidator()

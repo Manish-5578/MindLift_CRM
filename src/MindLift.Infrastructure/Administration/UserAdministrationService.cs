@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using MindLift.Application.Abstractions;
 using MindLift.Application.Common.Exceptions;
 using MindLift.Domain.Entities;
@@ -18,7 +19,9 @@ public sealed class UserAdministrationService(
     IClock clock,
     IPlanLimitService planLimits,
     RefreshTokenService refreshTokens,
-    IDataScopeService scope)
+    IDataScopeService scope,
+    IEmailSender email,
+    IOptions<AppOptions> app)
 {
     private const int MaxManagerChainDepth = 50;
 
@@ -61,7 +64,8 @@ public sealed class UserAdministrationService(
             u.RoleId,
             u.RoleId is { } roleId && roleNames.TryGetValue(roleId, out var name) ? name : null,
             u.TeamId,
-            u.LastLoginAt)).ToList();
+            u.LastLoginAt,
+            u.MustChangePassword)).ToList();
 
         return new PagedResult<UserListItem>(items, total, page, pageSize);
     }
@@ -274,6 +278,153 @@ public sealed class UserAdministrationService(
         }
     }
 
+    public async Task<UserDetail> CreateAsync(CreateUserRequest request, CancellationToken cancellationToken = default)
+    {
+        var normalized = users.NormalizeEmail(request.Email);
+        if (await db.Users.IgnoreQueryFilters().AnyAsync(u => u.NormalizedEmail == normalized, cancellationToken))
+        {
+            throw new ConflictException("email_taken", "An account with this email already exists.");
+        }
+
+        await planLimits.EnsureSeatAvailableAsync(cancellationToken);
+        var role = await EnsureRoleAndTeamAsync(request.RoleId, request.TeamId, cancellationToken);
+        await EnsureCallerCanGrantRoleAsync(role, cancellationToken);
+
+        if (request.BranchId is { } branchId && !await db.Branches.AnyAsync(b => b.Id == branchId, cancellationToken))
+        {
+            throw new NotFoundException("Branch", branchId);
+        }
+
+        var tenantId = tenant.TenantId ?? throw new UnauthorizedException("missing_tenant", "No workspace tenant found.");
+        var user = new AppUser
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = tenantId,
+            UserName = request.Email.Trim(),
+            Email = request.Email.Trim(),
+            NormalizedEmail = normalized,
+            FirstName = request.FirstName.Trim(),
+            LastName = request.LastName.Trim(),
+            PhoneNumber = request.Phone,
+            JobTitle = request.JobTitle,
+            RoleId = role.Id,
+            TeamId = request.TeamId,
+            BranchId = request.BranchId,
+            IsActive = true,
+            EmailConfirmed = true,
+            LockoutEnabled = true,
+            MustChangePassword = true,
+            CreatedAt = clock.UtcNow,
+        };
+
+        var result = await users.CreateAsync(user, request.Password);
+        if (!result.Succeeded)
+        {
+            var passwordErrors = result.Errors
+                .Where(e => e.Code.StartsWith("Password", StringComparison.Ordinal))
+                .Select(e => e.Description)
+                .ToArray();
+
+            if (passwordErrors.Length > 0)
+            {
+                throw new MindLift.Application.Common.Exceptions.ValidationException(new Dictionary<string, string[]>
+                {
+                    ["password"] = passwordErrors,
+                });
+            }
+
+            throw new ConflictException("user_create_failed", string.Join(" ", result.Errors.Select(e => e.Description)));
+        }
+
+        var appUrl = app.Value.BaseUrl.TrimEnd('/');
+        var companyName = (await db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Id == tenantId, cancellationToken))?.Name ?? "MindLift";
+        var emailBody = $"Hello {user.FirstName},\n\nYou have been added to {companyName} on MindLift.\n\nLogin Email: {user.Email}\nTemporary Password: {request.Password}\n\nPlease sign in at {appUrl}/login and you will be prompted to reset your password.\n\nRegards,\nMindLift Team";
+        try
+        {
+            await email.SendAsync(user.Email, $"Welcome to {companyName} on MindLift", emailBody, cancellationToken);
+        }
+        catch
+        {
+            // Silently ignore mail failures so account creation succeeds in all environments
+        }
+
+        return Map(user);
+    }
+
+    private async Task<Role> EnsureRoleAndTeamAsync(Guid roleId, Guid? teamId, CancellationToken cancellationToken)
+    {
+        var role = await db.Roles.FirstOrDefaultAsync(r => r.Id == roleId, cancellationToken)
+            ?? throw new NotFoundException("Role", roleId);
+
+        if (teamId is { } team && !await db.Teams.AnyAsync(t => t.Id == team, cancellationToken))
+        {
+            throw new NotFoundException("Team", team);
+        }
+
+        return role;
+    }
+
+    private async Task EnsureCallerCanGrantRoleAsync(Role targetRole, CancellationToken cancellationToken)
+    {
+        if (tenant.IsPlatformAdmin) return;
+        if (tenant.UserId is not { } callerId)
+            throw new ForbiddenException("Caller not found.", "forbidden");
+
+        var caller = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == callerId, cancellationToken);
+        if (caller == null)
+            throw new ForbiddenException("Caller not found.", "forbidden");
+
+        if (caller.IsTenantOwner) return;
+
+        if (caller.RoleId is null)
+            throw new ForbiddenException("You do not have a role and cannot grant roles.", "grant_forbidden");
+
+        var callerRole = await db.Roles.AsNoTracking().FirstOrDefaultAsync(r => r.Id == caller.RoleId, cancellationToken);
+        if (callerRole == null)
+            throw new ForbiddenException("Caller role not found.", "forbidden");
+
+        if (callerRole.IsAdmin) return;
+
+        if (targetRole.IsAdmin)
+        {
+            throw new ForbiddenException("Only administrators can grant or invite the Admin role.", "admin_role_required");
+        }
+
+        var callerPermissions = await db.RolePermissions.AsNoTracking()
+            .Where(p => p.RoleId == callerRole.Id)
+            .ToDictionaryAsync(p => p.Module, cancellationToken);
+
+        var targetPermissions = await db.RolePermissions.AsNoTracking()
+            .Where(p => p.RoleId == targetRole.Id)
+            .ToListAsync(cancellationToken);
+
+        foreach (var targetPerm in targetPermissions)
+        {
+            callerPermissions.TryGetValue(targetPerm.Module, out var callerPerm);
+
+            if (targetPerm.CanView && (callerPerm == null || !callerPerm.CanView))
+                throw new ForbiddenException($"Cannot grant role '{targetRole.Name}': missing View permission on {targetPerm.Module}.", "privilege_escalation");
+
+            if (targetPerm.CanCreate && (callerPerm == null || !callerPerm.CanCreate))
+                throw new ForbiddenException($"Cannot grant role '{targetRole.Name}': missing Create permission on {targetPerm.Module}.", "privilege_escalation");
+
+            if (targetPerm.CanEdit && (callerPerm == null || !callerPerm.CanEdit))
+                throw new ForbiddenException($"Cannot grant role '{targetRole.Name}': missing Edit permission on {targetPerm.Module}.", "privilege_escalation");
+
+            if (targetPerm.CanDelete && (callerPerm == null || !callerPerm.CanDelete))
+                throw new ForbiddenException($"Cannot grant role '{targetRole.Name}': missing Delete permission on {targetPerm.Module}.", "privilege_escalation");
+
+            if (targetPerm.CanExport && (callerPerm == null || !callerPerm.CanExport))
+                throw new ForbiddenException($"Cannot grant role '{targetRole.Name}': missing Export permission on {targetPerm.Module}.", "privilege_escalation");
+
+            if (targetPerm.CanImport && (callerPerm == null || !callerPerm.CanImport))
+                throw new ForbiddenException($"Cannot grant role '{targetRole.Name}': missing Import permission on {targetPerm.Module}.", "privilege_escalation");
+
+            if (callerPerm != null && targetPerm.Scope > callerPerm.Scope)
+                throw new ForbiddenException($"Cannot grant role '{targetRole.Name}': requested scope ({targetPerm.Scope}) exceeds your scope ({callerPerm.Scope}) on {targetPerm.Module}.", "privilege_escalation");
+        }
+    }
+
     private static UserDetail Map(AppUser u) => new(
         u.Id,
         u.Email ?? string.Empty,
@@ -289,5 +440,6 @@ public sealed class UserAdministrationService(
         u.BranchId,
         u.ManagerId,
         u.LastLoginAt,
-        u.CreatedAt);
+        u.CreatedAt,
+        u.MustChangePassword);
 }

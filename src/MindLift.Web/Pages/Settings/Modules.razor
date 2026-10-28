@@ -50,15 +50,9 @@
     /// <summary>How an admin runs the workspace. The server refuses to switch these off, so the switch is not offered.</summary>
     private static bool IsCore(string module) => module is "Dashboard" or "Users" or "Settings";
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
-        if (!App.IsAdmin)
-        {
-            Nav.NavigateTo("/");
-            return;
-        }
-
-        await LoadAsync();
+        Nav.NavigateTo("/settings/company", replace: true);
     }
 
     private async Task LoadAsync()

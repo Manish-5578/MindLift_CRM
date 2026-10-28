@@ -23,6 +23,9 @@ public sealed class AppUser : IdentityUser<Guid>
     /// <summary>Direct manager. Drives the Team data scope together with TeamId.</summary>
     public Guid? ManagerId { get; set; }
 
+    /// <summary>Flag indicating whether the user was created with a temporary password and must reset it on first login.</summary>
+    public bool MustChangePassword { get; set; }
+
     public DateTime CreatedAt { get; set; }
     public DateTime? LastLoginAt { get; set; }
 }

@@ -21,6 +21,11 @@ public sealed class UsersController(UserAdministrationService users) : Controlle
     public async Task<ActionResult<UserDetail>> Get(Guid id, CancellationToken cancellationToken)
         => Ok(await users.GetAsync(id, cancellationToken));
 
+    [HasPermission(AppModule.Users, PermissionAction.Create)]
+    [HttpPost]
+    public async Task<ActionResult<UserDetail>> Create([FromBody] CreateUserRequest request, CancellationToken cancellationToken)
+        => Ok(await users.CreateAsync(request, cancellationToken));
+
     [HasPermission(AppModule.Users, PermissionAction.Edit)]
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<UserDetail>> Update(Guid id, [FromBody] UpdateUserRequest request, CancellationToken cancellationToken)

@@ -522,6 +522,7 @@ app.UseMiddleware<MindLift.Api.Middleware.RequestLogContextMiddleware>();
 app.UseMiddleware<MindLift.Api.Middleware.SupportSessionMiddleware>();
 app.UseMiddleware<SubscriptionGuardMiddleware>();
 app.UseAuthorization();
+app.UseMiddleware<MindLift.Api.Middleware.MustChangePasswordMiddleware>();
 
 app.MapControllers();
 app.MapHub<NotificationHub>("/hubs/notifications");

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <IsPackable>false</IsPackable>
@@ -18,6 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\MindLift.Application\MindLift.Application.csproj" />
     <ProjectReference Include="..\..\src\MindLift.Infrastructure\MindLift.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\MindLift.Api\MindLift.Api.csproj" />
   </ItemGroup>
 
 </Project>

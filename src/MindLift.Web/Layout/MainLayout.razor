@@ -188,6 +188,12 @@
     /// <summary>An admin whose setup is unfinished is sent to the wizard from every page except the wizard itself.</summary>
     private void RedirectToSetupIfPending()
     {
+        if (Session.IsSignedIn && App.Bootstrap?.User.MustChangePassword == true && !Nav.ToBaseRelativePath(Nav.Uri).StartsWith("change-password", StringComparison.OrdinalIgnoreCase))
+        {
+            Nav.NavigateTo("/change-password");
+            return;
+        }
+
         if (Session.IsSignedIn && App.SetupPending && !Nav.ToBaseRelativePath(Nav.Uri).StartsWith("onboarding", StringComparison.OrdinalIgnoreCase))
         {
             Nav.NavigateTo("/onboarding");

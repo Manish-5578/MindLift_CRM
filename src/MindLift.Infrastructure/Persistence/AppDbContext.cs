@@ -133,6 +133,7 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.Property(u => u.FirstName).HasMaxLength(100);
             b.Property(u => u.LastName).HasMaxLength(100);
             b.Property(u => u.Language).HasMaxLength(5);
+            b.Property(u => u.MustChangePassword).HasDefaultValue(false);
         });
 
         builder.Entity<AuditLog>(b =>

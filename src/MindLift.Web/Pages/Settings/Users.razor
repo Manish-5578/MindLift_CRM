@@ -9,9 +9,9 @@
 <PageTitle>@T["Users"] · MindLift</PageTitle>
 
 <div class="ml-page ml-page--form">
-    <PageHeader Title="Users" Subtitle="Invite people, change roles and deactivate accounts.">
+    <PageHeader Title="Users" Subtitle="Add people, change roles and deactivate accounts.">
         <Actions>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => _invite = true" data-testid="primary-action">@T["Invite user"]</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenAddUser" data-testid="primary-action">@T["Add user"]</MudButton>
         </Actions>
     </PageHeader>
     <SettingsNav Current="/settings/users" />
@@ -45,6 +45,7 @@
                         <MudText Typo="Typo.subtitle2">@user.FullName</MudText>
                         <MudText Typo="Typo.caption" Class="ml-muted">@user.Email · @(user.RoleName ?? "No role")</MudText>
                     </div>
+                    @if (user.MustChangePassword) { <StatusChip Text="Needs password reset" Color="@StatusColors.For("New")" /> }
                     @if (!user.IsActive) { <StatusChip Text="Inactive" Color="@StatusColors.For("Expired")" /> }
                     else if (user.IsTenantOwner) { <StatusChip Text="Owner" Color="@StatusColors.For("Won")" /> }
                     @if (user.IsActive && !user.IsTenantOwner && user.Id != App.Bootstrap!.User.UserId)
@@ -55,13 +56,13 @@
             }
             @if (_users.Items.Count == 0)
             {
-                <EmptyState Title="No users yet" Message="Invite your team to get started." Compact="true" />
+                <EmptyState Title="No users yet" Message="Add your team to get started." Compact="true" />
             }
         </MlCard>
     }
 </div>
 
-<FormDrawer Open="_invite" OpenChanged="v => _invite = v" Title="Invite user" SubmitText="Send invitation" Busy="_busy" OnSubmit="InviteAsync">
+<FormDrawer Open="_invite" OpenChanged="v => _invite = v" Title="Add user" SubmitText="Add user" Busy="_busy" OnSubmit="AddUserAsync">
     <div class="ml-stack">
         <MudTextField @bind-Value="_email" Label="@T["Email *"]" InputType="InputType.Email" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="invite-email" />
         <MudGrid Spacing="3">
@@ -74,6 +75,22 @@
                 <MudSelectItem T="Guid?" Value="@role.Id">@role.Name</MudSelectItem>
             }
         </MudSelect>
+
+        <div>
+            <div class="ml-row" style="gap:8px;align-items:flex-start">
+                <div class="ml-grow">
+                    <PasswordInput @bind-Value="_password" Label="@T["Temporary password *"]" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                   Required="true"
+                                   HelperText="@T["At least 8 chars (upper, lower, digit). The user must reset this on their first login."]"
+                                   data-testid="invite-password" />
+                </div>
+                <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Size="Size.Small" OnClick="GeneratePassword"
+                           StartIcon="@Icons.Material.Outlined.AutoFixHigh" Style="margin-top:4px">
+                    @T["Generate"]
+                </MudButton>
+            </div>
+        </div>
+
         @if (_error is not null) { <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert> }
     </div>
 </FormDrawer>
@@ -87,8 +104,41 @@
     private string _email = string.Empty;
     private string _first = string.Empty;
     private string _last = string.Empty;
+    private string _password = string.Empty;
     private Guid? _roleId;
     private string? _error;
+
+    private void OpenAddUser()
+    {
+        _error = null;
+        _invite = true;
+        if (string.IsNullOrWhiteSpace(_password))
+        {
+            GeneratePassword();
+        }
+    }
+
+    private void GeneratePassword()
+    {
+        const string uppers = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+        const string lowers = "abcdefghijkmnopqrstuvwxyz";
+        const string digits = "23456789";
+        const string specials = "!@#$%";
+        var rnd = new Random();
+        var chars = new List<char>
+        {
+            uppers[rnd.Next(uppers.Length)],
+            lowers[rnd.Next(lowers.Length)],
+            digits[rnd.Next(digits.Length)],
+            specials[rnd.Next(specials.Length)]
+        };
+        const string all = uppers + lowers + digits + specials;
+        for (int i = 0; i < 6; i++)
+        {
+            chars.Add(all[rnd.Next(all.Length)]);
+        }
+        _password = new string(chars.OrderBy(_ => rnd.Next()).ToArray());
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -120,10 +170,10 @@
         }
     }
 
-    private async Task InviteAsync()
+    private async Task AddUserAsync()
     {
         _error = null;
-        if (string.IsNullOrWhiteSpace(_email) || string.IsNullOrWhiteSpace(_first) || string.IsNullOrWhiteSpace(_last) || _roleId is null)
+        if (string.IsNullOrWhiteSpace(_email) || string.IsNullOrWhiteSpace(_first) || string.IsNullOrWhiteSpace(_last) || string.IsNullOrWhiteSpace(_password) || _roleId is null)
         {
             _error = T["Fill in every field marked with *."];
             return;
@@ -132,17 +182,19 @@
         _busy = true;
         try
         {
-            var response = await Http.PostAsJsonAsync("api/v1/invitations",
-                new CreateInvitationRequest(_email.Trim(), _first.Trim(), _last.Trim(), _roleId.Value, null));
+            var response = await Http.PostAsJsonAsync("api/v1/users",
+                new CreateUserRequest(_email.Trim(), _first.Trim(), _last.Trim(), _roleId.Value, _password.Trim()));
             if (!response.IsSuccessStatusCode)
             {
-                _error = await ProblemText.FromAsync(response, T["We could not send the invitation."]);
+                var fields = await ProblemText.FieldErrorsAsync(response);
+                _error = fields.Count > 0 ? string.Join(" ", fields.Values) : await ProblemText.FromAsync(response, T["We could not add the user."]);
                 return;
             }
 
             _invite = false;
-            _email = _first = _last = string.Empty;
-            Snackbar.Add(T["Invitation sent"], Severity.Success);
+            _email = _first = _last = _password = string.Empty;
+            Snackbar.Add(T["User added successfully with temporary password. They must reset it upon first login."], Severity.Success);
+            await LoadAsync();
         }
         finally
         {

@@ -28,6 +28,11 @@ public sealed class TokenService(IOptions<JwtOptions> options, IClock clock)
             new("lang", user.Language),
         };
 
+        if (user.MustChangePassword)
+        {
+            claims.Add(new Claim("mcp", "true"));
+        }
+
         // The session stamp: when the password changes or the person is signed out everywhere, the stamp changes and older tokens stop working.
         if (!string.IsNullOrEmpty(user.SecurityStamp))
         {

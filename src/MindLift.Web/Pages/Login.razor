@@ -54,8 +54,14 @@
                 return;
             }
 
-            Session.SetTokens((await response.Content.ReadFromJsonAsync<TokenResponse>())!);
+            var tokenResp = await response.Content.ReadFromJsonAsync<TokenResponse>();
+            Session.SetTokens(tokenResp!);
             await App.LoadAsync();
+            if (tokenResp?.MustChangePassword == true || App.Bootstrap?.User.MustChangePassword == true)
+            {
+                Nav.NavigateTo("/change-password");
+                return;
+            }
             await GoHomeAsync();
         }
         catch (HttpRequestException)

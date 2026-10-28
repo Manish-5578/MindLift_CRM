@@ -11,7 +11,7 @@ public sealed class ResponsiveAndSettingsTests(E2EHost host)
     [
         "/", "/leads", "/leads/board", "/leads/import", "/contacts", "/accounts", "/contacts/import", "/deals", "/deals/board", "/deals/import", "/activities", "/settings/checklists", "/settings/booking-pages", "/calendar", "/notifications", "/notifications/preferences",
         "/settings/company", "/settings/users", "/settings/roles", "/settings/teams", "/settings/pipelines",
-        "/settings/picklists", "/settings/custom-fields", "/settings/layouts", "/settings/modules",
+        "/settings/picklists", "/settings/custom-fields", "/settings/layouts",
         "/settings/currencies", "/settings/assignment-rules", "/settings/web-forms",
     ];
 

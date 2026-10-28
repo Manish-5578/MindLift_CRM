@@ -14,7 +14,7 @@ using MindLift.Shared.Contracts;
 namespace MindLift.Infrastructure.Auth;
 
 /// <summary>Result of a successful sign-in or refresh. The refresh token is raw and must only be sent to the client once.</summary>
-public sealed record AuthResult(string AccessToken, DateTime ExpiresAtUtc, string RefreshToken);
+public sealed record AuthResult(string AccessToken, DateTime ExpiresAtUtc, string RefreshToken, bool MustChangePassword = false);
 
 /// <summary>
 /// Sign-in, sign-up, refresh, sign-out, password and email flows (plan 4.3, 6.2).
@@ -232,7 +232,29 @@ public sealed class AuthService(
             throw ToValidation(result, "Your current password is incorrect.");
         }
 
+        user.MustChangePassword = false;
+        await users.UpdateSecurityStampAsync(user);
+        await users.UpdateAsync(user);
         await refreshTokens.RevokeAllForUserAsync(userId, cancellationToken);
+    }
+
+    public async Task<AuthResult> FirstLoginChangePasswordAsync(Guid userId, string newPassword, CancellationToken cancellationToken = default)
+    {
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken)
+            ?? throw new NotFoundException("User", userId);
+
+        var resetToken = await users.GeneratePasswordResetTokenAsync(user);
+        var result = await users.ResetPasswordAsync(user, resetToken, newPassword);
+        if (!result.Succeeded)
+        {
+            throw ToValidation(result, "Password does not meet requirements.");
+        }
+
+        user.MustChangePassword = false;
+        await users.UpdateSecurityStampAsync(user);
+        await users.UpdateAsync(user);
+        await refreshTokens.RevokeAllForUserAsync(userId, cancellationToken);
+        return await IssueForUserAsync(user, cancellationToken);
     }
 
     public async Task<MeResponse> GetMeAsync(Guid userId, CancellationToken cancellationToken = default)
@@ -259,7 +281,8 @@ public sealed class AuthService(
             role?.Name,
             role?.IsAdmin ?? false,
             tenantRow.Status,
-            tenantRow.TrialEndsAt);
+            tenantRow.TrialEndsAt,
+            user.MustChangePassword);
     }
 
     /// <summary>Issues tokens for a user whose tenant is already set by the caller.</summary>
@@ -267,7 +290,7 @@ public sealed class AuthService(
     {
         var (access, expires) = tokens.CreateAccessToken(user, user.IsPlatformAdmin);
         var refresh = await refreshTokens.IssueAsync(user.Id, user.TenantId, cancellationToken: cancellationToken);
-        return new AuthResult(access, expires, refresh);
+        return new AuthResult(access, expires, refresh, user.MustChangePassword);
     }
 
     /// <summary>

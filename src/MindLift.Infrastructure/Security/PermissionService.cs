@@ -31,7 +31,17 @@ public sealed class PermissionService(IAppDbContext db, ITenantContext tenant, H
         }
 
         var user = await CurrentUserAsync(cancellationToken);
-        if (user is null || !user.IsActive || user.RoleId is null)
+        if (user is null || !user.IsActive)
+        {
+            return null;
+        }
+
+        if (user.IsPlatformAdmin || user.IsTenantOwner)
+        {
+            return new ModulePermission(module, true, true, true, true, true, true, DataScope.All);
+        }
+
+        if (user.RoleId is null)
         {
             return null;
         }

@@ -109,6 +109,11 @@ public sealed class AuthController(
         return NoContent();
     }
 
+    [Authorize]
+    [HttpPost("first-login-change-password")]
+    public async Task<ActionResult<TokenResponse>> FirstLoginChangePassword([FromBody] FirstLoginChangePasswordRequest request, CancellationToken cancellationToken)
+        => Issue(await auth.FirstLoginChangePasswordAsync(CurrentUserId(), request.NewPassword, cancellationToken));
+
     [AllowAnonymous]
     [HttpGet("invitations/{token}")]
     public async Task<ActionResult<InvitationPreview>> PreviewInvitation(string token, CancellationToken cancellationToken)
@@ -133,7 +138,7 @@ public sealed class AuthController(
             Response.Cookies.Append(RefreshCookieName, result.RefreshToken, RefreshCookieOptions(DateTimeOffset.UtcNow.AddDays(14)));
         }
 
-        return new TokenResponse(result.AccessToken, result.ExpiresAtUtc, isMobile ? result.RefreshToken : null);
+        return new TokenResponse(result.AccessToken, result.ExpiresAtUtc, isMobile ? result.RefreshToken : null, result.MustChangePassword);
     }
 
     private static CookieOptions RefreshCookieOptions(DateTimeOffset expires) => new()

@@ -5,7 +5,7 @@ using MindLift.Infrastructure.Persistence;
 namespace MindLift.Infrastructure.Caching;
 
 /// <summary>What every request needs to know about the signed-in person: whether they can still use the app, their role, their session stamp, and platform admin status.</summary>
-public sealed record UserState(Guid TenantId, bool IsActive, Guid? RoleId, string? SecurityStamp, bool IsPlatformAdmin);
+public sealed record UserState(Guid TenantId, bool IsActive, Guid? RoleId, string? SecurityStamp, bool IsPlatformAdmin, bool IsTenantOwner = false);
 
 /// <summary>Whether a company may make changes: its status and when its trial ends.</summary>
 public sealed record TenantStanding(string Status, DateTime? TrialEndsAt);
@@ -25,7 +25,7 @@ public sealed class RequestStateCache(AppDbContext db, HybridCache cache)
     public ValueTask<UserState?> UserAsync(Guid userId, CancellationToken cancellationToken = default)
         => cache.GetOrCreateAsync(UserKey(userId), async token =>
             await db.Users.IgnoreQueryFilters().AsNoTracking().Where(u => u.Id == userId)
-                .Select(u => new UserState(u.TenantId, u.IsActive, u.RoleId, u.SecurityStamp, u.IsPlatformAdmin)).FirstOrDefaultAsync(token),
+                .Select(u => new UserState(u.TenantId, u.IsActive, u.RoleId, u.SecurityStamp, u.IsPlatformAdmin, u.IsTenantOwner)).FirstOrDefaultAsync(token),
             Keep, cancellationToken: cancellationToken);
 
     public ValueTask<TenantStanding?> TenantAsync(Guid tenantId, CancellationToken cancellationToken = default)
