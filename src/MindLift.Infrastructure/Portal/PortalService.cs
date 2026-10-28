@@ -45,7 +45,21 @@ public sealed class PortalService(
         }
 
         var plan = await db.Plans.AsNoTracking().FirstOrDefaultAsync(p => p.Id == t.PlanId, ct);
-        return MindLift.Infrastructure.Platform.PlanModules.Disabled(t, plan).Contains(nameof(MindLift.Shared.Enums.AppModule.Portal)) ? null : t;
+        if (MindLift.Infrastructure.Platform.PlanModules.Disabled(t, plan).Contains(nameof(MindLift.Shared.Enums.AppModule.Portal)))
+        {
+            return null;
+        }
+
+        var portalModule = await db.ModuleSettings.IgnoreQueryFilters()
+            .Where(m => m.TenantId == t.Id && m.Module == AppModule.Portal && !m.IsDeleted)
+            .Select(m => (bool?)m.IsEnabled)
+            .FirstOrDefaultAsync(ct);
+        if (portalModule != true)
+        {
+            return null;
+        }
+
+        return t;
     }
 
     public async Task<PortalBrandingDto> GetBrandingAsync(string tenantSlug, CancellationToken ct = default)
@@ -120,6 +134,7 @@ public sealed class PortalService(
         if (t == null) return; // Prevent tenant enumeration
 
         using var scope = tenant.Use(t.Id);
+        await EnsurePortalEnabledAsync(t.Id, ct);
 
         var normEmail = req.Email.Trim().ToUpperInvariant();
         var user = await db.PortalUsers
@@ -380,6 +395,15 @@ public sealed class PortalService(
     /// <summary>Sign-in and refresh are refused while the workspace has switched its portal off.</summary>
     private async Task EnsurePortalEnabledAsync(Guid tenantId, CancellationToken ct)
     {
+        var portalModule = await db.ModuleSettings.IgnoreQueryFilters()
+            .Where(m => m.TenantId == tenantId && m.Module == AppModule.Portal && !m.IsDeleted)
+            .Select(m => (bool?)m.IsEnabled)
+            .FirstOrDefaultAsync(ct);
+        if (portalModule != true)
+        {
+            throw new ForbiddenException("The customer portal is switched off for this company.", "portal_disabled");
+        }
+
         var enabled = await db.PortalSettings.IgnoreQueryFilters()
             .Where(s => s.TenantId == tenantId && !s.IsDeleted)
             .Select(s => (bool?)s.IsEnabled)
@@ -796,12 +820,43 @@ public sealed class PortalService(
         s.SupportEmail = req.SupportEmail;
         s.SupportPhone = req.SupportPhone;
 
+        var moduleSetting = await db.ModuleSettings.FirstOrDefaultAsync(m => m.Module == AppModule.Portal, ct);
+        if (moduleSetting != null)
+        {
+            moduleSetting.IsEnabled = req.IsEnabled;
+        }
+        else
+        {
+            db.ModuleSettings.Add(new ModuleSetting
+            {
+                TenantId = CurrentTenantId,
+                Module = AppModule.Portal,
+                IsEnabled = req.IsEnabled,
+                SingularLabel = "Portal",
+                PluralLabel = "Portal",
+                SortOrder = (int)AppModule.Portal
+            });
+        }
+
+        if (!req.IsEnabled)
+        {
+            var now = DateTime.UtcNow;
+            await db.PortalTokens.Where(x => x.UsedAt == null && !x.IsDeleted)
+                .ExecuteUpdateAsync(up => up.SetProperty(x => x.UsedAt, now), ct);
+        }
+
         await db.SaveChangesAsync(ct);
         return new PortalSettingsDto(s.IsEnabled, s.WelcomeMessage, s.WelcomeMessageAr, s.ShowMetrics, s.AllowGeneralUploads, s.NotifyCustomerOnExpiry, s.SupportEmail, s.SupportPhone);
     }
 
     public async Task InviteContactAsync(InvitePortalUserRequest req, CancellationToken ct = default)
     {
+        var moduleSetting = await db.ModuleSettings.FirstOrDefaultAsync(m => m.Module == AppModule.Portal, ct);
+        if (moduleSetting != null && !moduleSetting.IsEnabled)
+        {
+            moduleSetting.IsEnabled = true;
+        }
+
         var contact = await db.Contacts.FirstOrDefaultAsync(c => c.Id == req.ContactId && !c.IsDeleted, ct)
             ?? throw new NotFoundException("Contact", req.ContactId);
         await EnsureInScopeAsync(AppModule.Contacts, contact.OwnerId, "Contact", contact.Id, ct);

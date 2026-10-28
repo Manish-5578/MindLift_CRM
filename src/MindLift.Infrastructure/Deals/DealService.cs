@@ -693,9 +693,12 @@ public sealed class DealService(
         var contactIds = deals.Where(d => d.PrimaryContactId != null).Select(d => d.PrimaryContactId!.Value).Distinct().ToList();
         var stageIds = deals.Select(d => d.StageId).Distinct().ToList();
         var settings = await db.TenantSettings.AsNoTracking().FirstAsync(cancellationToken);
+        var visibleAccounts = await RecordHelpers.InScopeAsync(db.Accounts.AsNoTracking(), scope, AppModule.Accounts, x => x.OwnerId, cancellationToken);
+        var visibleContacts = await RecordHelpers.InScopeAsync(db.Contacts.AsNoTracking(), scope, AppModule.Contacts, c => c.OwnerId, cancellationToken);
+
         return new Lookups(
-            await db.Accounts.AsNoTracking().Where(a => accountIds.Contains(a.Id)).ToDictionaryAsync(a => a.Id, a => a.Name, cancellationToken),
-            await db.Contacts.AsNoTracking().Where(c => contactIds.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => (c.FirstName + " " + c.LastName).Trim(), cancellationToken),
+            await visibleAccounts.Where(a => accountIds.Contains(a.Id)).ToDictionaryAsync(a => a.Id, a => a.Name, cancellationToken),
+            await visibleContacts.Where(c => contactIds.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => (c.FirstName + " " + c.LastName).Trim(), cancellationToken),
             await db.PipelineStages.AsNoTracking().Where(s => stageIds.Contains(s.Id)).ToDictionaryAsync(s => s.Id, cancellationToken),
             await RecordHelpers.OwnerNamesAsync(db, deals.Select(d => d.OwnerId).Distinct(), cancellationToken),
             await RatesAsync(settings.BaseCurrency, cancellationToken),

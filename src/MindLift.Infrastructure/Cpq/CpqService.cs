@@ -422,8 +422,21 @@ public sealed class CpqService(
             ?? throw new NotFoundException("Deal", quote.DealId.Value);
 
         // Mark all quotes for this deal as not synced, and this one as synced
-        var otherQuotes = await db.Set<Quote>().Where(q => q.DealId == deal.Id && !q.IsDeleted).ToListAsync(ct);
-        foreach (var o in otherQuotes) o.IsSyncedToDeal = false;
+        var scopes = await ScopesAsync(ct);
+        var allDealQuotes = await db.Set<Quote>().Where(q => q.DealId == deal.Id && !q.IsDeleted).ToListAsync(ct);
+        var inScopeDealQuotes = await ScopeQuotes(db.Set<Quote>().Where(q => q.DealId == deal.Id && !q.IsDeleted), scopes).ToListAsync(ct);
+        var inScopeIds = inScopeDealQuotes.Select(x => x.Id).ToHashSet();
+
+        var outOfScopeSynced = allDealQuotes.FirstOrDefault(q => !inScopeIds.Contains(q.Id) && q.IsSyncedToDeal);
+        if (outOfScopeSynced != null)
+        {
+            throw new ForbiddenException("Cannot desync a quote outside your quotation scope.", "quotation_out_of_scope");
+        }
+
+        foreach (var o in inScopeDealQuotes)
+        {
+            o.IsSyncedToDeal = false;
+        }
 
         quote.IsSyncedToDeal = true;
         deal.Amount = quote.GrandTotal;

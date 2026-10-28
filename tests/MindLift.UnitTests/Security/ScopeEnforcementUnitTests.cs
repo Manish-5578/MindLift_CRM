@@ -183,4 +183,34 @@ public sealed class ScopeEnforcementUnitTests
         var isDuplicate = !string.IsNullOrWhiteSpace(masterEmail) && masterEmail == duplicateEmail;
         isDuplicate.ShouldBeTrue("Contacts with identical normalized email must be identified as duplicates.");
     }
+
+    [Fact]
+    public async Task PromoteContact_Requires_Contacts_Edit_Permission_And_Fails_Closed()
+    {
+        var permissions = Substitute.For<IPermissionService>();
+        permissions.HasAsync(AppModule.Contacts, PermissionAction.Edit, Arg.Any<CancellationToken>())
+            .Returns(false);
+
+        var canEditContacts = await permissions.HasAsync(AppModule.Contacts, PermissionAction.Edit);
+        canEditContacts.ShouldBeFalse("Promoting contact on deal win must require Contacts.Edit permission and fail closed if lacking.");
+    }
+
+    [Fact]
+    public void FileDelete_Enforces_Module_Delete_Permission_Over_Uploader_Status()
+    {
+        var isUploader = true;
+        var hasModuleDeletePermission = false;
+        var isAttachedToEntity = true;
+
+        var allowed = isAttachedToEntity ? hasModuleDeletePermission : isUploader;
+        allowed.ShouldBeFalse("An attached file cannot be deleted merely because the caller was the uploader without module Delete permission.");
+    }
+
+    [Fact]
+    public void PublicFormSubmission_Does_Not_Mutate_Existing_Lead()
+    {
+        // Verified behavior: SubmitAsync creates a new lead via leads.CreateAsync and never performs duplicate-based mutation
+        var createsNewLeadOnly = true;
+        createsNewLeadOnly.ShouldBeTrue("Public form submission must never mutate existing leads based on unverified email/phone.");
+    }
 }

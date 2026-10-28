@@ -194,6 +194,18 @@ public sealed class CompanySettingsService(AppDbContext db, ITenantContext tenan
         if (allowed)
         {
             row.IsEnabled = request.IsEnabled;
+            if (!request.IsEnabled && parsed == MindLift.Shared.Enums.AppModule.Portal)
+            {
+                var now = DateTime.UtcNow;
+                await db.PortalTokens.Where(x => x.UsedAt == null && !x.IsDeleted)
+                    .ExecuteUpdateAsync(s => s.SetProperty(x => x.UsedAt, now), cancellationToken);
+
+                var portalSettings = await db.PortalSettings.FirstOrDefaultAsync(s => !s.IsDeleted, cancellationToken);
+                if (portalSettings != null)
+                {
+                    portalSettings.IsEnabled = false;
+                }
+            }
         }
 
         row.SingularLabel = request.SingularLabel.Trim();

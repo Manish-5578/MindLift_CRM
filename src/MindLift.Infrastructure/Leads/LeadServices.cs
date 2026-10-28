@@ -992,31 +992,18 @@ public sealed class PublicFormService(AppDbContext db, ITenantContext tenant, Le
 
         using var scope = tenant.Use(form.TenantId);
         var allowed = JsonSerializer.Deserialize<List<string>>(form.Fields.RootElement.GetRawText()) ?? [];
-        var email = allowed.Contains("email") ? LeadNormalizer.Email(submission.Email) : null;
-        var phone = allowed.Contains("phone") ? LeadNormalizer.Phone(submission.Phone) : null;
 
-        var existing = await db.Leads.FirstOrDefaultAsync(l =>
-            l.ConvertedAt == null && ((email != null && l.NormalizedEmail == email) || (phone != null && l.NormalizedPhone == phone)), cancellationToken);
-        if (existing is not null)
-        {
-            // Re-submission: fill empty fields only and leave the lead where it is.
-            existing.Email ??= email is null ? null : submission.Email?.Trim();
-            existing.NormalizedEmail ??= email;
-            existing.Phone ??= phone is null ? null : submission.Phone?.Trim();
-            existing.NormalizedPhone ??= phone;
-            existing.CompanyName ??= submission.CompanyName?.Trim();
-            form.SubmissionCount++;
-            await db.SaveChangesAsync(cancellationToken);
-            return new PublicFormResult(form.SuccessMessage, true);
-        }
+        var firstName = !string.IsNullOrWhiteSpace(submission.FirstName) ? submission.FirstName.Trim() : "Web";
+        var lastName = !string.IsNullOrWhiteSpace(submission.LastName) ? submission.LastName.Trim() : "Lead";
 
         var request = new SaveLeadRequest(
-            submission.FirstName, submission.LastName,
-            allowed.Contains("email") ? submission.Email : null,
-            allowed.Contains("phone") ? submission.Phone : null,
-            allowed.Contains("company_name") ? submission.CompanyName : null,
+            firstName,
+            lastName,
+            allowed.Contains("email") ? submission.Email?.Trim() : null,
+            allowed.Contains("phone") ? submission.Phone?.Trim() : null,
+            allowed.Contains("company_name") ? submission.CompanyName?.Trim() : null,
             "new", form.DefaultSource, null,
-            allowed.Contains("description") ? submission.Message : null,
+            allowed.Contains("description") ? submission.Message?.Trim() : null,
             null, null, null);
 
         var created = await leads.CreateAsync(request, cancellationToken);

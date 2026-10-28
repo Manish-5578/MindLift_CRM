@@ -376,24 +376,45 @@ public sealed class ActivityService(AppDbContext db, ITenantContext tenant, IClo
         var contactId = request.ContactId;
         var accountId = request.AccountId;
         var dealId = request.DealId;
-        await EnsureLinkInScopeAsync(request.LeadId, activity.LeadId, db.Leads.AsNoTracking(), AppModule.Leads, x => x.OwnerId, x => x.Id, "leadId", cancellationToken);
-        await EnsureLinkInScopeAsync(request.ContactId, activity.ContactId, db.Contacts.AsNoTracking(), AppModule.Contacts, x => x.OwnerId, x => x.Id, "contactId", cancellationToken);
-        await EnsureLinkInScopeAsync(request.AccountId, activity.AccountId, db.Accounts.AsNoTracking(), AppModule.Accounts, x => x.OwnerId, x => x.Id, "accountId", cancellationToken);
-        await EnsureLinkInScopeAsync(request.DealId, activity.DealId, db.Deals.AsNoTracking(), AppModule.Deals, x => x.OwnerId, x => x.Id, "dealId", cancellationToken);
+        await EnsureLinkInScopeAsync(request.LeadId, db.Leads.AsNoTracking(), AppModule.Leads, x => x.OwnerId, x => x.Id, "leadId", cancellationToken);
+        await EnsureLinkInScopeAsync(request.ContactId, db.Contacts.AsNoTracking(), AppModule.Contacts, x => x.OwnerId, x => x.Id, "contactId", cancellationToken);
+        await EnsureLinkInScopeAsync(request.AccountId, db.Accounts.AsNoTracking(), AppModule.Accounts, x => x.OwnerId, x => x.Id, "accountId", cancellationToken);
+        await EnsureLinkInScopeAsync(request.DealId, db.Deals.AsNoTracking(), AppModule.Deals, x => x.OwnerId, x => x.Id, "dealId", cancellationToken);
         if (leadId is { } l && !await db.Leads.AnyAsync(x => x.Id == l, cancellationToken)) throw RecordHelpers.Invalid("leadId", "That lead no longer exists.");
         if (dealId is { } d)
         {
             var deal = await db.Deals.AsNoTracking().Where(x => x.Id == d).Select(x => new { x.AccountId, x.PrimaryContactId }).FirstOrDefaultAsync(cancellationToken)
                 ?? throw RecordHelpers.Invalid("dealId", "That deal no longer exists.");
-            accountId ??= deal.AccountId;
-            contactId ??= deal.PrimaryContactId;
+            if (accountId is null && deal.AccountId is { } derivedAcc)
+            {
+                var scopedAccounts = await RecordHelpers.InScopeAsync(db.Accounts.AsNoTracking(), scope, AppModule.Accounts, x => x.OwnerId, cancellationToken);
+                if (await scopedAccounts.AnyAsync(x => x.Id == derivedAcc, cancellationToken))
+                {
+                    accountId = derivedAcc;
+                }
+            }
+            if (contactId is null && deal.PrimaryContactId is { } derivedContact)
+            {
+                var scopedContacts = await RecordHelpers.InScopeAsync(db.Contacts.AsNoTracking(), scope, AppModule.Contacts, x => x.OwnerId, cancellationToken);
+                if (await scopedContacts.AnyAsync(x => x.Id == derivedContact, cancellationToken))
+                {
+                    contactId = derivedContact;
+                }
+            }
         }
 
         if (contactId is { } c)
         {
             var contact = await db.Contacts.AsNoTracking().Where(x => x.Id == c).Select(x => new { x.AccountId }).FirstOrDefaultAsync(cancellationToken)
                 ?? throw RecordHelpers.Invalid("contactId", "That contact no longer exists.");
-            accountId ??= contact.AccountId;
+            if (accountId is null && contact.AccountId is { } derivedAcc)
+            {
+                var scopedAccounts = await RecordHelpers.InScopeAsync(db.Accounts.AsNoTracking(), scope, AppModule.Accounts, x => x.OwnerId, cancellationToken);
+                if (await scopedAccounts.AnyAsync(x => x.Id == derivedAcc, cancellationToken))
+                {
+                    accountId = derivedAcc;
+                }
+            }
         }
 
         if (accountId is { } a && !await db.Accounts.AnyAsync(x => x.Id == a, cancellationToken)) throw RecordHelpers.Invalid("accountId", "That account no longer exists.");
@@ -454,11 +475,7 @@ public sealed class ActivityService(AppDbContext db, ITenantContext tenant, IClo
         activity.DealId = dealId;
         if (request.OwnerId is { } owner)
         {
-            if (owner != activity.OwnerId)
-            {
-                await RecordHelpers.EnsureOwnerAsync(db, scope, AppModule.Activities, owner, cancellationToken);
-            }
-
+            await RecordHelpers.EnsureOwnerAsync(db, scope, AppModule.Activities, owner, cancellationToken);
             activity.OwnerId = owner;
         }
 
@@ -641,10 +658,15 @@ public sealed class ActivityService(AppDbContext db, ITenantContext tenant, IClo
         var contactIds = rows.Where(r => r.ContactId != null).Select(r => r.ContactId!.Value).Distinct().ToList();
         var accountIds = rows.Where(r => r.AccountId != null).Select(r => r.AccountId!.Value).Distinct().ToList();
         var leadIds = rows.Where(r => r.LeadId != null).Select(r => r.LeadId!.Value).Distinct().ToList();
-        var deals = await db.Deals.AsNoTracking().Where(x => dealIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, cancellationToken);
-        var contacts = await db.Contacts.AsNoTracking().Where(x => contactIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => (x.FirstName + " " + x.LastName).Trim(), cancellationToken);
-        var accounts = await db.Accounts.AsNoTracking().Where(x => accountIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, cancellationToken);
-        var leads = await db.Leads.AsNoTracking().Where(x => leadIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => (x.FirstName + " " + x.LastName).Trim(), cancellationToken);
+        var visibleDeals = await RecordHelpers.InScopeAsync(db.Deals.AsNoTracking(), scope, AppModule.Deals, x => x.OwnerId, cancellationToken);
+        var visibleContacts = await RecordHelpers.InScopeAsync(db.Contacts.AsNoTracking(), scope, AppModule.Contacts, x => x.OwnerId, cancellationToken);
+        var visibleAccounts = await RecordHelpers.InScopeAsync(db.Accounts.AsNoTracking(), scope, AppModule.Accounts, x => x.OwnerId, cancellationToken);
+        var visibleLeads = await RecordHelpers.InScopeAsync(db.Leads.AsNoTracking(), scope, AppModule.Leads, x => x.OwnerId, cancellationToken);
+
+        var deals = await visibleDeals.Where(x => dealIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, cancellationToken);
+        var contacts = await visibleContacts.Where(x => contactIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => (x.FirstName + " " + x.LastName).Trim(), cancellationToken);
+        var accounts = await visibleAccounts.Where(x => accountIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, cancellationToken);
+        var leads = await visibleLeads.Where(x => leadIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => (x.FirstName + " " + x.LastName).Trim(), cancellationToken);
         var activityIds = rows.Select(r => r.Id).ToList();
         var mentionRows = await db.ActivityMentions.AsNoTracking().Where(m => activityIds.Contains(m.ActivityId)).ToListAsync(cancellationToken);
         var mentionNames = await RecordHelpers.OwnerNamesAsync(db, mentionRows.Select(m => m.UserId).Distinct(), cancellationToken);
@@ -676,11 +698,11 @@ public sealed class ActivityService(AppDbContext db, ITenantContext tenant, IClo
     private async Task<Activity> LoadScopedAsync(Guid id, CancellationToken cancellationToken)
         => await (await ScopedAsync(cancellationToken)).FirstOrDefaultAsync(a => a.Id == id, cancellationToken) ?? throw new NotFoundException("Activity", id);
 
-    /// <summary>A record linked by the caller (not inherited from a deal or contact) must be one they can see. Links already on the activity may stay.</summary>
-    private async Task EnsureLinkInScopeAsync<T>(Guid? requested, Guid? current, IQueryable<T> source, AppModule module,
+    /// <summary>A record linked by the caller must be one they can see.</summary>
+    private async Task EnsureLinkInScopeAsync<T>(Guid? requested, IQueryable<T> source, AppModule module,
         System.Linq.Expressions.Expression<Func<T, Guid>> owner, System.Linq.Expressions.Expression<Func<T, Guid>> key, string field, CancellationToken cancellationToken)
     {
-        if (requested is not { } wanted || wanted == current)
+        if (requested is not { } wanted)
         {
             return;
         }

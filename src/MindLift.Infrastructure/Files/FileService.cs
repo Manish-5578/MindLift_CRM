@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using MindLift.Application.Abstractions;
 using MindLift.Application.Common.Exceptions;
 using MindLift.Domain.Entities;
+using MindLift.Infrastructure.Contacts;
 using MindLift.Infrastructure.Persistence;
 using MindLift.Shared.Contracts;
 using MindLift.Shared.Enums;
@@ -135,13 +136,35 @@ public sealed class FileService(AppDbContext db, IFileStorage storage, ITenantCo
     public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var row = await LoadAsync(id, cancellationToken);
-        var isUploader = row.UploadedById is { } uploader && uploader == tenant.UserId;
-        var canDelete = row.EntityType is { } type && EntityModules.TryGetValue(type, out var module)
-            ? await permissions.HasAsync(module, PermissionAction.Delete, cancellationToken)
-            : false;
-        if (!isUploader && !canDelete)
+        if (row.EntityType is { } type && EntityModules.TryGetValue(type, out var module))
         {
-            throw new ForbiddenException();
+            if (!await permissions.HasAsync(module, PermissionAction.Delete, cancellationToken))
+            {
+                throw new ForbiddenException();
+            }
+
+            if (row.EntityId is { } entityId)
+            {
+                var inScope = type switch
+                {
+                    "leads" => await (await RecordHelpers.InScopeAsync(db.Leads.AsNoTracking(), scope, AppModule.Leads, x => x.OwnerId, cancellationToken)).AnyAsync(x => x.Id == entityId, cancellationToken),
+                    "contacts" => await (await RecordHelpers.InScopeAsync(db.Contacts.AsNoTracking(), scope, AppModule.Contacts, x => x.OwnerId, cancellationToken)).AnyAsync(x => x.Id == entityId, cancellationToken),
+                    "accounts" => await (await RecordHelpers.InScopeAsync(db.Accounts.AsNoTracking(), scope, AppModule.Accounts, x => x.OwnerId, cancellationToken)).AnyAsync(x => x.Id == entityId, cancellationToken),
+                    "deals" => await (await RecordHelpers.InScopeAsync(db.Deals.AsNoTracking(), scope, AppModule.Deals, x => x.OwnerId, cancellationToken)).AnyAsync(x => x.Id == entityId, cancellationToken),
+                    _ => await (await RecordHelpers.InScopeAsync(db.Activities.AsNoTracking(), scope, AppModule.Activities, x => x.OwnerId, cancellationToken)).AnyAsync(x => x.Id == entityId, cancellationToken),
+                };
+                if (!inScope)
+                {
+                    throw new NotFoundException(type, entityId);
+                }
+            }
+        }
+        else
+        {
+            if (row.UploadedById is null || row.UploadedById != tenant.UserId)
+            {
+                throw new ForbiddenException();
+            }
         }
 
         // Soft delete only. The bytes stay in storage until a retention job removes them.

@@ -166,7 +166,8 @@ public sealed class ContactService(AppDbContext db, ITenantContext tenant, ICloc
 
         var owners = await RecordHelpers.OwnerNamesAsync(db, rows.Select(r => r.OwnerId).Distinct(), cancellationToken);
         var accountIds = rows.Where(r => r.AccountId != null).Select(r => r.AccountId!.Value).Distinct().ToList();
-        var accounts = await db.Accounts.AsNoTracking().Where(a => accountIds.Contains(a.Id)).ToDictionaryAsync(a => a.Id, a => a.Name, cancellationToken);
+        var visibleAccounts = await RecordHelpers.InScopeAsync(db.Accounts.AsNoTracking(), scope, AppModule.Accounts, a => a.OwnerId, cancellationToken);
+        var accounts = await visibleAccounts.Where(a => accountIds.Contains(a.Id)).ToDictionaryAsync(a => a.Id, a => a.Name, cancellationToken);
 
         var items = rows.Select(c => new ContactListItemDto(c.Id, $"{c.FirstName} {c.LastName}".Trim(), c.FirstName, c.LastName, c.Email, c.Phone, c.JobTitle,
             c.AccountId, c.AccountId is { } a ? accounts.GetValueOrDefault(a) : null, c.Type, c.OwnerId, owners.GetValueOrDefault(c.OwnerId), c.CreatedAt)).ToList();
@@ -450,7 +451,7 @@ public sealed class ContactService(AppDbContext db, ITenantContext tenant, ICloc
             throw RecordHelpers.Invalid("type", "Choose a valid type.");
         }
 
-        if (request.AccountId is { } accountId && accountId != contact.AccountId
+        if (request.AccountId is { } accountId
             && !await (await RecordHelpers.InScopeAsync(db.Accounts.AsNoTracking(), scope, AppModule.Accounts, a => a.OwnerId, cancellationToken)).AnyAsync(a => a.Id == accountId, cancellationToken))
         {
             throw RecordHelpers.Invalid("accountId", "Choose an existing account.");
@@ -491,7 +492,8 @@ public sealed class ContactService(AppDbContext db, ITenantContext tenant, ICloc
 
     private async Task<ContactDto> MapAsync(Contact c, CancellationToken cancellationToken)
     {
-        var accountName = c.AccountId is { } id ? await db.Accounts.AsNoTracking().Where(a => a.Id == id).Select(a => a.Name).FirstOrDefaultAsync(cancellationToken) : null;
+        var visibleAccounts = await RecordHelpers.InScopeAsync(db.Accounts.AsNoTracking(), scope, AppModule.Accounts, a => a.OwnerId, cancellationToken);
+        var accountName = c.AccountId is { } id ? await visibleAccounts.Where(a => a.Id == id).Select(a => a.Name).FirstOrDefaultAsync(cancellationToken) : null;
         return new ContactDto(c.Id, c.FirstName, c.LastName, c.Email, c.Phone, c.JobTitle, c.Description, c.AccountId, accountName, c.Type, c.OwnerId, c.CreatedAt, RecordHelpers.Custom(c.CustomFields));
     }
 
@@ -542,7 +544,8 @@ public sealed class AccountService(AppDbContext db, ITenantContext tenant, ICloc
         var counts = await db.Contacts.AsNoTracking().Where(c => c.AccountId != null && ids.Contains(c.AccountId.Value))
             .GroupBy(c => c.AccountId!.Value).Select(g => new { g.Key, Count = g.Count() }).ToDictionaryAsync(x => x.Key, x => x.Count, cancellationToken);
         var parentIds = rows.Where(r => r.ParentAccountId != null).Select(r => r.ParentAccountId!.Value).Distinct().ToList();
-        var parents = await db.Accounts.AsNoTracking().Where(a => parentIds.Contains(a.Id)).ToDictionaryAsync(a => a.Id, a => a.Name, cancellationToken);
+        var scopedAccounts = await ScopedAsync(cancellationToken);
+        var parents = await scopedAccounts.AsNoTracking().Where(a => parentIds.Contains(a.Id)).ToDictionaryAsync(a => a.Id, a => a.Name, cancellationToken);
         var owners = await RecordHelpers.OwnerNamesAsync(db, rows.Select(r => r.OwnerId).Distinct(), cancellationToken);
 
         var items = rows.Select(a => new AccountListItemDto(a.Id, a.Name, a.Website, a.Phone, a.Industry, a.ParentAccountId,
@@ -765,7 +768,7 @@ public sealed class AccountService(AppDbContext db, ITenantContext tenant, ICloc
                 throw RecordHelpers.Invalid("parentAccountId", "An account cannot be its own parent.");
             }
 
-            if (parentId != account.ParentAccountId && !await (await ScopedAsync(cancellationToken)).AnyAsync(a => a.Id == parentId, cancellationToken))
+            if (!await (await ScopedAsync(cancellationToken)).AnyAsync(a => a.Id == parentId, cancellationToken))
             {
                 throw RecordHelpers.Invalid("parentAccountId", "Choose an existing account as the parent.");
             }
@@ -816,7 +819,8 @@ public sealed class AccountService(AppDbContext db, ITenantContext tenant, ICloc
 
     private async Task<AccountDto> MapAsync(Account a, CancellationToken cancellationToken)
     {
-        var parent = a.ParentAccountId is { } id ? await db.Accounts.AsNoTracking().Where(x => x.Id == id).Select(x => x.Name).FirstOrDefaultAsync(cancellationToken) : null;
+        var scopedAccounts = await ScopedAsync(cancellationToken);
+        var parent = a.ParentAccountId is { } id ? await scopedAccounts.AsNoTracking().Where(x => x.Id == id).Select(x => x.Name).FirstOrDefaultAsync(cancellationToken) : null;
         return new AccountDto(a.Id, a.Name, a.Website, a.Phone, a.Industry, a.Description, a.ParentAccountId, parent, a.OwnerId, a.CreatedAt, RecordHelpers.Custom(a.CustomFields));
     }
 
