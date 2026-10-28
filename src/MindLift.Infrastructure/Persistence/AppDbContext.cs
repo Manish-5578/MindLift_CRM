@@ -153,6 +153,11 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<WhatsAppSettings> WhatsAppSettings { get; set; } = null!;
     public DbSet<WhatsAppConversation> WhatsAppConversations { get; set; } = null!;
     public DbSet<WhatsAppMessage> WhatsAppMessages { get; set; } = null!;
+    public DbSet<SharedMailbox> SharedMailboxes { get; set; } = null!;
+    public DbSet<SharedMailboxMember> SharedMailboxMembers { get; set; } = null!;
+    public DbSet<SharedThread> SharedThreads { get; set; } = null!;
+    public DbSet<SharedThreadMessage> SharedThreadMessages { get; set; } = null!;
+    public DbSet<SharedThreadCollisionLock> SharedThreadCollisionLocks { get; set; } = null!;
 
     /// <summary>Tenant used by query filters. Guid.Empty when no tenant is set, so no rows match.</summary>
     protected Guid CurrentTenantId => tenant.TenantId ?? Guid.Empty;
@@ -1476,6 +1481,55 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.HasIndex(x => x.MessageId);
             b.HasIndex(x => new { x.TenantId, x.ConversationId });
             b.HasIndex(x => new { x.TenantId, x.SentAtUtc });
+        });
+
+        builder.Entity<SharedMailbox>(b =>
+        {
+            b.ToTable("shared_mailboxes");
+            b.Property(x => x.Name).HasMaxLength(100);
+            b.Property(x => x.EmailAddress).HasMaxLength(256);
+            b.Property(x => x.AutoAssignmentRule).HasMaxLength(50).HasDefaultValue("Manual");
+            b.HasIndex(x => new { x.TenantId, x.EmailAddress }).IsUnique();
+        });
+
+        builder.Entity<SharedMailboxMember>(b =>
+        {
+            b.ToTable("shared_mailbox_members");
+            b.Property(x => x.Role).HasMaxLength(50).HasDefaultValue("Agent");
+            b.HasIndex(x => new { x.TenantId, x.MailboxId, x.UserId }).IsUnique();
+        });
+
+        builder.Entity<SharedThread>(b =>
+        {
+            b.ToTable("shared_threads");
+            b.Property(x => x.Subject).HasMaxLength(500);
+            b.Property(x => x.CustomerEmail).HasMaxLength(256);
+            b.Property(x => x.CustomerName).HasMaxLength(200);
+            b.Property(x => x.Status).HasMaxLength(50).HasDefaultValue("Open");
+            b.Property(x => x.Priority).HasMaxLength(50).HasDefaultValue("Medium");
+            b.HasIndex(x => new { x.TenantId, x.MailboxId });
+            b.HasIndex(x => new { x.TenantId, x.AssignedUserId });
+            b.HasIndex(x => new { x.TenantId, x.Status });
+            b.HasIndex(x => new { x.TenantId, x.LastMessageAtUtc });
+        });
+
+        builder.Entity<SharedThreadMessage>(b =>
+        {
+            b.ToTable("shared_thread_messages");
+            b.Property(x => x.SenderType).HasMaxLength(50).HasDefaultValue("Customer");
+            b.Property(x => x.SenderEmail).HasMaxLength(256);
+            b.Property(x => x.SenderName).HasMaxLength(200);
+            b.HasIndex(x => new { x.TenantId, x.ThreadId });
+            b.HasIndex(x => new { x.TenantId, x.SentAtUtc });
+        });
+
+        builder.Entity<SharedThreadCollisionLock>(b =>
+        {
+            b.ToTable("shared_thread_collision_locks");
+            b.Property(x => x.UserName).HasMaxLength(200);
+            b.Property(x => x.Action).HasMaxLength(50).HasDefaultValue("Drafting");
+            b.HasIndex(x => new { x.TenantId, x.ThreadId, x.UserId }).IsUnique();
+            b.HasIndex(x => new { x.TenantId, x.ExpiresAtUtc });
         });
     }
 

@@ -202,6 +202,8 @@ public static class DependencyInjection
         services.AddScoped<MindLift.Infrastructure.Communication.CallRecordingService>();
         services.AddScoped<MindLift.Application.Abstractions.IWhatsAppService, MindLift.Infrastructure.Communication.WhatsAppService>();
         services.AddScoped<MindLift.Infrastructure.Communication.WhatsAppService>();
+        services.AddScoped<MindLift.Application.Abstractions.ISharedInboxService, MindLift.Infrastructure.Communication.SharedInboxService>();
+        services.AddScoped<MindLift.Infrastructure.Communication.SharedInboxService>();
         services.AddScoped<MindLift.Infrastructure.Activities.ActivityService>();
         services.AddScoped<MindLift.Infrastructure.Activities.QuickLogService>();
         services.AddScoped<MindLift.Infrastructure.Activities.ChecklistService>();
