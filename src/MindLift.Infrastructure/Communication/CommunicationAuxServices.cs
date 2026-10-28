@@ -269,7 +269,11 @@ public sealed class ChannelAccountService(
         account.SenderAddress = request.SenderAddress;
         account.IsDefault = request.IsDefault;
         account.IsActive = request.IsActive;
-        account.AutoCreateLeads = request.AutoCreateLeads;
+        if (request.Channel == CommunicationChannel.Email && !string.IsNullOrWhiteSpace(request.Host))
+        {
+            await SmtpSecurityPolicy.ValidateDestinationAsync(request.Host, ct);
+        }
+
         account.Host = request.Host;
         account.Port = request.Port;
         account.Username = request.Username;

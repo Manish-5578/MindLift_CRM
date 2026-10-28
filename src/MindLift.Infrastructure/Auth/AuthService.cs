@@ -1,10 +1,13 @@
+using Hangfire;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MindLift.Application.Abstractions;
 using MindLift.Application.Common.Exceptions;
 using MindLift.Domain.Entities;
+using MindLift.Infrastructure.Communication;
 using MindLift.Infrastructure.Identity;
 using MindLift.Infrastructure.Persistence;
+using MindLift.Infrastructure.Portal;
 using MindLift.Infrastructure.Tenancy;
 using MindLift.Shared.Contracts;
 
@@ -27,7 +30,9 @@ public sealed class AuthService(
     TenantSignupService signup,
     IEmailSender email,
     IClock clock,
-    Microsoft.Extensions.Options.IOptions<AppOptions> app)
+    Microsoft.Extensions.Options.IOptions<AppOptions> app,
+    IBackgroundJobClient jobs,
+    ISecretProtector secretProtector)
 {
     private const string GenericLoginFailure = "Email or password is incorrect.";
     private static readonly string StandInHash = new PasswordHasher<AppUser>().HashPassword(new AppUser(), Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16)));
@@ -133,18 +138,24 @@ public sealed class AuthService(
         var user = await FindUserAcrossTenantsAsync(emailAddress, cancellationToken);
         if (user is null || !user.IsActive)
         {
+            _ = users.PasswordHasher.VerifyHashedPassword(new AppUser(), StandInHash, emailAddress);
             return;
         }
 
         using var scope = tenant.Use(user.TenantId, user.Id);
         var token = await users.GeneratePasswordResetTokenAsync(user);
         var link = $"{app.Value.BaseUrl}/reset-password?email={Uri.EscapeDataString(user.Email!)}&token={Uri.EscapeDataString(token)}";
+        var body = $"Hello {user.FirstName},\n\nUse this link to choose a new password (valid for one hour):\n{link}\n\nIf you did not ask for this, ignore this email.";
+        var protectedBody = secretProtector.Protect(body);
 
-        await email.SendAsync(
-            user.Email!,
-            "Reset your MindLift password",
-            $"Hello {user.FirstName},\n\nUse this link to choose a new password (valid for one hour):\n{link}\n\nIf you did not ask for this, ignore this email.",
-            cancellationToken);
+        try
+        {
+            jobs.Enqueue<PortalEmailJob>(job => job.SendAsync(user.Email!, "Reset your MindLift password", protectedBody, CancellationToken.None));
+        }
+        catch
+        {
+            // Silently ignore queue failures to prevent timing and status leaking
+        }
     }
 
     public async Task ResetPasswordAsync(string emailAddress, string token, string newPassword, CancellationToken cancellationToken = default)

@@ -55,6 +55,13 @@ public sealed class FileService(AppDbContext db, IFileStorage storage, ITenantCo
 
         var module = await AuthorizeEntityAsync(entityType, entityId, PermissionAction.Edit, cancellationToken);
 
+        var maxTenantBytes = (configuration.GetValue<long?>("Storage:MaxTenantStorageMegabytes") ?? 500) * 1024 * 1024;
+        var currentTenantUsage = await db.Files.AsNoTracking().Where(f => f.TenantId == tenantId).SumAsync(f => (long)f.SizeBytes, cancellationToken);
+        if (currentTenantUsage + (content.CanSeek ? content.Length : 0) > maxTenantBytes)
+        {
+            throw Invalid($"Tenant storage quota of {maxTenantBytes / 1024 / 1024} MB exceeded.");
+        }
+
         var limit = MaxBytes;
         if (content.CanSeek && content.Length > limit)
         {
@@ -71,6 +78,10 @@ public sealed class FileService(AppDbContext db, IFileStorage storage, ITenantCo
             if (buffer.Length > limit)
             {
                 throw Invalid($"The file is larger than {limit / 1024 / 1024} MB.");
+            }
+            if (currentTenantUsage + buffer.Length > maxTenantBytes)
+            {
+                throw Invalid($"Tenant storage quota of {maxTenantBytes / 1024 / 1024} MB exceeded.");
             }
         }
 
@@ -145,14 +156,7 @@ public sealed class FileService(AppDbContext db, IFileStorage storage, ITenantCo
 
             if (row.EntityId is { } entityId)
             {
-                var inScope = type switch
-                {
-                    "leads" => await (await RecordHelpers.InScopeAsync(db.Leads.AsNoTracking(), scope, AppModule.Leads, x => x.OwnerId, cancellationToken)).AnyAsync(x => x.Id == entityId, cancellationToken),
-                    "contacts" => await (await RecordHelpers.InScopeAsync(db.Contacts.AsNoTracking(), scope, AppModule.Contacts, x => x.OwnerId, cancellationToken)).AnyAsync(x => x.Id == entityId, cancellationToken),
-                    "accounts" => await (await RecordHelpers.InScopeAsync(db.Accounts.AsNoTracking(), scope, AppModule.Accounts, x => x.OwnerId, cancellationToken)).AnyAsync(x => x.Id == entityId, cancellationToken),
-                    "deals" => await (await RecordHelpers.InScopeAsync(db.Deals.AsNoTracking(), scope, AppModule.Deals, x => x.OwnerId, cancellationToken)).AnyAsync(x => x.Id == entityId, cancellationToken),
-                    _ => await (await RecordHelpers.InScopeAsync(db.Activities.AsNoTracking(), scope, AppModule.Activities, x => x.OwnerId, cancellationToken)).AnyAsync(x => x.Id == entityId, cancellationToken),
-                };
+                var inScope = await IsEntityInScopeAsync(type, entityId, cancellationToken);
                 if (!inScope)
                 {
                     throw new NotFoundException(type, entityId);
@@ -184,14 +188,35 @@ public sealed class FileService(AppDbContext db, IFileStorage storage, ITenantCo
         }
     }
 
+    private async Task<bool> IsEntityInScopeAsync(string type, Guid entityId, CancellationToken cancellationToken)
+    {
+        return type.ToLowerInvariant() switch
+        {
+            "leads" => await (await RecordHelpers.InScopeAsync(db.Leads.AsNoTracking(), scope, AppModule.Leads, x => x.OwnerId, cancellationToken)).AnyAsync(x => x.Id == entityId, cancellationToken),
+            "contacts" => await (await RecordHelpers.InScopeAsync(db.Contacts.AsNoTracking(), scope, AppModule.Contacts, x => x.OwnerId, cancellationToken)).AnyAsync(x => x.Id == entityId, cancellationToken),
+            "accounts" => await (await RecordHelpers.InScopeAsync(db.Accounts.AsNoTracking(), scope, AppModule.Accounts, x => x.OwnerId, cancellationToken)).AnyAsync(x => x.Id == entityId, cancellationToken),
+            "deals" => await (await RecordHelpers.InScopeAsync(db.Deals.AsNoTracking(), scope, AppModule.Deals, x => x.OwnerId, cancellationToken)).AnyAsync(x => x.Id == entityId, cancellationToken),
+            _ => await (await RecordHelpers.InScopeAsync(db.Activities.AsNoTracking(), scope, AppModule.Activities, x => x.OwnerId, cancellationToken)).AnyAsync(x => x.Id == entityId, cancellationToken),
+        };
+    }
+
     private async Task EnsureCanReadAsync(StoredFile row, CancellationToken cancellationToken)
     {
-        // An attachment on a record can be read by anyone who can view that record's module.
+        // An attachment on a record can be read by anyone who can view that record's module and has row scope.
         if (row.EntityType is { } type && EntityModules.TryGetValue(type, out var module))
         {
             if (!await permissions.HasAsync(module, PermissionAction.View, cancellationToken))
             {
                 throw new ForbiddenException();
+            }
+
+            if (row.EntityId is { } entityId)
+            {
+                var inScope = await IsEntityInScopeAsync(type, entityId, cancellationToken);
+                if (!inScope)
+                {
+                    throw new NotFoundException(type, entityId);
+                }
             }
 
             return;
@@ -204,7 +229,7 @@ public sealed class FileService(AppDbContext db, IFileStorage storage, ITenantCo
         }
     }
 
-    /// <summary>Checks the entity key, that the record exists in this tenant, and that the user has the action on its module.</summary>
+    /// <summary>Checks the entity key, that the record exists and is in the user's scope, and that the user has the action on its module.</summary>
     private async Task<AppModule?> AuthorizeEntityAsync(string? entityType, Guid? entityId, PermissionAction action, CancellationToken cancellationToken)
     {
         if (entityType is null && entityId is null)
@@ -223,15 +248,8 @@ public sealed class FileService(AppDbContext db, IFileStorage storage, ITenantCo
         }
 
         var id = entityId.Value;
-        var exists = entityType.ToLowerInvariant() switch
-        {
-            "leads" => await db.Leads.AnyAsync(e => e.Id == id, cancellationToken),
-            "contacts" => await db.Contacts.AnyAsync(e => e.Id == id, cancellationToken),
-            "accounts" => await db.Accounts.AnyAsync(e => e.Id == id, cancellationToken),
-            "deals" => await db.Deals.AnyAsync(e => e.Id == id, cancellationToken),
-            _ => await db.Activities.AnyAsync(e => e.Id == id, cancellationToken),
-        };
-        if (!exists)
+        var inScope = await IsEntityInScopeAsync(entityType, id, cancellationToken);
+        if (!inScope)
         {
             throw new NotFoundException(entityType, id);
         }

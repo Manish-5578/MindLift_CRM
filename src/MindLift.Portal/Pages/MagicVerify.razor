@@ -27,6 +27,17 @@ else if (!string.IsNullOrEmpty(_error))
         </MudButton>
     </AuthCard>
 }
+else if (Session.User is not null)
+{
+    <AuthCard Title='@T["login.title"]' Subtitle='@string.Format("You are already signed in as {0}. Opening this magic link will switch your session to another account.", Session.User.CustomerName)'>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" OnClick="VerifyAsync" Class="mt-4" id="magic-confirm">
+            Switch Account
+        </MudButton>
+        <MudButton Variant="Variant.Text" Color="Color.Default" FullWidth="true" Href='@Link()' Class="mt-2" id="magic-keep">
+            Keep Current Session
+        </MudButton>
+    </AuthCard>
+}
 else
 {
     <AuthCard Title='@T["login.title"]' Subtitle='@T["magic.prompt"]'>
@@ -41,12 +52,18 @@ else
 
     [SupplyParameterFromQuery] public string? Token { get; set; }
 
+    private string? _cachedToken;
     private bool _verifying;
     private string? _error;
 
     protected override Task LoadAsync()
     {
-        if (string.IsNullOrWhiteSpace(Token))
+        if (!string.IsNullOrWhiteSpace(Token))
+        {
+            _cachedToken = Token;
+            Nav.NavigateTo(Link("magic"), replace: true);
+        }
+        else if (string.IsNullOrWhiteSpace(_cachedToken))
         {
             _error = T["magic.failed"];
         }
@@ -55,7 +72,8 @@ else
 
     private async Task VerifyAsync()
     {
-        if (string.IsNullOrWhiteSpace(Token))
+        var token = _cachedToken ?? Token;
+        if (string.IsNullOrWhiteSpace(token))
         {
             _error = T["magic.failed"];
             return;
@@ -64,7 +82,7 @@ else
         _verifying = true;
         try
         {
-            var req = new PortalMagicLinkVerifyRequest(Token.Trim());
+            var req = new PortalMagicLinkVerifyRequest(token.Trim());
             var resp = await Session.Anonymous.PostAsJsonAsync(Api($"{Uri.EscapeDataString(Slug)}/auth/magic-link/verify"), req);
             if (resp.IsSuccessStatusCode)
             {

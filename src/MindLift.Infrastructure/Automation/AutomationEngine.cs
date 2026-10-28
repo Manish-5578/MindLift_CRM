@@ -280,6 +280,7 @@ public sealed class AutomationEngine(
         "IsDeleted",
         "DeletedAt",
         "DeletedById",
+        "Version",
         "RowVersion",
         "SecurityStamp",
         "PasswordHash",

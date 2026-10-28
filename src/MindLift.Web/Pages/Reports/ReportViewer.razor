@@ -557,15 +557,24 @@
     private static string GenerateCsv(ReportResult res)
     {
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine(string.Join(",", res.Columns.Select(c => $"\"{c.Label.Replace("\"", "\"\"")}\"")));
+        sb.AppendLine(string.Join(",", res.Columns.Select(c => MindLift.Shared.Imports.CsvText.Escape(c.Label))));
         foreach (var r in res.Rows)
         {
             var vals = res.Columns.Select(c =>
             {
                 r.TryGetValue(c.Key, out var v);
-                return $"\"{v?.ToString()?.Replace("\"", "\"\"")}\"";
+                return MindLift.Shared.Imports.CsvText.Escape(v?.ToString() ?? string.Empty);
             });
             sb.AppendLine(string.Join(",", vals));
+        }
+        if (res.Totals != null)
+        {
+            var totalVals = res.Columns.Select(c =>
+            {
+                res.Totals.TryGetValue(c.Key, out var v);
+                return MindLift.Shared.Imports.CsvText.Escape(v?.ToString() ?? string.Empty);
+            });
+            sb.AppendLine(string.Join(",", totalVals));
         }
         return sb.ToString();
     }

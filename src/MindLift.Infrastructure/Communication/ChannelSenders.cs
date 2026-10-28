@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MimeKit;
 using MindLift.Application.Abstractions;
+using MindLift.Application.Common.Exceptions;
 using MindLift.Domain.Entities;
 using MindLift.Infrastructure.Messaging;
 using MindLift.Infrastructure.Persistence;
@@ -78,11 +79,19 @@ public sealed class EmailChannelSender(
                 ? secretProtector.Unprotect(account.EncryptedPassword)
                 : defaultSmtpOptions.Value.Password;
 
+            if (!string.IsNullOrWhiteSpace(account.Host))
+            {
+                await SmtpSecurityPolicy.ValidateDestinationAsync(account.Host, ct);
+            }
+
+            var hasCredentials = !string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password);
+            var security = SmtpSecurityPolicy.DetermineSecurity(port, defaultSmtpOptions.Value.UseStartTls, hasCredentials);
+            SmtpSecurityPolicy.AssertTransportSecurity(security, hasCredentials);
+
             using var client = new SmtpClient();
-            var security = defaultSmtpOptions.Value.UseStartTls ? SecureSocketOptions.StartTls : SecureSocketOptions.None;
             await client.ConnectAsync(host, port, security, ct);
 
-            if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
+            if (hasCredentials)
             {
                 await client.AuthenticateAsync(username, password, ct);
             }
@@ -104,6 +113,11 @@ public sealed class EmailChannelSender(
     {
         try
         {
+            if (!string.IsNullOrWhiteSpace(account.Host))
+            {
+                await SmtpSecurityPolicy.ValidateDestinationAsync(account.Host, ct);
+            }
+
             var host = !string.IsNullOrWhiteSpace(account.Host) ? account.Host : defaultSmtpOptions.Value.Host;
             var port = account.Port.HasValue && account.Port > 0 ? account.Port.Value : defaultSmtpOptions.Value.Port;
             var username = !string.IsNullOrWhiteSpace(account.Username) ? account.Username : defaultSmtpOptions.Value.Username;
@@ -111,11 +125,14 @@ public sealed class EmailChannelSender(
                 ? secretProtector.Unprotect(account.EncryptedPassword)
                 : defaultSmtpOptions.Value.Password;
 
+            var hasCredentials = !string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password);
+            var security = SmtpSecurityPolicy.DetermineSecurity(port, defaultSmtpOptions.Value.UseStartTls, hasCredentials);
+            SmtpSecurityPolicy.AssertTransportSecurity(security, hasCredentials);
+
             using var client = new SmtpClient();
-            var security = defaultSmtpOptions.Value.UseStartTls ? SecureSocketOptions.StartTls : SecureSocketOptions.None;
             await client.ConnectAsync(host, port, security, ct);
 
-            if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
+            if (hasCredentials)
             {
                 await client.AuthenticateAsync(username, password, ct);
             }
@@ -123,9 +140,15 @@ public sealed class EmailChannelSender(
             await client.DisconnectAsync(quit: true, ct);
             return new TestConnectionResult(true, $"Successfully connected to SMTP server at {host}:{port}");
         }
+        catch (ValidationException valEx)
+        {
+            logger.LogWarning(valEx, "SMTP test rejected by destination policy: {Host}:{Port}", account.Host, account.Port);
+            return new TestConnectionResult(false, "Connection rejected: The destination address is not permitted by security policy.");
+        }
         catch (Exception ex)
         {
-            return new TestConnectionResult(false, $"Connection failed: {ex.Message}");
+            logger.LogWarning(ex, "SMTP connection test failed for {Host}:{Port}", account.Host, account.Port);
+            return new TestConnectionResult(false, "Connection failed. Please verify your host, port, credentials, and network configuration.");
         }
     }
 }

@@ -229,9 +229,6 @@ public sealed class PortalService(
         if (token.UsedAt.HasValue || token.ExpiresAt < DateTime.UtcNow)
             throw new UnauthorizedException("expired_token", "Invitation token has expired.");
 
-        if (!await TryConsumeAsync(token, ct))
-            throw new UnauthorizedException("expired_token", "Invitation token has expired.");
-
         var user = await db.PortalUsers
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(u => u.Id == token.PortalUserId && u.TenantId == t.Id && !u.IsDeleted, ct)
@@ -243,6 +240,9 @@ public sealed class PortalService(
 
         if (user.ActivatedAt.HasValue)
             throw new ConflictException("already_activated", "This portal account has already been activated. Please sign in or use password reset.");
+
+        if (!await TryConsumeAsync(token, ct))
+            throw new UnauthorizedException("expired_token", "Invitation token has expired.");
 
         var now = DateTime.UtcNow;
 
@@ -866,6 +866,11 @@ public sealed class PortalService(
             throw new ValidationException(new Dictionary<string, string[]> { ["email"] = ["An email address is required."] });
         }
 
+        if (!string.IsNullOrWhiteSpace(contact.Email) && !string.Equals(contact.Email.Trim(), req.Email.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ValidationException(new Dictionary<string, string[]> { ["email"] = ["Invitation recipient must match the contact's email address."] });
+        }
+
         var normEmail = req.Email.Trim().ToUpperInvariant();
         var user = await db.PortalUsers.FirstOrDefaultAsync(u => u.NormalizedEmail == normEmail && !u.IsDeleted, ct);
 
@@ -877,6 +882,11 @@ public sealed class PortalService(
         if (user != null && user.ActivatedAt.HasValue)
         {
             throw new ConflictException("already_activated", "This contact already has an active portal account. Please sign in or use password reset to manage credentials.");
+        }
+
+        if (user != null && user.InvitedAt.HasValue && user.InvitedAt.Value > DateTime.UtcNow.AddSeconds(-60))
+        {
+            throw new BusinessRuleException("invite_cooldown", "An invitation was recently sent to this contact. Please wait a minute before resending.");
         }
 
         if (user == null)

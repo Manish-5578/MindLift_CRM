@@ -445,12 +445,7 @@ public sealed class ReportService(
 
     private static string EscapeCsv(string? val)
     {
-        if (string.IsNullOrEmpty(val)) return "";
-        if (val.Contains(',') || val.Contains('"') || val.Contains('\n') || val.Contains('\r'))
-        {
-            return $"\"{val.Replace("\"", "\"\"")}\"";
-        }
-        return val;
+        return MindLift.Shared.Imports.CsvText.Escape(val ?? string.Empty);
     }
 
     private static string EscapeXml(string val) =>

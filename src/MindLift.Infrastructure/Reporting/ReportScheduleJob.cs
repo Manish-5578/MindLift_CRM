@@ -218,8 +218,7 @@ public sealed class ReportScheduleJob(
 
     private static string EscapeCsv(string? val)
     {
-        if (string.IsNullOrEmpty(val)) return "\"\"";
-        return $"\"{val.Replace("\"", "\"\"")}\"";
+        return MindLift.Shared.Imports.CsvText.Escape(val ?? string.Empty);
     }
 
     private static byte[] ExportExcelXml(ReportResult result, string title)

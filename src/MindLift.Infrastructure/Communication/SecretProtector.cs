@@ -22,7 +22,6 @@ public interface ISecretProtector
 public sealed class SecretProtector : ISecretProtector
 {
     private const string Version2 = "v2:";
-    private static readonly string FallbackKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
     private readonly byte[] _encryptionKey;
     private readonly byte[] _macKey;
@@ -30,11 +29,10 @@ public sealed class SecretProtector : ISecretProtector
 
     public SecretProtector(IConfiguration configuration, ILogger<SecretProtector>? logger = null)
     {
-        var configured = FirstNonEmpty(configuration["Security:SecretKey"], configuration["Jwt:SigningKey"]);
-        if (configured is null)
+        var configured = FirstNonEmpty(configuration["Security:SecretKey"], configuration["Jwt:SigningKey"], configuration["Jwt:Key"]);
+        if (string.IsNullOrWhiteSpace(configured))
         {
-            logger?.LogWarning("Neither Security:SecretKey nor Jwt:SigningKey is set, so stored channel secrets are encrypted with a process-generated ephemeral key. Set Security:SecretKey in production.");
-            configured = FallbackKey;
+            throw new InvalidOperationException("Neither Security:SecretKey nor Jwt:SigningKey is set. Configure Security:SecretKey to protect integration credentials.");
         }
 
         var master = SHA256.HashData(Encoding.UTF8.GetBytes(configured));
@@ -42,8 +40,8 @@ public sealed class SecretProtector : ISecretProtector
         _macKey = HMACSHA256.HashData(master, "mindlift-secret-integrity"u8);
 
         // Keys earlier versions could have used, most likely first.
-        _legacyKeys = new[] { configuration["Security:SecretKey"], configuration["Jwt:Key"], FallbackKey }
-            .Where(key => !string.IsNullOrEmpty(key))
+        _legacyKeys = new[] { configuration["Security:SecretKey"], configuration["Jwt:SigningKey"], configuration["Jwt:Key"] }
+            .Where(key => !string.IsNullOrWhiteSpace(key))
             .Select(key => SHA256.HashData(Encoding.UTF8.GetBytes(key!)))
             .DistinctBy(Convert.ToHexString)
             .ToList();

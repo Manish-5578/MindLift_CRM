@@ -361,9 +361,26 @@ public sealed class LeadService(
         Deal? deal = null;
         if (request.CreateDeal)
         {
-            var pipelineId = request.PipelineId ?? await db.Pipelines.Where(p => p.IsDefault).Select(p => p.Id).FirstOrDefaultAsync(cancellationToken);
+            if (request.Amount is < 0 or > 9_999_999_999_999m)
+            {
+                throw RecordHelpers.Invalid("amount", "Enter an amount of zero or more.");
+            }
+
+            var currency = (request.Currency ?? settings.BaseCurrency).Trim().ToUpperInvariant();
+            if (currency != settings.BaseCurrency && !await db.ExchangeRates.AnyAsync(r => r.Currency == currency, cancellationToken))
+            {
+                throw RecordHelpers.Invalid("currency", $"No exchange rate for {currency} yet. Add one in Settings, Currencies.");
+            }
+
+            var pipelineId = request.PipelineId ?? await db.Pipelines.Where(p => p.IsDefault && p.IsActive).Select(p => p.Id).FirstOrDefaultAsync(cancellationToken);
+            if (pipelineId == Guid.Empty || !await db.Pipelines.AnyAsync(p => p.Id == pipelineId && p.IsActive, cancellationToken))
+            {
+                throw RecordHelpers.Invalid("pipelineId", "Choose an active pipeline.");
+            }
+
             var stages = await db.PipelineStages.AsNoTracking().Where(s => s.PipelineId == pipelineId).OrderBy(s => s.SortOrder).ToListAsync(cancellationToken);
-            var stage = stages.FirstOrDefault(s => s.Id == request.StageId) ?? stages.FirstOrDefault(s => s.StageType == "Open")
+            var stage = (request.StageId.HasValue ? stages.FirstOrDefault(s => s.Id == request.StageId.Value) : null)
+                ?? stages.FirstOrDefault(s => s.StageType == "Open")
                 ?? throw new BusinessRuleException("no_pipeline", "Choose a pipeline with an open stage for the deal.");
             if (stage.StageType != "Open")
             {
@@ -378,7 +395,7 @@ public sealed class LeadService(
                 StageId = stage.Id,
                 Status = "Open",
                 Amount = request.Amount ?? 0,
-                Currency = request.Currency ?? settings.BaseCurrency,
+                Currency = currency,
                 Probability = stage.Probability,
                 ExpectedCloseDate = request.ExpectedCloseDate,
                 AccountId = account?.Id,

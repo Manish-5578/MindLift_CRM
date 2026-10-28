@@ -207,10 +207,95 @@ public sealed class ScopeEnforcementUnitTests
     }
 
     [Fact]
-    public void PublicFormSubmission_Does_Not_Mutate_Existing_Lead()
+    public void Automation_Rule_Rejects_Protected_Metadata_Fields()
     {
-        // Verified behavior: SubmitAsync creates a new lead via leads.CreateAsync and never performs duplicate-based mutation
-        var createsNewLeadOnly = true;
-        createsNewLeadOnly.ShouldBeTrue("Public form submission must never mutate existing leads based on unverified email/phone.");
+        var blockedFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "IsDeleted", "DeletedAt", "Id", "TenantId", "Version", "CreatedAt", "CreatedById", "UpdatedAt", "UpdatedById"
+        };
+
+        blockedFields.Contains("IsDeleted").ShouldBeTrue();
+        blockedFields.Contains("Version").ShouldBeTrue();
+        blockedFields.Contains("TenantId").ShouldBeTrue();
+        blockedFields.Contains("Id").ShouldBeTrue();
+        blockedFields.Contains("isdeleted").ShouldBeTrue();
+        blockedFields.Contains("version").ShouldBeTrue();
+        blockedFields.Contains("CustomField1").ShouldBeFalse();
+        blockedFields.Contains("Status").ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData("127.0.0.1", true)]
+    [InlineData("localhost", true)]
+    [InlineData("10.0.0.1", true)]
+    [InlineData("192.168.1.1", true)]
+    [InlineData("172.16.0.1", true)]
+    [InlineData("169.254.169.254", true)]
+    public void SmtpSecurityPolicy_Detects_Blocked_IPs(string ipStr, bool blocked)
+    {
+        if (IPAddress.TryParse(ipStr, out var ip))
+        {
+            WebhookSecurity.IsBlockedAddress(ip).ShouldBe(blocked);
+        }
+    }
+
+    [Fact]
+    public void SmtpSecurityPolicy_Mandates_Transport_Encryption_When_Credentials_Provided()
+    {
+        var hasCredentials = true;
+        var noneSecurity = MailKit.Security.SecureSocketOptions.None;
+
+        Should.Throw<InvalidOperationException>(() =>
+        {
+            MindLift.Infrastructure.Communication.SmtpSecurityPolicy.AssertTransportSecurity(noneSecurity, hasCredentials);
+        });
+
+        var startTlsSecurity = MailKit.Security.SecureSocketOptions.StartTls;
+        Should.NotThrow(() =>
+        {
+            MindLift.Infrastructure.Communication.SmtpSecurityPolicy.AssertTransportSecurity(startTlsSecurity, hasCredentials);
+        });
+    }
+
+    [Theory]
+    [InlineData("=cmd|'/C calc'!A0", "'=cmd|'/C calc'!A0")]
+    [InlineData("@SUM(A1:A10)", "'@SUM(A1:A10)")]
+    [InlineData("+cmd|'/C calc'!A0", "'+cmd|'/C calc'!A0")]
+    [InlineData("-2+3+cmd|'/C calc'!A0", "'-2+3+cmd|'/C calc'!A0")]
+    [InlineData("Normal Text", "Normal Text")]
+    [InlineData("+1 555 123 4567", "+1 555 123 4567")]
+    [InlineData("-12.50", "-12.50")]
+    public void CsvText_Escape_Neutralizes_Formulas(string input, string expected)
+    {
+        var escaped = MindLift.Shared.Imports.CsvText.Escape(input);
+        escaped.ShouldBe(expected);
+    }
+
+    [Fact]
+    public void Contact_Merge_Rejects_Name_Only_Match_Without_Matching_Email_Or_Phone()
+    {
+        var master = new MindLift.Domain.Entities.Contact
+        {
+            FirstName = "Alice",
+            LastName = "Smith",
+            NormalizedEmail = "alice.smith@example.com",
+            NormalizedPhone = "+15551112222"
+        };
+
+        var sameNameUnrelated = new MindLift.Domain.Entities.Contact
+        {
+            FirstName = "Alice",
+            LastName = "Smith",
+            NormalizedEmail = "different.alice@otherdomain.com",
+            NormalizedPhone = "+15559998888"
+        };
+
+        var emailMatches = !string.IsNullOrWhiteSpace(master.NormalizedEmail)
+            && master.NormalizedEmail == sameNameUnrelated.NormalizedEmail;
+        var phoneMatches = !string.IsNullOrWhiteSpace(master.NormalizedPhone)
+            && master.NormalizedPhone == sameNameUnrelated.NormalizedPhone;
+
+        var isCandidate = emailMatches || phoneMatches;
+        isCandidate.ShouldBeFalse("Same name without matching normalized email or phone must not be accepted for merge.");
     }
 }

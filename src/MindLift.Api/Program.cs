@@ -290,11 +290,14 @@ if (!app.Environment.IsDevelopment())
 // In non-development environments, refuse plaintext HTTP requests on authentication and portal endpoints.
 app.Use(async (context, next) =>
 {
-    if (!app.Environment.IsDevelopment() && !context.Request.IsHttps)
+    var forwardedProto = context.Request.Headers["X-Forwarded-Proto"].ToString();
+    var isPlaintextHttp = !context.Request.IsHttps || string.Equals(forwardedProto, "http", StringComparison.OrdinalIgnoreCase);
+
+    if (!app.Environment.IsDevelopment() && isPlaintextHttp)
     {
         var path = context.Request.Path.Value ?? string.Empty;
         if (path.StartsWith("/api/v1/auth", StringComparison.OrdinalIgnoreCase) ||
-            path.StartsWith("/api/v1/portal/", StringComparison.OrdinalIgnoreCase) && path.Contains("/auth/", StringComparison.OrdinalIgnoreCase))
+            (path.StartsWith("/api/v1/portal/", StringComparison.OrdinalIgnoreCase) && path.Contains("/auth/", StringComparison.OrdinalIgnoreCase)))
         {
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
             context.Response.ContentType = "application/problem+json";

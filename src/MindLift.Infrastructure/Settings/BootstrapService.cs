@@ -52,6 +52,16 @@ public sealed class BootstrapService(
                 : new ModulePermissionDto(module.ToString(), permission.CanView, permission.CanCreate, permission.CanEdit, permission.CanDelete, permission.CanExport, permission.CanImport, permission.Scope.ToString()));
         }
 
+        var canViewSettings = await permissions.HasAsync(AppModule.Settings, PermissionAction.View, cancellationToken);
+        var effectiveCompany = canViewSettings
+            ? snapshot.Company
+            : snapshot.Company with
+            {
+                Email = null,
+                Phone = null,
+                TaxRegistrationNumber = null
+            };
+
         return new BootstrapDto(
             me,
             snapshot.Modules,
@@ -60,7 +70,7 @@ public sealed class BootstrapService(
             snapshot.Pipelines,
             snapshot.Layouts.ToDictionary(p => p.Key, p => (IReadOnlyList<LayoutDto>)p.Value),
             snapshot.Currencies,
-            snapshot.Company,
+            effectiveCompany,
             matrix,
             currentVersion);
     }

@@ -2,6 +2,7 @@
 @layout AuthLayout
 @inject HttpClient Http
 @inject Translator T
+@inject NavigationManager Nav
 
 <PageTitle>@T["Confirm your email"] · MindLift</PageTitle>
 
@@ -36,16 +37,21 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (string.IsNullOrWhiteSpace(Email) || string.IsNullOrWhiteSpace(Token))
+        var email = Email;
+        var token = Token;
+
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(token))
         {
             _error = T["This link is not complete. Open the link from the email again."];
             _working = false;
             return;
         }
 
+        Nav.NavigateTo("/verify-email", replace: true);
+
         try
         {
-            var response = await Http.PostAsJsonAsync("api/v1/auth/verify-email", new VerifyEmailRequest(Email, Token));
+            var response = await Http.PostAsJsonAsync("api/v1/auth/verify-email", new VerifyEmailRequest(email, token));
             _ok = response.IsSuccessStatusCode;
             if (!_ok)
             {

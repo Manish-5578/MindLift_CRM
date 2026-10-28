@@ -71,7 +71,13 @@ public sealed class SecretProtectorTests
 
         With(("Jwt:SigningKey", "the-staff-signing-key-value-0123456789")).Unprotect(stored).ShouldBe("token-value");
         With(("Security:SecretKey", "something-else")).Unprotect(stored).ShouldBeNull();
-        With().Unprotect(stored).ShouldBeNull(); // The built-in key is not the signing key.
+        Should.Throw<InvalidOperationException>(() => With());
+    }
+
+    [Fact]
+    public void Missing_key_configuration_throws_invalid_operation_exception()
+    {
+        Should.Throw<InvalidOperationException>(() => With());
     }
 
     [Fact]

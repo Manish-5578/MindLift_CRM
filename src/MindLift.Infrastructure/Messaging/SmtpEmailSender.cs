@@ -35,12 +35,19 @@ public sealed class SmtpEmailSender(IOptions<SmtpOptions> options) : IEmailSende
         message.Body = body.ToMessageBody();
 
         using var client = new SmtpClient();
+        var hasCredentials = !string.IsNullOrEmpty(_options.Username) && !string.IsNullOrEmpty(_options.Password);
         var security = _options.Port == 465
             ? SecureSocketOptions.SslOnConnect
-            : (_options.UseStartTls ? SecureSocketOptions.StartTls : SecureSocketOptions.Auto);
+            : (_options.UseStartTls || hasCredentials ? SecureSocketOptions.StartTls : SecureSocketOptions.Auto);
+
+        if (hasCredentials && security == SecureSocketOptions.None)
+        {
+            throw new InvalidOperationException("Transport encryption (STARTTLS or SSL/TLS) is mandatory when authenticating with SMTP credentials.");
+        }
+
         await client.ConnectAsync(_options.Host, _options.Port, security, cancellationToken);
 
-        if (!string.IsNullOrEmpty(_options.Username))
+        if (hasCredentials)
         {
             await client.AuthenticateAsync(_options.Username, _options.Password, cancellationToken);
         }

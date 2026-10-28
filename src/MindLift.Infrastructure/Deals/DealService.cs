@@ -413,12 +413,6 @@ public sealed class DealService(
         var stages = await db.PipelineStages.AsNoTracking().Where(s => s.PipelineId == pipelineId).OrderBy(s => s.SortOrder).ToListAsync(cancellationToken);
         var pipelineChanged = !isNew && pipelineId != deal.PipelineId;
 
-        if (request.AccountId is { } accountId && accountId != deal.AccountId
-            && !await (await RecordHelpers.InScopeAsync(db.Accounts.AsNoTracking(), scope, AppModule.Accounts, a => a.OwnerId, cancellationToken)).AnyAsync(a => a.Id == accountId, cancellationToken))
-        {
-            throw RecordHelpers.Invalid("accountId", "Choose an existing account.");
-        }
-
         var customErrors = CustomFieldRules.ValidateValues(await fields.CustomRulesAsync("deals", cancellationToken),
             request.CustomFields?.ToDictionary(kv => kv.Key, kv => (JsonElement?)kv.Value) ?? []);
         if (customErrors.Count > 0)
@@ -428,14 +422,32 @@ public sealed class DealService(
 
         var contacts = await ResolveContactsAsync(deal.Id, request.Contacts, cancellationToken);
 
+        Guid? resolvedAccountId = request.AccountId;
+        if (resolvedAccountId is { } accountId)
+        {
+            var visibleAccounts = await RecordHelpers.InScopeAsync(db.Accounts.AsNoTracking(), scope, AppModule.Accounts, a => a.OwnerId, cancellationToken);
+            if (!await visibleAccounts.AnyAsync(a => a.Id == accountId, cancellationToken))
+            {
+                throw RecordHelpers.Invalid("accountId", "Choose an existing account.");
+            }
+        }
+        else if (contacts.FirstOrDefault(c => c.IsPrimary)?.ContactId is { } primaryContactId)
+        {
+            var inferredAccountId = await db.Contacts.Where(c => c.Id == primaryContactId).Select(c => c.AccountId).FirstOrDefaultAsync(cancellationToken);
+            if (inferredAccountId is { } infId)
+            {
+                var visibleAccounts = await RecordHelpers.InScopeAsync(db.Accounts.AsNoTracking(), scope, AppModule.Accounts, a => a.OwnerId, cancellationToken);
+                resolvedAccountId = await visibleAccounts.AnyAsync(a => a.Id == infId, cancellationToken) ? infId : null;
+            }
+        }
+
         deal.Name = request.Name.Trim();
         deal.Amount = request.Amount;
         deal.Currency = currency;
         deal.ExpectedCloseDate = request.ExpectedCloseDate;
         deal.Description = request.Description;
         deal.PrimaryContactId = contacts.FirstOrDefault(c => c.IsPrimary)?.ContactId;
-        deal.AccountId = request.AccountId
-            ?? (deal.PrimaryContactId is { } primary ? await db.Contacts.Where(c => c.Id == primary).Select(c => c.AccountId).FirstOrDefaultAsync(cancellationToken) : null);
+        deal.AccountId = resolvedAccountId;
         if (request.OwnerId is { } owner)
         {
             if (owner != deal.OwnerId)
@@ -708,10 +720,14 @@ public sealed class DealService(
     private static DealListItemDto ToListItem(Deal d, Lookups l)
     {
         var stage = l.Stages.GetValueOrDefault(d.StageId);
+        var accountName = d.AccountId is { } a ? l.Accounts.GetValueOrDefault(a) : null;
+        var accountId = accountName is not null ? d.AccountId : null;
+        var contactName = d.PrimaryContactId is { } c ? l.Contacts.GetValueOrDefault(c) : null;
+
         return new DealListItemDto(d.Id, d.Name, d.Amount, d.Currency, InBase(d.Amount, d.Currency, l.Rates), d.PipelineId, d.StageId,
-            stage?.Name ?? "—", stage?.StageType ?? "Open", d.Status, d.Probability, d.AccountId,
-            d.AccountId is { } a ? l.Accounts.GetValueOrDefault(a) : null,
-            d.PrimaryContactId is { } c ? l.Contacts.GetValueOrDefault(c) : null,
+            stage?.Name ?? "—", stage?.StageType ?? "Open", d.Status, d.Probability, accountId,
+            accountName,
+            contactName,
             d.OwnerId, l.Owners.GetValueOrDefault(d.OwnerId), d.ExpectedCloseDate, IsRotting(d, stage, l.Now), d.CreatedAt, stage?.NameAr);
     }
 
@@ -722,15 +738,18 @@ public sealed class DealService(
         var stage = await db.PipelineStages.AsNoTracking().FirstOrDefaultAsync(s => s.Id == d.StageId, cancellationToken);
         var visibleAccounts = await RecordHelpers.InScopeAsync(db.Accounts.AsNoTracking(), scope, AppModule.Accounts, x => x.OwnerId, cancellationToken);
         var accountName = d.AccountId is { } a ? await visibleAccounts.Where(x => x.Id == a).Select(x => x.Name).FirstOrDefaultAsync(cancellationToken) : null;
+        var effectiveAccountId = accountName is not null ? d.AccountId : null;
+
         var links = await db.DealContacts.AsNoTracking().Where(c => c.DealId == d.Id).ToListAsync(cancellationToken);
         var ids = links.Select(c => c.ContactId).ToList();
         var visibleContacts = await RecordHelpers.InScopeAsync(db.Contacts.AsNoTracking(), scope, AppModule.Contacts, c => c.OwnerId, cancellationToken);
         var names = await visibleContacts.Where(c => ids.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => (c.FirstName + " " + c.LastName).Trim(), cancellationToken);
-        var contacts = links.OrderByDescending(c => c.IsPrimary).ThenBy(c => names.GetValueOrDefault(c.ContactId))
-            .Select(c => new DealContactDto(c.ContactId, names.GetValueOrDefault(c.ContactId) ?? "—", c.Role, c.IsPrimary)).ToList();
+        var contacts = links.Where(c => names.ContainsKey(c.ContactId))
+            .OrderByDescending(c => c.IsPrimary).ThenBy(c => names.GetValueOrDefault(c.ContactId))
+            .Select(c => new DealContactDto(c.ContactId, names[c.ContactId], c.Role, c.IsPrimary)).ToList();
 
         return new DealDto(d.Id, d.Name, d.PipelineId, d.StageId, d.Status, d.Amount, d.Currency, InBase(d.Amount, d.Currency, rates), d.Probability, d.ProbabilityOverridden,
-            d.ExpectedCloseDate, d.ClosedAt, d.LostReason, d.LostNotes, d.Description, d.AccountId, accountName, contacts, d.OwnerId, d.CreatedAt, d.StageChangedAt,
+            d.ExpectedCloseDate, d.ClosedAt, d.LostReason, d.LostNotes, d.Description, effectiveAccountId, accountName, contacts, d.OwnerId, d.CreatedAt, d.StageChangedAt,
             IsRotting(d, stage, clock.UtcNow), d.Version, RecordHelpers.Custom(d.CustomFields));
     }
 

@@ -1,5 +1,6 @@
 using FluentValidation;
 using MindLift.Shared.Contracts;
+using MindLift.Shared.Enums;
 
 namespace MindLift.Api.Validation;
 
@@ -225,7 +226,13 @@ public sealed class ConvertLeadRequestValidator : AbstractValidator<ConvertLeadR
     {
         RuleFor(x => x.AccountName).MaximumLength(200);
         RuleFor(x => x.DealName).MaximumLength(200);
-        RuleFor(x => x.Currency).MaximumLength(3);
+        RuleFor(x => x.Currency)
+            .Length(3)
+            .Matches("^[A-Za-z]{3}$")
+            .When(x => !string.IsNullOrEmpty(x.Currency));
+        RuleFor(x => x.Amount)
+            .InclusiveBetween(0m, 9_999_999_999_999m)
+            .When(x => x.Amount.HasValue);
     }
 }
 
@@ -259,6 +266,13 @@ public sealed class SaveWebFormRequestValidator : AbstractValidator<SaveWebFormR
 
 public sealed class SaveAutomationRuleRequestValidator : AbstractValidator<SaveAutomationRuleRequest>
 {
+    private static readonly HashSet<string> BlockedFieldKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Id", "TenantId", "CreatedAt", "CreatedById", "UpdatedAt", "UpdatedById",
+        "IsDeleted", "DeletedAt", "DeletedById", "Version", "RowVersion", "SecurityStamp",
+        "PasswordHash", "NormalizedEmail", "NormalizedPhone"
+    };
+
     public SaveAutomationRuleRequestValidator()
     {
         RuleFor(x => x.Name).NotEmpty().MaximumLength(150);
@@ -266,6 +280,10 @@ public sealed class SaveAutomationRuleRequestValidator : AbstractValidator<SaveA
         RuleFor(x => x.Priority).InclusiveBetween(1, 1000);
         RuleFor(x => x.Actions).NotNull().Must(a => a is not null && a.Count is >= 1 and <= 20)
             .WithMessage("A rule must have between 1 and 20 actions.");
+
+        RuleForEach(x => x.Actions)
+            .Must(a => a.Type != AutomationActionType.UpdateField || (!string.IsNullOrWhiteSpace(a.FieldKey) && !BlockedFieldKeys.Contains(a.FieldKey.Trim())))
+            .WithMessage("Automation rules cannot update protected entity metadata fields (such as IsDeleted, Id, Version, or audit fields).");
     }
 }
 

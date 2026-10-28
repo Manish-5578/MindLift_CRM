@@ -332,6 +332,14 @@ public sealed class ContactService(AppDbContext db, ITenantContext tenant, ICloc
             email != null && c.NormalizedEmail == email ? "Same email" : "Same phone")).ToList();
     }
 
+    public static bool IsDuplicateCandidate(Contact master, Contact other)
+    {
+        if (master.Id == other.Id) return false;
+        var emailMatch = !string.IsNullOrWhiteSpace(master.NormalizedEmail) && master.NormalizedEmail == other.NormalizedEmail;
+        var phoneMatch = !string.IsNullOrWhiteSpace(master.NormalizedPhone) && master.NormalizedPhone == other.NormalizedPhone;
+        return emailMatch || phoneMatch;
+    }
+
     /// <summary>Moves what is useful from the duplicates into the master, repoints their activities, and removes the duplicates.</summary>
     public async Task<ContactDto> MergeAsync(Guid masterId, IReadOnlyList<Guid> duplicateIds, CancellationToken cancellationToken = default)
     {
@@ -366,15 +374,9 @@ public sealed class ContactService(AppDbContext db, ITenantContext tenant, ICloc
         // Validate each duplicate against server-side duplicate-matching rules before merge
         foreach (var duplicate in duplicates)
         {
-            var isDuplicate = (!string.IsNullOrWhiteSpace(master.NormalizedEmail) && master.NormalizedEmail == duplicate.NormalizedEmail)
-                || (!string.IsNullOrWhiteSpace(master.NormalizedPhone) && master.NormalizedPhone == duplicate.NormalizedPhone)
-                || (!string.IsNullOrWhiteSpace(master.FirstName) && !string.IsNullOrWhiteSpace(master.LastName)
-                    && string.Equals(master.FirstName, duplicate.FirstName, StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(master.LastName, duplicate.LastName, StringComparison.OrdinalIgnoreCase));
-
-            if (!isDuplicate)
+            if (!IsDuplicateCandidate(master, duplicate))
             {
-                throw new ValidationException("duplicateIds", $"Contact '{duplicate.FirstName} {duplicate.LastName}' (ID: {duplicate.Id}) is not a duplicate of the master contact.");
+                throw new ValidationException("duplicateIds", $"Contact '{duplicate.FirstName} {duplicate.LastName}' (ID: {duplicate.Id}) is not a duplicate of the master contact. Both records must share a matching normalized email or phone number.");
             }
         }
 
