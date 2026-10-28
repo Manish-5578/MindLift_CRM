@@ -176,6 +176,8 @@ public static class DependencyInjection
         services.AddScoped<MindLift.Infrastructure.Cpq.PaymentLinkService>();
         services.AddScoped<MindLift.Application.Abstractions.ICadenceService, MindLift.Infrastructure.Automation.CadenceService>();
         services.AddScoped<MindLift.Infrastructure.Automation.CadenceService>();
+        services.AddScoped<MindLift.Application.Abstractions.IRoutingService, MindLift.Infrastructure.Automation.RoutingService>();
+        services.AddScoped<MindLift.Infrastructure.Automation.RoutingService>();
         services.AddScoped<MindLift.Infrastructure.Activities.ActivityService>();
         services.AddScoped<MindLift.Infrastructure.Activities.QuickLogService>();
         services.AddScoped<MindLift.Infrastructure.Activities.ChecklistService>();

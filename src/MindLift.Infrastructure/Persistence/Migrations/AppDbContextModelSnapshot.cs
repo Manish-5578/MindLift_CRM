@@ -5621,6 +5621,100 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.ToTable("leads", (string)null);
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.LeadRoutingLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("AssignedUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("assigned_user_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<Guid>("LeadId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lead_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTime>("RoutedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("routed_at");
+
+                    b.Property<string>("RoutingStrategy")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("routing_strategy");
+
+                    b.Property<bool>("Success")
+                        .HasColumnType("boolean")
+                        .HasColumnName("success");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid?>("TerritoryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("territory_id");
+
+                    b.Property<string>("TerritoryName")
+                        .HasColumnType("text")
+                        .HasColumnName("territory_name");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_lead_routing_logs");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_lead_routing_logs_tenant_id");
+
+                    b.HasIndex("TenantId", "LeadId")
+                        .HasDatabaseName("ix_lead_routing_logs_tenant_id_lead_id");
+
+                    b.HasIndex("TenantId", "RoutedAt")
+                        .HasDatabaseName("ix_lead_routing_logs_tenant_id_routed_at");
+
+                    b.HasIndex("TenantId", "TerritoryId")
+                        .HasDatabaseName("ix_lead_routing_logs_tenant_id_territory_id");
+
+                    b.ToTable("lead_routing_logs", (string)null);
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.Message", b =>
                 {
                     b.Property<Guid>("Id")
@@ -9326,6 +9420,224 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.ToTable("tenant_settings", (string)null);
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.Territory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.PrimitiveCollection<string[]>("Cities")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("cities");
+
+                    b.PrimitiveCollection<string[]>("CountryCodes")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("country_codes");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
+                    b.Property<Guid?>("FallbackUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("fallback_user_id");
+
+                    b.PrimitiveCollection<string[]>("Industries")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("industries");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<int>("LastAssignedIndex")
+                        .HasColumnType("integer")
+                        .HasColumnName("last_assigned_index");
+
+                    b.Property<Guid?>("LastAssignedMemberId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("last_assigned_member_id");
+
+                    b.Property<int?>("MaxCompanySize")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_company_size");
+
+                    b.Property<decimal?>("MaxRevenue")
+                        .HasColumnType("numeric")
+                        .HasColumnName("max_revenue");
+
+                    b.Property<int?>("MinCompanySize")
+                        .HasColumnType("integer")
+                        .HasColumnName("min_company_size");
+
+                    b.Property<decimal?>("MinRevenue")
+                        .HasColumnType("numeric")
+                        .HasColumnName("min_revenue");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.PrimitiveCollection<string[]>("PostalCodes")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("postal_codes");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("integer")
+                        .HasColumnName("priority");
+
+                    b.PrimitiveCollection<string[]>("Regions")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("regions");
+
+                    b.Property<string>("RoutingStrategy")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("RoundRobin")
+                        .HasColumnName("routing_strategy");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_territories");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_territories_tenant_id");
+
+                    b.HasIndex("TenantId", "IsActive", "Priority")
+                        .HasDatabaseName("ix_territories_tenant_id_is_active_priority");
+
+                    b.ToTable("territories", (string)null);
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.TerritoryMember", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("AssignedLeadCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("assigned_lead_count");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<DateTime?>("LastAssignedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_assigned_at");
+
+                    b.Property<int?>("MaxCapacity")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_capacity");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TerritoryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("territory_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.Property<int>("Weight")
+                        .HasColumnType("integer")
+                        .HasColumnName("weight");
+
+                    b.HasKey("Id")
+                        .HasName("pk_territory_members");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_territory_members_tenant_id");
+
+                    b.HasIndex("TerritoryId")
+                        .HasDatabaseName("ix_territory_members_territory_id");
+
+                    b.HasIndex("TenantId", "UserId")
+                        .HasDatabaseName("ix_territory_members_tenant_id_user_id");
+
+                    b.HasIndex("TenantId", "TerritoryId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_territory_members_tenant_id_territory_id_user_id");
+
+                    b.ToTable("territory_members", (string)null);
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.Ticket", b =>
                 {
                     b.Property<Guid>("Id")
@@ -10387,6 +10699,18 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.Navigation("Report");
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.TerritoryMember", b =>
+                {
+                    b.HasOne("MindLift.Domain.Entities.Territory", "Territory")
+                        .WithMany("Members")
+                        .HasForeignKey("TerritoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_territory_members_territories_territory_id");
+
+                    b.Navigation("Territory");
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.Cadence", b =>
                 {
                     b.Navigation("Enrollments");
@@ -10444,6 +10768,11 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.Navigation("Children");
 
                     b.Navigation("Reports");
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.Territory", b =>
+                {
+                    b.Navigation("Members");
                 });
 #pragma warning restore 612, 618
         }

@@ -122,6 +122,9 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<CadenceStep> CadenceSteps { get; set; } = null!;
     public DbSet<CadenceEnrollment> CadenceEnrollments { get; set; } = null!;
     public DbSet<CadenceStepExecution> CadenceStepExecutions { get; set; } = null!;
+    public DbSet<Territory> Territories { get; set; } = null!;
+    public DbSet<TerritoryMember> TerritoryMembers { get; set; } = null!;
+    public DbSet<LeadRoutingLog> LeadRoutingLogs { get; set; } = null!;
 
     /// <summary>Tenant used by query filters. Guid.Empty when no tenant is set, so no rows match.</summary>
     protected Guid CurrentTenantId => tenant.TenantId ?? Guid.Empty;
@@ -1099,6 +1102,35 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
                 .WithMany(e => e.StepExecutions)
                 .HasForeignKey(x => x.EnrollmentId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<Territory>(b =>
+        {
+            b.ToTable("territories");
+            b.Property(x => x.Name).HasMaxLength(200);
+            b.Property(x => x.RoutingStrategy).HasMaxLength(50).HasDefaultValue("RoundRobin");
+            b.HasIndex(x => new { x.TenantId, x.IsActive, x.Priority });
+        });
+
+        builder.Entity<TerritoryMember>(b =>
+        {
+            b.ToTable("territory_members");
+            b.HasIndex(x => new { x.TenantId, x.TerritoryId, x.UserId }).IsUnique();
+            b.HasIndex(x => new { x.TenantId, x.UserId });
+            b.HasOne(x => x.Territory)
+                .WithMany(t => t.Members)
+                .HasForeignKey(x => x.TerritoryId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<LeadRoutingLog>(b =>
+        {
+            b.ToTable("lead_routing_logs");
+            b.Property(x => x.RoutingStrategy).HasMaxLength(50);
+            b.Property(x => x.Reason).HasMaxLength(1000);
+            b.HasIndex(x => new { x.TenantId, x.LeadId });
+            b.HasIndex(x => new { x.TenantId, x.TerritoryId });
+            b.HasIndex(x => new { x.TenantId, x.RoutedAt });
         });
     }
 
