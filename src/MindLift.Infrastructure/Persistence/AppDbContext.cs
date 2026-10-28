@@ -101,6 +101,7 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<IntegrationCredential> IntegrationCredentials { get; set; } = null!;
     public DbSet<TimelineEvent> TimelineEvents { get; set; } = null!;
     public DbSet<ContactAccountLink> ContactAccountLinks { get; set; } = null!;
+    public DbSet<DealLineItem> DealLineItems { get; set; } = null!;
 
     /// <summary>Tenant used by query filters. Guid.Empty when no tenant is set, so no rows match.</summary>
     protected Guid CurrentTenantId => tenant.TenantId ?? Guid.Empty;
@@ -763,6 +764,37 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.Property(x => x.Role).HasMaxLength(100);
             b.HasIndex(x => new { x.TenantId, x.ContactId, x.AccountId }).IsUnique().HasFilter("is_deleted = false");
             b.HasIndex(x => new { x.TenantId, x.AccountId });
+        });
+
+        builder.Entity<DealLineItem>(b =>
+        {
+            b.ToTable("deal_line_items");
+            b.Property(x => x.ProductName).HasMaxLength(200);
+            b.Property(x => x.Description).HasMaxLength(1000);
+            b.Property(x => x.Quantity).HasPrecision(18, 4);
+            b.Property(x => x.UnitPrice).HasPrecision(18, 4);
+            b.Property(x => x.DiscountPercent).HasPrecision(18, 4);
+            b.Property(x => x.DiscountAmount).HasPrecision(18, 4);
+            b.Property(x => x.TaxRate).HasPrecision(18, 4);
+            b.Property(x => x.SubTotal).HasPrecision(18, 4);
+            b.Property(x => x.TotalAmount).HasPrecision(18, 4);
+
+            b.HasOne(x => x.Deal)
+                .WithMany(x => x.LineItems)
+                .HasForeignKey(x => x.DealId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            b.HasOne(x => x.Product)
+                .WithMany()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            b.HasOne(x => x.PriceBook)
+                .WithMany()
+                .HasForeignKey(x => x.PriceBookId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            b.HasIndex(x => new { x.TenantId, x.DealId });
         });
     }
 

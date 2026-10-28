@@ -122,6 +122,8 @@ public sealed class Deal : TenantEntity, IOwnedEntity, IHasCustomFields, ISample
     public Guid OwnerId { get; set; }
     public JsonDocument? CustomFields { get; set; }
     public bool IsSample { get; set; }
+
+    public ICollection<DealLineItem> LineItems { get; set; } = new List<DealLineItem>();
 }
 
 [Audited]

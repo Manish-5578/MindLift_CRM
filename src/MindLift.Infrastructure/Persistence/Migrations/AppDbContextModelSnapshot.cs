@@ -2827,6 +2827,129 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.ToTable("deal_contacts", (string)null);
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.DealLineItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<Guid>("DealId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deal_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<decimal>("DiscountAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("discount_amount");
+
+                    b.Property<decimal>("DiscountPercent")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("discount_percent");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<Guid?>("PriceBookId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("price_book_id");
+
+                    b.Property<Guid?>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("product_name");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("quantity");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.Property<decimal>("SubTotal")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("sub_total");
+
+                    b.Property<decimal>("TaxRate")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("tax_rate");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("total_amount");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("unit_price");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_deal_line_items");
+
+                    b.HasIndex("DealId")
+                        .HasDatabaseName("ix_deal_line_items_deal_id");
+
+                    b.HasIndex("PriceBookId")
+                        .HasDatabaseName("ix_deal_line_items_price_book_id");
+
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("ix_deal_line_items_product_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_deal_line_items_tenant_id");
+
+                    b.HasIndex("TenantId", "DealId")
+                        .HasDatabaseName("ix_deal_line_items_tenant_id_deal_id");
+
+                    b.ToTable("deal_line_items", (string)null);
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.DealStageHistory", b =>
                 {
                     b.Property<Guid>("Id")
@@ -7946,6 +8069,34 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_asp_net_user_tokens_asp_net_users_user_id");
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.DealLineItem", b =>
+                {
+                    b.HasOne("MindLift.Domain.Entities.Deal", "Deal")
+                        .WithMany("LineItems")
+                        .HasForeignKey("DealId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_deal_line_items_deals_deal_id");
+
+                    b.HasOne("MindLift.Domain.Entities.PriceBook", "PriceBook")
+                        .WithMany()
+                        .HasForeignKey("PriceBookId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_deal_line_items_price_books_price_book_id");
+
+                    b.HasOne("MindLift.Domain.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_deal_line_items_products_product_id");
+
+                    b.Navigation("Deal");
+
+                    b.Navigation("PriceBook");
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.Invoice", b =>
                 {
                     b.HasOne("MindLift.Domain.Entities.Account", "Account")
@@ -8125,6 +8276,11 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_report_schedules_report_definitions_report_id");
 
                     b.Navigation("Report");
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.Deal", b =>
+                {
+                    b.Navigation("LineItems");
                 });
 
             modelBuilder.Entity("MindLift.Domain.Entities.Invoice", b =>

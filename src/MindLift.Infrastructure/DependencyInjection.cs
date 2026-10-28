@@ -145,6 +145,7 @@ public static class DependencyInjection
 
         // Deals (M8).
         services.AddScoped<MindLift.Infrastructure.Deals.DealService>();
+        services.AddScoped<MindLift.Infrastructure.Deals.DealLineItemService>();
         services.AddScoped<MindLift.Infrastructure.Activities.ActivityService>();
         services.AddScoped<MindLift.Infrastructure.Activities.ChecklistService>();
         services.AddScoped<MindLift.Infrastructure.Activities.TimelineService>();
