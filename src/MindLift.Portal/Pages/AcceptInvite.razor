@@ -11,7 +11,7 @@ else if (UnknownCompany)
 {
     <NoCompany Message='@T["login.unknownCompany"]' />
 }
-else if (string.IsNullOrWhiteSpace(Token))
+else if (string.IsNullOrWhiteSpace(_cachedToken ?? Token))
 {
     <AuthCard Title='@T["invite.title"]' Subtitle='@T["invite.missing"]'>
         <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Href='@Link("login")' Class="mt-4">
@@ -47,6 +47,7 @@ else
 
     [SupplyParameterFromQuery] public string? Token { get; set; }
 
+    private string? _cachedToken;
     private string _password = string.Empty;
     private string _confirm = string.Empty;
     private bool _busy;
@@ -54,9 +55,26 @@ else
 
     private bool CanSubmit => !string.IsNullOrEmpty(_password) && !string.IsNullOrEmpty(_confirm);
 
+    protected override Task LoadAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(Token))
+        {
+            _cachedToken = Token;
+            Nav.NavigateTo(Link("accept-invite"), replace: true);
+        }
+        return Task.CompletedTask;
+    }
+
     private async Task SubmitAsync()
     {
         if (!CanSubmit) return;
+        var token = _cachedToken ?? Token;
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            _error = T["invite.failed"];
+            return;
+        }
+
         if (_password.Length < 8)
         {
             _error = T["invite.short"];
@@ -73,7 +91,7 @@ else
         _error = null;
         try
         {
-            var req = new AcceptPortalInviteRequest(Token!, _password);
+            var req = new AcceptPortalInviteRequest(token.Trim(), _password);
             var resp = await Session.Anonymous.PostAsJsonAsync(Api($"{Uri.EscapeDataString(Slug)}/auth/accept-invite"), req);
             if (resp.IsSuccessStatusCode)
             {

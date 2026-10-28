@@ -56,19 +56,8 @@ public sealed class AuthService(
                 // Silently ignore queue failures
             }
 
-            var dummyUser = new AppUser
-            {
-                Id = Guid.NewGuid(),
-                TenantId = Guid.NewGuid(),
-                UserName = request.Email,
-                Email = request.Email,
-                FirstName = request.FirstName.Trim(),
-                LastName = request.LastName.Trim(),
-                IsActive = false
-            };
-            var (access, expires) = tokens.CreateAccessToken(dummyUser, false);
-            var dummyRefresh = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
-            return new AuthResult(access, expires, dummyRefresh);
+            var shadowUser = await signup.CreateShadowTenantWithOwnerAsync(request, cancellationToken);
+            return await IssueForUserAsync(shadowUser, cancellationToken);
         }
 
         var user = await signup.CreateTenantWithOwnerAsync(request, cancellationToken);

@@ -474,7 +474,13 @@ public sealed class AutomationEngine(
 
             var client = httpClientFactory.CreateClient("AutomationWebhooks");
             client.Timeout = TimeSpan.FromSeconds(5);
-            await client.PostAsJsonAsync(action.WebhookUrl, payload, cancellationToken);
+            var response = await client.PostAsJsonAsync(action.WebhookUrl, payload, cancellationToken);
+            if ((int)response.StatusCode >= 300 && (int)response.StatusCode < 400)
+            {
+                logger.LogWarning("Webhook to {Url} returned redirect status code {StatusCode}, which is not permitted.", action.WebhookUrl, (int)response.StatusCode);
+                throw new InvalidOperationException($"Webhook returned redirect status code {(int)response.StatusCode}, which is not permitted.");
+            }
+            response.EnsureSuccessStatusCode();
         }
         catch (Exception ex) when (ex is not InvalidOperationException)
         {

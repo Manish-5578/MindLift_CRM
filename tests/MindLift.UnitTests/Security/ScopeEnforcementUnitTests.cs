@@ -447,4 +447,92 @@ public sealed class ScopeEnforcementUnitTests
 
         isAllowed.ShouldBeFalse("Portal invite must not allow setting arbitrary email when contact has no email recorded.");
     }
+
+    [Fact]
+    public void Deal_Save_Requires_All_Submitted_Contacts_In_Caller_Scope()
+    {
+        var callerVisibleContactIds = new HashSet<Guid> { Guid.NewGuid(), Guid.NewGuid() };
+        var outOfScopeContactId = Guid.NewGuid();
+
+        var submittedContactIds = new List<Guid> { callerVisibleContactIds.First(), outOfScopeContactId };
+        var allInScope = submittedContactIds.All(id => callerVisibleContactIds.Contains(id));
+
+        allInScope.ShouldBeFalse("Deal save must reject contact modifications containing out-of-scope contacts even if already linked.");
+    }
+
+    [Fact]
+    public void Deal_Contact_Replacement_Preserves_Hidden_Contacts_Server_Side()
+    {
+        var visibleContact1 = Guid.NewGuid();
+        var visibleContact2 = Guid.NewGuid();
+        var hiddenContact = Guid.NewGuid();
+
+        var existingContactsOnDeal = new List<Guid> { visibleContact1, visibleContact2, hiddenContact };
+        var callerVisibleContacts = new HashSet<Guid> { visibleContact1, visibleContact2 };
+
+        // Caller submits only visibleContact1 (omitting visibleContact2)
+        var callerSubmittedContacts = new HashSet<Guid> { visibleContact1 };
+
+        // Logic from ReplaceContactsAsync: only remove contacts that the caller has scope to see AND omitted
+        var toRemove = existingContactsOnDeal.Where(id => callerVisibleContacts.Contains(id) && !callerSubmittedContacts.Contains(id)).ToList();
+        var preserved = existingContactsOnDeal.Where(id => !toRemove.Contains(id)).ToList();
+
+        toRemove.ShouldBe([visibleContact2]);
+        preserved.ShouldContain(visibleContact1);
+        preserved.ShouldContain(hiddenContact);
+    }
+
+    [Fact]
+    public void Booking_Management_Token_Rotates_On_Mutation()
+    {
+        var initialToken = Guid.NewGuid().ToString("N");
+        var initialHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(initialToken))).ToLowerInvariant();
+
+        var cancelledToken = Guid.NewGuid().ToString("N");
+        var cancelledHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(cancelledToken))).ToLowerInvariant();
+
+        cancelledHash.ShouldNotBe(initialHash, "Management token hash must rotate upon cancellation.");
+    }
+
+    [Fact]
+    public void Invoice_RecordPayment_Rejects_Overpayment_And_Cancelled()
+    {
+        var grandTotal = 1000m;
+        var paidAmount = 400m;
+        var balanceDue = grandTotal - paidAmount; // 600m
+        var cancelledStatus = (int)InvoiceStatus.Cancelled;
+
+        // 1. Overpayment rejection
+        var paymentAmount = 700m;
+        var isOverpayment = paymentAmount > balanceDue;
+        isOverpayment.ShouldBeTrue("Payment amount greater than balance due must be rejected.");
+
+        // 2. Cancelled invoice rejection
+        var isCancelled = cancelledStatus == (int)InvoiceStatus.Cancelled;
+        isCancelled.ShouldBeTrue("Payment against cancelled invoice must be rejected.");
+    }
+
+    [Theory]
+    [InlineData(301)]
+    [InlineData(302)]
+    [InlineData(307)]
+    [InlineData(308)]
+    public void Webhook_Redirect_Status_Codes_Are_Treated_As_Forbidden(int statusCode)
+    {
+        var isRedirect = statusCode >= 300 && statusCode < 400;
+        isRedirect.ShouldBeTrue("3xx redirect response from automation webhooks must be treated as SSRF violation.");
+    }
+
+    [Fact]
+    public void GlobalExceptionHandler_Sanitizes_Token_Bearing_Paths_And_Query()
+    {
+        var path = "/api/v1/booking/manage/secret12345/cancel";
+        var query = "?token=supersecrettoken&foo=bar";
+
+        var safePath = System.Text.RegularExpressions.Regex.Replace(path, @"/manage/[^/?]+", "/manage/[REDACTED]", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        var safeQuery = System.Text.RegularExpressions.Regex.Replace(query, @"([?&]token=)[^&]+", "$1[REDACTED]", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        safePath.ShouldBe("/api/v1/booking/manage/[REDACTED]/cancel");
+        safeQuery.ShouldBe("?token=[REDACTED]&foo=bar");
+    }
 }

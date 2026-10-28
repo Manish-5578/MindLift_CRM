@@ -303,6 +303,16 @@ public sealed class ContactService(AppDbContext db, ITenantContext tenant, ICloc
             return contact;
         }, cancellationToken);
 
+        if (contact.AccountId != previousSnapshot.AccountId)
+        {
+            var linkedPortalUsers = await db.PortalUsers.Where(u => u.ContactId == contact.Id).ToListAsync(cancellationToken);
+            foreach (var pu in linkedPortalUsers)
+            {
+                pu.AccountId = contact.AccountId;
+            }
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
         if (contact.OwnerId != previousOwner)
         {
             await NotifyOwnerAsync(contact.OwnerId, contact.Id, $"{contact.FirstName} {contact.LastName}".Trim(), cancellationToken);
@@ -318,6 +328,14 @@ public sealed class ContactService(AppDbContext db, ITenantContext tenant, ICloc
     {
         var contact = await LoadScopedAsync(id, cancellationToken);
         db.Contacts.Remove(contact);
+
+        var portalUsers = await db.PortalUsers.Where(u => u.ContactId == id).ToListAsync(cancellationToken);
+        foreach (var pu in portalUsers)
+        {
+            pu.IsActive = false;
+            pu.PasswordChangedAt = clock.UtcNow;
+        }
+
         await db.SaveChangesAsync(cancellationToken);
     }
 

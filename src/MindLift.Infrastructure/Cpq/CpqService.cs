@@ -14,7 +14,7 @@ using MindLift.Shared.Enums;
 namespace MindLift.Infrastructure.Cpq;
 
 public sealed class CpqService(
-    IAppDbContext db,
+    MindLift.Infrastructure.Persistence.AppDbContext db,
     ITenantContext tenant,
     MindLift.Infrastructure.Tenancy.NumberSequences numbers,
     IDataScopeService scope,
@@ -614,10 +614,30 @@ public sealed class CpqService(
 
     public async Task<PaymentDto> RecordPaymentAsync(Guid invoiceId, RecordPaymentRequest req, CancellationToken ct = default)
     {
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+
         var inv = await FindInvoiceAsync(invoiceId, withPayments: true, ct)
             ?? throw new NotFoundException("Invoice", invoiceId);
 
-        if (req.Amount <= 0) throw new ValidationException("Amount", "Payment amount must be greater than zero.");
+        if (inv.Status == (int)InvoiceStatus.Cancelled)
+        {
+            throw new BusinessRuleException("invoice_cancelled", "Cannot record payment against a cancelled invoice.");
+        }
+
+        if (inv.Status == (int)InvoiceStatus.Paid || inv.BalanceDue <= 0)
+        {
+            throw new BusinessRuleException("invoice_already_paid", "This invoice is already fully paid.");
+        }
+
+        if (req.Amount <= 0)
+        {
+            throw new ValidationException("Amount", "Payment amount must be greater than zero.");
+        }
+
+        if (req.Amount > inv.BalanceDue)
+        {
+            throw new ValidationException("Amount", $"Payment amount ({req.Amount:N2}) cannot exceed outstanding balance ({inv.BalanceDue:N2}).");
+        }
 
         var payment = new PaymentRecord
         {
@@ -647,6 +667,7 @@ public sealed class CpqService(
 
         inv.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
 
         return new PaymentDto
         {

@@ -108,6 +108,80 @@ public sealed class TenantSignupService(
         return owner;
     }
 
+    public async Task<AppUser> CreateShadowTenantWithOwnerAsync(SignupRequest request, CancellationToken cancellationToken = default)
+    {
+        if (!request.AcceptTerms)
+        {
+            throw new ValidationException(new Dictionary<string, string[]>
+            {
+                ["acceptTerms"] = ["You must accept the terms to continue."],
+            });
+        }
+
+        var now = clock.UtcNow;
+        var country = request.Country.ToUpperInvariant();
+        var defaults = CountryDefaults.For(country);
+        var plan = await db.Plans.AsNoTracking().SingleAsync(p => p.Key == TrialPlanKey, cancellationToken);
+
+        var workspace = new Tenant
+        {
+            Name = request.CompanyName.Trim(),
+            Slug = await UniqueSlugAsync(request.CompanyName, cancellationToken),
+            Status = "Trial",
+            PlanId = plan.Id,
+            TrialEndsAt = now.AddDays(TrialDays),
+            Country = country,
+            CreatedAt = now,
+        };
+        db.Tenants.Add(workspace);
+        await db.SaveChangesAsync(cancellationToken);
+
+        using var scope = tenant.Use(workspace.Id);
+
+        db.TenantSettings.Add(new TenantSettings
+        {
+            TenantId = workspace.Id,
+            CompanyName = workspace.Name,
+            Email = request.Email,
+            Phone = request.Phone,
+            BaseCurrency = defaults.Currency,
+            DefaultLanguage = request.Language == "ar" ? "ar" : "en",
+            TimeZoneId = defaults.TimeZoneId,
+            WeekStartDay = (int)defaults.WeekStart,
+            TaxEnabled = defaults.TaxRate > 0,
+            TaxLabel = defaults.TaxLabel,
+            DefaultTaxRate = defaults.TaxRate,
+        });
+
+        await seed.SeedTenantAsync(workspace.Id, cancellationToken);
+        var adminRoleId = await seed.AdminRoleIdAsync(cancellationToken);
+
+        var normalizedEmail = users.NormalizeEmail(request.Email);
+        var shadowOwner = new AppUser
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = workspace.Id,
+            UserName = request.Email,
+            Email = request.Email,
+            NormalizedEmail = $"{normalizedEmail}_shadow_{Guid.NewGuid():N}",
+            NormalizedUserName = $"{normalizedEmail}_shadow_{Guid.NewGuid():N}",
+            PhoneNumber = request.Phone,
+            FirstName = request.FirstName.Trim(),
+            LastName = request.LastName.Trim(),
+            Language = request.Language == "ar" ? "ar" : "en",
+            RoleId = adminRoleId,
+            IsTenantOwner = true,
+            IsActive = true,
+            LockoutEnabled = true,
+            CreatedAt = now,
+        };
+        shadowOwner.PasswordHash = users.PasswordHasher.HashPassword(shadowOwner, request.Password);
+        db.Users.Add(shadowOwner);
+        await db.SaveChangesAsync(cancellationToken);
+
+        return shadowOwner;
+    }
+
     /// <summary>"Al Noor Properties" → "al-noor-properties", with -2, -3 ... appended until unique (plan 6.2).</summary>
     private async Task<string> UniqueSlugAsync(string companyName, CancellationToken cancellationToken)
     {

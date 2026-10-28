@@ -83,20 +83,43 @@ public sealed class PublicBookingController(PublicBookingService booking) : Cont
         => Ok(await booking.BookAsync(tenantSlug, pageSlug, request, cancellationToken));
 
     [AllowAnonymous]
+    [HttpGet("manage")]
     [HttpGet("manage/{token}")]
-    public async Task<ActionResult<ManageBookingDto>> Manage(string token, CancellationToken cancellationToken)
-        => Ok(await booking.ManageAsync(token, cancellationToken));
+    public async Task<ActionResult<ManageBookingDto>> Manage([FromRoute] string? token, CancellationToken cancellationToken)
+        => Ok(await booking.ManageAsync(ExtractToken(token), cancellationToken));
 
     [AllowAnonymous]
+    [HttpPost("manage/cancel")]
     [HttpPost("manage/{token}/cancel")]
-    public async Task<IActionResult> Cancel(string token, [FromBody] CancelBookingRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Cancel([FromRoute] string? token, [FromBody] CancelBookingRequest request, CancellationToken cancellationToken)
     {
-        await booking.CancelAsync(token, request, cancellationToken);
+        var resolvedToken = ExtractToken(token, request.Token);
+        await booking.CancelAsync(resolvedToken, request, cancellationToken);
         return NoContent();
     }
 
     [AllowAnonymous]
+    [HttpPost("manage/reschedule")]
     [HttpPost("manage/{token}/reschedule")]
-    public async Task<ActionResult<BookingConfirmationDto>> Reschedule(string token, [FromBody] RescheduleBookingRequest request, CancellationToken cancellationToken)
-        => Ok(await booking.RescheduleAsync(token, request, cancellationToken));
+    public async Task<ActionResult<BookingConfirmationDto>> Reschedule([FromRoute] string? token, [FromBody] RescheduleBookingRequest request, CancellationToken cancellationToken)
+    {
+        var resolvedToken = ExtractToken(token, request.Token);
+        return Ok(await booking.RescheduleAsync(resolvedToken, request, cancellationToken));
+    }
+
+    private string ExtractToken(string? routeToken, string? bodyToken = null)
+    {
+        if (!string.IsNullOrWhiteSpace(bodyToken)) return bodyToken.Trim();
+        if (Request.Headers.TryGetValue("X-Booking-Token", out var headerVal) && !string.IsNullOrWhiteSpace(headerVal))
+            return headerVal.ToString().Trim();
+        if (Request.Headers.TryGetValue("Authorization", out var authVal) && !string.IsNullOrWhiteSpace(authVal))
+        {
+            var str = authVal.ToString().Trim();
+            if (str.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                return str["Bearer ".Length..].Trim();
+        }
+        if (!string.IsNullOrWhiteSpace(routeToken)) return routeToken.Trim();
+
+        throw new MindLift.Application.Common.Exceptions.UnauthorizedException("missing_booking_token", "Booking management token is required.");
+    }
 }

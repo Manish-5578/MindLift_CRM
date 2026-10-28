@@ -82,7 +82,12 @@ public sealed class ActivityService(AppDbContext db, ITenantContext tenant, IClo
     /// <summary>Progress of the onboarding checklists of a won deal: the tasks the templates created and how many are done.</summary>
     public async Task<IReadOnlyList<OnboardingProgressDto>> OnboardingAsync(Guid dealId, CancellationToken cancellationToken = default)
     {
-        var tasks = await db.Activities.AsNoTracking().Where(a => a.DealId == dealId && a.ChecklistTemplateId != null).OrderBy(a => a.DueAt).ToListAsync(cancellationToken);
+        var visibleDeals = await RecordHelpers.InScopeAsync(db.Deals.AsNoTracking(), scope, AppModule.Deals, d => d.OwnerId, cancellationToken);
+        var deal = await visibleDeals.FirstOrDefaultAsync(d => d.Id == dealId, cancellationToken)
+            ?? throw new NotFoundException("Deal", dealId);
+
+        var scopedActivities = await ScopedAsync(cancellationToken);
+        var tasks = await scopedActivities.AsNoTracking().Where(a => a.DealId == dealId && a.ChecklistTemplateId != null).OrderBy(a => a.DueAt).ToListAsync(cancellationToken);
         var ids = tasks.Select(t => t.ChecklistTemplateId!.Value).Distinct().ToList();
         var names = await db.ChecklistTemplates.AsNoTracking().IgnoreQueryFilters().Where(t => ids.Contains(t.Id)).ToDictionaryAsync(t => t.Id, t => t.Name, cancellationToken);
         var dtos = (await MapAsync(tasks, cancellationToken)).ToDictionary(d => d.Id);

@@ -127,6 +127,97 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromSeconds(30),
         };
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var principal = context.Principal;
+                if (principal == null)
+                {
+                    context.Fail("Principal is missing.");
+                    return;
+                }
+
+                var sub = principal.FindFirst("sub")?.Value;
+                var tid = principal.FindFirst("tid")?.Value;
+                if (!Guid.TryParse(sub, out var portalUserId) || !Guid.TryParse(tid, out var tenantId))
+                {
+                    context.Fail("Invalid subject or tenant claim.");
+                    return;
+                }
+
+                var db = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+
+                var user = await db.PortalUsers.IgnoreQueryFilters().AsNoTracking()
+                    .FirstOrDefaultAsync(u => u.Id == portalUserId && u.TenantId == tenantId && !u.IsDeleted);
+
+                if (user is null || !user.IsActive)
+                {
+                    context.Fail("Portal user is deactivated or deleted.");
+                    return;
+                }
+
+                // Linked contact must exist and not be deleted
+                var contactExists = await db.Contacts.IgnoreQueryFilters().AsNoTracking()
+                    .AnyAsync(c => c.Id == user.ContactId && c.TenantId == tenantId && !c.IsDeleted);
+                if (!contactExists)
+                {
+                    context.Fail("Linked contact is deleted or inactive.");
+                    return;
+                }
+
+                // Portal must be enabled for this tenant
+                var portalModule = await db.ModuleSettings.IgnoreQueryFilters().AsNoTracking()
+                    .Where(m => m.TenantId == tenantId && m.Module == MindLift.Shared.Enums.AppModule.Portal && !m.IsDeleted)
+                    .Select(m => (bool?)m.IsEnabled)
+                    .FirstOrDefaultAsync();
+                if (portalModule != true)
+                {
+                    context.Fail("Customer portal module is disabled.");
+                    return;
+                }
+
+                var portalSettings = await db.PortalSettings.IgnoreQueryFilters().AsNoTracking()
+                    .Where(s => s.TenantId == tenantId && !s.IsDeleted)
+                    .Select(s => (bool?)s.IsEnabled)
+                    .FirstOrDefaultAsync() ?? true;
+                if (!portalSettings)
+                {
+                    context.Fail("Customer portal is disabled for this company.");
+                    return;
+                }
+
+                // Check password change / session termination version
+                if (user.PasswordChangedAt.HasValue)
+                {
+                    var iatStr = principal.FindFirst("iat")?.Value;
+                    if (long.TryParse(iatStr, out var iatSeconds))
+                    {
+                        var issuedAt = DateTimeOffset.FromUnixTimeSeconds(iatSeconds).UtcDateTime;
+                        if (issuedAt < user.PasswordChangedAt.Value.AddSeconds(-2))
+                        {
+                            context.Fail("Session invalidated due to password change or account update.");
+                            return;
+                        }
+                    }
+                }
+
+                // Derive contact/account authorization identifiers from the validated server-side PortalUser
+                if (principal.Identity is System.Security.Claims.ClaimsIdentity identity)
+                {
+                    var existingCid = identity.FindFirst("cid");
+                    if (existingCid != null) identity.RemoveClaim(existingCid);
+                    identity.AddClaim(new System.Security.Claims.Claim("cid", user.ContactId.ToString()));
+
+                    var existingAid = identity.FindFirst("aid");
+                    if (existingAid != null) identity.RemoveClaim(existingAid);
+                    if (user.AccountId.HasValue)
+                    {
+                        identity.AddClaim(new System.Security.Claims.Claim("aid", user.AccountId.Value.ToString()));
+                    }
+                }
+            }
+        };
     });
 
 // Authorization: permission policies (perm:{module}:{action}) and the platform-admin policy.
@@ -319,11 +410,25 @@ app.Use(async (context, next) =>
 });
 
 app.UseMiddleware<MindLift.Api.Middleware.CorrelationIdMiddleware>();
-app.UseSerilogRequestLogging(options => options.EnrichDiagnosticContext = (diagnostics, http) =>
+app.UseSerilogRequestLogging(options =>
 {
-    diagnostics.Set("CorrelationId", http.TraceIdentifier);
-    diagnostics.Set("TenantId", http.User.FindFirst("tid")?.Value ?? "-");
-    diagnostics.Set("UserId", http.User.FindFirst("sub")?.Value ?? "-");
+    options.GetLevel = (httpContext, elapsed, ex) =>
+    {
+        var path = httpContext.Request.Path.Value ?? string.Empty;
+        if (path.Contains("/booking/manage", StringComparison.OrdinalIgnoreCase) || path.Contains("/manage/", StringComparison.OrdinalIgnoreCase))
+        {
+            return Serilog.Events.LogEventLevel.Verbose;
+        }
+        return ex != null || httpContext.Response.StatusCode > 499
+            ? Serilog.Events.LogEventLevel.Error
+            : Serilog.Events.LogEventLevel.Information;
+    };
+    options.EnrichDiagnosticContext = (diagnostics, http) =>
+    {
+        diagnostics.Set("CorrelationId", http.TraceIdentifier);
+        diagnostics.Set("TenantId", http.User.FindFirst("tid")?.Value ?? "-");
+        diagnostics.Set("UserId", http.User.FindFirst("sub")?.Value ?? "-");
+    };
 });
 app.UseExceptionHandler();
 

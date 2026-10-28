@@ -27,6 +27,11 @@ public sealed class AutomationOutboxJob(IEmailSender email, IHttpClientFactory h
         client.Timeout = TimeSpan.FromSeconds(5);
         using var content = new StringContent(json, Encoding.UTF8, "application/json");
         var response = await client.PostAsync(url, content, cancellationToken);
+        if ((int)response.StatusCode >= 300 && (int)response.StatusCode < 400)
+        {
+            logger.LogWarning("Queued webhook to {Url} returned redirect status {StatusCode}, which is not permitted.", url, (int)response.StatusCode);
+            throw new InvalidOperationException($"Webhook returned redirect status code {(int)response.StatusCode}, which is not permitted.");
+        }
         response.EnsureSuccessStatusCode();
     }
 }

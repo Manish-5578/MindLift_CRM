@@ -27,7 +27,12 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
 
         if (problem.Status == StatusCodes.Status500InternalServerError)
         {
-            logger.LogError(exception, "Unhandled exception for {Method} {Path}", httpContext.Request.Method, httpContext.Request.Path);
+            var rawPath = httpContext.Request.Path.Value ?? string.Empty;
+            var rawQuery = httpContext.Request.QueryString.Value ?? string.Empty;
+            var safePath = System.Text.RegularExpressions.Regex.Replace(rawPath, @"/manage/[^/?]+", "/manage/[REDACTED]", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            var safeQuery = System.Text.RegularExpressions.Regex.Replace(rawQuery, @"([?&]token=)[^&]+", "$1[REDACTED]", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            var sanitizedUrl = $"{safePath}{safeQuery}";
+            logger.LogError(exception, "Unhandled exception for {Method} {Path}", httpContext.Request.Method, sanitizedUrl);
             Sentry.SentrySdk.CaptureException(exception);   // does nothing unless Sentry:Dsn is set
         }
 

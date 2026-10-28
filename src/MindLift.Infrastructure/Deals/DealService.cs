@@ -525,15 +525,13 @@ public sealed class DealService(
             throw RecordHelpers.Invalid("contacts", "One of the contacts no longer exists.");
         }
 
-        // Contacts already on the deal may stay; any newly linked contact must be one the caller can see.
-        var alreadyLinked = await db.DealContacts.AsNoTracking().Where(l => l.DealId == dealId).Select(l => l.ContactId).ToListAsync(cancellationToken);
-        var added = ids.Except(alreadyLinked).ToList();
-        if (added.Count > 0)
+        // Every submitted ContactId MUST be visible in the caller's Contacts scope, not just newly added IDs.
+        if (ids.Count > 0)
         {
             var visible = await RecordHelpers.InScopeAsync(db.Contacts.AsNoTracking(), scope, AppModule.Contacts, c => c.OwnerId, cancellationToken);
-            if (await visible.CountAsync(c => added.Contains(c.Id), cancellationToken) != added.Count)
+            if (await visible.CountAsync(c => ids.Contains(c.Id), cancellationToken) != ids.Count)
             {
-                throw RecordHelpers.Invalid("contacts", "One of the contacts no longer exists.");
+                throw RecordHelpers.Invalid("contacts", "One of the contacts no longer exists or is outside your Contacts scope.");
             }
         }
 
@@ -553,7 +551,17 @@ public sealed class DealService(
     private async Task ReplaceContactsAsync(Deal deal, List<DealContactInput> contacts, CancellationToken cancellationToken)
     {
         var existing = await db.DealContacts.Where(c => c.DealId == deal.Id).ToListAsync(cancellationToken);
-        db.DealContacts.RemoveRange(existing.Where(e => contacts.All(c => c.ContactId != e.ContactId)));
+
+        // Find which existing contacts on the deal are in the caller's Contacts scope
+        var visibleContacts = await RecordHelpers.InScopeAsync(db.Contacts.AsNoTracking(), scope, AppModule.Contacts, c => c.OwnerId, cancellationToken);
+        var existingContactIds = existing.Select(e => e.ContactId).ToList();
+        var visibleExistingContactIds = (await visibleContacts.Where(c => existingContactIds.Contains(c.Id)).Select(c => c.Id).ToListAsync(cancellationToken)).ToHashSet();
+
+        // Only remove existing contacts that the caller has scope to see and explicitly omitted.
+        // Pre-existing hidden contacts outside the caller's Contacts scope are preserved server-side.
+        var toRemove = existing.Where(e => visibleExistingContactIds.Contains(e.ContactId) && contacts.All(c => c.ContactId != e.ContactId)).ToList();
+        db.DealContacts.RemoveRange(toRemove);
+
         foreach (var input in contacts)
         {
             var current = existing.FirstOrDefault(e => e.ContactId == input.ContactId);

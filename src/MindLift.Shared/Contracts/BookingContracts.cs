@@ -97,9 +97,9 @@ public sealed record ManageBookingDto(
     bool CanChange,
     string TimeZone);
 
-public sealed record CancelBookingRequest(string? Reason);
+public sealed record CancelBookingRequest(string? Reason, string? Token = null);
 
-public sealed record RescheduleBookingRequest(DateTime Start, string? TimeZone);
+public sealed record RescheduleBookingRequest(DateTime Start, string? TimeZone, string? Token = null);
 
 public sealed record BookingListItemDto(Guid Id, string PageName, string Name, string Email, DateTime StartUtc, DateTime EndUtc, string Status, Guid UserId, string? UserName);
 

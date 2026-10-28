@@ -754,7 +754,7 @@ public sealed class PortalService(
         var req = await db.DocumentRequests.FirstOrDefaultAsync(r => r.Id == requestId && r.ContactId == contactId && !r.IsDeleted, ct)
             ?? throw new NotFoundException("DocumentRequest", requestId);
 
-        if (req.Status is "Completed" or "Cancelled")
+        if (req.Status is "Completed" or "Cancelled" or "Submitted")
         {
             throw new BusinessRuleException("request_closed", "This request is closed and no longer accepts uploads.");
         }

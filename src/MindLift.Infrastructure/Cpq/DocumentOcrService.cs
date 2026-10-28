@@ -206,6 +206,26 @@ public sealed class DocumentOcrService(
             }
         }
 
+        const long MaxTenantStorageBytes = 500L * 1024 * 1024; // 500 MB quota
+        const int MaxTenantDocumentCount = 5000;
+
+        var totalBytes = await db.Set<BusinessDocument>().IgnoreQueryFilters()
+            .Where(d => d.TenantId == CurrentTenantId && !d.IsDeleted)
+            .SumAsync(d => (long)d.FileSizeBytes, ct);
+
+        if (totalBytes + fileSize > MaxTenantStorageBytes)
+        {
+            throw new PlanLimitException("storage_quota_exceeded", "Storage quota exceeded. Please delete old documents or upgrade your plan.");
+        }
+
+        var totalCount = await db.Set<BusinessDocument>().IgnoreQueryFilters()
+            .CountAsync(d => d.TenantId == CurrentTenantId && !d.IsDeleted, ct);
+
+        if (totalCount >= MaxTenantDocumentCount)
+        {
+            throw new PlanLimitException("document_count_limit", "Maximum document count reached for this tenant.");
+        }
+
         var cleanFileName = Path.GetFileName(fileName);
         var storageKey = $"docs/{CurrentTenantId}/{Guid.NewGuid():N}_{cleanFileName}";
         using var stream = new MemoryStream(fileBytes);
@@ -745,10 +765,23 @@ public sealed class DocumentOcrService(
             doc.Category = "General";
         }
 
+        // If already queued, return current state idempotently without creating duplicate background jobs
+        if (doc.Status == "Queued")
+        {
+            return MapDocument(doc);
+        }
+
         // A reading that has been going for longer than any reading can take was cut off (the app was stopped, say), so the document may be read again.
         if (doc.Status == "Processing" && DateTime.UtcNow - (doc.UpdatedAt ?? doc.CreatedAt) < TimeSpan.FromMinutes(20))
         {
             throw new BusinessRuleException("already_reading", "This document is being read right now.");
+        }
+
+        const int MaxPendingOcrJobsPerTenant = 50;
+        var pendingCount = await db.Set<BusinessDocument>().CountAsync(d => (d.Status == "Queued" || d.Status == "Processing") && !d.IsDeleted, ct);
+        if (pendingCount >= MaxPendingOcrJobsPerTenant)
+        {
+            throw new PlanLimitException("ocr_queue_limit", "The OCR processing queue is currently at capacity. Please try again later.");
         }
 
         doc.OcrStatus = (int)DocumentOcrStatus.Pending;

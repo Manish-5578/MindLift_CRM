@@ -156,6 +156,8 @@ public sealed class PublicBookingService(
         booking.Status = BookingStatus.Cancelled;
         booking.CancelledAt = clock.UtcNow;
         booking.CancelReason = RecordHelpers.Clean(request.Reason) is { } reason ? (reason.Length > 500 ? reason[..500] : reason) : null;
+        var cancelledToken = Guid.NewGuid().ToString("N");
+        booking.ManageTokenHash = Hash(cancelledToken);
         var activity = await db.Activities.FirstOrDefaultAsync(a => a.Id == booking.ActivityId, cancellationToken);
         if (activity is not null)
         {
@@ -163,7 +165,7 @@ public sealed class PublicBookingService(
         }
 
         await db.SaveChangesAsync(cancellationToken);
-        await SendConfirmationAsync(workspace, page, booking, booking.UserId, token, "Booking cancelled", true, cancellationToken);
+        await SendConfirmationAsync(workspace, page, booking, booking.UserId, cancelledToken, "Booking cancelled", true, cancellationToken);
         await TellPersonAsync(page, booking, NotificationTypes.BookingCancelled, $"Booking cancelled: {booking.Name}", cancellationToken);
     }
 
@@ -201,6 +203,9 @@ public sealed class PublicBookingService(
         booking.TimeZone = ZoneOrPage(request.TimeZone, page).Id;
         booking.RemindersSent = BookingJson.Write(OffsetsAlreadyPassed(page, start));
 
+        var newToken = Guid.NewGuid().ToString("N");
+        booking.ManageTokenHash = Hash(newToken);
+
         var activity = await db.Activities.FirstAsync(a => a.Id == booking.ActivityId, cancellationToken);
         activity.DueAt = start;
         activity.EndAt = end;
@@ -209,9 +214,9 @@ public sealed class PublicBookingService(
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
-        await SendConfirmationAsync(workspace, page, booking, assigned, token, "Booking moved", false, cancellationToken);
+        await SendConfirmationAsync(workspace, page, booking, assigned, newToken, "Booking moved", false, cancellationToken);
         await TellPersonAsync(page, booking, NotificationTypes.BookingCreated, $"Booking moved: {booking.Name}", cancellationToken);
-        return new BookingConfirmationDto(page.Name, start, end, token, $"/booking/manage/{token}");
+        return new BookingConfirmationDto(page.Name, start, end, newToken, $"/booking/manage/{newToken}");
     }
 
     // ---------- helpers ----------
