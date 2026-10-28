@@ -4477,6 +4477,449 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.ToTable("email_suppressions", (string)null);
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.EmailSyncAccount", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("AutoCreateLeads")
+                        .HasColumnType("boolean")
+                        .HasColumnName("auto_create_leads");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("display_name");
+
+                    b.Property<string>("EmailAddress")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("email_address");
+
+                    b.Property<string>("EmailVisibility")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("Public")
+                        .HasColumnName("email_visibility");
+
+                    b.Property<string>("EncryptedOAuthToken")
+                        .HasColumnType("text")
+                        .HasColumnName("encrypted_o_auth_token");
+
+                    b.Property<string>("EncryptedPassword")
+                        .HasColumnType("text")
+                        .HasColumnName("encrypted_password");
+
+                    b.Property<string>("EncryptedRefreshToken")
+                        .HasColumnType("text")
+                        .HasColumnName("encrypted_refresh_token");
+
+                    b.PrimitiveCollection<string[]>("ExcludedDomains")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("excluded_domains");
+
+                    b.Property<string>("ImapHost")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("imap_host");
+
+                    b.Property<int?>("ImapPort")
+                        .HasColumnType("integer")
+                        .HasColumnName("imap_port");
+
+                    b.Property<bool>("ImapUseSsl")
+                        .HasColumnType("boolean")
+                        .HasColumnName("imap_use_ssl");
+
+                    b.Property<string>("ImapUsername")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("imap_username");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("LastErrorMessage")
+                        .HasColumnType("text")
+                        .HasColumnName("last_error_message");
+
+                    b.Property<DateTime?>("LastSyncedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_synced_at");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("IMAP")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("SmtpHost")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("smtp_host");
+
+                    b.Property<int?>("SmtpPort")
+                        .HasColumnType("integer")
+                        .HasColumnName("smtp_port");
+
+                    b.Property<bool>("SmtpUseSsl")
+                        .HasColumnType("boolean")
+                        .HasColumnName("smtp_use_ssl");
+
+                    b.Property<string>("SmtpUsername")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("smtp_username");
+
+                    b.Property<string>("SyncDirection")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("TwoWay")
+                        .HasColumnName("sync_direction");
+
+                    b.PrimitiveCollection<string[]>("SyncFolders")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("sync_folders");
+
+                    b.Property<string>("SyncStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("Idle")
+                        .HasColumnName("sync_status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<int>("TotalSyncedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_synced_count");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_email_sync_accounts");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_email_sync_accounts_tenant_id");
+
+                    b.HasIndex("TenantId", "EmailAddress")
+                        .HasDatabaseName("ix_email_sync_accounts_tenant_id_email_address");
+
+                    b.HasIndex("TenantId", "UserId")
+                        .HasDatabaseName("ix_email_sync_accounts_tenant_id_user_id");
+
+                    b.ToTable("email_sync_accounts", (string)null);
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.EmailSyncLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<Guid>("EmailSyncAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("email_sync_account_id");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("text")
+                        .HasColumnName("error_message");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<int>("MessagesCreated")
+                        .HasColumnType("integer")
+                        .HasColumnName("messages_created");
+
+                    b.Property<int>("MessagesFetched")
+                        .HasColumnType("integer")
+                        .HasColumnName("messages_fetched");
+
+                    b.Property<int>("MessagesLinked")
+                        .HasColumnType("integer")
+                        .HasColumnName("messages_linked");
+
+                    b.Property<int>("MessagesSkipped")
+                        .HasColumnType("integer")
+                        .HasColumnName("messages_skipped");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("Success")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_email_sync_logs");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_email_sync_logs_tenant_id");
+
+                    b.HasIndex("TenantId", "EmailSyncAccountId", "StartedAt")
+                        .HasDatabaseName("ix_email_sync_logs_tenant_id_email_sync_account_id_started_at");
+
+                    b.ToTable("email_sync_logs", (string)null);
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.EmailSyncMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<string>("AttachmentsJson")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("attachments_json");
+
+                    b.PrimitiveCollection<string[]>("BccAddresses")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("bcc_addresses");
+
+                    b.Property<string>("BodyHtml")
+                        .HasColumnType("text")
+                        .HasColumnName("body_html");
+
+                    b.Property<string>("BodyPlain")
+                        .HasColumnType("text")
+                        .HasColumnName("body_plain");
+
+                    b.PrimitiveCollection<string[]>("CcAddresses")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("cc_addresses");
+
+                    b.Property<Guid?>("ContactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("contact_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime>("DateUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("date_utc");
+
+                    b.Property<Guid?>("DealId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deal_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("Direction")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("Inbound")
+                        .HasColumnName("direction");
+
+                    b.Property<Guid>("EmailSyncAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("email_sync_account_id");
+
+                    b.Property<string>("ExternalMessageId")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("external_message_id");
+
+                    b.Property<string>("FromAddress")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("from_address");
+
+                    b.Property<string>("FromName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("from_name");
+
+                    b.Property<bool>("HasAttachments")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_attachments");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_read");
+
+                    b.Property<Guid?>("LeadId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lead_id");
+
+                    b.Property<string>("Snippet")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("snippet");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("subject");
+
+                    b.Property<DateTime>("SyncedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("synced_at");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("ThreadId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("thread_id");
+
+                    b.PrimitiveCollection<string[]>("ToAddresses")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("to_addresses");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_email_sync_messages");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_email_sync_messages_tenant_id");
+
+                    b.HasIndex("TenantId", "ContactId")
+                        .HasDatabaseName("ix_email_sync_messages_tenant_id_contact_id");
+
+                    b.HasIndex("TenantId", "ExternalMessageId")
+                        .HasDatabaseName("ix_email_sync_messages_tenant_id_external_message_id");
+
+                    b.HasIndex("TenantId", "LeadId")
+                        .HasDatabaseName("ix_email_sync_messages_tenant_id_lead_id");
+
+                    b.HasIndex("TenantId", "ThreadId")
+                        .HasDatabaseName("ix_email_sync_messages_tenant_id_thread_id");
+
+                    b.HasIndex("TenantId", "EmailSyncAccountId", "DateUtc")
+                        .HasDatabaseName("ix_email_sync_messages_tenant_id_email_sync_account_id_date_utc");
+
+                    b.ToTable("email_sync_messages", (string)null);
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.EmailTemplate", b =>
                 {
                     b.Property<Guid>("Id")

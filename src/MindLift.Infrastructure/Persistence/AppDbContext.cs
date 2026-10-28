@@ -138,6 +138,9 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<GdprErasureRecord> GdprErasureRecords { get; set; } = null!;
     public DbSet<EnrichmentLog> EnrichmentLogs { get; set; } = null!;
     public DbSet<EnrichmentConfig> EnrichmentConfigs { get; set; } = null!;
+    public DbSet<EmailSyncAccount> EmailSyncAccounts { get; set; } = null!;
+    public DbSet<EmailSyncMessage> EmailSyncMessages { get; set; } = null!;
+    public DbSet<EmailSyncLog> EmailSyncLogs { get; set; } = null!;
 
     /// <summary>Tenant used by query filters. Guid.Empty when no tenant is set, so no rows match.</summary>
     protected Guid CurrentTenantId => tenant.TenantId ?? Guid.Empty;
@@ -1284,6 +1287,47 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.ToTable("enrichment_configs");
             b.Property(x => x.DefaultProvider).HasMaxLength(100).HasDefaultValue("MindLift Intelligence");
             b.HasIndex(x => x.TenantId).IsUnique();
+        });
+
+        builder.Entity<EmailSyncAccount>(b =>
+        {
+            b.ToTable("email_sync_accounts");
+            b.Property(x => x.EmailAddress).HasMaxLength(320);
+            b.Property(x => x.DisplayName).HasMaxLength(100);
+            b.Property(x => x.Provider).HasMaxLength(50).HasDefaultValue("IMAP");
+            b.Property(x => x.ImapHost).HasMaxLength(255);
+            b.Property(x => x.ImapUsername).HasMaxLength(255);
+            b.Property(x => x.SmtpHost).HasMaxLength(255);
+            b.Property(x => x.SmtpUsername).HasMaxLength(255);
+            b.Property(x => x.SyncDirection).HasMaxLength(50).HasDefaultValue("TwoWay");
+            b.Property(x => x.EmailVisibility).HasMaxLength(50).HasDefaultValue("Public");
+            b.Property(x => x.SyncStatus).HasMaxLength(50).HasDefaultValue("Idle");
+            b.HasIndex(x => new { x.TenantId, x.UserId });
+            b.HasIndex(x => new { x.TenantId, x.EmailAddress });
+        });
+
+        builder.Entity<EmailSyncMessage>(b =>
+        {
+            b.ToTable("email_sync_messages");
+            b.Property(x => x.ExternalMessageId).HasMaxLength(500);
+            b.Property(x => x.ThreadId).HasMaxLength(100);
+            b.Property(x => x.Subject).HasMaxLength(500);
+            b.Property(x => x.FromAddress).HasMaxLength(320);
+            b.Property(x => x.FromName).HasMaxLength(200);
+            b.Property(x => x.Direction).HasMaxLength(50).HasDefaultValue("Inbound");
+            b.Property(x => x.Snippet).HasMaxLength(500);
+            b.HasIndex(x => new { x.TenantId, x.EmailSyncAccountId, x.DateUtc });
+            b.HasIndex(x => new { x.TenantId, x.ExternalMessageId });
+            b.HasIndex(x => new { x.TenantId, x.ThreadId });
+            b.HasIndex(x => new { x.TenantId, x.LeadId });
+            b.HasIndex(x => new { x.TenantId, x.ContactId });
+        });
+
+        builder.Entity<EmailSyncLog>(b =>
+        {
+            b.ToTable("email_sync_logs");
+            b.Property(x => x.Status).HasMaxLength(50).HasDefaultValue("Success");
+            b.HasIndex(x => new { x.TenantId, x.EmailSyncAccountId, x.StartedAt });
         });
     }
 
