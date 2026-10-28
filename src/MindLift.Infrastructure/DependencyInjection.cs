@@ -109,6 +109,7 @@ public static class DependencyInjection
         services.AddScoped<PlatformService>();
         services.AddScoped<MindLift.Application.Abstractions.IPlatformEntitlements, MindLift.Infrastructure.Platform.PlatformEntitlements>();
         services.AddScoped<MindLift.Infrastructure.Platform.PlatformConsole>();
+        services.AddScoped<MindLift.Application.Abstractions.IFeatureFlags, MindLift.Infrastructure.Platform.FeatureFlags>();
 
         // Settings and configuration (M3).
         services.AddScoped<SettingsVersion>();

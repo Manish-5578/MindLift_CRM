@@ -6958,6 +6958,70 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.ToTable("tenants", (string)null);
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.TenantFeature", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_enabled");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("key");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_tenant_features");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_tenant_features_tenant_id");
+
+                    b.HasIndex("TenantId", "Key")
+                        .IsUnique()
+                        .HasDatabaseName("ix_tenant_features_tenant_id_key")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("tenant_features", (string)null);
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.TenantSettings", b =>
                 {
                     b.Property<Guid>("Id")

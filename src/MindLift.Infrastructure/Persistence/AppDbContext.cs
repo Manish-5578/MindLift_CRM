@@ -96,6 +96,7 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<PortalUser> PortalUsers { get; set; } = null!;
     public DbSet<PortalToken> PortalTokens { get; set; } = null!;
     public DbSet<DocumentRequest> DocumentRequests { get; set; } = null!;
+    public DbSet<TenantFeature> TenantFeatures { get; set; } = null!;
 
     /// <summary>Tenant used by query filters. Guid.Empty when no tenant is set, so no rows match.</summary>
     protected Guid CurrentTenantId => tenant.TenantId ?? Guid.Empty;
@@ -708,6 +709,13 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.HasIndex(x => new { x.TenantId, x.Category });
             b.HasIndex(x => new { x.TenantId, x.AssociatedContactId });
             b.HasIndex(x => new { x.TenantId, x.AssociatedAccountId });
+        });
+
+        builder.Entity<TenantFeature>(b =>
+        {
+            b.ToTable("tenant_features");
+            b.Property(x => x.Key).HasMaxLength(64);
+            b.HasIndex(x => new { x.TenantId, x.Key }).IsUnique().HasFilter("is_deleted = false");
         });
     }
 
