@@ -48,12 +48,19 @@ public sealed class ReportService(
     private Guid TenantId => tenant.TenantId ?? throw new ForbiddenException("No tenant set.");
     private Guid UserId => tenant.UserId ?? throw new ForbiddenException("No user set.");
 
+    private IQueryable<ReportDefinition> AuthorizedReports()
+        => db.ReportDefinitions.Where(r => r.TenantId == TenantId && !r.IsDeleted
+            && (r.IsSystem || r.Visibility == ReportVisibility.Everyone || r.CreatedById == UserId));
+
+    private async Task<ReportDefinition> GetAuthorizedReportAsync(Guid id, CancellationToken ct = default)
+        => await AuthorizedReports().FirstOrDefaultAsync(r => r.Id == id, ct)
+            ?? throw new NotFoundException("Report", id);
+
     public async Task<IReadOnlyList<ReportDefinitionDto>> ListReportsAsync(Guid? folderId, bool favoritesOnly, CancellationToken ct = default)
     {
-        var query = db.ReportDefinitions
+        IQueryable<ReportDefinition> query = AuthorizedReports()
             .Include(r => r.Folder)
-            .Include(r => r.Favorites)
-            .Where(r => r.TenantId == TenantId && !r.IsDeleted);
+            .Include(r => r.Favorites);
 
         if (folderId.HasValue)
         {
@@ -64,9 +71,6 @@ public sealed class ReportService(
         {
             query = query.Where(r => r.Favorites.Any(f => f.UserId == UserId && !f.IsDeleted));
         }
-
-        // Visibility filter: Everyone, or CreatedBy current user, or System reports
-        query = query.Where(r => r.IsSystem || r.Visibility == ReportVisibility.Everyone || r.CreatedById == UserId);
 
         var list = await query.OrderByDescending(r => r.LastRunAt ?? r.CreatedAt).ToListAsync(ct);
 
@@ -127,10 +131,10 @@ public sealed class ReportService(
 
     public async Task<ReportDefinitionDto> GetReportAsync(Guid id, CancellationToken ct = default)
     {
-        var r = await db.ReportDefinitions
+        var r = await AuthorizedReports()
             .Include(x => x.Folder)
             .Include(x => x.Favorites)
-            .FirstOrDefaultAsync(x => x.Id == id && x.TenantId == TenantId && !x.IsDeleted, ct)
+            .FirstOrDefaultAsync(x => x.Id == id, ct)
             ?? throw new NotFoundException("Report", id);
 
         ReportQuery rQuery = new();
@@ -169,12 +173,13 @@ public sealed class ReportService(
         ReportDefinition entity;
         if (id.HasValue && id.Value != Guid.Empty)
         {
-            entity = await db.ReportDefinitions
-                .FirstOrDefaultAsync(x => x.Id == id.Value && x.TenantId == TenantId && !x.IsDeleted, ct)
-                ?? throw new NotFoundException("Report", id.Value);
+            entity = await GetAuthorizedReportAsync(id.Value, ct);
 
             if (entity.IsSystem)
                 throw new ValidationException("System reports cannot be modified directly. Use Save As instead.");
+
+            if (entity.CreatedById.HasValue && entity.CreatedById != UserId)
+                throw new ForbiddenException("You cannot modify a report created by another user. Use Save As instead.");
 
             entity.Name = req.Name;
             entity.Description = req.Description;
@@ -207,12 +212,13 @@ public sealed class ReportService(
 
     public async Task DeleteReportAsync(Guid id, CancellationToken ct = default)
     {
-        var r = await db.ReportDefinitions
-            .FirstOrDefaultAsync(x => x.Id == id && x.TenantId == TenantId && !x.IsDeleted, ct)
-            ?? throw new NotFoundException("Report", id);
+        var r = await GetAuthorizedReportAsync(id, ct);
 
         if (r.IsSystem)
             throw new ValidationException("System reports cannot be deleted.");
+
+        if (r.CreatedById.HasValue && r.CreatedById != UserId)
+            throw new ForbiddenException("You can only delete your own reports.");
 
         r.IsDeleted = true;
         await db.SaveChangesAsync(ct);
@@ -220,6 +226,8 @@ public sealed class ReportService(
 
     public async Task<bool> ToggleFavoriteAsync(Guid id, CancellationToken ct = default)
     {
+        await GetAuthorizedReportAsync(id, ct);
+
         var fav = await db.ReportFavorites
             .FirstOrDefaultAsync(x => x.ReportId == id && x.UserId == UserId && x.TenantId == TenantId && !x.IsDeleted, ct);
 
@@ -242,9 +250,7 @@ public sealed class ReportService(
 
     public async Task<ReportResult> RunReportAsync(Guid id, ReportRunRequest req, CancellationToken ct = default)
     {
-        var report = await db.ReportDefinitions
-            .FirstOrDefaultAsync(x => x.Id == id && x.TenantId == TenantId && !x.IsDeleted, ct)
-            ?? throw new NotFoundException("Report", id);
+        var report = await GetAuthorizedReportAsync(id, ct);
 
         ReportQuery query;
         try
@@ -516,6 +522,8 @@ public sealed class ReportService(
     // Schedules
     public async Task<IReadOnlyList<ReportScheduleDto>> GetSchedulesAsync(Guid reportId, CancellationToken ct = default)
     {
+        await GetAuthorizedReportAsync(reportId, ct);
+
         var list = await db.ReportSchedules
             .Where(s => s.ReportId == reportId && s.TenantId == TenantId && !s.IsDeleted)
             .ToListAsync(ct);
@@ -545,11 +553,13 @@ public sealed class ReportService(
 
     public async Task<ReportScheduleDto> SaveScheduleAsync(Guid reportId, Guid? id, SaveReportScheduleRequest req, CancellationToken ct = default)
     {
+        await GetAuthorizedReportAsync(reportId, ct);
+
         ReportSchedule entity;
         if (id.HasValue && id.Value != Guid.Empty)
         {
             entity = await db.ReportSchedules
-                .FirstOrDefaultAsync(s => s.Id == id.Value && s.TenantId == TenantId && !s.IsDeleted, ct)
+                .FirstOrDefaultAsync(s => s.Id == id.Value && s.ReportId == reportId && s.TenantId == TenantId && !s.IsDeleted, ct)
                 ?? throw new NotFoundException("ReportSchedule", id.Value);
 
             entity.CronExpression = req.CronExpression;
@@ -563,6 +573,7 @@ public sealed class ReportService(
             {
                 TenantId = TenantId,
                 ReportId = reportId,
+                CreatedById = UserId,
                 CronExpression = req.CronExpression,
                 Format = req.Format,
                 RecipientsJson = JsonDocument.Parse(JsonSerializer.Serialize(req.Recipients)),
@@ -609,6 +620,8 @@ public sealed class ReportService(
         var s = await db.ReportSchedules
             .FirstOrDefaultAsync(x => x.Id == id && x.TenantId == TenantId && !x.IsDeleted, ct)
             ?? throw new NotFoundException("ReportSchedule", id);
+
+        await GetAuthorizedReportAsync(s.ReportId, ct);
 
         s.IsDeleted = true;
         await db.SaveChangesAsync(ct);

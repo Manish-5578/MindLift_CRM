@@ -53,14 +53,7 @@ public sealed class BootstrapService(
         }
 
         var canViewSettings = await permissions.HasAsync(AppModule.Settings, PermissionAction.View, cancellationToken);
-        var effectiveCompany = canViewSettings
-            ? snapshot.Company
-            : snapshot.Company with
-            {
-                Email = null,
-                Phone = null,
-                TaxRegistrationNumber = null
-            };
+        var effectiveCompany = canViewSettings ? snapshot.Company : null;
 
         return new BootstrapDto(
             me,

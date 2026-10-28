@@ -27,15 +27,17 @@ public sealed class AuthFlowTests(MindLiftApiFactory factory) : IClassFixture<Mi
     }
 
     [Fact]
-    public async Task Signing_up_twice_with_the_same_email_is_rejected()
+    public async Task Signing_up_twice_with_the_same_email_returns_uniform_success_without_enumerating()
     {
         var owner = await Workspaces.SignupAsync(factory);
 
         var response = await Workspaces.MobileClient(factory).PostAsJsonAsync("/api/v1/auth/signup",
             new SignupRequest("Another company", "Sara", "Khan", owner.Email, Workspaces.Password, null, "AE", "en", true));
 
-        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
-        (await Workspaces.ErrorCodeAsync(response)).ShouldBe("email_taken");
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var token = await response.Content.ReadFromJsonAsync<TokenResponse>();
+        token.ShouldNotBeNull();
+        token.AccessToken.ShouldNotBeNullOrWhiteSpace();
     }
 
     [Fact]

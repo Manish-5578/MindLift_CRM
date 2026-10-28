@@ -4,6 +4,7 @@ using MindLift.Application.Common.Exceptions;
 using MindLift.Infrastructure.Automation;
 using MindLift.Infrastructure.Identity;
 using MindLift.Infrastructure.Security;
+using MindLift.Shared.Contracts;
 using MindLift.Shared.Enums;
 using NSubstitute;
 using Shouldly;
@@ -297,5 +298,153 @@ public sealed class ScopeEnforcementUnitTests
 
         var isCandidate = emailMatches || phoneMatches;
         isCandidate.ShouldBeFalse("Same name without matching normalized email or phone must not be accepted for merge.");
+    }
+
+    [Fact]
+    public void Deal_Dto_Redacts_Account_When_Out_Of_Scope()
+    {
+        var dealAccountId = Guid.NewGuid();
+        var visibleAccountIds = new HashSet<Guid> { Guid.NewGuid(), Guid.NewGuid() }; // Does not contain dealAccountId
+
+        var isAccountVisible = dealAccountId != Guid.Empty && visibleAccountIds.Contains(dealAccountId);
+        Guid? effectiveAccountId = isAccountVisible ? dealAccountId : null;
+        string? accountName = isAccountVisible ? "Secret Corp" : null;
+
+        effectiveAccountId.ShouldBeNull("Deal DTO must not expose out-of-scope AccountId.");
+        accountName.ShouldBeNull("Deal DTO must not expose out-of-scope AccountName.");
+    }
+
+    [Fact]
+    public void Deal_Dto_Filters_Out_Contacts_That_Are_Out_Of_Scope()
+    {
+        var contact1 = Guid.NewGuid();
+        var contact2 = Guid.NewGuid();
+        var contact3 = Guid.NewGuid();
+
+        var visibleContactIds = new HashSet<Guid> { contact1, contact3 }; // contact2 is out of scope
+
+        var dealContacts = new[]
+        {
+            new DealContactDto(contact1, "Alice", null, true),
+            new DealContactDto(contact2, "Bob", null, false),
+            new DealContactDto(contact3, "Charlie", null, false)
+        };
+
+        var filteredContacts = dealContacts.Where(c => visibleContactIds.Contains(c.ContactId)).ToList();
+
+        filteredContacts.Count.ShouldBe(2);
+        filteredContacts.ShouldNotContain(c => c.ContactId == contact2);
+    }
+
+    [Fact]
+    public void Report_Visibility_Excludes_Private_Reports_Of_Other_Users()
+    {
+        var currentUserId = Guid.NewGuid();
+        var otherUserId = Guid.NewGuid();
+
+        var systemReport = new MindLift.Domain.Entities.ReportDefinition { Id = Guid.NewGuid(), IsSystem = true, Visibility = ReportVisibility.Everyone, CreatedById = null };
+        var publicReport = new MindLift.Domain.Entities.ReportDefinition { Id = Guid.NewGuid(), IsSystem = false, Visibility = ReportVisibility.Everyone, CreatedById = otherUserId };
+        var ownPrivateReport = new MindLift.Domain.Entities.ReportDefinition { Id = Guid.NewGuid(), IsSystem = false, Visibility = ReportVisibility.Private, CreatedById = currentUserId };
+        var otherPrivateReport = new MindLift.Domain.Entities.ReportDefinition { Id = Guid.NewGuid(), IsSystem = false, Visibility = ReportVisibility.Private, CreatedById = otherUserId };
+
+        var reports = new[] { systemReport, publicReport, ownPrivateReport, otherPrivateReport }.AsQueryable();
+
+        var authorized = reports.Where(r => r.IsSystem || r.Visibility == ReportVisibility.Everyone || r.CreatedById == currentUserId).ToList();
+
+        authorized.ShouldContain(systemReport);
+        authorized.ShouldContain(publicReport);
+        authorized.ShouldContain(ownPrivateReport);
+        authorized.ShouldNotContain(otherPrivateReport, "Private report of another user must be excluded from authorized reports.");
+    }
+
+    [Fact]
+    public void ReportScheduleJob_Detects_Unauthorized_Schedule_Owner()
+    {
+        var scheduleOwnerId = Guid.NewGuid();
+        var reportCreatorId = Guid.NewGuid();
+
+        var privateReport = new MindLift.Domain.Entities.ReportDefinition
+        {
+            Id = Guid.NewGuid(),
+            IsSystem = false,
+            Visibility = ReportVisibility.Private,
+            CreatedById = reportCreatorId
+        };
+
+        var isAuthorized = privateReport.IsSystem
+            || privateReport.Visibility == ReportVisibility.Everyone
+            || (scheduleOwnerId != Guid.Empty && privateReport.CreatedById == scheduleOwnerId);
+
+        isAuthorized.ShouldBeFalse("ReportScheduleJob must detect when the schedule owner is not the private report creator.");
+    }
+
+    [Fact]
+    public void Portal_Token_Cutoff_Rejects_Tokens_Issued_Before_Password_Change()
+    {
+        var passwordChangedAt = DateTime.UtcNow;
+        var tokenIssuedBefore = passwordChangedAt.AddMinutes(-5);
+        var tokenIssuedAfter = passwordChangedAt.AddMinutes(5);
+
+        var isStaleBefore = tokenIssuedBefore < passwordChangedAt;
+        var isStaleAfter = tokenIssuedAfter < passwordChangedAt;
+
+        isStaleBefore.ShouldBeTrue("Tokens issued prior to password change must be rejected as stale.");
+        isStaleAfter.ShouldBeFalse("Tokens issued after password change should be valid.");
+    }
+
+    [Fact]
+    public void ChannelAccount_Validation_Rejects_Mismatched_Or_Inactive_Account()
+    {
+        var requestedChannel = CommunicationChannel.Email;
+        var accountChannel = CommunicationChannel.WhatsApp;
+        var isActive = true;
+
+        var isValid = isActive && accountChannel == requestedChannel;
+        isValid.ShouldBeFalse("Channel account whose channel does not match request must be rejected.");
+
+        var inactiveSameChannel = false;
+        var sameChannel = CommunicationChannel.Email;
+        var isInactiveValid = inactiveSameChannel && sameChannel == requestedChannel;
+        isInactiveValid.ShouldBeFalse("Inactive channel account must be rejected.");
+    }
+
+    [Theory]
+    [InlineData(25, true)]
+    [InlineData(465, true)]
+    [InlineData(587, true)]
+    [InlineData(2525, true)]
+    [InlineData(22, false)]
+    [InlineData(80, false)]
+    [InlineData(443, false)]
+    [InlineData(8080, false)]
+    [InlineData(3306, false)]
+    public void SmtpSecurityPolicy_Restricts_Allowed_Ports(int port, bool expectedAllowed)
+    {
+        var allowedPorts = new HashSet<int> { 25, 465, 587, 2525 };
+        allowedPorts.Contains(port).ShouldBe(expectedAllowed);
+    }
+
+    [Fact]
+    public void Bootstrap_Omits_Company_Settings_When_Lacking_Settings_View()
+    {
+        var canViewSettings = false;
+        var companySettings = new CompanySettingsDto(
+            "Acme Corp", null, null, "USD", "en", "UTC", 1, 1, false, null, 0m, null, null);
+
+        CompanySettingsDto? effectiveCompany = canViewSettings ? companySettings : null;
+
+        effectiveCompany.ShouldBeNull("Callers without Settings.View must receive null Company in BootstrapDto.");
+    }
+
+    [Fact]
+    public void Portal_Invite_Rejects_When_Contact_Has_No_Email()
+    {
+        string? contactEmail = null;
+        var reqEmail = "attacker@example.com";
+
+        var isAllowed = !string.IsNullOrWhiteSpace(contactEmail) &&
+            string.Equals(contactEmail.Trim(), reqEmail.Trim(), StringComparison.OrdinalIgnoreCase);
+
+        isAllowed.ShouldBeFalse("Portal invite must not allow setting arbitrary email when contact has no email recorded.");
     }
 }

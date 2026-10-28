@@ -41,6 +41,11 @@ public sealed class FileService(AppDbContext db, IFileStorage storage, ITenantCo
         ["activities"] = AppModule.Activities,
     };
 
+    private static readonly SemaphoreSlim GlobalUploadThrottle = new(10, 10);
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, int> TenantActiveUploads = new();
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, long> TenantInFlightBytes = new();
+    private const int MaxConcurrentUploadsPerTenant = 3;
+
     private long MaxBytes => (configuration.GetValue<long?>("Storage:MaxUploadMegabytes") ?? 25) * 1024 * 1024;
 
     public async Task<StoredFileDto> UploadAsync(Stream content, string fileName, string? entityType, Guid? entityId, CancellationToken cancellationToken = default)
@@ -55,69 +60,126 @@ public sealed class FileService(AppDbContext db, IFileStorage storage, ITenantCo
 
         var module = await AuthorizeEntityAsync(entityType, entityId, PermissionAction.Edit, cancellationToken);
 
-        var maxTenantBytes = (configuration.GetValue<long?>("Storage:MaxTenantStorageMegabytes") ?? 500) * 1024 * 1024;
-        var currentTenantUsage = await db.Files.AsNoTracking().Where(f => f.TenantId == tenantId).SumAsync(f => (long)f.SizeBytes, cancellationToken);
-        if (currentTenantUsage + (content.CanSeek ? content.Length : 0) > maxTenantBytes)
+        if (!await GlobalUploadThrottle.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken))
         {
-            throw Invalid($"Tenant storage quota of {maxTenantBytes / 1024 / 1024} MB exceeded.");
+            throw new ValidationException(new Dictionary<string, string[]> { ["file"] = ["Server upload capacity is currently busy. Please retry shortly."] });
         }
 
-        var limit = MaxBytes;
-        if (content.CanSeek && content.Length > limit)
+        var activeTenantUploads = TenantActiveUploads.AddOrUpdate(tenantId, 1, (_, c) => c + 1);
+        if (activeTenantUploads > MaxConcurrentUploadsPerTenant)
         {
-            throw Invalid($"The file is larger than {limit / 1024 / 1024} MB.");
+            TenantActiveUploads.AddOrUpdate(tenantId, 0, (_, c) => Math.Max(0, c - 1));
+            GlobalUploadThrottle.Release();
+            throw new ValidationException(new Dictionary<string, string[]> { ["file"] = ["Too many concurrent uploads for this workspace. Please wait for in-progress uploads to finish."] });
         }
 
-        // Read at most MaxBytes + 1 so an oversized upload is rejected without buffering the whole body.
-        using var buffer = new MemoryStream();
-        var chunk = new byte[81920];
-        int read;
-        while ((read = await content.ReadAsync(chunk, cancellationToken)) > 0)
+        var tempFilePath = Path.Combine(Path.GetTempPath(), $"mindlift_upload_{Guid.NewGuid():N}.tmp");
+        long allocatedBytes = 0;
+
+        try
         {
-            buffer.Write(chunk, 0, read);
-            if (buffer.Length > limit)
-            {
-                throw Invalid($"The file is larger than {limit / 1024 / 1024} MB.");
-            }
-            if (currentTenantUsage + buffer.Length > maxTenantBytes)
+            var maxTenantBytes = (configuration.GetValue<long?>("Storage:MaxTenantStorageMegabytes") ?? 500) * 1024 * 1024;
+            var currentTenantUsage = await db.Files.IgnoreQueryFilters().AsNoTracking()
+                .Where(f => f.TenantId == tenantId)
+                .SumAsync(f => (long)f.SizeBytes, cancellationToken);
+
+            var inFlightBytes = TenantInFlightBytes.GetValueOrDefault(tenantId, 0L);
+            if (currentTenantUsage + inFlightBytes + (content.CanSeek ? content.Length : 0) > maxTenantBytes)
             {
                 throw Invalid($"Tenant storage quota of {maxTenantBytes / 1024 / 1024} MB exceeded.");
             }
+
+            var limit = MaxBytes;
+            if (content.CanSeek && content.Length > limit)
+            {
+                throw Invalid($"The file is larger than {limit / 1024 / 1024} MB.");
+            }
+
+            byte[] headerBuffer = new byte[512];
+            int headerBytesRead = 0;
+            long totalBytes = 0;
+
+            using var hasher = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+            await using (var fileStream = new FileStream(tempFilePath, FileMode.Create, FileAccess.ReadWrite, FileShare.None, 81920, FileOptions.DeleteOnClose))
+            {
+                var chunk = new byte[81920];
+                int read;
+                while ((read = await content.ReadAsync(chunk, cancellationToken)) > 0)
+                {
+                    totalBytes += read;
+                    allocatedBytes += read;
+                    TenantInFlightBytes.AddOrUpdate(tenantId, read, (_, current) => current + read);
+
+                    if (totalBytes > limit)
+                    {
+                        throw Invalid($"The file is larger than {limit / 1024 / 1024} MB.");
+                    }
+
+                    if (currentTenantUsage + TenantInFlightBytes.GetValueOrDefault(tenantId, 0L) > maxTenantBytes)
+                    {
+                        throw Invalid($"Tenant storage quota of {maxTenantBytes / 1024 / 1024} MB exceeded.");
+                    }
+
+                    if (headerBytesRead < headerBuffer.Length)
+                    {
+                        var copyCount = Math.Min(read, headerBuffer.Length - headerBytesRead);
+                        Array.Copy(chunk, 0, headerBuffer, headerBytesRead, copyCount);
+                        headerBytesRead += copyCount;
+                    }
+
+                    hasher.AppendData(chunk, 0, read);
+                    await fileStream.WriteAsync(chunk.AsMemory(0, read), cancellationToken);
+                }
+
+                if (totalBytes == 0)
+                {
+                    throw Invalid("The file is empty.");
+                }
+
+                if (!SignatureMatches(extension, headerBuffer.AsSpan(0, headerBytesRead)))
+                {
+                    throw Invalid("The file content does not match its type.");
+                }
+
+                var sha256 = Convert.ToHexString(hasher.GetHashAndReset()).ToLowerInvariant();
+                var key = $"{tenantId}/{Guid.NewGuid():N}{extension.ToLowerInvariant()}";
+
+                fileStream.Position = 0;
+                await storage.SaveAsync(key, fileStream, cancellationToken);
+
+                var row = new StoredFile
+                {
+                    FileName = SafeFileName(fileName!),
+                    ContentType = contentType,
+                    SizeBytes = totalBytes,
+                    StoragePath = key,
+                    Sha256 = sha256,
+                    UploadedById = tenant.UserId,
+                    EntityType = module is null ? null : entityType!.ToLowerInvariant(),
+                    EntityId = module is null ? null : entityId,
+                };
+                db.Files.Add(row);
+                await db.SaveChangesAsync(cancellationToken);
+                return Map(row);
+            }
         }
-
-        if (buffer.Length == 0)
+        finally
         {
-            throw Invalid("The file is empty.");
+            if (allocatedBytes > 0)
+            {
+                TenantInFlightBytes.AddOrUpdate(tenantId, 0, (_, current) => Math.Max(0, current - allocatedBytes));
+            }
+            TenantActiveUploads.AddOrUpdate(tenantId, 0, (_, current) => Math.Max(0, current - 1));
+            GlobalUploadThrottle.Release();
+            try
+            {
+                if (File.Exists(tempFilePath))
+                {
+                    File.Delete(tempFilePath);
+                }
+            }
+            catch { }
         }
-
-        // Spans cannot live across an await, so the checks that need one finish here.
-        var raw = buffer.GetBuffer();
-        var length = (int)buffer.Length;
-        if (!SignatureMatches(extension, raw.AsSpan(0, length)))
-        {
-            throw Invalid("The file content does not match its type.");
-        }
-
-        var sha256 = Convert.ToHexString(SHA256.HashData(raw.AsSpan(0, length))).ToLowerInvariant();
-
-        var key = $"{tenantId}/{Guid.NewGuid():N}{extension.ToLowerInvariant()}";
-        buffer.Position = 0;
-        await storage.SaveAsync(key, buffer, cancellationToken);
-
-        var row = new StoredFile
-        {
-            FileName = SafeFileName(fileName!),
-            ContentType = contentType,
-            SizeBytes = buffer.Length,
-            StoragePath = key,
-            Sha256 = sha256,
-            UploadedById = tenant.UserId,
-            EntityType = module is null ? null : entityType!.ToLowerInvariant(),
-            EntityId = module is null ? null : entityId,
-        };
-        db.Files.Add(row);
-        await db.SaveChangesAsync(cancellationToken);
-        return Map(row);
     }
 
     public async Task<(StoredFile File, Stream Content)> OpenAsync(Guid id, CancellationToken cancellationToken = default)
@@ -171,7 +233,15 @@ public sealed class FileService(AppDbContext db, IFileStorage storage, ITenantCo
             }
         }
 
-        // Soft delete only. The bytes stay in storage until a retention job removes them.
+        try
+        {
+            await storage.DeleteAsync(row.StoragePath, cancellationToken);
+        }
+        catch
+        {
+            // Storage delete best-effort if backing object is already removed
+        }
+
         db.Files.Remove(row);
         await db.SaveChangesAsync(cancellationToken);
     }

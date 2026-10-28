@@ -48,7 +48,7 @@ public sealed class PortalSecurityTests(MindLiftApiFactory factory) : IClassFixt
 
     private async Task<PortalLoginResponse> AcceptAsync(Invited invited, HttpClient client)
     {
-        var response = await client.PostAsJsonAsync($"/api/v1/portal/{invited.Slug}/auth/accept-invite",
+        var response = await client.PostAsJsonAsync($"/api/v1/portal/{invited.Slug}/auth/mobile/accept-invite",
             new AcceptPortalInviteRequest(factory.Emails.LatestTokenFor(invited.Email), Password));
         response.StatusCode.ShouldBe(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
         return (await response.Content.ReadFromJsonAsync<PortalLoginResponse>())!;
@@ -121,7 +121,7 @@ public sealed class PortalSecurityTests(MindLiftApiFactory factory) : IClassFixt
         var first = await AcceptAsync(invited, Mobile());
 
         var attempts = await Task.WhenAll(Enumerable.Range(0, 6).Select(_ =>
-            Mobile().PostAsJsonAsync($"/api/v1/portal/{invited.Slug}/auth/refresh", new PortalRefreshRequest(first.RefreshToken))));
+            Mobile().PostAsJsonAsync($"/api/v1/portal/{invited.Slug}/auth/mobile/refresh", new PortalRefreshRequest(first.RefreshToken))));
 
         attempts.Count(r => r.StatusCode == HttpStatusCode.OK).ShouldBeLessThanOrEqualTo(1);
     }
@@ -174,9 +174,9 @@ public sealed class PortalSecurityTests(MindLiftApiFactory factory) : IClassFixt
         var change = await signedIn.PostAsJsonAsync("/api/v1/portal/me/password", new ChangePortalPasswordRequest(Password, "Another!Pass2"));
         change.StatusCode.ShouldBe(HttpStatusCode.NoContent, await change.Content.ReadAsStringAsync());
 
-        var refresh = await Mobile().PostAsJsonAsync($"/api/v1/portal/{invited.Slug}/auth/refresh", new PortalRefreshRequest(session.RefreshToken));
+        var refresh = await Mobile().PostAsJsonAsync($"/api/v1/portal/{invited.Slug}/auth/mobile/refresh", new PortalRefreshRequest(session.RefreshToken));
         refresh.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
-        (await Mobile().PostAsJsonAsync($"/api/v1/portal/{invited.Slug}/auth/login", new PortalLoginRequest(invited.Email, "Another!Pass2")))
+        (await Mobile().PostAsJsonAsync($"/api/v1/portal/{invited.Slug}/auth/mobile/login", new PortalLoginRequest(invited.Email, "Another!Pass2")))
             .StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 

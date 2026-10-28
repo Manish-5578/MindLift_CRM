@@ -76,8 +76,9 @@ public sealed class DealService(
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             var term = query.Search.Trim().ToLowerInvariant();
+            var visibleAccounts = await RecordHelpers.InScopeAsync(db.Accounts.AsNoTracking(), scope, AppModule.Accounts, a => a.OwnerId, cancellationToken);
             source = source.Where(d => d.Name.ToLower().Contains(term)
-                || (d.AccountId != null && db.Accounts.Any(a => a.Id == d.AccountId && a.Name.ToLower().Contains(term))));
+                || (d.AccountId != null && visibleAccounts.Any(a => a.Id == d.AccountId && a.Name.ToLower().Contains(term))));
         }
 
         return source;
@@ -720,8 +721,9 @@ public sealed class DealService(
     private static DealListItemDto ToListItem(Deal d, Lookups l)
     {
         var stage = l.Stages.GetValueOrDefault(d.StageId);
-        var accountName = d.AccountId is { } a ? l.Accounts.GetValueOrDefault(a) : null;
-        var accountId = accountName is not null ? d.AccountId : null;
+        var isAccountVisible = d.AccountId is { } a && l.Accounts.ContainsKey(a);
+        var accountName = isAccountVisible ? l.Accounts[d.AccountId!.Value] : null;
+        var accountId = isAccountVisible ? d.AccountId : null;
         var contactName = d.PrimaryContactId is { } c ? l.Contacts.GetValueOrDefault(c) : null;
 
         return new DealListItemDto(d.Id, d.Name, d.Amount, d.Currency, InBase(d.Amount, d.Currency, l.Rates), d.PipelineId, d.StageId,
@@ -737,8 +739,9 @@ public sealed class DealService(
         var rates = await RatesAsync(settings.BaseCurrency, cancellationToken);
         var stage = await db.PipelineStages.AsNoTracking().FirstOrDefaultAsync(s => s.Id == d.StageId, cancellationToken);
         var visibleAccounts = await RecordHelpers.InScopeAsync(db.Accounts.AsNoTracking(), scope, AppModule.Accounts, x => x.OwnerId, cancellationToken);
-        var accountName = d.AccountId is { } a ? await visibleAccounts.Where(x => x.Id == a).Select(x => x.Name).FirstOrDefaultAsync(cancellationToken) : null;
-        var effectiveAccountId = accountName is not null ? d.AccountId : null;
+        var visibleAccount = d.AccountId is { } a ? await visibleAccounts.Where(x => x.Id == a).Select(x => new { x.Id, x.Name }).FirstOrDefaultAsync(cancellationToken) : null;
+        var effectiveAccountId = visibleAccount?.Id;
+        var accountName = visibleAccount?.Name;
 
         var links = await db.DealContacts.AsNoTracking().Where(c => c.DealId == d.Id).ToListAsync(cancellationToken);
         var ids = links.Select(c => c.ContactId).ToList();

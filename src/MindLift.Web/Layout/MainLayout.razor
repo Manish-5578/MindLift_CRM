@@ -18,7 +18,7 @@
     <MudLayout>
         <MudAppBar Elevation="0" Class="ml-appbar" Dense="false">
             <MudIconButton Icon="@Icons.Material.Outlined.Menu" Color="Color.Inherit" OnClick="@(() => _drawerOpen = !_drawerOpen)" aria-label="@T["Toggle navigation"]" />
-            <MudText Typo="Typo.subtitle1" Class="ml-hide-xs">@(App.Bootstrap?.Company.CompanyName ?? "MindLift")</MudText>
+            <MudText Typo="Typo.subtitle1" Class="ml-hide-xs">@(App.Bootstrap?.Company?.CompanyName ?? "MindLift")</MudText>
             <MudSpacer />
             @if (Session.IsSignedIn && App.Bootstrap is not null)
             {
@@ -59,7 +59,7 @@
             {
                 <div class="ml-billing-banner ml-billing-banner--bad" data-testid="support-banner">
                     <MudIcon Icon="@Icons.Material.Filled.SupportAgent" Size="Size.Small" />
-                    <span>@T["Support view of {0}, opened by {1}. Read-only: nothing can be changed, and every page viewed is recorded.", App.Bootstrap?.Company.CompanyName ?? "", Session.SupportBy ?? ""]</span>
+                    <span>@T["Support view of {0}, opened by {1}. Read-only: nothing can be changed, and every page viewed is recorded.", App.Bootstrap?.Company?.CompanyName ?? "", Session.SupportBy ?? ""]</span>
                     <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Error" OnClick="EndSupportAsync" data-testid="support-end">@T["End support view"]</MudButton>
                 </div>
             }
@@ -174,7 +174,7 @@
     /// <summary>The tenant's colour replaces the light primary (plan 18.4). Only a valid colour is used, so a bad value can never reach the page CSS.</summary>
     private void ApplyBrandColor()
     {
-        var color = App.Bootstrap?.Company.PrimaryColor;
+        var color = App.Bootstrap?.Company?.PrimaryColor;
         color = BrandColor.Validate(color) is null && !string.IsNullOrWhiteSpace(color) ? color : null;
         if (color == _themeColor)
         {

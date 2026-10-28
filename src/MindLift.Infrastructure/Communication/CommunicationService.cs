@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using MindLift.Application.Abstractions;
+using MindLift.Application.Common.Exceptions;
 using MindLift.Domain.Entities;
 using MindLift.Infrastructure.Persistence;
 using MindLift.Shared.Contracts;
@@ -78,23 +79,44 @@ public sealed class CommunicationService(
             await files.EnsureReadableAsync(attachmentIds, ct);
         }
         // 2. Resolve Channel Account
-        ChannelAccount? account = null;
+        ChannelAccount account;
         if (request.ChannelAccountId.HasValue)
         {
-            account = await dbContext.ChannelAccounts.FindAsync([request.ChannelAccountId.Value], ct);
-        }
-        account ??= await dbContext.ChannelAccounts
-            .Where(a => a.Channel == request.Channel && a.IsActive)
-            .OrderByDescending(a => a.IsDefault)
-            .FirstOrDefaultAsync(ct);
+            var requested = await dbContext.ChannelAccounts
+                .FirstOrDefaultAsync(a => a.Id == request.ChannelAccountId.Value && a.Channel == request.Channel && a.IsActive, ct);
+            if (requested is null)
+            {
+                throw new ValidationException(new Dictionary<string, string[]>
+                {
+                    ["channelAccountId"] = ["The requested channel account is invalid, inactive, or configured for a different channel."]
+                });
+            }
 
-        account ??= new ChannelAccount
+            account = requested;
+        }
+        else
         {
-            Channel = request.Channel,
-            Name = $"{request.Channel} Default",
-            SenderAddress = request.Channel == CommunicationChannel.Email ? "noreply@mindlift.com" : "+10000000000",
-            IsActive = true
-        };
+            var defaultAccount = await dbContext.ChannelAccounts
+                .Where(a => a.Channel == request.Channel && a.IsActive)
+                .OrderByDescending(a => a.IsDefault)
+                .FirstOrDefaultAsync(ct);
+
+            account = defaultAccount ?? new ChannelAccount
+            {
+                Channel = request.Channel,
+                Name = $"{request.Channel} Default",
+                SenderAddress = request.Channel == CommunicationChannel.Email ? "noreply@mindlift.com" : "+10000000000",
+                IsActive = true
+            };
+        }
+
+        if (account.Channel != request.Channel || !account.IsActive)
+        {
+            throw new ValidationException(new Dictionary<string, string[]>
+            {
+                ["channel"] = ["Channel account does not match the requested communication channel or is inactive."]
+            });
+        }
 
         // 3. Resolve Body (Template or Direct)
         var body = request.Body;

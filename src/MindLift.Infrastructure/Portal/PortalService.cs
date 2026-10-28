@@ -201,6 +201,11 @@ public sealed class PortalService(
             .FirstOrDefaultAsync(u => u.Id == token.PortalUserId && u.TenantId == t.Id && !u.IsDeleted, ct)
             ?? throw new NotFoundException("User", token.PortalUserId);
 
+        if (user.PasswordChangedAt.HasValue && token.CreatedAt < user.PasswordChangedAt.Value)
+        {
+            throw new UnauthorizedException("invalid_token", "Magic link is invalid or expired.");
+        }
+
         user.LastLoginAt = DateTime.UtcNow;
         if (!user.IsActive)
         {
@@ -234,6 +239,9 @@ public sealed class PortalService(
             .FirstOrDefaultAsync(u => u.Id == token.PortalUserId && u.TenantId == t.Id && !u.IsDeleted, ct)
             ?? throw new NotFoundException("User", token.PortalUserId);
 
+        if (user.PasswordChangedAt.HasValue && token.CreatedAt < user.PasswordChangedAt.Value)
+            throw new UnauthorizedException("invalid_token", "Invitation token is invalid or expired.");
+
         // Sending an invitation switches access on. A person deactivated since then stays deactivated.
         if (!user.IsActive)
             throw new UnauthorizedException("account_inactive", "Your portal account is deactivated.");
@@ -255,6 +263,7 @@ public sealed class PortalService(
         await RevokeRefreshTokensAsync(t.Id, user.Id, ct);
 
         user.PasswordHash = Hasher.HashPassword(user, req.Password);
+        user.PasswordChangedAt = now;
         user.ActivatedAt = now;
         user.LastLoginAt = now;
 
@@ -374,10 +383,11 @@ public sealed class PortalService(
 
         user.FailedLoginCount = 0;
         user.PasswordHash = Hasher.HashPassword(user, req.NewPassword);
+        user.PasswordChangedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
 
-        // Other devices have to sign in again with the new password.
-        await RevokeRefreshTokensAsync(user.TenantId, user.Id, ct);
+        // When a portal password is changed, revoke all outstanding portal bearer tokens (refresh, magic-link, invite)
+        await RevokeAllTokensAsync(user.TenantId, user.Id, ct);
     }
 
     private const string RefreshPurpose = "Refresh";
@@ -469,6 +479,14 @@ public sealed class PortalService(
             item.UsedAt = DateTime.UtcNow;
         }
         await db.SaveChangesAsync(ct);
+    }
+
+    private async Task RevokeAllTokensAsync(Guid tenantId, Guid portalUserId, CancellationToken ct)
+    {
+        var now = DateTime.UtcNow;
+        await db.PortalTokens.IgnoreQueryFilters()
+            .Where(x => x.TenantId == tenantId && x.PortalUserId == portalUserId && x.UsedAt == null && !x.IsDeleted)
+            .ExecuteUpdateAsync(set => set.SetProperty(x => x.UsedAt, now), ct);
     }
 
     /// <summary>Saves pending changes, then returns a new access token and a new single-use refresh token.</summary>
@@ -861,20 +879,31 @@ public sealed class PortalService(
             ?? throw new NotFoundException("Contact", req.ContactId);
         await EnsureInScopeAsync(AppModule.Contacts, contact.OwnerId, "Contact", contact.Id, ct);
 
-        if (string.IsNullOrWhiteSpace(req.Email))
+        if (string.IsNullOrWhiteSpace(contact.Email))
         {
-            throw new ValidationException(new Dictionary<string, string[]> { ["email"] = ["An email address is required."] });
+            throw new ValidationException(new Dictionary<string, string[]>
+            {
+                ["email"] = ["Contact must have a valid email address on file before being invited to the portal. Update the contact record first."]
+            });
         }
 
-        if (!string.IsNullOrWhiteSpace(contact.Email) && !string.Equals(contact.Email.Trim(), req.Email.Trim(), StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrWhiteSpace(req.Email) && !string.Equals(contact.Email.Trim(), req.Email.Trim(), StringComparison.OrdinalIgnoreCase))
         {
-            throw new ValidationException(new Dictionary<string, string[]> { ["email"] = ["Invitation recipient must match the contact's email address."] });
+            throw new ValidationException(new Dictionary<string, string[]>
+            {
+                ["email"] = ["Invitation recipient must match the contact's email address."]
+            });
         }
 
-        var normEmail = req.Email.Trim().ToUpperInvariant();
-        var user = await db.PortalUsers.FirstOrDefaultAsync(u => u.NormalizedEmail == normEmail && !u.IsDeleted, ct);
+        var inviteEmail = contact.Email.Trim();
+        var normEmail = inviteEmail.ToUpperInvariant();
 
-        if (user != null && user.ContactId != contact.Id)
+        // Enforce at most one portal user per contact
+        var user = await db.PortalUsers.FirstOrDefaultAsync(u => u.ContactId == contact.Id && !u.IsDeleted, ct);
+
+        // Check if this email is already registered to a different contact in the tenant
+        var otherUser = await db.PortalUsers.FirstOrDefaultAsync(u => u.TenantId == CurrentTenantId && u.NormalizedEmail == normEmail && u.ContactId != contact.Id && !u.IsDeleted, ct);
+        if (otherUser != null)
         {
             throw new ConflictException("portal_email_taken", "This email already has portal access for another contact.");
         }
@@ -896,7 +925,7 @@ public sealed class PortalService(
                 TenantId = CurrentTenantId,
                 ContactId = contact.Id,
                 AccountId = contact.AccountId,
-                Email = req.Email.Trim(),
+                Email = inviteEmail,
                 NormalizedEmail = normEmail,
                 IsActive = true,
                 InvitedAt = DateTime.UtcNow
@@ -905,6 +934,9 @@ public sealed class PortalService(
         }
         else
         {
+            user.Email = inviteEmail;
+            user.NormalizedEmail = normEmail;
+            user.AccountId = contact.AccountId;
             user.InvitedAt = DateTime.UtcNow;
             user.IsActive = true;
         }

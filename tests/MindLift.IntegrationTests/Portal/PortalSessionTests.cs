@@ -45,7 +45,7 @@ public sealed class PortalSessionTests(MindLiftApiFactory factory) : IClassFixtu
 
     private async Task<PortalLoginResponse> AcceptAsync(Invited inv, HttpClient client, string password = "Customer!Pass1")
     {
-        var resp = await client.PostAsJsonAsync($"/api/v1/portal/{inv.Slug}/auth/accept-invite",
+        var resp = await client.PostAsJsonAsync($"/api/v1/portal/{inv.Slug}/auth/mobile/accept-invite",
             new AcceptPortalInviteRequest(factory.Emails.LatestTokenFor(inv.Email), password));
         resp.StatusCode.ShouldBe(HttpStatusCode.OK, await resp.Content.ReadAsStringAsync());
         return (await resp.Content.ReadFromJsonAsync<PortalLoginResponse>())!;
@@ -60,18 +60,18 @@ public sealed class PortalSessionTests(MindLiftApiFactory factory) : IClassFixtu
         first.RefreshToken.ShouldNotBeNullOrWhiteSpace();
         first.ExpiresAtUtc.ShouldNotBeNull();
 
-        var r1 = await client.PostAsJsonAsync($"/api/v1/portal/{inv.Slug}/auth/refresh", new PortalRefreshRequest(first.RefreshToken));
+        var r1 = await client.PostAsJsonAsync($"/api/v1/portal/{inv.Slug}/auth/mobile/refresh", new PortalRefreshRequest(first.RefreshToken));
         r1.StatusCode.ShouldBe(HttpStatusCode.OK, await r1.Content.ReadAsStringAsync());
         var second = (await r1.Content.ReadFromJsonAsync<PortalLoginResponse>())!;
         second.RefreshToken.ShouldNotBe(first.RefreshToken);
         second.AccessToken.ShouldNotBeNullOrWhiteSpace();
 
         // Re-using the first (rotated) token is treated as theft: it fails and the newer token stops working too.
-        var reuse = await client.PostAsJsonAsync($"/api/v1/portal/{inv.Slug}/auth/refresh", new PortalRefreshRequest(first.RefreshToken));
+        var reuse = await client.PostAsJsonAsync($"/api/v1/portal/{inv.Slug}/auth/mobile/refresh", new PortalRefreshRequest(first.RefreshToken));
         reuse.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
         (await Workspaces.ErrorCodeAsync(reuse)).ShouldBe("refresh_token_reused");
 
-        var afterReuse = await client.PostAsJsonAsync($"/api/v1/portal/{inv.Slug}/auth/refresh", new PortalRefreshRequest(second.RefreshToken));
+        var afterReuse = await client.PostAsJsonAsync($"/api/v1/portal/{inv.Slug}/auth/mobile/refresh", new PortalRefreshRequest(second.RefreshToken));
         afterReuse.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 
@@ -82,9 +82,9 @@ public sealed class PortalSessionTests(MindLiftApiFactory factory) : IClassFixtu
         var client = Mobile(factory);
         var login = await AcceptAsync(inv, client);
 
-        (await client.PostAsJsonAsync($"/api/v1/portal/{inv.Slug}/auth/logout", new PortalRefreshRequest(login.RefreshToken)))
+        (await client.PostAsJsonAsync($"/api/v1/portal/{inv.Slug}/auth/mobile/logout", new PortalRefreshRequest(login.RefreshToken)))
             .StatusCode.ShouldBe(HttpStatusCode.NoContent);
-        (await client.PostAsJsonAsync($"/api/v1/portal/{inv.Slug}/auth/refresh", new PortalRefreshRequest(login.RefreshToken)))
+        (await client.PostAsJsonAsync($"/api/v1/portal/{inv.Slug}/auth/mobile/refresh", new PortalRefreshRequest(login.RefreshToken)))
             .StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 
@@ -126,11 +126,11 @@ public sealed class PortalSessionTests(MindLiftApiFactory factory) : IClassFixtu
         (await inv.Admin.Client.PutAsJsonAsync("/api/v1/settings/portal", new SavePortalSettingsRequest(false, null, null, true, true, true, null, null)))
             .StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var signIn = await client.PostAsJsonAsync($"/api/v1/portal/{inv.Slug}/auth/login", new PortalLoginRequest(inv.Email, "Customer!Pass1"));
+        var signIn = await client.PostAsJsonAsync($"/api/v1/portal/{inv.Slug}/auth/mobile/login", new PortalLoginRequest(inv.Email, "Customer!Pass1"));
         signIn.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
         (await Workspaces.ErrorCodeAsync(signIn)).ShouldBe("portal_disabled");
 
-        (await client.PostAsJsonAsync($"/api/v1/portal/{inv.Slug}/auth/refresh", new PortalRefreshRequest(login.RefreshToken)))
+        (await client.PostAsJsonAsync($"/api/v1/portal/{inv.Slug}/auth/mobile/refresh", new PortalRefreshRequest(login.RefreshToken)))
             .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
 

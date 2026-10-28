@@ -59,6 +59,19 @@ public sealed class ReportScheduleJob(
             return;
         }
 
+        // Revalidate authorization for schedule owner before executing stored report
+        var isAuthorized = report.IsSystem
+            || report.Visibility == ReportVisibility.Everyone
+            || (schedule.CreatedById.HasValue && report.CreatedById == schedule.CreatedById.Value);
+
+        if (!isAuthorized)
+        {
+            logger.LogWarning("Report {ReportId} is private and schedule owner {OwnerId} is not authorized. Disabling schedule {ScheduleId}.", report.Id, schedule.CreatedById, scheduleId);
+            schedule.IsActive = false;
+            await db.SaveChangesAsync(ct);
+            return;
+        }
+
         // Deserialize recipients
         List<string> recipients = [];
         try

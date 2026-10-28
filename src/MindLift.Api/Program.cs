@@ -155,6 +155,7 @@ builder.Services.AddControllers(options => options.Filters.Add<ValidationActionF
 // Both are configurable, and the limits are per minute.
 var publicPermits = builder.Configuration.GetValue<int?>("RateLimiting:PublicPermitsPerMinute") ?? 120;
 var webhookPermits = builder.Configuration.GetValue<int?>("RateLimiting:WebhookPermitsPerMinute") ?? 1200;
+var uploadPermits = builder.Configuration.GetValue<int?>("RateLimiting:UploadPermitsPerMinute") ?? 30;
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -164,6 +165,9 @@ builder.Services.AddRateLimiter(options =>
     options.AddPolicy("webhook", context => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
         context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions { PermitLimit = webhookPermits, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+    options.AddPolicy("uploads", context => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+        context.User?.FindFirst("tenant_id")?.Value ?? context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions { PermitLimit = uploadPermits, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 });
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();

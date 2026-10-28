@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using MindLift.Application.Common.Exceptions;
 using MindLift.Infrastructure.Files;
 using MindLift.Shared.Contracts;
@@ -17,6 +18,7 @@ public sealed class FilesController(FileService files) : ControllerBase
 {
     /// <summary>Multipart form: file, and optionally entityType plus entityId to attach it to a record.</summary>
     [HttpPost]
+    [EnableRateLimiting("uploads")]
     [RequestSizeLimit(30L * 1024 * 1024)]
     public async Task<ActionResult<StoredFileDto>> Upload(IFormFile? file, [FromForm] string? entityType, [FromForm] Guid? entityId, CancellationToken cancellationToken)
     {

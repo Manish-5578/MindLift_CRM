@@ -32,6 +32,7 @@ public sealed class PortalUser : TenantEntity
     public string Language { get; set; } = "en";
     public int FailedLoginCount { get; set; }
     public DateTime? LockoutEnd { get; set; }
+    public DateTime? PasswordChangedAt { get; set; }
 }
 
 public sealed class PortalToken : TenantEntity

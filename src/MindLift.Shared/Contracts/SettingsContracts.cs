@@ -1,4 +1,4 @@
-﻿using MindLift.Shared.Filtering;
+using MindLift.Shared.Filtering;
 
 namespace MindLift.Shared.Contracts;
 
@@ -169,7 +169,7 @@ public sealed record BootstrapDto(
     IReadOnlyList<PipelineDto> Pipelines,
     IReadOnlyDictionary<string, IReadOnlyList<LayoutDto>> Layouts,
     CurrencySettingsDto Currencies,
-    CompanySettingsDto Company,
+    CompanySettingsDto? Company,
     IReadOnlyList<ModulePermissionDto> Permissions,
     string Version);
 

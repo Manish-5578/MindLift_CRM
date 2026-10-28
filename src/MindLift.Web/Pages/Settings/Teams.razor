@@ -58,7 +58,7 @@
                 <div class="ml-row" style="padding:12px 20px;border-bottom:1px solid var(--ml-border);min-height:56px" data-testid="branch-row">
                     <div class="ml-grow">
                         <MudText Typo="Typo.subtitle2">@branch.Name</MudText>
-                        <MudText Typo="Typo.caption" Class="ml-muted">@(branch.Address ?? "No address") · @(branch.TimeZoneId ?? App.Bootstrap?.Company.TimeZoneId ?? "UTC")</MudText>
+                        <MudText Typo="Typo.caption" Class="ml-muted">@(branch.Address ?? "No address") · @(branch.TimeZoneId ?? App.Bootstrap?.Company?.TimeZoneId ?? "UTC")</MudText>
                     </div>
                     <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="() => OpenBranch(branch)" aria-label="@T["Edit branch"]" />
                     @if (_confirmBranchId == branch.Id)

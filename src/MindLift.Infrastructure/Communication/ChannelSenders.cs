@@ -34,6 +34,11 @@ public sealed class EmailChannelSender(
         List<Guid>? attachmentIds = null,
         CancellationToken ct = default)
     {
+        if (account.Channel != CommunicationChannel.Email || !account.IsActive)
+        {
+            throw new ValidationException(new Dictionary<string, string[]> { ["channel"] = ["Account is not an active email channel account."] });
+        }
+
         try
         {
             var message = new MimeMessage();
@@ -79,17 +84,11 @@ public sealed class EmailChannelSender(
                 ? secretProtector.Unprotect(account.EncryptedPassword)
                 : defaultSmtpOptions.Value.Password;
 
-            if (!string.IsNullOrWhiteSpace(account.Host))
-            {
-                await SmtpSecurityPolicy.ValidateDestinationAsync(account.Host, ct);
-            }
-
             var hasCredentials = !string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password);
             var security = SmtpSecurityPolicy.DetermineSecurity(port, defaultSmtpOptions.Value.UseStartTls, hasCredentials);
             SmtpSecurityPolicy.AssertTransportSecurity(security, hasCredentials);
 
-            using var client = new SmtpClient();
-            await client.ConnectAsync(host, port, security, ct);
+            using var client = await SmtpSecurityPolicy.ConnectWithPinnedDestinationAsync(host, port, security, ct);
 
             if (hasCredentials)
             {
@@ -113,11 +112,6 @@ public sealed class EmailChannelSender(
     {
         try
         {
-            if (!string.IsNullOrWhiteSpace(account.Host))
-            {
-                await SmtpSecurityPolicy.ValidateDestinationAsync(account.Host, ct);
-            }
-
             var host = !string.IsNullOrWhiteSpace(account.Host) ? account.Host : defaultSmtpOptions.Value.Host;
             var port = account.Port.HasValue && account.Port > 0 ? account.Port.Value : defaultSmtpOptions.Value.Port;
             var username = !string.IsNullOrWhiteSpace(account.Username) ? account.Username : defaultSmtpOptions.Value.Username;
@@ -129,8 +123,7 @@ public sealed class EmailChannelSender(
             var security = SmtpSecurityPolicy.DetermineSecurity(port, defaultSmtpOptions.Value.UseStartTls, hasCredentials);
             SmtpSecurityPolicy.AssertTransportSecurity(security, hasCredentials);
 
-            using var client = new SmtpClient();
-            await client.ConnectAsync(host, port, security, ct);
+            using var client = await SmtpSecurityPolicy.ConnectWithPinnedDestinationAsync(host, port, security, ct);
 
             if (hasCredentials)
             {
@@ -138,7 +131,7 @@ public sealed class EmailChannelSender(
             }
 
             await client.DisconnectAsync(quit: true, ct);
-            return new TestConnectionResult(true, $"Successfully connected to SMTP server at {host}:{port}");
+            return new TestConnectionResult(true, "Successfully connected to the SMTP server.");
         }
         catch (ValidationException valEx)
         {
@@ -169,6 +162,11 @@ public sealed class WhatsAppChannelSender(
         List<Guid>? attachmentIds = null,
         CancellationToken ct = default)
     {
+        if (account.Channel != CommunicationChannel.WhatsApp || !account.IsActive)
+        {
+            throw new ValidationException(new Dictionary<string, string[]> { ["channel"] = ["Account is not an active WhatsApp channel account."] });
+        }
+
         var rawToken = secretProtector.Unprotect(account.EncryptedAuthToken ?? account.EncryptedPassword);
         var phoneNumberId = account.PhoneNumberId;
 
@@ -256,6 +254,11 @@ public sealed class TwilioSmsSender(
         List<Guid>? attachmentIds = null,
         CancellationToken ct = default)
     {
+        if (account.Channel != CommunicationChannel.Sms || !account.IsActive)
+        {
+            throw new ValidationException(new Dictionary<string, string[]> { ["channel"] = ["Account is not an active SMS channel account."] });
+        }
+
         var accountSid = account.AccountSid;
         var authToken = secretProtector.Unprotect(account.EncryptedAuthToken ?? account.EncryptedPassword);
 

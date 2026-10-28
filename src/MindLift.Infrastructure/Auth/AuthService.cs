@@ -39,6 +39,38 @@ public sealed class AuthService(
 
     public async Task<AuthResult> SignUpAsync(SignupRequest request, CancellationToken cancellationToken = default)
     {
+        var normalizedEmail = users.NormalizeEmail(request.Email);
+        var emailExists = await db.Users.IgnoreQueryFilters().AnyAsync(u => u.NormalizedEmail == normalizedEmail, cancellationToken);
+        if (emailExists)
+        {
+            // Do not reveal email existence to unauthenticated callers (prevent enumeration oracle).
+            var appUrl = app.Value.BaseUrl.TrimEnd('/');
+            var alertBody = $"Hello {request.FirstName},\n\nA new workspace registration was attempted using your email address ({request.Email}). If this was you, you already have an account and can sign in at {appUrl}/login or reset your password.\n\nRegards,\nMindLift Team";
+            var protectedBody = secretProtector.Protect(alertBody);
+            try
+            {
+                jobs.Enqueue<MindLift.Infrastructure.Portal.PortalEmailJob>(job => job.SendAsync(request.Email, "Sign-up attempt on your MindLift account", protectedBody, CancellationToken.None));
+            }
+            catch
+            {
+                // Silently ignore queue failures
+            }
+
+            var dummyUser = new AppUser
+            {
+                Id = Guid.NewGuid(),
+                TenantId = Guid.NewGuid(),
+                UserName = request.Email,
+                Email = request.Email,
+                FirstName = request.FirstName.Trim(),
+                LastName = request.LastName.Trim(),
+                IsActive = false
+            };
+            var (access, expires) = tokens.CreateAccessToken(dummyUser, false);
+            var dummyRefresh = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+            return new AuthResult(access, expires, dummyRefresh);
+        }
+
         var user = await signup.CreateTenantWithOwnerAsync(request, cancellationToken);
         return await IssueForUserAsync(user, cancellationToken);
     }

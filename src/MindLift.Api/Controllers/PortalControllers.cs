@@ -76,7 +76,7 @@ public sealed class PortalAuthController(IPortalService portalService) : Control
     [HttpPost("{slug}/auth/refresh")]
     public async Task<ActionResult<PortalLoginResponse>> Refresh(string slug, [FromBody] PortalRefreshRequest? body, CancellationToken ct = default)
     {
-        var token = Request.Cookies[RefreshCookieName] ?? body?.RefreshToken
+        var token = Request.Cookies[RefreshCookieName]
             ?? throw new UnauthorizedException("invalid_refresh_token", "Your session has ended. Please sign in again.");
         return Issue(slug, await portalService.RefreshAsync(slug, token, ct));
     }
@@ -85,7 +85,7 @@ public sealed class PortalAuthController(IPortalService portalService) : Control
     [HttpPost("{slug}/auth/logout")]
     public async Task<IActionResult> Logout(string slug, [FromBody] PortalRefreshRequest? body, CancellationToken ct = default)
     {
-        var token = Request.Cookies[RefreshCookieName] ?? body?.RefreshToken;
+        var token = Request.Cookies[RefreshCookieName];
         if (!string.IsNullOrEmpty(token))
         {
             await portalService.LogoutAsync(slug, token, ct);
@@ -95,16 +95,42 @@ public sealed class PortalAuthController(IPortalService portalService) : Control
         return NoContent();
     }
 
-    /// <summary>Browsers get the refresh token as an HttpOnly cookie that scripts cannot read; mobile clients get it in the body.</summary>
+    [AllowAnonymous]
+    [HttpPost("{slug}/auth/mobile/login")]
+    public async Task<ActionResult<PortalLoginResponse>> MobileLogin(string slug, [FromBody] PortalLoginRequest req, CancellationToken ct = default)
+        => Ok(await portalService.LoginAsync(slug, req, ct));
+
+    [AllowAnonymous]
+    [HttpPost("{slug}/auth/mobile/accept-invite")]
+    public async Task<ActionResult<PortalLoginResponse>> MobileAcceptInvite(string slug, [FromBody] AcceptPortalInviteRequest req, CancellationToken ct = default)
+        => Ok(await portalService.AcceptInviteAsync(slug, req, ct));
+
+    [AllowAnonymous]
+    [HttpPost("{slug}/auth/mobile/refresh")]
+    public async Task<ActionResult<PortalLoginResponse>> MobileRefresh(string slug, [FromBody] PortalRefreshRequest body, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(body?.RefreshToken))
+            throw new UnauthorizedException("invalid_refresh_token", "Your session has ended. Please sign in again.");
+        return Ok(await portalService.RefreshAsync(slug, body.RefreshToken, ct));
+    }
+
+    [AllowAnonymous]
+    [HttpPost("{slug}/auth/mobile/logout")]
+    public async Task<IActionResult> MobileLogout(string slug, [FromBody] PortalRefreshRequest body, CancellationToken ct = default)
+    {
+        if (!string.IsNullOrWhiteSpace(body?.RefreshToken))
+            await portalService.LogoutAsync(slug, body.RefreshToken, ct);
+        return NoContent();
+    }
+
+    /// <summary>Browser portal endpoints ALWAYS set the refresh token in HttpOnly cookie and NEVER return it in JSON.</summary>
     private PortalLoginResponse Issue(string slug, PortalLoginResponse result)
     {
-        var isMobile = string.Equals(Request.Headers[MobileHeader], "mobile", StringComparison.OrdinalIgnoreCase);
-        if (isMobile || result.RefreshToken is null)
+        if (result.RefreshToken is { } token)
         {
-            return result;
+            Response.Cookies.Append(RefreshCookieName, token, CookieOptionsFor(slug, DateTimeOffset.UtcNow.AddDays(30)));
         }
 
-        Response.Cookies.Append(RefreshCookieName, result.RefreshToken, CookieOptionsFor(slug, DateTimeOffset.UtcNow.AddDays(30)));
         return result with { RefreshToken = null };
     }
 

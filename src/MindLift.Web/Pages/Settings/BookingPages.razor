@@ -118,7 +118,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _timeZone = App.Bootstrap?.Company.TimeZoneId ?? "UTC";
+        _timeZone = App.Bootstrap?.Company?.TimeZoneId ?? "UTC";
         await LoadAsync();
     }
 
@@ -163,7 +163,7 @@
         var firstRange = page?.Availability.Weekly.Values.FirstOrDefault(r => r.Count > 0)?.FirstOrDefault();
         _from = firstRange?.From ?? "09:00";
         _to = firstRange?.To ?? "17:00";
-        _timeZone = page?.Availability.TimeZone ?? App.Bootstrap?.Company.TimeZoneId ?? "UTC";
+        _timeZone = page?.Availability.TimeZone ?? App.Bootstrap?.Company?.TimeZoneId ?? "UTC";
         _location = page?.LocationType ?? "Video";
         _locationValue = page?.LocationValue;
         _reminders = page is null ? "60, 15" : string.Join(", ", page.ReminderOffsetsMinutes);

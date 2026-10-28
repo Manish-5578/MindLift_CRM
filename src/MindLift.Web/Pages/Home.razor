@@ -343,7 +343,7 @@
 
     private string FormatValue(decimal value, string format) => format switch
     {
-        "currency" => $"{value:N0} {App.Bootstrap?.Company.BaseCurrency ?? "USD"}",
+        "currency" => $"{value:N0} {App.Bootstrap?.Currencies?.BaseCurrency ?? App.Bootstrap?.Company?.BaseCurrency ?? "USD"}",
         "percent" => $"{value:N1}%",
         _ => $"{value:N0}"
     };
@@ -486,7 +486,7 @@
     {
         if (widget.Data is null) return;
         var data = Deserialize<DealsInProgressData>(widget.Data.Value);
-        var currency = App.Bootstrap?.Company.BaseCurrency;
+        var currency = App.Bootstrap?.Currencies?.BaseCurrency ?? App.Bootstrap?.Company?.BaseCurrency ?? "USD";
         var parts = (data?.ByStage ?? []).Where(x => x.TotalInBase > 0).Select(x => new ChartDonut.Part(x.Name, x.TotalInBase)).ToList();
         <MlCard Title="Deals in progress" Subtitle="@($"{data?.Count ?? 0} open deals · weighted {data?.WeightedInBase:N0} {currency}")" TestId="deals-in-progress">
             @if (data?.RottingCount > 0)
