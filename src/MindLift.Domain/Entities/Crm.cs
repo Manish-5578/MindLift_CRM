@@ -103,6 +103,9 @@ public sealed class Deal : TenantEntity, IOwnedEntity, IHasCustomFields, ISample
     public DateTime? ExpectedCloseDate { get; set; }
     public DateTime? ClosedAt { get; set; }
 
+    /// <summary>Pipeline, BestCase, Commit, Closed, or Omitted.</summary>
+    public string ForecastCategory { get; set; } = "Pipeline";
+
     /// <summary>Picklist value code from lost_reason. Required when Status is Lost.</summary>
     public string? LostReason { get; set; }
 

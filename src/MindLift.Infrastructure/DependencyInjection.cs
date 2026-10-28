@@ -161,6 +161,8 @@ public static class DependencyInjection
         services.AddScoped<MindLift.Infrastructure.Deals.DealStageGateService>();
         services.AddScoped<MindLift.Application.Abstractions.IDealSplitService, MindLift.Infrastructure.Deals.DealSplitService>();
         services.AddScoped<MindLift.Infrastructure.Deals.DealSplitService>();
+        services.AddScoped<MindLift.Application.Abstractions.IForecastingService, MindLift.Infrastructure.Deals.ForecastingService>();
+        services.AddScoped<MindLift.Infrastructure.Deals.ForecastingService>();
         services.AddScoped<MindLift.Infrastructure.Activities.ActivityService>();
         services.AddScoped<MindLift.Infrastructure.Activities.QuickLogService>();
         services.AddScoped<MindLift.Infrastructure.Activities.ChecklistService>();

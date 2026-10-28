@@ -52,7 +52,8 @@ public sealed record DealDto(
     DateTime StageChangedAtUtc,
     bool IsRotting,
     int Version,
-    IReadOnlyDictionary<string, JsonElement> CustomFields);
+    IReadOnlyDictionary<string, JsonElement> CustomFields,
+    string ForecastCategory = "Pipeline");
 
 public sealed record SaveDealRequest(
     string Name,

@@ -3020,6 +3020,14 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("expected_close_date");
 
+                    b.Property<string>("ForecastCategory")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Pipeline")
+                        .HasColumnName("forecast_category");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
@@ -3108,6 +3116,9 @@ namespace MindLift.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId", "AccountId")
                         .HasDatabaseName("ix_deals_tenant_id_account_id");
+
+                    b.HasIndex("TenantId", "ForecastCategory")
+                        .HasDatabaseName("ix_deals_tenant_id_forecast_category");
 
                     b.HasIndex("TenantId", "PrimaryContactId")
                         .HasDatabaseName("ix_deals_tenant_id_primary_contact_id");

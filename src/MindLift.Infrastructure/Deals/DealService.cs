@@ -764,7 +764,7 @@ public sealed class DealService(
 
         return new DealDto(d.Id, d.Name, d.PipelineId, d.StageId, d.Status, d.Amount, d.Currency, InBase(d.Amount, d.Currency, rates), d.Probability, d.ProbabilityOverridden,
             d.ExpectedCloseDate, d.ClosedAt, d.LostReason, d.LostNotes, d.Description, effectiveAccountId, accountName, contacts, d.OwnerId, d.CreatedAt, d.StageChangedAt,
-            IsRotting(d, stage, clock.UtcNow), d.Version, RecordHelpers.Custom(d.CustomFields));
+            IsRotting(d, stage, clock.UtcNow), d.Version, RecordHelpers.Custom(d.CustomFields), d.ForecastCategory ?? "Pipeline");
     }
 
     private async Task<IQueryable<Deal>> ScopedAsync(CancellationToken cancellationToken)

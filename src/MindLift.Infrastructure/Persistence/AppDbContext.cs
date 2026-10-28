@@ -918,6 +918,12 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
                 .HasForeignKey(x => x.DealId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
+
+        builder.Entity<Deal>(b =>
+        {
+            b.Property(d => d.ForecastCategory).HasMaxLength(30).HasDefaultValue("Pipeline");
+            b.HasIndex(d => new { d.TenantId, d.ForecastCategory });
+        });
     }
 
     private void ConfigureTenantEntity<TEntity>(ModelBuilder builder) where TEntity : TenantEntity
