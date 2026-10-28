@@ -129,6 +129,9 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<LeadScoreLog> LeadScoreLogs { get; set; } = null!;
     public DbSet<SlaPolicy> SlaPolicies { get; set; } = null!;
     public DbSet<LeadSlaTracker> LeadSlaTrackers { get; set; } = null!;
+    public DbSet<WebsiteTracker> WebsiteTrackers { get; set; } = null!;
+    public DbSet<VisitorSession> VisitorSessions { get; set; } = null!;
+    public DbSet<VisitorPageView> VisitorPageViews { get; set; } = null!;
 
     /// <summary>Tenant used by query filters. Guid.Empty when no tenant is set, so no rows match.</summary>
     protected Guid CurrentTenantId => tenant.TenantId ?? Guid.Empty;
@@ -1172,6 +1175,42 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.Property(x => x.Notes).HasMaxLength(1000);
             b.HasIndex(x => new { x.TenantId, x.LeadId }).IsUnique();
             b.HasIndex(x => new { x.TenantId, x.Status, x.DueAt });
+        });
+
+        builder.Entity<WebsiteTracker>(b =>
+        {
+            b.ToTable("website_trackers");
+            b.Property(x => x.Name).HasMaxLength(200);
+            b.Property(x => x.Domain).HasMaxLength(255);
+            b.Property(x => x.TrackingToken).HasMaxLength(100);
+            b.HasIndex(x => x.TrackingToken).IsUnique();
+            b.HasIndex(x => new { x.TenantId, x.IsActive });
+        });
+
+        builder.Entity<VisitorSession>(b =>
+        {
+            b.ToTable("visitor_sessions");
+            b.Property(x => x.VisitorId).HasMaxLength(100);
+            b.Property(x => x.SessionId).HasMaxLength(100);
+            b.Property(x => x.IdentifiedEmail).HasMaxLength(255);
+            b.HasIndex(x => new { x.TenantId, x.VisitorId });
+            b.HasIndex(x => new { x.TenantId, x.LeadId });
+            b.HasIndex(x => new { x.TenantId, x.LastSeenAt });
+        });
+
+        builder.Entity<VisitorPageView>(b =>
+        {
+            b.ToTable("visitor_page_views");
+            b.Property(x => x.VisitorId).HasMaxLength(100);
+            b.Property(x => x.Url).HasMaxLength(2048);
+            b.Property(x => x.Title).HasMaxLength(500);
+            b.HasIndex(x => new { x.TenantId, x.SessionId });
+            b.HasIndex(x => new { x.TenantId, x.LeadId });
+            b.HasIndex(x => new { x.TenantId, x.ViewedAt });
+            b.HasOne(x => x.Session)
+                .WithMany(s => s.PageViews)
+                .HasForeignKey(x => x.SessionId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 

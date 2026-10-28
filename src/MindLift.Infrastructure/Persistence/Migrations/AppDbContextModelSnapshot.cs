@@ -10342,6 +10342,239 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.ToTable("timeline_events", (string)null);
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.VisitorPageView", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<int>("DurationSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("duration_seconds");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<Guid?>("LeadId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lead_id");
+
+                    b.Property<string>("Referrer")
+                        .HasColumnType("text")
+                        .HasColumnName("referrer");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("url");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.Property<DateTime>("ViewedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("viewed_at");
+
+                    b.Property<string>("VisitorId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("visitor_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_visitor_page_views");
+
+                    b.HasIndex("SessionId")
+                        .HasDatabaseName("ix_visitor_page_views_session_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_visitor_page_views_tenant_id");
+
+                    b.HasIndex("TenantId", "LeadId")
+                        .HasDatabaseName("ix_visitor_page_views_tenant_id_lead_id");
+
+                    b.HasIndex("TenantId", "SessionId")
+                        .HasDatabaseName("ix_visitor_page_views_tenant_id_session_id");
+
+                    b.HasIndex("TenantId", "ViewedAt")
+                        .HasDatabaseName("ix_visitor_page_views_tenant_id_viewed_at");
+
+                    b.ToTable("visitor_page_views", (string)null);
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.VisitorSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("City")
+                        .HasColumnType("text")
+                        .HasColumnName("city");
+
+                    b.Property<Guid?>("ContactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("contact_id");
+
+                    b.Property<string>("Country")
+                        .HasColumnType("text")
+                        .HasColumnName("country");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<DateTime>("FirstSeenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_seen_at");
+
+                    b.Property<string>("IdentifiedEmail")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("identified_email");
+
+                    b.Property<string>("InitialReferrer")
+                        .HasColumnType("text")
+                        .HasColumnName("initial_referrer");
+
+                    b.Property<string>("IpAddress")
+                        .HasColumnType("text")
+                        .HasColumnName("ip_address");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<DateTime>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_seen_at");
+
+                    b.Property<Guid?>("LeadId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lead_id");
+
+                    b.Property<int>("PageViewsCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("page_views_count");
+
+                    b.Property<string>("SessionId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("session_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<int>("TotalDurationSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_duration_seconds");
+
+                    b.Property<Guid>("TrackerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tracker_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<string>("UserAgent")
+                        .HasColumnType("text")
+                        .HasColumnName("user_agent");
+
+                    b.Property<string>("UtmCampaign")
+                        .HasColumnType("text")
+                        .HasColumnName("utm_campaign");
+
+                    b.Property<string>("UtmMedium")
+                        .HasColumnType("text")
+                        .HasColumnName("utm_medium");
+
+                    b.Property<string>("UtmSource")
+                        .HasColumnType("text")
+                        .HasColumnName("utm_source");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.Property<string>("VisitorId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("visitor_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_visitor_sessions");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_visitor_sessions_tenant_id");
+
+                    b.HasIndex("TenantId", "LastSeenAt")
+                        .HasDatabaseName("ix_visitor_sessions_tenant_id_last_seen_at");
+
+                    b.HasIndex("TenantId", "LeadId")
+                        .HasDatabaseName("ix_visitor_sessions_tenant_id_lead_id");
+
+                    b.HasIndex("TenantId", "VisitorId")
+                        .HasDatabaseName("ix_visitor_sessions_tenant_id_visitor_id");
+
+                    b.ToTable("visitor_sessions", (string)null);
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.VisualWorkflow", b =>
                 {
                     b.Property<Guid>("Id")
@@ -10615,6 +10848,101 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_web_forms_tenant_id");
 
                     b.ToTable("web_forms", (string)null);
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.WebsiteTracker", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.PrimitiveCollection<string[]>("AllowedOrigins")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("allowed_origins");
+
+                    b.Property<bool>("AutoCreateLeads")
+                        .HasColumnType("boolean")
+                        .HasColumnName("auto_create_leads");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("Domain")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("domain");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<int>("TotalPageViews")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_page_views");
+
+                    b.Property<int>("TotalVisits")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_visits");
+
+                    b.Property<string>("TrackingToken")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("tracking_token");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_website_trackers");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_website_trackers_tenant_id");
+
+                    b.HasIndex("TrackingToken")
+                        .IsUnique()
+                        .HasDatabaseName("ix_website_trackers_tracking_token");
+
+                    b.HasIndex("TenantId", "IsActive")
+                        .HasDatabaseName("ix_website_trackers_tenant_id_is_active");
+
+                    b.ToTable("website_trackers", (string)null);
                 });
 
             modelBuilder.Entity("MindLift.Infrastructure.Identity.AppUser", b =>
@@ -11121,6 +11449,18 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.Navigation("Territory");
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.VisitorPageView", b =>
+                {
+                    b.HasOne("MindLift.Domain.Entities.VisitorSession", "Session")
+                        .WithMany("PageViews")
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_visitor_page_views_visitor_sessions_session_id");
+
+                    b.Navigation("Session");
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.Cadence", b =>
                 {
                     b.Navigation("Enrollments");
@@ -11183,6 +11523,11 @@ namespace MindLift.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("MindLift.Domain.Entities.Territory", b =>
                 {
                     b.Navigation("Members");
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.VisitorSession", b =>
+                {
+                    b.Navigation("PageViews");
                 });
 #pragma warning restore 612, 618
         }
