@@ -26,6 +26,15 @@ public sealed class AuditableEntityInterceptor(ITenantContext tenant, IClock clo
         nameof(TenantEntity.UpdatedById),
     ];
 
+    /// <summary>The audit trail records that a secret changed, never what it was or what it became.</summary>
+    private const string Redacted = "[redacted]";
+
+    private static bool IsSecretField(string name)
+        => name.Contains("Secret", StringComparison.OrdinalIgnoreCase)
+           || name.Contains("Password", StringComparison.OrdinalIgnoreCase)
+           || name.EndsWith("TokenHash", StringComparison.OrdinalIgnoreCase)
+           || name.Equals("ApiKey", StringComparison.OrdinalIgnoreCase);
+
     public override InterceptionResult<int> SavingChanges(DbContextEventData eventData, InterceptionResult<int> result)
     {
         ProcessChanges(eventData.Context);
@@ -144,10 +153,11 @@ public sealed class AuditableEntityInterceptor(ITenantContext tenant, IClock clo
                 continue;
             }
 
+            var secret = IsSecretField(property.Metadata.Name);
             changes.Add(new AuditChange(
                 property.Metadata.Name,
-                ToAuditValue(property.OriginalValue),
-                ToAuditValue(property.CurrentValue)));
+                secret ? Redacted : ToAuditValue(property.OriginalValue),
+                secret ? Redacted : ToAuditValue(property.CurrentValue)));
         }
 
         return changes;

@@ -97,6 +97,9 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<PortalToken> PortalTokens { get; set; } = null!;
     public DbSet<DocumentRequest> DocumentRequests { get; set; } = null!;
     public DbSet<TenantFeature> TenantFeatures { get; set; } = null!;
+    public DbSet<IdempotencyRecord> IdempotencyRecords { get; set; } = null!;
+    public DbSet<IntegrationCredential> IntegrationCredentials { get; set; } = null!;
+    public DbSet<TimelineEvent> TimelineEvents { get; set; } = null!;
 
     /// <summary>Tenant used by query filters. Guid.Empty when no tenant is set, so no rows match.</summary>
     protected Guid CurrentTenantId => tenant.TenantId ?? Guid.Empty;
@@ -721,6 +724,36 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.ToTable("tenant_features");
             b.Property(x => x.Key).HasMaxLength(64);
             b.HasIndex(x => new { x.TenantId, x.Key }).IsUnique().HasFilter("is_deleted = false");
+        });
+
+        builder.Entity<IdempotencyRecord>(b =>
+        {
+            b.ToTable("idempotency_records");
+            b.Property(x => x.Scope).HasMaxLength(64);
+            b.Property(x => x.Key).HasMaxLength(200);
+            // The database decides who got there first: this index is the whole guarantee.
+            b.HasIndex(x => new { x.TenantId, x.Scope, x.Key }).IsUnique();
+            b.HasIndex(x => x.ExpiresAt);
+        });
+
+        builder.Entity<IntegrationCredential>(b =>
+        {
+            b.ToTable("integration_credentials");
+            b.Property(x => x.Provider).HasMaxLength(64);
+            b.Property(x => x.Label).HasMaxLength(100);
+            b.Property(x => x.SettingsJson).HasMaxLength(4000);
+            b.HasIndex(x => new { x.TenantId, x.Provider, x.Label }).IsUnique().HasFilter("is_deleted = false");
+        });
+
+        builder.Entity<TimelineEvent>(b =>
+        {
+            b.ToTable("timeline_events");
+            b.Property(x => x.EntityType).HasMaxLength(48);
+            b.Property(x => x.Kind).HasMaxLength(48);
+            b.Property(x => x.Source).HasMaxLength(48);
+            b.Property(x => x.Summary).HasMaxLength(300);
+            b.Property(x => x.DetailJson).HasMaxLength(8000);
+            b.HasIndex(x => new { x.TenantId, x.EntityType, x.EntityId, x.OccurredAt });
         });
     }
 

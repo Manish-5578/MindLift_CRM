@@ -557,6 +557,7 @@ new RecurringJobManager(hangfireStorage).AddOrUpdate<MindLift.Infrastructure.Cam
 new RecurringJobManager(hangfireStorage).AddOrUpdate<MindLift.Infrastructure.Billing.BillingRenewalJob>("billing-renewals", job => job.RunAsync(CancellationToken.None), Cron.Daily(5));
 new RecurringJobManager(hangfireStorage).AddOrUpdate<MindLift.Infrastructure.Persistence.AuditRetentionJob>("audit-retention", job => job.RunAsync(CancellationToken.None), Cron.Daily(2));
 new RecurringJobManager(hangfireStorage).AddOrUpdate<MindLift.Infrastructure.Cpq.DocumentExpiryJob>("document-expiry", job => job.RunAsync(CancellationToken.None), Cron.Daily(4));
+new RecurringJobManager(hangfireStorage).AddOrUpdate<MindLift.Infrastructure.Platform.IdempotencyCleanupJob>("idempotency-cleanup", job => job.RunAsync(CancellationToken.None), Cron.Daily(3, 45));
 
 app.Run();
 

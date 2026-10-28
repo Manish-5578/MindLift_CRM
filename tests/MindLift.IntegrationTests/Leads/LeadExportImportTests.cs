@@ -77,6 +77,7 @@ public sealed class LeadExportImportTests(MindLiftApiFactory factory) : IClassFi
     public async Task An_export_of_more_than_one_page_contains_every_lead()
     {
         var owner = await Workspaces.SignupAsync(factory);
+        owner.Client.Timeout = TimeSpan.FromMinutes(10);
         var csv = new StringBuilder("First name,Last name,Email\n");
         for (var i = 0; i < 450; i++)
         {

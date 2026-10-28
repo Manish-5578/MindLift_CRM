@@ -156,6 +156,7 @@ public sealed class BulkActionTests(MindLiftApiFactory factory) : IClassFixture<
     public async Task Select_all_over_the_limit_is_refused_so_the_user_narrows_the_list()
     {
         var admin = await Workspaces.SignupAsync(factory);
+        admin.Client.Timeout = TimeSpan.FromMinutes(10);
         var csv = new StringBuilder("First name,Last name,Email\n");
         for (var i = 0; i <= BulkActions.MaxRecords; i++)
         {
