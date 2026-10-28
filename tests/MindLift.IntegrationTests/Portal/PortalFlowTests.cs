@@ -34,6 +34,7 @@ public sealed class PortalFlowTests(MindLiftApiFactory factory) : IClassFixture<
         var companyName = $"PortalBranding_{Guid.NewGuid():N}"[..20];
         var admin = await Workspaces.SignupAsync(factory, companyName);
         var tenant = await GetTenantAsync(companyName);
+        (await admin.Client.PutAsJsonAsync("/api/v1/settings/portal", new SavePortalSettingsRequest(true, null, null, true, true, true, null, null))).EnsureSuccessStatusCode();
 
         var anonClient = factory.CreateClient();
         var resp = await anonClient.GetAsync($"/api/v1/portal/{tenant.Slug}/branding");

@@ -166,7 +166,8 @@ public sealed class DocumentOcrService(
         Guid? invoiceId = null,
         Guid? contactId = null,
         bool sharedWithPortal = false,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        bool linksAlreadyAuthorized = false)
     {
         // Only the kinds of file a business document can be are accepted, and the stored type comes from the extension, not from what the sender claims.
         var extension = Path.GetExtension(fileName).ToLowerInvariant();
@@ -182,7 +183,10 @@ public sealed class DocumentOcrService(
         }
 
         await EnsureLinkedRecordsExistAsync(accountId, dealId, quoteId, invoiceId, contactId, ct);
-        await EnsureLinksInScopeAsync(accountId, dealId, contactId, quoteId, invoiceId, ct);
+        if (!linksAlreadyAuthorized)
+        {
+            await EnsureLinksInScopeAsync(accountId, dealId, contactId, quoteId, invoiceId, ct);
+        }
 
         // When uploading documents linked to a quote/invoice, populate the effective scoped parent association(s) on BusinessDocument:
         if (quoteId is { } qId)
@@ -245,7 +249,7 @@ public sealed class DocumentOcrService(
             AssociatedInvoiceId = invoiceId,
             AssociatedContactId = contactId,
             SharedWithPortal = sharedWithPortal,
-            Status = "Queued",
+            Status = "Uploaded",
             OcrStatus = (int)DocumentOcrStatus.Pending,
             CreatedAt = DateTime.UtcNow
         };
@@ -258,7 +262,10 @@ public sealed class DocumentOcrService(
 
     public async Task<OcrResultDto> ProcessOcrAsync(Guid documentId, CancellationToken ct = default)
     {
-        await EnsureDocumentInScopeAsync(documentId, ct);
+        if (tenant.UserId is not null)
+        {
+            await EnsureDocumentInScopeAsync(documentId, ct);
+        }
         var doc = await db.Set<BusinessDocument>().FirstOrDefaultAsync(d => d.Id == documentId && !d.IsDeleted, ct)
             ?? throw new NotFoundException("Document", documentId);
 
@@ -918,6 +925,24 @@ public sealed class DocumentOcrService(
         var doc = await ScopeDocuments(db.Set<BusinessDocument>().AsNoTracking(), await ScopesAsync(ct))
             .FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted, ct);
         return doc == null ? null : MapDocument(doc);
+    }
+
+    private IQueryable<BusinessDocument> PortalOwned(Guid id, Guid contactId, Guid? accountId) =>
+        db.Set<BusinessDocument>().AsNoTracking().Where(d => d.Id == id && !d.IsDeleted && d.SharedWithPortal
+            && (d.AssociatedContactId == contactId || (accountId != null && d.AssociatedAccountId == accountId)));
+
+    public async Task<BusinessDocumentDto?> GetPortalDocumentAsync(Guid id, Guid contactId, Guid? accountId, CancellationToken ct = default)
+    {
+        var doc = await PortalOwned(id, contactId, accountId).FirstOrDefaultAsync(ct);
+        return doc == null ? null : MapDocument(doc);
+    }
+
+    public async Task<(Stream Stream, string ContentType, string FileName)?> GetPortalDocumentStreamAsync(Guid id, Guid contactId, Guid? accountId, CancellationToken ct = default)
+    {
+        var doc = await PortalOwned(id, contactId, accountId).FirstOrDefaultAsync(ct);
+        if (doc == null) return null;
+        var stream = await fileStorage.OpenReadAsync(doc.StorageKey, ct);
+        return (stream, doc.ContentType, doc.FileName);
     }
 
     public async Task<(Stream Stream, string ContentType, string FileName)?> GetDocumentStreamAsync(Guid id, CancellationToken ct = default)

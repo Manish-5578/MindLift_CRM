@@ -36,12 +36,18 @@ public sealed class PortalService(
     private static UnauthorizedException InvalidCredentials() => new("invalid_credentials", "Invalid email or password.");
 
     /// <summary>The company behind a portal address, or null when there is none or the platform owner switched its customer portal off.</summary>
-    private async Task<Tenant?> FindTenantAsync(string tenantSlug, CancellationToken ct)
+    private async Task<Tenant?> FindTenantAsync(string tenantSlug, CancellationToken ct, bool requireEnabled = true)
     {
         var t = await db.Tenants.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Slug == tenantSlug, ct);
         if (t is null)
         {
             return null;
+        }
+
+        if (!requireEnabled)
+        {
+            // Sign-in style flows call EnsurePortalEnabledAsync next, which refuses with 403 portal_disabled for every off state.
+            return t;
         }
 
         var plan = await db.Plans.AsNoTracking().FirstOrDefaultAsync(p => p.Id == t.PlanId, ct);
@@ -90,7 +96,7 @@ public sealed class PortalService(
 
     public async Task<PortalLoginResponse> LoginAsync(string tenantSlug, PortalLoginRequest req, CancellationToken ct = default)
     {
-        var t = await FindTenantAsync(tenantSlug, ct)
+        var t = await FindTenantAsync(tenantSlug, ct, requireEnabled: false)
             ?? throw new NotFoundException("Tenant", tenantSlug);
 
         using var scope = tenant.Use(t.Id);
@@ -177,7 +183,7 @@ public sealed class PortalService(
 
     public async Task<PortalLoginResponse> VerifyMagicLinkAsync(string tenantSlug, PortalMagicLinkVerifyRequest req, CancellationToken ct = default)
     {
-        var t = await FindTenantAsync(tenantSlug, ct)
+        var t = await FindTenantAsync(tenantSlug, ct, requireEnabled: false)
             ?? throw new NotFoundException("Tenant", tenantSlug);
 
         using var scope = tenant.Use(t.Id);
@@ -218,7 +224,7 @@ public sealed class PortalService(
 
     public async Task<PortalLoginResponse> AcceptInviteAsync(string tenantSlug, AcceptPortalInviteRequest req, CancellationToken ct = default)
     {
-        var t = await FindTenantAsync(tenantSlug, ct)
+        var t = await FindTenantAsync(tenantSlug, ct, requireEnabled: false)
             ?? throw new NotFoundException("Tenant", tenantSlug);
 
         using var scope = tenant.Use(t.Id);
@@ -272,7 +278,7 @@ public sealed class PortalService(
 
     public async Task<PortalLoginResponse> RefreshAsync(string tenantSlug, string refreshToken, CancellationToken ct = default)
     {
-        var t = await FindTenantAsync(tenantSlug, ct)
+        var t = await FindTenantAsync(tenantSlug, ct, requireEnabled: false)
             ?? throw new UnauthorizedException("invalid_refresh_token", "Your session has ended. Please sign in again.");
 
         using var scope = tenant.Use(t.Id);
@@ -327,7 +333,7 @@ public sealed class PortalService(
             var user = await db.PortalUsers.FirstOrDefaultAsync(u => u.Id == token.PortalUserId, ct);
             if (user is not null)
             {
-                user.Version++;
+                user.SessionVersion++;
                 user.PasswordChangedAt = DateTime.UtcNow;
             }
             await db.SaveChangesAsync(ct);
@@ -390,7 +396,7 @@ public sealed class PortalService(
         user.FailedLoginCount = 0;
         user.PasswordHash = Hasher.HashPassword(user, req.NewPassword);
         user.PasswordChangedAt = DateTime.UtcNow;
-        user.Version++;
+        user.SessionVersion++;
         await db.SaveChangesAsync(ct);
 
         // When a portal password is changed, revoke all outstanding portal bearer tokens (refresh, magic-link, invite)
@@ -520,7 +526,7 @@ public sealed class PortalService(
 
         var customerName = $"{contact.FirstName} {contact.LastName}".Trim();
         var (accessToken, expiresAt) = tokenService.CreatePortalAccessToken(
-            user.Id, tenantId, contact.Id, account?.Id, user.Email, customerName, user.Language, user.Version);
+            user.Id, tenantId, contact.Id, account?.Id, user.Email, customerName, user.Language, user.SessionVersion);
 
         return new PortalLoginResponse(
             AccessToken: accessToken,
@@ -778,7 +784,8 @@ public sealed class PortalService(
             null,
             contactId: contactId,
             sharedWithPortal: true,
-            ct: ct);
+            ct: ct,
+            linksAlreadyAuthorized: true);
 
         var entity = await db.BusinessDocuments.FirstAsync(d => d.Id == doc.Id, ct);
         entity.Status = "NeedsReview";

@@ -203,9 +203,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                     return;
                 }
 
-                // Check portal session version claim against database PortalUser.Version
+                // Check portal session version claim against the session version (bumped only on sign-out, password change or deactivation)
                 var verStr = principal.FindFirst("ver")?.Value;
-                if (!int.TryParse(verStr, out var tokenVer) || tokenVer != user.Version)
+                if (!int.TryParse(verStr, out var tokenVer) || tokenVer != user.SessionVersion)
                 {
                     context.Fail("Portal session version mismatch. Token has been revoked.");
                     return;

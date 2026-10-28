@@ -76,14 +76,14 @@ public sealed class PortalSecurityTests(MindLiftApiFactory factory) : IClassFixt
     {
         var invited = await InviteAsync();
 
-        Regex.IsMatch(LatestBodyFor(invited.Email), $@"https?://\S+/portal/{invited.Slug}/accept-invite\?token=").ShouldBeTrue();
+        Regex.IsMatch(LatestBodyFor(invited.Email), $@"https?://\S+/portal/{invited.Slug}/accept-invite#token=").ShouldBeTrue();
 
         var client = Mobile();
         await AcceptAsync(invited, client);
         (await client.PostAsJsonAsync($"/api/v1/portal/{invited.Slug}/auth/magic-link", new PortalMagicLinkRequest(invited.Email)))
             .StatusCode.ShouldBeOneOf(HttpStatusCode.OK, HttpStatusCode.NoContent, HttpStatusCode.Accepted);
 
-        Regex.IsMatch(LatestBodyFor(invited.Email), $@"https?://\S+/portal/{invited.Slug}/magic\?token=").ShouldBeTrue();
+        Regex.IsMatch(LatestBodyFor(invited.Email), $@"https?://\S+/portal/{invited.Slug}/magic#token=").ShouldBeTrue();
     }
 
     [Fact]

@@ -231,6 +231,7 @@ public sealed class PlatformConsoleTests(MindLiftApiFactory factory) : IClassFix
         var (platform, company, id) = await SetUpAsync();
         var slug = (await DetailAsync(platform, id)).Company.Slug;
         var anonymous = Workspaces.MobileClient(factory);
+        (await company.Client.PutAsJsonAsync("/api/v1/settings/portal", new SavePortalSettingsRequest(true, null, null, true, true, true, null, null))).EnsureSuccessStatusCode();
         (await anonymous.GetAsync($"/api/v1/portal/{slug}/branding")).StatusCode.ShouldBe(HttpStatusCode.OK);
 
         await SetModulesAsync(platform, id, "Portal");

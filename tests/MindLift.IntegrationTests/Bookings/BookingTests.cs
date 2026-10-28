@@ -246,7 +246,7 @@ public sealed class BookingTests(MindLiftApiFactory factory) : IClassFixture<Min
         (await anonymous.PostAsJsonAsync($"/api/v1/public/booking/manage/{confirmation.ManageToken}/cancel", new CancelBookingRequest("Can't make it"))).StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
         (await SlotsAsync(anonymous, page, Day(1), Day(1))).ShouldContain(x => x.StartUtc == slot.StartUtc);
-        (await anonymous.PostAsJsonAsync($"/api/v1/public/booking/manage/{confirmation.ManageToken}/cancel", new CancelBookingRequest(null))).StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        (await anonymous.PostAsJsonAsync($"/api/v1/public/booking/manage/{confirmation.ManageToken}/cancel", new CancelBookingRequest(null))).StatusCode.ShouldBe(HttpStatusCode.NotFound);
         (await s.Client.GetFromJsonAsync<List<CalendarEventDto>>($"/api/v1/calendar/events?from={Range(0)}&to={Range(8)}"))!.ShouldNotContain(e => e.Kind == "booking");
     }
 

@@ -228,9 +228,10 @@ public sealed class ReportFlowTests(MindLiftApiFactory factory) : IClassFixture<
         var admin = await Workspaces.SignupAsync(factory);
 
         // 1. Create target
+        var me = await admin.Client.GetFromJsonAsync<MeResponse>("/api/v1/auth/me");
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var req = new SaveSalesTargetRequest(
-            null,
+            me!.UserId,
             null,
             SalesTargetMetric.WonAmount,
             SalesTargetPeriod.Month,

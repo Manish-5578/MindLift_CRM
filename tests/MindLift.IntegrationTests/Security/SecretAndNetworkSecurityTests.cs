@@ -89,7 +89,9 @@ public sealed class SecretAndNetworkSecurityTests(MindLiftApiFactory factory) : 
     [Fact]
     public void SecretProtector_operates_cleanly_without_hardcoded_keys()
     {
-        var config = new ConfigurationBuilder().Build();
+        Should.Throw<InvalidOperationException>(() => new SecretProtector(new ConfigurationBuilder().Build()));
+
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Security:SecretKey"] = "test-only-secret-key-for-unit-tests-0123456789" }).Build();
         var protector = new SecretProtector(config);
 
         var secret = "super-sensitive-api-token-999";

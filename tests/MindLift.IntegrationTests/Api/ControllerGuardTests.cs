@@ -44,7 +44,9 @@ public sealed class ControllerGuardTests
                 // FilesController is sign-in only because the module depends on the record the file is attached to.
                 // FileService checks that module's permission for every attached file (see FileEndpointTests).
                 // SupportController.End only closes the support session the caller is in (see SupportAccessTests).
-                var selfService = (controller == typeof(AuthController) || controller == typeof(FilesController) || controller == typeof(SearchController) || controller == typeof(TimelineController) || controller == typeof(NotificationsController) || controller == typeof(CalendarController) || controller == typeof(PublicBookingController) || controller == typeof(SupportController) || controller == typeof(CalendarSyncController))
+                // ViewsController is sign-in only because the module depends on the entity named in the request;
+                // SavedViewService checks that module's permission on every list, create and delete.
+                var selfService = (controller == typeof(AuthController) || controller == typeof(FilesController) || controller == typeof(SearchController) || controller == typeof(TimelineController) || controller == typeof(NotificationsController) || controller == typeof(CalendarController) || controller == typeof(PublicBookingController) || controller == typeof(SupportController) || controller == typeof(CalendarSyncController) || controller == typeof(ViewsController))
                     && attributes.Any(a => a is AuthorizeAttribute { Policy: null } && a is not HasPermissionAttribute);
 
                 if (!guarded && !selfService)

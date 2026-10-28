@@ -204,7 +204,7 @@ public sealed class PortalIsolationAndReviewTests(MindLiftApiFactory factory) : 
         var c = await CustomerAsync(admin, "Sami");
 
         var other = await admin.Client.PostAsJsonAsync("/api/v1/contacts",
-            new SaveContactRequest("Other", "Person", null, null, null, null, null, "client", null, null));
+            new SaveContactRequest("Other", "Person", c.Email, null, null, null, null, "client", null, null));
         var otherContact = (await other.Content.ReadFromJsonAsync<ContactDto>())!;
 
         var dup = await admin.Client.PostAsJsonAsync($"/api/v1/contacts/{otherContact.Id}/portal/invite", new InvitePortalUserRequest(otherContact.Id, c.Email));

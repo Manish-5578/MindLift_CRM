@@ -201,8 +201,8 @@ public sealed class PortalCustomerController(IPortalService portalService, IDocu
     [HttpGet("documents/{id:guid}")]
     public async Task<ActionResult<BusinessDocumentDto>> GetDocumentById(Guid id, CancellationToken ct = default)
     {
-        var doc = await ocrService.GetDocumentByIdAsync(id, ct);
-        if (doc == null || !OwnsDocument(doc)) return NotFound();
+        var doc = await ocrService.GetPortalDocumentAsync(id, GetContactId(), GetAccountId(), ct);
+        if (doc == null) return NotFound();
 
         return Ok(doc);
     }
@@ -210,10 +210,7 @@ public sealed class PortalCustomerController(IPortalService portalService, IDocu
     [HttpGet("documents/{id:guid}/file")]
     public async Task<IActionResult> GetDocumentFile(Guid id, CancellationToken ct = default)
     {
-        var doc = await ocrService.GetDocumentByIdAsync(id, ct);
-        if (doc == null || !OwnsDocument(doc)) return NotFound();
-
-        var streamResult = await ocrService.GetDocumentStreamAsync(id, ct);
+        var streamResult = await ocrService.GetPortalDocumentStreamAsync(id, GetContactId(), GetAccountId(), ct);
         if (streamResult == null) return NotFound();
 
         // Always a download, never shown inside the portal's own page, and the browser must not guess another type.

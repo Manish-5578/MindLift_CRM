@@ -172,7 +172,8 @@ public sealed class FileEndpointTests(MindLiftApiFactory factory) : IClassFixtur
         stored.EntityId.ShouldBe(leadId);
         var list = await admin.Client.GetFromJsonAsync<List<StoredFileDto>>($"/api/v1/files?entityType=leads&entityId={leadId}");
         list!.Select(f => f.Id).ShouldContain(stored.Id);
-        (await staff.Client.GetAsync($"/api/v1/files/{stored.Id}")).StatusCode.ShouldBe(HttpStatusCode.OK);
+        // The staff role reads only its own records, so a lead owned by the admin (and its files) stays hidden.
+        (await staff.Client.GetAsync($"/api/v1/files/{stored.Id}")).StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
     [Fact]

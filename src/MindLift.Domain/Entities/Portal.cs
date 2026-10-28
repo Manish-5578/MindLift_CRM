@@ -33,6 +33,12 @@ public sealed class PortalUser : TenantEntity
     public int FailedLoginCount { get; set; }
     public DateTime? LockoutEnd { get; set; }
     public DateTime? PasswordChangedAt { get; set; }
+
+    /// <summary>
+    /// Carried in the portal access token as <c>ver</c>. It changes only when every session must end (sign-out, password change,
+    /// deactivation). <see cref="TenantEntity.Version"/> cannot be used for this: it changes on every ordinary edit of the row.
+    /// </summary>
+    public int SessionVersion { get; set; } = 1;
 }
 
 public sealed class PortalToken : TenantEntity

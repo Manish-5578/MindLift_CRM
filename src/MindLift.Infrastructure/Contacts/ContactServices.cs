@@ -309,7 +309,7 @@ public sealed class ContactService(AppDbContext db, ITenantContext tenant, ICloc
             foreach (var pu in linkedPortalUsers)
             {
                 pu.AccountId = contact.AccountId;
-                pu.Version++;
+                pu.SessionVersion++;
             }
             await db.SaveChangesAsync(cancellationToken);
         }
@@ -334,7 +334,7 @@ public sealed class ContactService(AppDbContext db, ITenantContext tenant, ICloc
         foreach (var pu in portalUsers)
         {
             pu.IsActive = false;
-            pu.Version++;
+            pu.SessionVersion++;
             pu.PasswordChangedAt = clock.UtcNow;
         }
 

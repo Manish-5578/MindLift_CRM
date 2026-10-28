@@ -715,7 +715,15 @@ public sealed class LeadService(
         {
             if (owner != lead.OwnerId)
             {
-                await RecordHelpers.EnsureOwnerAsync(db, scope, AppModule.Leads, owner, cancellationToken);
+                if (tenant.UserId is null)
+                {
+                    // Server-driven capture with no signed-in caller (a public booking assigns the page host): no caller scope applies.
+                    await RecordHelpers.EnsureOwnerAsync(db, owner, cancellationToken);
+                }
+                else
+                {
+                    await RecordHelpers.EnsureOwnerAsync(db, scope, AppModule.Leads, owner, cancellationToken);
+                }
             }
 
             lead.OwnerId = owner;
@@ -1010,17 +1018,64 @@ public sealed class PublicFormService(AppDbContext db, ITenantContext tenant, Le
         using var scope = tenant.Use(form.TenantId);
         var allowed = JsonSerializer.Deserialize<List<string>>(form.Fields.RootElement.GetRawText()) ?? [];
 
-        var firstName = !string.IsNullOrWhiteSpace(submission.FirstName) ? submission.FirstName.Trim() : "Web";
+        if (string.IsNullOrWhiteSpace(submission.FirstName))
+        {
+            throw new ValidationException(new Dictionary<string, string[]> { ["firstName"] = ["Enter your first name."] });
+        }
+
+        var firstName = submission.FirstName.Trim();
         var lastName = !string.IsNullOrWhiteSpace(submission.LastName) ? submission.LastName.Trim() : "Lead";
+
+        var email = allowed.Contains("email") ? submission.Email?.Trim() : null;
+        var phone = allowed.Contains("phone") ? submission.Phone?.Trim() : null;
+        var company = allowed.Contains("company_name") ? submission.CompanyName?.Trim() : null;
+        var message = allowed.Contains("description") ? submission.Message?.Trim() : null;
+
+        // A visitor who submits again is not a new lead: the existing one only has its blank fields filled in.
+        var normalizedEmail = LeadNormalizer.Email(email);
+        var normalizedPhone = LeadNormalizer.Phone(phone);
+        Lead? existing = null;
+        if (normalizedEmail is not null)
+        {
+            existing = await db.Leads.FirstOrDefaultAsync(l => l.NormalizedEmail == normalizedEmail, cancellationToken);
+        }
+
+        if (existing is null && normalizedPhone is not null)
+        {
+            existing = await db.Leads.FirstOrDefaultAsync(l => l.NormalizedPhone == normalizedPhone, cancellationToken);
+        }
+
+        if (existing is not null)
+        {
+            if (string.IsNullOrWhiteSpace(existing.Phone) && !string.IsNullOrWhiteSpace(phone))
+            {
+                existing.Phone = phone;
+                existing.NormalizedPhone = normalizedPhone;
+            }
+
+            if (string.IsNullOrWhiteSpace(existing.CompanyName) && !string.IsNullOrWhiteSpace(company))
+            {
+                existing.CompanyName = company;
+            }
+
+            if (string.IsNullOrWhiteSpace(existing.Description) && !string.IsNullOrWhiteSpace(message))
+            {
+                existing.Description = message;
+            }
+
+            form.SubmissionCount++;
+            await db.SaveChangesAsync(cancellationToken);
+            return new PublicFormResult(form.SuccessMessage, true);
+        }
 
         var request = new SaveLeadRequest(
             firstName,
             lastName,
-            allowed.Contains("email") ? submission.Email?.Trim() : null,
-            allowed.Contains("phone") ? submission.Phone?.Trim() : null,
-            allowed.Contains("company_name") ? submission.CompanyName?.Trim() : null,
+            email,
+            phone,
+            company,
             "new", form.DefaultSource, null,
-            allowed.Contains("description") ? submission.Message?.Trim() : null,
+            message,
             null, null, null);
 
         var created = await leads.CreateAsync(request, cancellationToken);

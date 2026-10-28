@@ -101,8 +101,9 @@ public sealed class DashboardFlowTests(MindLiftApiFactory factory) : IClassFixtu
         var endOfMonth = startOfMonth.AddMonths(1).AddDays(-1);
 
         // 1. Create sales target
+        var me = await admin.Client.GetFromJsonAsync<MeResponse>("/api/v1/auth/me");
         var targetReq = new SaveSalesTargetRequest(
-            UserId: null,
+            UserId: me!.UserId,
             TeamId: null,
             Metric: SalesTargetMetric.WonAmount,
             PeriodType: SalesTargetPeriod.Month,

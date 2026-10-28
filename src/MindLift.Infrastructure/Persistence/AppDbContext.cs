@@ -711,6 +711,11 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.HasIndex(x => new { x.TenantId, x.AssociatedAccountId });
         });
 
+        builder.Entity<PortalUser>(b =>
+        {
+            b.Property(x => x.SessionVersion).HasDefaultValue(1);
+        });
+
         builder.Entity<TenantFeature>(b =>
         {
             b.ToTable("tenant_features");

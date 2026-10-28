@@ -49,9 +49,15 @@ public interface IDocumentOcrService
         Guid? invoiceId = null,
         Guid? contactId = null,
         bool sharedWithPortal = false,
-        CancellationToken ct = default);
+        CancellationToken ct = default,
+        bool linksAlreadyAuthorized = false);
 
     Task<OcrResultDto> ProcessOcrAsync(Guid documentId, CancellationToken ct = default);
+
+    /// <summary>A document shared with the portal that belongs to this customer's contact or account. Null otherwise.</summary>
+    Task<BusinessDocumentDto?> GetPortalDocumentAsync(Guid id, Guid contactId, Guid? accountId, CancellationToken ct = default);
+
+    Task<(Stream Stream, string ContentType, string FileName)?> GetPortalDocumentStreamAsync(Guid id, Guid contactId, Guid? accountId, CancellationToken ct = default);
     Task<IReadOnlyList<BusinessDocumentDto>> GetDocumentsAsync(Guid? accountId = null, Guid? dealId = null, Guid? contactId = null, CancellationToken ct = default);
 
     /// <summary>Staff only: 404s unless the document's linked CRM record (deal, else account, else contact) is in the caller's row scope.</summary>
