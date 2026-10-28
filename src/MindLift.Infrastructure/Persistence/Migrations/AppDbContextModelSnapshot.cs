@@ -3491,6 +3491,113 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.ToTable("contact_account_links", (string)null);
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.CustomDashboardWidget", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("FilterJson")
+                        .HasColumnType("text")
+                        .HasColumnName("filter_json");
+
+                    b.Property<string>("GroupByField")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("group_by_field");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<bool>("IsShared")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_shared");
+
+                    b.Property<string>("MetricAggregation")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("metric_aggregation");
+
+                    b.Property<string>("Size")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("size");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("source");
+
+                    b.Property<string>("TargetField")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("target_field");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.Property<string>("WidgetType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("widget_type");
+
+                    b.HasKey("Id")
+                        .HasName("pk_custom_dashboard_widgets");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_custom_dashboard_widgets_tenant_id");
+
+                    b.HasIndex("TenantId", "CreatedByUserId")
+                        .HasDatabaseName("ix_custom_dashboard_widgets_tenant_id_created_by_user_id");
+
+                    b.HasIndex("TenantId", "IsShared")
+                        .HasDatabaseName("ix_custom_dashboard_widgets_tenant_id_is_shared");
+
+                    b.ToTable("custom_dashboard_widgets", (string)null);
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.CustomFieldDefinition", b =>
                 {
                     b.Property<Guid>("Id")

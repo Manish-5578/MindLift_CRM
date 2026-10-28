@@ -160,6 +160,7 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<SharedThreadCollisionLock> SharedThreadCollisionLocks { get; set; } = null!;
     public DbSet<MeetingLink> MeetingLinks { get; set; } = null!;
     public DbSet<CustomerSurvey> CustomerSurveys { get; set; } = null!;
+    public DbSet<CustomDashboardWidget> CustomDashboardWidgets { get; set; } = null!;
 
     /// <summary>Tenant used by query filters. Guid.Empty when no tenant is set, so no rows match.</summary>
     protected Guid CurrentTenantId => tenant.TenantId ?? Guid.Empty;
@@ -1564,6 +1565,20 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.HasIndex(x => new { x.TenantId, x.AccountId });
             b.HasIndex(x => new { x.TenantId, x.ContactId });
             b.HasIndex(x => new { x.TenantId, x.Sentiment });
+        });
+
+        builder.Entity<CustomDashboardWidget>(b =>
+        {
+            b.ToTable("custom_dashboard_widgets");
+            b.Property(x => x.Title).HasMaxLength(150);
+            b.Property(x => x.WidgetType).HasMaxLength(50);
+            b.Property(x => x.Source).HasMaxLength(50);
+            b.Property(x => x.MetricAggregation).HasMaxLength(30);
+            b.Property(x => x.TargetField).HasMaxLength(50);
+            b.Property(x => x.GroupByField).HasMaxLength(50);
+            b.Property(x => x.Size).HasMaxLength(10);
+            b.HasIndex(x => new { x.TenantId, x.CreatedByUserId });
+            b.HasIndex(x => new { x.TenantId, x.IsShared });
         });
     }
 
