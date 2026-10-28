@@ -107,6 +107,8 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<LayoutRule> LayoutRules { get; set; } = null!;
     public DbSet<CustomObjectDefinition> CustomObjectDefinitions { get; set; } = null!;
     public DbSet<CustomObjectRecord> CustomObjectRecords { get; set; } = null!;
+    public DbSet<VisualWorkflow> VisualWorkflows { get; set; } = null!;
+    public DbSet<VisualWorkflowExecution> VisualWorkflowExecutions { get; set; } = null!;
 
     /// <summary>Tenant used by query filters. Guid.Empty when no tenant is set, so no rows match.</summary>
     protected Guid CurrentTenantId => tenant.TenantId ?? Guid.Empty;
@@ -855,6 +857,28 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.Property(x => x.DataJson).HasColumnType("jsonb");
             b.HasIndex(x => new { x.TenantId, x.ObjectDefinitionId, x.RecordNumber });
             b.HasIndex(x => new { x.TenantId, x.ObjectDefinitionId, x.CreatedAt });
+        });
+
+        builder.Entity<VisualWorkflow>(b =>
+        {
+            b.ToTable("visual_workflows");
+            b.Property(x => x.Name).HasMaxLength(150);
+            b.Property(x => x.Description).HasMaxLength(500);
+            b.Property(x => x.EntityType).HasMaxLength(50);
+            b.Property(x => x.TriggerType).HasMaxLength(50);
+            b.Property(x => x.NodesJson).HasColumnType("jsonb");
+            b.Property(x => x.EdgesJson).HasColumnType("jsonb");
+            b.HasIndex(x => new { x.TenantId, x.EntityType, x.IsActive });
+        });
+
+        builder.Entity<VisualWorkflowExecution>(b =>
+        {
+            b.ToTable("visual_workflow_executions");
+            b.Property(x => x.WorkflowName).HasMaxLength(150);
+            b.Property(x => x.EntityType).HasMaxLength(50);
+            b.Property(x => x.Status).HasMaxLength(30);
+            b.Property(x => x.ExecutionLogJson).HasColumnType("jsonb");
+            b.HasIndex(x => new { x.TenantId, x.WorkflowId, x.ExecutedAt });
         });
     }
 
