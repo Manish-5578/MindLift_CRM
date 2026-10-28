@@ -8433,6 +8433,84 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.ToTable("number_sequences", (string)null);
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.OfflineSyncBatchLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("AppliedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("applied_count");
+
+                    b.Property<string>("BatchId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("batch_id");
+
+                    b.Property<int>("ClientMutationCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("client_mutation_count");
+
+                    b.Property<DateTime>("CompletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at_utc");
+
+                    b.Property<int>("ConflictCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("conflict_count");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<int>("ErrorCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("error_count");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_offline_sync_batches");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_offline_sync_batches_tenant_id");
+
+                    b.ToTable("offline_sync_batches", (string)null);
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.PaymentLink", b =>
                 {
                     b.Property<Guid>("Id")

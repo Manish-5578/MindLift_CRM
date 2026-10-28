@@ -161,6 +161,7 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<MeetingLink> MeetingLinks { get; set; } = null!;
     public DbSet<CustomerSurvey> CustomerSurveys { get; set; } = null!;
     public DbSet<CustomDashboardWidget> CustomDashboardWidgets { get; set; } = null!;
+    public DbSet<OfflineSyncBatchLog> OfflineSyncBatches { get; set; } = null!;
 
     /// <summary>Tenant used by query filters. Guid.Empty when no tenant is set, so no rows match.</summary>
     protected Guid CurrentTenantId => tenant.TenantId ?? Guid.Empty;

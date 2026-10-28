@@ -218,6 +218,8 @@ public static class DependencyInjection
         services.AddScoped<MindLift.Infrastructure.Reporting.VelocityReportService>();
         services.AddScoped<MindLift.Application.Abstractions.ILeaderboardService, MindLift.Infrastructure.Analytics.LeaderboardService>();
         services.AddScoped<MindLift.Infrastructure.Analytics.LeaderboardService>();
+        services.AddScoped<MindLift.Application.Abstractions.IOfflineSyncService, MindLift.Infrastructure.Platform.OfflineSyncService>();
+        services.AddScoped<MindLift.Infrastructure.Platform.OfflineSyncService>();
         services.AddScoped<MindLift.Infrastructure.Activities.ActivityService>();
         services.AddScoped<MindLift.Infrastructure.Activities.QuickLogService>();
         services.AddScoped<MindLift.Infrastructure.Activities.ChecklistService>();
