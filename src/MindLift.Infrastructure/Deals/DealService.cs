@@ -34,7 +34,8 @@ public sealed class DealService(
     IEnumerable<IDealWonHandler> wonHandlers,
     INotificationService notifications,
     IRecordSavePipeline savePipeline,
-    MindLift.Infrastructure.Common.BulkQueue bulkQueue)
+    MindLift.Infrastructure.Common.BulkQueue bulkQueue,
+    IPermissionService permissions)
 {
     private const int BoardCardsPerStage = 50;
     private const int ClosedDealDays = 30;
@@ -633,8 +634,15 @@ public sealed class DealService(
             return;
         }
 
+        if (!await permissions.HasAsync(AppModule.Contacts, PermissionAction.Edit, cancellationToken))
+        {
+            throw new ForbiddenException("Winning a deal promotes the primary contact, which requires Edit permission on Contacts.", "contacts_edit_required");
+        }
+
         var visible = await RecordHelpers.InScopeAsync(db.Contacts, scope, AppModule.Contacts, c => c.OwnerId, cancellationToken);
-        var contact = await visible.FirstOrDefaultAsync(c => c.Id == contactId, cancellationToken);
+        var contact = await visible.FirstOrDefaultAsync(c => c.Id == contactId, cancellationToken)
+            ?? throw new NotFoundException("Contact", contactId);
+
         if (contact is { Type: "prospect" or null })
         {
             contact.Type = "client";

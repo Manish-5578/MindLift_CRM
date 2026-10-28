@@ -26,6 +26,17 @@ public interface IPermissionService
     Task InvalidateRoleAsync(Guid roleId, CancellationToken cancellationToken = default);
 }
 
+public static class PermissionServiceExtensions
+{
+    public static async Task RequireAsync(this IPermissionService permissions, AppModule module, PermissionAction action, CancellationToken cancellationToken = default)
+    {
+        if (!await permissions.HasAsync(module, action, cancellationToken))
+        {
+            throw new MindLift.Application.Common.Exceptions.ForbiddenException($"You need {action} permission on {module} for this.", "forbidden");
+        }
+    }
+}
+
 /// <summary>Row-level scope: which owners the current user may see (plan 4.4.5).</summary>
 public interface IDataScopeService
 {

@@ -38,7 +38,7 @@ public sealed class OnboardingController(OnboardingService onboarding) : Control
     public async Task<ActionResult<OnboardingDto>> SavePipeline([FromBody] SaveOnboardingPipelineRequest request, CancellationToken cancellationToken)
         => Ok(await onboarding.SavePipelineAsync(request, cancellationToken));
 
-    [HasPermission(AppModule.Settings, PermissionAction.Edit)]
+    [HasPermission(AppModule.Users, PermissionAction.Create)]
     [HttpPost("team")]
     public async Task<ActionResult<OnboardingDto>> InviteTeam([FromBody] OnboardingTeamRequest request, CancellationToken cancellationToken)
         => Ok(await onboarding.InviteTeamAsync(request, cancellationToken));

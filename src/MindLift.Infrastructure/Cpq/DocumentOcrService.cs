@@ -38,24 +38,53 @@ public sealed class DocumentOcrService(
 {
     private Guid CurrentTenantId => tenant.TenantId ?? throw new UnauthorizedAccessException("Tenant context required.");
 
-    private sealed record Scopes(IReadOnlyList<Guid>? Deals, IReadOnlyList<Guid>? Accounts, IReadOnlyList<Guid>? Contacts);
+    private sealed record Scopes(
+        IReadOnlyList<Guid>? Documents,
+        IReadOnlyList<Guid>? Deals,
+        IReadOnlyList<Guid>? Accounts,
+        IReadOnlyList<Guid>? Contacts,
+        IReadOnlyList<Guid>? Quotes,
+        IReadOnlyList<Guid>? Invoices);
 
     private async Task<Scopes> ScopesAsync(CancellationToken ct) => new(
+        await scope.GetScopeUserIdsAsync(MindLift.Shared.Enums.AppModule.Documents, ct),
         await scope.GetScopeUserIdsAsync(MindLift.Shared.Enums.AppModule.Deals, ct),
         await scope.GetScopeUserIdsAsync(MindLift.Shared.Enums.AppModule.Accounts, ct),
-        await scope.GetScopeUserIdsAsync(MindLift.Shared.Enums.AppModule.Contacts, ct));
+        await scope.GetScopeUserIdsAsync(MindLift.Shared.Enums.AppModule.Contacts, ct),
+        await scope.GetScopeUserIdsAsync(MindLift.Shared.Enums.AppModule.Quotations, ct),
+        await scope.GetScopeUserIdsAsync(MindLift.Shared.Enums.AppModule.Invoices, ct));
 
     // A document follows the record it belongs to: the deal when there is one, otherwise the account,
-    // otherwise the contact. One with no link is visible to everyone who can open Documents.
+    // otherwise the contact, otherwise quote, otherwise invoice. Unlinked documents are scoped by Documents module data scope.
     private IQueryable<BusinessDocument> ScopeDocuments(IQueryable<BusinessDocument> q, Scopes s)
     {
-        if (s.Deals is null && s.Accounts is null && s.Contacts is null) return q;
-        var d = s.Deals; var a = s.Accounts; var c = s.Contacts;
+        if (s.Documents is null && s.Deals is null && s.Accounts is null && s.Contacts is null && s.Quotes is null && s.Invoices is null)
+        {
+            return q;
+        }
+
+        var docScope = s.Documents;
+        var d = s.Deals;
+        var a = s.Accounts;
+        var c = s.Contacts;
+        var qScope = s.Quotes;
+        var iScope = s.Invoices;
+
         return q.Where(x =>
             x.AssociatedDealId != null ? (d == null || db.Set<Deal>().Any(r => r.Id == x.AssociatedDealId && d.Contains(r.OwnerId)))
             : x.AssociatedAccountId != null ? (a == null || db.Set<Account>().Any(r => r.Id == x.AssociatedAccountId && a.Contains(r.OwnerId)))
             : x.AssociatedContactId != null ? (c == null || db.Set<Contact>().Any(r => r.Id == x.AssociatedContactId && c.Contains(r.OwnerId)))
-            : true);
+            : x.AssociatedQuoteId != null ? db.Set<Quote>().Any(quote => quote.Id == x.AssociatedQuoteId && !quote.IsDeleted
+                && (qScope == null || (quote.CreatedById != null && qScope.Contains(quote.CreatedById.Value)))
+                && (quote.DealId == null || d == null || db.Set<Deal>().Any(deal => deal.Id == quote.DealId && d.Contains(deal.OwnerId)))
+                && (quote.AccountId == null || a == null || db.Set<Account>().Any(acc => acc.Id == quote.AccountId && a.Contains(acc.OwnerId)))
+                && (quote.ContactId == null || c == null || db.Set<Contact>().Any(cont => cont.Id == quote.ContactId && c.Contains(cont.OwnerId))))
+            : x.AssociatedInvoiceId != null ? db.Set<Invoice>().Any(inv => inv.Id == x.AssociatedInvoiceId && !inv.IsDeleted
+                && (iScope == null || (inv.CreatedById != null && iScope.Contains(inv.CreatedById.Value)))
+                && (inv.DealId == null || d == null || db.Set<Deal>().Any(deal => deal.Id == inv.DealId && d.Contains(deal.OwnerId)))
+                && (inv.AccountId == null || a == null || db.Set<Account>().Any(acc => acc.Id == inv.AccountId && a.Contains(acc.OwnerId)))
+                && (inv.ContactId == null || c == null || db.Set<Contact>().Any(cont => cont.Id == inv.ContactId && c.Contains(cont.OwnerId))))
+            : (docScope == null || (x.CreatedById != null && docScope.Contains(x.CreatedById.Value))));
     }
 
     public async Task EnsureDocumentInScopeAsync(Guid id, CancellationToken ct = default)
@@ -153,6 +182,29 @@ public sealed class DocumentOcrService(
         }
 
         await EnsureLinkedRecordsExistAsync(accountId, dealId, quoteId, invoiceId, contactId, ct);
+        await EnsureLinksInScopeAsync(accountId, dealId, contactId, quoteId, invoiceId, ct);
+
+        // When uploading documents linked to a quote/invoice, populate the effective scoped parent association(s) on BusinessDocument:
+        if (quoteId is { } qId)
+        {
+            var q = await cpq.GetQuoteByIdAsync(qId, ct);
+            if (q != null)
+            {
+                dealId ??= q.DealId;
+                accountId ??= q.AccountId;
+                contactId ??= q.ContactId;
+            }
+        }
+        else if (invoiceId is { } invId)
+        {
+            var inv = await cpq.GetInvoiceByIdAsync(invId, ct);
+            if (inv != null)
+            {
+                dealId ??= inv.DealId;
+                accountId ??= inv.AccountId;
+                contactId ??= inv.ContactId;
+            }
+        }
 
         var cleanFileName = Path.GetFileName(fileName);
         var storageKey = $"docs/{CurrentTenantId}/{Guid.NewGuid():N}_{cleanFileName}";
@@ -186,6 +238,7 @@ public sealed class DocumentOcrService(
 
     public async Task<OcrResultDto> ProcessOcrAsync(Guid documentId, CancellationToken ct = default)
     {
+        await EnsureDocumentInScopeAsync(documentId, ct);
         var doc = await db.Set<BusinessDocument>().FirstOrDefaultAsync(d => d.Id == documentId && !d.IsDeleted, ct)
             ?? throw new NotFoundException("Document", documentId);
 
@@ -554,6 +607,7 @@ public sealed class DocumentOcrService(
 
     public async Task<BusinessDocumentDto> ReviewDocumentAsync(Guid id, ReviewDocumentRequest request, Guid reviewerUserId, CancellationToken ct = default)
     {
+        await EnsureDocumentInScopeAsync(id, ct);
         var doc = await db.Set<BusinessDocument>().FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted, ct)
             ?? throw new NotFoundException("Document", id);
 
@@ -601,6 +655,7 @@ public sealed class DocumentOcrService(
 
     public async Task<bool> UpdateExtractedFieldsAsync(Guid id, UpdateExtractedFieldsRequest request, CancellationToken ct = default)
     {
+        await EnsureDocumentInScopeAsync(id, ct);
         var doc = await db.Set<BusinessDocument>().FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted, ct)
             ?? throw new NotFoundException("Document", id);
 
@@ -669,6 +724,7 @@ public sealed class DocumentOcrService(
     /// </summary>
     public async Task<BusinessDocumentDto> QueueReadAsync(Guid id, string? documentType, CancellationToken ct = default)
     {
+        await EnsureDocumentInScopeAsync(id, ct);
         var doc = await db.Set<BusinessDocument>().FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted, ct)
             ?? throw new NotFoundException("Document", id);
 
@@ -722,6 +778,8 @@ public sealed class DocumentOcrService(
     /// <summary>Links the document to a contact, an account and/or a deal (each must be this workspace's own), or clears a link by passing null.</summary>
     public async Task<BusinessDocumentDto> LinkAsync(Guid id, LinkDocumentRequest request, CancellationToken ct = default)
     {
+        await EnsureDocumentInScopeAsync(id, ct);
+        await EnsureLinksInScopeAsync(request.AccountId, request.DealId, request.ContactId, null, null, ct);
         var doc = await db.Set<BusinessDocument>().FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted, ct)
             ?? throw new NotFoundException("Document", id);
 
@@ -735,6 +793,7 @@ public sealed class DocumentOcrService(
 
     public async Task<BusinessDocumentDto> ReprocessAsync(Guid id, CancellationToken ct = default)
     {
+        await EnsureDocumentInScopeAsync(id, ct);
         await ProcessOcrAsync(id, ct);
         var doc = await GetDocumentByIdAsync(id, ct) ?? throw new NotFoundException("Document", id);
         return doc;
@@ -823,13 +882,15 @@ public sealed class DocumentOcrService(
 
     public async Task<BusinessDocumentDto?> GetDocumentByIdAsync(Guid id, CancellationToken ct = default)
     {
-        var doc = await db.Set<BusinessDocument>().AsNoTracking().FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted, ct);
+        var doc = await ScopeDocuments(db.Set<BusinessDocument>().AsNoTracking(), await ScopesAsync(ct))
+            .FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted, ct);
         return doc == null ? null : MapDocument(doc);
     }
 
     public async Task<(Stream Stream, string ContentType, string FileName)?> GetDocumentStreamAsync(Guid id, CancellationToken ct = default)
     {
-        var doc = await db.Set<BusinessDocument>().AsNoTracking().FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted, ct);
+        var doc = await ScopeDocuments(db.Set<BusinessDocument>().AsNoTracking(), await ScopesAsync(ct))
+            .FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted, ct);
         if (doc == null) return null;
 
         var stream = await fileStorage.OpenReadAsync(doc.StorageKey, ct);
@@ -838,7 +899,8 @@ public sealed class DocumentOcrService(
 
     public async Task<(Stream Stream, string ContentType, string FileName)?> GetSearchablePdfAsync(Guid id, CancellationToken ct = default)
     {
-        var doc = await db.Set<BusinessDocument>().AsNoTracking().FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted, ct);
+        var doc = await ScopeDocuments(db.Set<BusinessDocument>().AsNoTracking(), await ScopesAsync(ct))
+            .FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted, ct);
         if (doc == null) return null;
 
         string? tempPath = null;
@@ -889,6 +951,7 @@ public sealed class DocumentOcrService(
 
     public async Task<bool> DeleteDocumentAsync(Guid id, CancellationToken ct = default)
     {
+        await EnsureDocumentInScopeAsync(id, ct);
         var doc = await db.Set<BusinessDocument>().FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted, ct);
         if (doc == null) return false;
 

@@ -61,7 +61,7 @@ public sealed class ContactsController(ContactService contacts, ImportNotifier i
     public async Task<ActionResult<IReadOnlyList<DuplicateCandidateDto>>> CheckDuplicates([FromBody] CheckDuplicatesRequest request, CancellationToken cancellationToken)
         => Ok(await contacts.CheckDuplicatesAsync(request, cancellationToken));
 
-    [HasPermission(AppModule.Contacts, PermissionAction.Edit)]
+    [HasPermission(AppModule.Contacts, PermissionAction.Delete)]
     [HttpPost("{id:guid}/merge")]
     public async Task<ActionResult<ContactDto>> Merge(Guid id, [FromBody] MergeContactsRequest request, CancellationToken cancellationToken)
         => Ok(await contacts.MergeAsync(id, request.DuplicateIds, cancellationToken));

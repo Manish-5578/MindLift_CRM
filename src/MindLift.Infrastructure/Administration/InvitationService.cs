@@ -48,10 +48,7 @@ public sealed class InvitationService(
 
         await planLimits.EnsureSeatAvailableAsync(cancellationToken);
         var role = await EnsureRoleAndTeamAsync(request.RoleId, request.TeamId, cancellationToken);
-        if (role.IsAdmin && !await IsCallerAdminAsync(cancellationToken))
-        {
-            throw new ForbiddenException("Only administrators can invite users with the Admin role.", "admin_role_required");
-        }
+        await EnsureCallerCanGrantRoleAsync(role, cancellationToken);
 
         var raw = TokenService.NewRefreshToken();
         var invitation = new Invitation
@@ -84,10 +81,7 @@ public sealed class InvitationService(
         }
 
         var role = await EnsureRoleAndTeamAsync(invitation.RoleId, invitation.TeamId, cancellationToken);
-        if (role.IsAdmin && !await IsCallerAdminAsync(cancellationToken))
-        {
-            throw new ForbiddenException("Only administrators can resend invitations with the Admin role.", "admin_role_required");
-        }
+        await EnsureCallerCanGrantRoleAsync(role, cancellationToken);
 
         var raw = TokenService.NewRefreshToken();
         invitation.TokenHash = TokenService.Hash(raw);
@@ -137,6 +131,20 @@ public sealed class InvitationService(
 
         await planLimits.EnsureSeatAvailableAsync(cancellationToken);
 
+        var assignedRole = await db.Roles.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(r => r.Id == invitation.RoleId && r.TenantId == invitation.TenantId && !r.IsDeleted, cancellationToken)
+            ?? throw new ConflictException("role_invalid", "The role assigned to this invitation is no longer valid.");
+
+        if (invitation.TeamId is { } teamId)
+        {
+            var teamValid = await db.Teams.IgnoreQueryFilters()
+                .AnyAsync(t => t.Id == teamId && t.TenantId == invitation.TenantId && !t.IsDeleted, cancellationToken);
+            if (!teamValid)
+            {
+                invitation.TeamId = null;
+            }
+        }
+
         var user = new AppUser
         {
             Id = Guid.CreateVersion7(),
@@ -145,7 +153,7 @@ public sealed class InvitationService(
             Email = invitation.Email,
             FirstName = invitation.FirstName,
             LastName = invitation.LastName,
-            RoleId = invitation.RoleId,
+            RoleId = assignedRole.Id,
             TeamId = invitation.TeamId,
             IsActive = true,
             EmailConfirmed = true,
@@ -199,6 +207,68 @@ public sealed class InvitationService(
         }
 
         return invitation;
+    }
+
+    private async Task EnsureCallerCanGrantRoleAsync(Role targetRole, CancellationToken cancellationToken)
+    {
+        if (tenant.IsPlatformAdmin) return;
+        if (tenant.UserId is not { } callerId)
+            throw new ForbiddenException("Authentication required.", "unauthorized");
+
+        var caller = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == callerId, cancellationToken);
+        if (caller == null)
+            throw new ForbiddenException("Caller not found.", "forbidden");
+
+        if (caller.IsTenantOwner) return;
+
+        if (caller.RoleId is null)
+            throw new ForbiddenException("You do not have a role and cannot grant roles.", "grant_forbidden");
+
+        var callerRole = await db.Roles.AsNoTracking().FirstOrDefaultAsync(r => r.Id == caller.RoleId, cancellationToken);
+        if (callerRole == null)
+            throw new ForbiddenException("Caller role not found.", "forbidden");
+
+        if (callerRole.IsAdmin) return;
+
+        if (targetRole.IsAdmin)
+        {
+            throw new ForbiddenException("Only administrators can grant or invite the Admin role.", "admin_role_required");
+        }
+
+        // Caller is a non-admin. Compare caller's role permissions against target role's permissions.
+        var callerPermissions = await db.RolePermissions.AsNoTracking()
+            .Where(p => p.RoleId == callerRole.Id)
+            .ToDictionaryAsync(p => p.Module, cancellationToken);
+
+        var targetPermissions = await db.RolePermissions.AsNoTracking()
+            .Where(p => p.RoleId == targetRole.Id)
+            .ToListAsync(cancellationToken);
+
+        foreach (var targetPerm in targetPermissions)
+        {
+            callerPermissions.TryGetValue(targetPerm.Module, out var callerPerm);
+
+            if (targetPerm.CanView && (callerPerm == null || !callerPerm.CanView))
+                throw new ForbiddenException($"Cannot grant role '{targetRole.Name}': missing View permission on {targetPerm.Module}.", "privilege_escalation");
+
+            if (targetPerm.CanCreate && (callerPerm == null || !callerPerm.CanCreate))
+                throw new ForbiddenException($"Cannot grant role '{targetRole.Name}': missing Create permission on {targetPerm.Module}.", "privilege_escalation");
+
+            if (targetPerm.CanEdit && (callerPerm == null || !callerPerm.CanEdit))
+                throw new ForbiddenException($"Cannot grant role '{targetRole.Name}': missing Edit permission on {targetPerm.Module}.", "privilege_escalation");
+
+            if (targetPerm.CanDelete && (callerPerm == null || !callerPerm.CanDelete))
+                throw new ForbiddenException($"Cannot grant role '{targetRole.Name}': missing Delete permission on {targetPerm.Module}.", "privilege_escalation");
+
+            if (targetPerm.CanExport && (callerPerm == null || !callerPerm.CanExport))
+                throw new ForbiddenException($"Cannot grant role '{targetRole.Name}': missing Export permission on {targetPerm.Module}.", "privilege_escalation");
+
+            if (targetPerm.CanImport && (callerPerm == null || !callerPerm.CanImport))
+                throw new ForbiddenException($"Cannot grant role '{targetRole.Name}': missing Import permission on {targetPerm.Module}.", "privilege_escalation");
+
+            if (callerPerm != null && targetPerm.Scope > callerPerm.Scope)
+                throw new ForbiddenException($"Cannot grant role '{targetRole.Name}': requested scope ({targetPerm.Scope}) exceeds your scope ({callerPerm.Scope}) on {targetPerm.Module}.", "privilege_escalation");
+        }
     }
 
     private async Task<bool> IsCallerAdminAsync(CancellationToken cancellationToken)

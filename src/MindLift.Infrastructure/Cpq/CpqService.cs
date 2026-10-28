@@ -9,43 +9,77 @@ using MindLift.Application.Abstractions;
 using MindLift.Application.Common.Exceptions;
 using MindLift.Domain.Entities;
 using MindLift.Shared.Contracts;
+using MindLift.Shared.Enums;
 
 namespace MindLift.Infrastructure.Cpq;
 
-public sealed class CpqService(IAppDbContext db, ITenantContext tenant, MindLift.Infrastructure.Tenancy.NumberSequences numbers, IDataScopeService scope) : ICpqService
+public sealed class CpqService(
+    IAppDbContext db,
+    ITenantContext tenant,
+    MindLift.Infrastructure.Tenancy.NumberSequences numbers,
+    IDataScopeService scope,
+    IPermissionService permissions) : ICpqService
 {
     private Guid CurrentTenantId => tenant.TenantId ?? throw new UnauthorizedAccessException("Tenant context required.");
 
-    // Quotes and invoices have no owner of their own. They follow the record they belong to: the deal when
-    // there is one, otherwise the account, otherwise the contact. A document with no link is visible to all
-    // users who can open the module (the controller already checks module permission).
-    private sealed record Scopes(IReadOnlyList<Guid>? Deals, IReadOnlyList<Guid>? Accounts, IReadOnlyList<Guid>? Contacts);
+    private sealed record Scopes(
+        IReadOnlyList<Guid>? Quotes,
+        IReadOnlyList<Guid>? Deals,
+        IReadOnlyList<Guid>? Accounts,
+        IReadOnlyList<Guid>? Contacts,
+        IReadOnlyList<Guid>? Invoices);
 
     private async Task<Scopes> ScopesAsync(CancellationToken ct) => new(
+        await scope.GetScopeUserIdsAsync(MindLift.Shared.Enums.AppModule.Quotations, ct),
         await scope.GetScopeUserIdsAsync(MindLift.Shared.Enums.AppModule.Deals, ct),
         await scope.GetScopeUserIdsAsync(MindLift.Shared.Enums.AppModule.Accounts, ct),
-        await scope.GetScopeUserIdsAsync(MindLift.Shared.Enums.AppModule.Contacts, ct));
+        await scope.GetScopeUserIdsAsync(MindLift.Shared.Enums.AppModule.Contacts, ct),
+        await scope.GetScopeUserIdsAsync(MindLift.Shared.Enums.AppModule.Invoices, ct));
 
     private IQueryable<Quote> ScopeQuotes(IQueryable<Quote> q, Scopes s)
     {
-        if (s.Deals is null && s.Accounts is null && s.Contacts is null) return q;
-        var d = s.Deals; var a = s.Accounts; var c = s.Contacts;
-        return q.Where(x =>
-            x.DealId != null ? (d == null || db.Set<Deal>().Any(r => r.Id == x.DealId && d.Contains(r.OwnerId)))
-            : x.AccountId != null ? (a == null || db.Set<Account>().Any(r => r.Id == x.AccountId && a.Contains(r.OwnerId)))
-            : x.ContactId != null ? (c == null || db.Set<Contact>().Any(r => r.Id == x.ContactId && c.Contains(r.OwnerId)))
-            : true);
+        // 1. Quotations row-level scope: if caller has restricted scope, quote must belong to permitted creator
+        if (s.Quotes is not null)
+        {
+            var allowed = s.Quotes;
+            q = q.Where(x => x.CreatedById != null && allowed.Contains(x.CreatedById.Value));
+        }
+
+        // 2. Intersect with parent-record scopes:
+        if (s.Deals is not null || s.Accounts is not null || s.Contacts is not null)
+        {
+            var d = s.Deals; var a = s.Accounts; var c = s.Contacts;
+            q = q.Where(x =>
+                x.DealId != null ? (d == null || db.Set<Deal>().Any(r => r.Id == x.DealId && d.Contains(r.OwnerId)))
+                : x.AccountId != null ? (a == null || db.Set<Account>().Any(r => r.Id == x.AccountId && a.Contains(r.OwnerId)))
+                : x.ContactId != null ? (c == null || db.Set<Contact>().Any(r => r.Id == x.ContactId && c.Contains(r.OwnerId)))
+                : true);
+        }
+
+        return q;
     }
 
     private IQueryable<Invoice> ScopeInvoices(IQueryable<Invoice> q, Scopes s)
     {
-        if (s.Deals is null && s.Accounts is null && s.Contacts is null) return q;
-        var d = s.Deals; var a = s.Accounts; var c = s.Contacts;
-        return q.Where(x =>
-            x.DealId != null ? (d == null || db.Set<Deal>().Any(r => r.Id == x.DealId && d.Contains(r.OwnerId)))
-            : x.AccountId != null ? (a == null || db.Set<Account>().Any(r => r.Id == x.AccountId && a.Contains(r.OwnerId)))
-            : x.ContactId != null ? (c == null || db.Set<Contact>().Any(r => r.Id == x.ContactId && c.Contains(r.OwnerId)))
-            : true);
+        // 1. Invoices row-level scope:
+        if (s.Invoices is not null)
+        {
+            var allowed = s.Invoices;
+            q = q.Where(x => x.CreatedById != null && allowed.Contains(x.CreatedById.Value));
+        }
+
+        // 2. Intersect with parent-record scopes:
+        if (s.Deals is not null || s.Accounts is not null || s.Contacts is not null)
+        {
+            var d = s.Deals; var a = s.Accounts; var c = s.Contacts;
+            q = q.Where(x =>
+                x.DealId != null ? (d == null || db.Set<Deal>().Any(r => r.Id == x.DealId && d.Contains(r.OwnerId)))
+                : x.AccountId != null ? (a == null || db.Set<Account>().Any(r => r.Id == x.AccountId && a.Contains(r.OwnerId)))
+                : x.ContactId != null ? (c == null || db.Set<Contact>().Any(r => r.Id == x.ContactId && c.Contains(r.OwnerId)))
+                : true);
+        }
+
+        return q;
     }
 
     /// <summary>Every record a quote or invoice is linked to must exist and be in the caller's scope.</summary>
@@ -54,16 +88,19 @@ public sealed class CpqService(IAppDbContext db, ITenantContext tenant, MindLift
         var s = await ScopesAsync(ct);
         if (dealId is { } did)
         {
+            await permissions.RequireAsync(MindLift.Shared.Enums.AppModule.Deals, PermissionAction.View, ct);
             var owner = await db.Set<Deal>().Where(r => r.Id == did && !r.IsDeleted).Select(r => (Guid?)r.OwnerId).FirstOrDefaultAsync(ct);
             if (owner is null || (s.Deals is not null && !s.Deals.Contains(owner.Value))) throw new NotFoundException("Deal", did);
         }
         if (accountId is { } aid)
         {
+            await permissions.RequireAsync(MindLift.Shared.Enums.AppModule.Accounts, PermissionAction.View, ct);
             var owner = await db.Set<Account>().Where(r => r.Id == aid && !r.IsDeleted).Select(r => (Guid?)r.OwnerId).FirstOrDefaultAsync(ct);
             if (owner is null || (s.Accounts is not null && !s.Accounts.Contains(owner.Value))) throw new NotFoundException("Account", aid);
         }
         if (contactId is { } cid)
         {
+            await permissions.RequireAsync(MindLift.Shared.Enums.AppModule.Contacts, PermissionAction.View, ct);
             var owner = await db.Set<Contact>().Where(r => r.Id == cid && !r.IsDeleted).Select(r => (Guid?)r.OwnerId).FirstOrDefaultAsync(ct);
             if (owner is null || (s.Contacts is not null && !s.Contacts.Contains(owner.Value))) throw new NotFoundException("Contact", cid);
         }
@@ -378,6 +415,7 @@ public sealed class CpqService(IAppDbContext db, ITenantContext tenant, MindLift
         {
             throw new ValidationException("DealId", "This quote is not associated with any deal.");
         }
+        await permissions.RequireAsync(MindLift.Shared.Enums.AppModule.Deals, PermissionAction.Edit, ct);
         await EnsureLinksInScopeAsync(quote.DealId, null, null, ct);
 
         var deal = await db.Set<Deal>().FirstOrDefaultAsync(d => d.Id == quote.DealId.Value && !d.IsDeleted, ct)

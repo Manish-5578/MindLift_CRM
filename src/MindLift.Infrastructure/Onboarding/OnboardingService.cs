@@ -145,6 +145,7 @@ public sealed class OnboardingService(
     /// <summary>Step 4: invites the team. Each invitation uses a seat, so the plan limit applies.</summary>
     public async Task<OnboardingDto> InviteTeamAsync(OnboardingTeamRequest request, CancellationToken cancellationToken = default)
     {
+        await EnsureCallerIsAdminOrOwnerAsync(cancellationToken);
         foreach (var invite in request.Invites)
         {
             await invitations.CreateAsync(new CreateInvitationRequest(invite.Email, invite.FirstName, invite.LastName, invite.RoleId, invite.TeamId), cancellationToken);
@@ -235,6 +236,26 @@ public sealed class OnboardingService(
         {
             workspace.OnboardingStep = Math.Min(step + 1, OnboardingSteps.Channels);
         }
+    }
+
+    private async Task EnsureCallerIsAdminOrOwnerAsync(CancellationToken cancellationToken)
+    {
+        if (tenant.IsPlatformAdmin) return;
+        if (tenant.UserId is not { } callerId)
+            throw new ForbiddenException("Authentication required.", "unauthorized");
+
+        var caller = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == callerId, cancellationToken);
+        if (caller == null)
+            throw new ForbiddenException("Caller not found.", "forbidden");
+
+        if (caller.IsTenantOwner) return;
+
+        if (caller.RoleId is null)
+            throw new ForbiddenException("Only administrators and owners can invite team members during onboarding.", "admin_required");
+
+        var isAdmin = await db.Roles.AsNoTracking().AnyAsync(r => r.Id == caller.RoleId && r.IsAdmin, cancellationToken);
+        if (!isAdmin)
+            throw new ForbiddenException("Only administrators and owners can invite team members during onboarding.", "admin_required");
     }
 
     private async Task<Tenant> LoadWorkspaceAsync(CancellationToken cancellationToken)

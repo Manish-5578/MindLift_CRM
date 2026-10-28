@@ -419,33 +419,66 @@ public sealed class DashboardService(
     };
 }
 
-public sealed class SalesTargetService(AppDbContext db, ITenantContext tenant, IDataScopeService scope) : ISalesTargetService
+public sealed class SalesTargetService(
+    AppDbContext db,
+    ITenantContext tenant,
+    IDataScopeService scope,
+    IPermissionService permissions) : ISalesTargetService
 {
-    // Access model: admins manage every target. Other callers see targets for
-    // their own team (me + reports) and their own team-wide targets, and may only
-    // create/edit/delete per-user targets for people who report to them.
-    private sealed record Access(bool IsAdmin, Guid? CallerId, Guid? CallerTeamId, HashSet<Guid> Team);
+    // Access model: admins manage every target. Other callers resolve their
+    // configured Reports data scope (Own = self only, Team = team members & reports, All = everyone).
+    private sealed record Access(bool IsAdmin, Guid? CallerId, Guid? CallerTeamId, IReadOnlyList<Guid>? AllowedUserIds, DataScope Scope);
 
     private async Task<Access> AccessAsync(CancellationToken ct)
     {
-        if (tenant.IsPlatformAdmin) return new Access(true, tenant.UserId, null, []);
+        if (tenant.IsPlatformAdmin) return new Access(true, tenant.UserId, null, null, DataScope.All);
         if (tenant.UserId is not { } callerId) throw new ForbiddenException();
         var caller = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == callerId, ct)
             ?? throw new ForbiddenException();
         var isAdmin = caller.IsTenantOwner
             || (caller.RoleId is { } rid && await db.Roles.AsNoTracking().AnyAsync(r => r.Id == rid && r.IsAdmin, ct));
-        var team = isAdmin ? [] : (await scope.TeamOfAsync(callerId, ct)).ToHashSet();
-        return new Access(isAdmin, callerId, caller.TeamId, team);
+        if (isAdmin)
+        {
+            return new Access(true, callerId, caller.TeamId, null, DataScope.All);
+        }
+
+        var perm = await permissions.GetModulePermissionAsync(AppModule.Reports, ct);
+        if (perm is null || !perm.CanView)
+        {
+            throw new ForbiddenException("You do not have permission to view sales targets.", "permission_denied");
+        }
+
+        var allowedUserIds = await scope.GetScopeUserIdsAsync(AppModule.Reports, ct);
+        return new Access(false, callerId, caller.TeamId, allowedUserIds, perm.Scope);
     }
 
-    private static bool CanSee(Access a, SalesTarget t) =>
-        a.IsAdmin
-        || (t.UserId is { } uid && a.Team.Contains(uid))
-        || (t.UserId is null && t.TeamId is { } tid && tid == a.CallerTeamId);
+    private static bool CanSee(Access a, SalesTarget t)
+    {
+        if (a.IsAdmin || a.AllowedUserIds is null) return true;
+        if (t.UserId is { } uid)
+        {
+            return a.AllowedUserIds.Contains(uid);
+        }
+        if (t.TeamId is { } tid)
+        {
+            return a.Scope is DataScope.Team or DataScope.All && tid == a.CallerTeamId;
+        }
+        return false;
+    }
 
-    private static bool CanManage(Access a, Guid? userId, Guid? teamId) =>
-        a.IsAdmin
-        || (teamId is null && userId is { } uid && uid != a.CallerId && a.Team.Contains(uid));
+    private static bool CanManage(Access a, Guid? userId, Guid? teamId)
+    {
+        if (a.IsAdmin || a.AllowedUserIds is null) return true;
+        if (userId is { } uid)
+        {
+            return a.AllowedUserIds.Contains(uid);
+        }
+        if (teamId is { } tid)
+        {
+            return a.Scope is DataScope.Team or DataScope.All && tid == a.CallerTeamId;
+        }
+        return false;
+    }
 
     public async Task<IReadOnlyList<SalesTargetDto>> ListAsync(CancellationToken ct = default)
     {
@@ -483,10 +516,25 @@ public sealed class SalesTargetService(AppDbContext db, ITenantContext tenant, I
     public async Task<SalesTargetDto> SaveAsync(Guid? id, SaveSalesTargetRequest request, CancellationToken ct = default)
     {
         var access = await AccessAsync(ct);
-        if (request.UserId is { } reqUser && !await db.Users.AnyAsync(u => u.Id == reqUser, ct))
-            throw new NotFoundException("User", reqUser);
-        if (request.TeamId is { } reqTeam && !await db.Teams.AnyAsync(t => t.Id == reqTeam, ct))
-            throw new NotFoundException("Team", reqTeam);
+        if (request.UserId is null && request.TeamId is null)
+        {
+            throw new ValidationException("UserId", "A target must be assigned to either a user or a team.");
+        }
+
+        if (request.UserId is { } reqUser)
+        {
+            if (!await db.Users.AnyAsync(u => u.Id == reqUser, ct))
+                throw new NotFoundException("User", reqUser);
+            if (access.AllowedUserIds is not null && !access.AllowedUserIds.Contains(reqUser))
+                throw new ForbiddenException("You cannot set targets for users outside your scope.", "out_of_scope");
+        }
+        if (request.TeamId is { } reqTeam)
+        {
+            if (!await db.Teams.AnyAsync(t => t.Id == reqTeam, ct))
+                throw new NotFoundException("Team", reqTeam);
+            if (access.Scope == DataScope.Own || (access.CallerTeamId is not null && reqTeam != access.CallerTeamId))
+                throw new ForbiddenException("You cannot set team targets outside your scope.", "out_of_scope");
+        }
         if (!CanManage(access, request.UserId, request.TeamId)) throw new ForbiddenException();
 
         SalesTarget target;

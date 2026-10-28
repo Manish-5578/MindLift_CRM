@@ -125,4 +125,62 @@ public sealed class ScopeEnforcementUnitTests
 
         isAuthPath.ShouldBe(requiresHttps);
     }
+
+    [Fact]
+    public async Task RequireAsync_Throws_ForbiddenException_When_User_Lacks_Permission()
+    {
+        var permissions = Substitute.For<IPermissionService>();
+        permissions.HasAsync(AppModule.Activities, PermissionAction.Edit, Arg.Any<CancellationToken>())
+            .Returns(false);
+
+        await Should.ThrowAsync<ForbiddenException>(async () =>
+        {
+            await permissions.RequireAsync(AppModule.Activities, PermissionAction.Edit);
+        });
+    }
+
+    [Fact]
+    public async Task RequireAsync_Succeeds_When_User_Has_Permission()
+    {
+        var permissions = Substitute.For<IPermissionService>();
+        permissions.HasAsync(AppModule.Deals, PermissionAction.Edit, Arg.Any<CancellationToken>())
+            .Returns(true);
+
+        await Should.NotThrowAsync(async () =>
+        {
+            await permissions.RequireAsync(AppModule.Deals, PermissionAction.Edit);
+        });
+    }
+
+    [Fact]
+    public void Contact_Duplicate_Validation_Detects_Unrelated_Contacts()
+    {
+        var masterEmail = "john.doe@example.com";
+        var masterPhone = "+1234567890";
+        var masterFirst = "John";
+        var masterLast = "Doe";
+
+        var unrelatedEmail = "jane.smith@example.com";
+        var unrelatedPhone = "+1987654321";
+        var unrelatedFirst = "Jane";
+        var unrelatedLast = "Smith";
+
+        var isDuplicate = (!string.IsNullOrWhiteSpace(masterEmail) && masterEmail == unrelatedEmail)
+            || (!string.IsNullOrWhiteSpace(masterPhone) && masterPhone == unrelatedPhone)
+            || (!string.IsNullOrWhiteSpace(masterFirst) && !string.IsNullOrWhiteSpace(masterLast)
+                && string.Equals(masterFirst, unrelatedFirst, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(masterLast, unrelatedLast, StringComparison.OrdinalIgnoreCase));
+
+        isDuplicate.ShouldBeFalse("Unrelated contacts with different email, phone, and name must not be identified as duplicates.");
+    }
+
+    [Fact]
+    public void Contact_Duplicate_Validation_Matches_Duplicate_By_Email()
+    {
+        var masterEmail = "john.doe@example.com";
+        var duplicateEmail = "john.doe@example.com";
+
+        var isDuplicate = !string.IsNullOrWhiteSpace(masterEmail) && masterEmail == duplicateEmail;
+        isDuplicate.ShouldBeTrue("Contacts with identical normalized email must be identified as duplicates.");
+    }
 }

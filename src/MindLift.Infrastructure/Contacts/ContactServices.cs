@@ -339,12 +339,42 @@ public sealed class ContactService(AppDbContext db, ITenantContext tenant, ICloc
             throw new ForbiddenException("Merging removes contacts, so it needs permission to delete contacts.", "forbidden");
         }
 
+        if (duplicateIds == null || duplicateIds.Count == 0)
+        {
+            throw new ValidationException("duplicateIds", "At least one duplicate contact ID must be provided.");
+        }
+
+        if (duplicateIds.Contains(masterId))
+        {
+            throw new ValidationException("duplicateIds", "Master contact cannot be listed as a duplicate of itself.");
+        }
+
+        if (duplicateIds.Distinct().Count() != duplicateIds.Count)
+        {
+            throw new ValidationException("duplicateIds", "Duplicate contact IDs must be unique.");
+        }
+
         var master = await LoadScopedAsync(masterId, cancellationToken);
-        var requested = duplicateIds.Where(d => d != masterId).Distinct().ToList();
+        var requested = duplicateIds.ToList();
         var duplicates = await (await ScopedAsync(cancellationToken)).Where(c => requested.Contains(c.Id)).ToListAsync(cancellationToken);
         if (duplicates.Count != requested.Count)
         {
             throw new NotFoundException("Contact", requested.First(r => duplicates.All(d => d.Id != r)));
+        }
+
+        // Validate each duplicate against server-side duplicate-matching rules before merge
+        foreach (var duplicate in duplicates)
+        {
+            var isDuplicate = (!string.IsNullOrWhiteSpace(master.NormalizedEmail) && master.NormalizedEmail == duplicate.NormalizedEmail)
+                || (!string.IsNullOrWhiteSpace(master.NormalizedPhone) && master.NormalizedPhone == duplicate.NormalizedPhone)
+                || (!string.IsNullOrWhiteSpace(master.FirstName) && !string.IsNullOrWhiteSpace(master.LastName)
+                    && string.Equals(master.FirstName, duplicate.FirstName, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(master.LastName, duplicate.LastName, StringComparison.OrdinalIgnoreCase));
+
+            if (!isDuplicate)
+            {
+                throw new ValidationException("duplicateIds", $"Contact '{duplicate.FirstName} {duplicate.LastName}' (ID: {duplicate.Id}) is not a duplicate of the master contact.");
+            }
         }
 
         foreach (var duplicate in duplicates)

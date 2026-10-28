@@ -283,9 +283,11 @@ public sealed class LeadService(
             throw new BusinessRuleException("lead_disqualified", "A disqualified lead cannot be converted. Reopen it first.");
         }
 
+        var hasActivities = await db.Activities.AnyAsync(a => a.LeadId == lead.Id, cancellationToken);
         await RequireAsync(AppModule.Accounts, request.AccountMode == "create" ? PermissionAction.Create : PermissionAction.Edit, request.AccountMode is "create" or "existing", cancellationToken);
         await RequireAsync(AppModule.Contacts, request.ContactMode == "existing" ? PermissionAction.Edit : PermissionAction.Create, true, cancellationToken);
         await RequireAsync(AppModule.Deals, PermissionAction.Create, request.CreateDeal, cancellationToken);
+        await RequireAsync(AppModule.Activities, PermissionAction.Edit, hasActivities, cancellationToken);
 
         var settings = await db.TenantSettings.AsNoTracking().FirstAsync(cancellationToken);
 
@@ -402,20 +404,34 @@ public sealed class LeadService(
         await db.SaveChangesAsync(cancellationToken);
 
         // The lead's activities move with it: they now also belong to the contact, company and deal.
-        var contactId = contact.Id;
-        var accountId = account?.Id;
-        var dealId = deal?.Id;
-        var activityScope = await scope.GetScopeUserIdsAsync(AppModule.Activities, cancellationToken);
-        var movable = db.Activities.Where(a => a.LeadId == lead.Id);
-        if (activityScope is not null)
+        var leadActivities = await db.Activities.Where(a => a.LeadId == lead.Id).ToListAsync(cancellationToken);
+        if (leadActivities.Count > 0)
         {
-            movable = movable.Where(a => activityScope.Contains(a.OwnerId));
+            await RequireAsync(AppModule.Activities, PermissionAction.Edit, true, cancellationToken);
+            var activityScope = await scope.GetScopeUserIdsAsync(AppModule.Activities, cancellationToken);
+            if (activityScope is not null)
+            {
+                var outOfScope = leadActivities.Any(a => !activityScope.Contains(a.OwnerId));
+                if (outOfScope)
+                {
+                    throw new ForbiddenException("One or more activities linked to this lead are outside your activity edit scope.", "activity_out_of_scope");
+                }
+            }
+
+            var contactId = contact.Id;
+            var accountId = account?.Id;
+            var dealId = deal?.Id;
+
+            foreach (var a in leadActivities)
+            {
+                a.ContactId = contactId;
+                a.AccountId = accountId;
+                a.DealId = dealId;
+            }
+
+            await db.SaveChangesAsync(cancellationToken);
         }
 
-        await movable.ExecuteUpdateAsync(s => s
-            .SetProperty(a => a.ContactId, contactId)
-            .SetProperty(a => a.AccountId, accountId)
-            .SetProperty(a => a.DealId, dealId), cancellationToken);
         await tx.CommitAsync(cancellationToken);
 
         return new ConvertLeadResult(contact.Id, account?.Id, deal?.Id);
@@ -468,13 +484,28 @@ public sealed class LeadService(
         // Merging removes the duplicates, so it needs the right to delete leads, and every duplicate must be in scope.
         await RequireAsync(AppModule.Leads, PermissionAction.Delete, true, cancellationToken);
 
+        if (duplicateIds == null || duplicateIds.Count == 0)
+        {
+            throw new ValidationException("duplicateIds", "At least one duplicate lead ID must be provided.");
+        }
+
+        if (duplicateIds.Contains(masterId))
+        {
+            throw new ValidationException("duplicateIds", "Master lead cannot be listed as a duplicate of itself.");
+        }
+
+        if (duplicateIds.Distinct().Count() != duplicateIds.Count)
+        {
+            throw new ValidationException("duplicateIds", "Duplicate lead IDs must be unique.");
+        }
+
         var master = await LoadScopedAsync(masterId, cancellationToken);
         if (master.ConvertedAt is not null)
         {
             throw new ForbiddenException("Converted leads cannot be merged.", "lead_converted");
         }
 
-        var requested = duplicateIds.Where(d => d != masterId).Distinct().ToList();
+        var requested = duplicateIds.ToList();
         var duplicates = await (await ScopedLeadsAsync(cancellationToken))
             .Where(l => requested.Contains(l.Id) && l.ConvertedAt == null)
             .ToListAsync(cancellationToken);
@@ -482,6 +513,22 @@ public sealed class LeadService(
         if (duplicates.Count != requested.Count)
         {
             throw new NotFoundException("Lead", requested.First(r => duplicates.All(d => d.Id != r)));
+        }
+
+        // Validate each duplicate against server-side duplicate-matching rules before merge
+        foreach (var duplicate in duplicates)
+        {
+            var isDuplicate = (!string.IsNullOrWhiteSpace(master.NormalizedEmail) && master.NormalizedEmail == duplicate.NormalizedEmail)
+                || (!string.IsNullOrWhiteSpace(master.NormalizedPhone) && master.NormalizedPhone == duplicate.NormalizedPhone)
+                || (!string.IsNullOrWhiteSpace(master.CompanyName) && string.Equals(master.CompanyName.Trim(), duplicate.CompanyName?.Trim(), StringComparison.OrdinalIgnoreCase))
+                || (!string.IsNullOrWhiteSpace(master.FirstName) && !string.IsNullOrWhiteSpace(master.LastName)
+                    && string.Equals(master.FirstName, duplicate.FirstName, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(master.LastName, duplicate.LastName, StringComparison.OrdinalIgnoreCase));
+
+            if (!isDuplicate)
+            {
+                throw new ValidationException("duplicateIds", $"Lead '{duplicate.FirstName} {duplicate.LastName}' (ID: {duplicate.Id}) is not a duplicate of the master lead.");
+            }
         }
 
         foreach (var duplicate in duplicates)

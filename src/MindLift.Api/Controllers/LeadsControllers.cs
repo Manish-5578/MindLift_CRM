@@ -67,7 +67,7 @@ public sealed class LeadsController(LeadService leads, ImportNotifier imports) :
     public async Task<ActionResult<IReadOnlyList<DuplicateCandidateDto>>> CheckDuplicates([FromBody] CheckDuplicatesRequest request, CancellationToken cancellationToken)
         => Ok(await leads.CheckDuplicatesAsync(request, cancellationToken));
 
-    [HasPermission(AppModule.Leads, PermissionAction.Edit)]
+    [HasPermission(AppModule.Leads, PermissionAction.Delete)]
     [HttpPost("{id:guid}/merge")]
     public async Task<ActionResult<LeadDto>> Merge(Guid id, [FromBody] MergeLeadsRequest request, CancellationToken cancellationToken)
         => Ok(await leads.MergeAsync(id, request.DuplicateIds, cancellationToken));

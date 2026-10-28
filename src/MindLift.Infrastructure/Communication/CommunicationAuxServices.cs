@@ -1,9 +1,12 @@
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using MindLift.Application.Abstractions;
+using MindLift.Application.Common.Exceptions;
 using MindLift.Domain.Entities;
+using MindLift.Infrastructure.Contacts;
 using MindLift.Infrastructure.Persistence;
 using MindLift.Shared.Contracts;
+using MindLift.Shared.Enums;
 
 namespace MindLift.Infrastructure.Communication;
 
@@ -78,7 +81,10 @@ public sealed partial class OptOutService(AppDbContext dbContext) : IOptOutServi
     }
 }
 
-public sealed partial class MessageTemplateService(AppDbContext dbContext) : IMessageTemplateService
+public sealed partial class MessageTemplateService(
+    AppDbContext dbContext,
+    IDataScopeService scope,
+    IPermissionService permissions) : IMessageTemplateService
 {
     [GeneratedRegex(@"\{\{([a-zA-Z0-9_\.]+)\}\}")]
     private static partial Regex PlaceholderRegex();
@@ -144,44 +150,47 @@ public sealed partial class MessageTemplateService(AppDbContext dbContext) : IMe
 
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        // Fetch entity values
+        // Fetch entity values with permission and data scope enforcement
         var type = entityType.Trim().ToLowerInvariant();
         if (type is "lead" or "leads")
         {
-            var lead = await dbContext.Leads.FindAsync([entityId], ct);
-            if (lead != null)
-            {
-                values["lead.first_name"] = lead.FirstName;
-                values["lead.last_name"] = lead.LastName;
-                values["lead.name"] = $"{lead.FirstName} {lead.LastName}".Trim();
-                values["lead.email"] = lead.Email ?? "";
-                values["lead.phone"] = lead.Phone ?? "";
-                values["lead.company"] = lead.CompanyName ?? "";
-            }
+            await permissions.RequireAsync(AppModule.Leads, PermissionAction.View, ct);
+            var lead = await (await RecordHelpers.InScopeAsync(dbContext.Leads.AsNoTracking(), scope, AppModule.Leads, l => l.OwnerId, ct))
+                .FirstOrDefaultAsync(l => l.Id == entityId, ct)
+                ?? throw new NotFoundException("Lead", entityId);
+
+            values["lead.first_name"] = lead.FirstName;
+            values["lead.last_name"] = lead.LastName;
+            values["lead.name"] = $"{lead.FirstName} {lead.LastName}".Trim();
+            values["lead.email"] = lead.Email ?? "";
+            values["lead.phone"] = lead.Phone ?? "";
+            values["lead.company"] = lead.CompanyName ?? "";
         }
         else if (type is "contact" or "contacts")
         {
-            var contact = await dbContext.Contacts.FindAsync([entityId], ct);
-            if (contact != null)
-            {
-                values["contact.first_name"] = contact.FirstName;
-                values["contact.last_name"] = contact.LastName;
-                values["contact.name"] = $"{contact.FirstName} {contact.LastName}".Trim();
-                values["contact.email"] = contact.Email ?? "";
-                values["contact.phone"] = contact.Phone ?? "";
-                values["contact.job_title"] = contact.JobTitle ?? "";
-            }
+            await permissions.RequireAsync(AppModule.Contacts, PermissionAction.View, ct);
+            var contact = await (await RecordHelpers.InScopeAsync(dbContext.Contacts.AsNoTracking(), scope, AppModule.Contacts, c => c.OwnerId, ct))
+                .FirstOrDefaultAsync(c => c.Id == entityId, ct)
+                ?? throw new NotFoundException("Contact", entityId);
+
+            values["contact.first_name"] = contact.FirstName;
+            values["contact.last_name"] = contact.LastName;
+            values["contact.name"] = $"{contact.FirstName} {contact.LastName}".Trim();
+            values["contact.email"] = contact.Email ?? "";
+            values["contact.phone"] = contact.Phone ?? "";
+            values["contact.job_title"] = contact.JobTitle ?? "";
         }
         else if (type is "deal" or "deals")
         {
-            var deal = await dbContext.Deals.FindAsync([entityId], ct);
-            if (deal != null)
-            {
-                values["deal.name"] = deal.Name;
-                values["deal.amount"] = deal.Amount.ToString("N2");
-                values["deal.currency"] = deal.Currency;
-                values["deal.status"] = deal.Status;
-            }
+            await permissions.RequireAsync(AppModule.Deals, PermissionAction.View, ct);
+            var deal = await (await RecordHelpers.InScopeAsync(dbContext.Deals.AsNoTracking(), scope, AppModule.Deals, d => d.OwnerId, ct))
+                .FirstOrDefaultAsync(d => d.Id == entityId, ct)
+                ?? throw new NotFoundException("Deal", entityId);
+
+            values["deal.name"] = deal.Name;
+            values["deal.amount"] = deal.Amount.ToString("N2");
+            values["deal.currency"] = deal.Currency;
+            values["deal.status"] = deal.Status;
         }
 
         if (extraParams != null)
