@@ -103,6 +103,7 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<ContactAccountLink> ContactAccountLinks { get; set; } = null!;
     public DbSet<DealLineItem> DealLineItems { get; set; } = null!;
     public DbSet<DealStageGate> DealStageGates { get; set; } = null!;
+    public DbSet<DependentPicklistMap> DependentPicklistMaps { get; set; } = null!;
 
     /// <summary>Tenant used by query filters. Guid.Empty when no tenant is set, so no rows match.</summary>
     protected Guid CurrentTenantId => tenant.TenantId ?? Guid.Empty;
@@ -807,6 +808,18 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.Property(x => x.FailureMessage).HasMaxLength(500);
             b.Property(x => x.ConditionJson).HasMaxLength(8000);
             b.HasIndex(x => new { x.TenantId, x.PipelineId, x.StageId });
+        });
+
+        builder.Entity<DependentPicklistMap>(b =>
+        {
+            b.ToTable("dependent_picklist_maps");
+            b.Property(x => x.EntityType).HasMaxLength(50);
+            b.Property(x => x.ParentField).HasMaxLength(100);
+            b.Property(x => x.ChildField).HasMaxLength(100);
+            b.Property(x => x.Name).HasMaxLength(150);
+            b.Property(x => x.Description).HasMaxLength(500);
+            b.Property(x => x.MappingJson).HasColumnType("jsonb");
+            b.HasIndex(x => new { x.TenantId, x.EntityType, x.ParentField, x.ChildField });
         });
     }
 

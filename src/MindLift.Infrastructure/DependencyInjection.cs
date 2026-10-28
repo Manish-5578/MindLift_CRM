@@ -123,6 +123,8 @@ public static class DependencyInjection
         services.AddScoped<CompanySettingsService>();
         services.AddScoped<FieldSettingsService>();
         services.AddScoped<PicklistPipelineService>();
+        services.AddScoped<MindLift.Application.Abstractions.IDependentPicklistService, MindLift.Infrastructure.Settings.DependentPicklistService>();
+        services.AddScoped<MindLift.Infrastructure.Settings.DependentPicklistService>();
         services.AddScoped<SavedViewService>();
         services.AddScoped<BootstrapService>();
 
