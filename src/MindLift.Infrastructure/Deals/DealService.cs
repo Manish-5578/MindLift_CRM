@@ -35,7 +35,8 @@ public sealed class DealService(
     INotificationService notifications,
     IRecordSavePipeline savePipeline,
     MindLift.Infrastructure.Common.BulkQueue bulkQueue,
-    IPermissionService permissions)
+    IPermissionService permissions,
+    DealStageGateService stageGates)
 {
     private const int BoardCardsPerStage = 50;
     private const int ClosedDealDays = 30;
@@ -584,6 +585,8 @@ public sealed class DealService(
         {
             return;
         }
+
+        await stageGates.ValidateTransitionAsync(deal, stage, cancellationToken);
 
         var now = clock.UtcNow;
         var wasWon = deal.Status == "Won";

@@ -102,6 +102,7 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<TimelineEvent> TimelineEvents { get; set; } = null!;
     public DbSet<ContactAccountLink> ContactAccountLinks { get; set; } = null!;
     public DbSet<DealLineItem> DealLineItems { get; set; } = null!;
+    public DbSet<DealStageGate> DealStageGates { get; set; } = null!;
 
     /// <summary>Tenant used by query filters. Guid.Empty when no tenant is set, so no rows match.</summary>
     protected Guid CurrentTenantId => tenant.TenantId ?? Guid.Empty;
@@ -795,6 +796,17 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
                 .OnDelete(DeleteBehavior.SetNull);
 
             b.HasIndex(x => new { x.TenantId, x.DealId });
+        });
+
+        builder.Entity<DealStageGate>(b =>
+        {
+            b.ToTable("deal_stage_gates");
+            b.Property(x => x.Name).HasMaxLength(150);
+            b.Property(x => x.Description).HasMaxLength(500);
+            b.Property(x => x.MinAmount).HasPrecision(18, 4);
+            b.Property(x => x.FailureMessage).HasMaxLength(500);
+            b.Property(x => x.ConditionJson).HasMaxLength(8000);
+            b.HasIndex(x => new { x.TenantId, x.PipelineId, x.StageId });
         });
     }
 

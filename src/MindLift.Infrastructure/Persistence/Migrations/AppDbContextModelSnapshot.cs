@@ -2950,6 +2950,110 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.ToTable("deal_line_items", (string)null);
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.DealStageGate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.PrimitiveCollection<string[]>("AllowedRoles")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("allowed_roles");
+
+                    b.Property<string>("ConditionJson")
+                        .HasMaxLength(8000)
+                        .HasColumnType("character varying(8000)")
+                        .HasColumnName("condition_json");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("FailureMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("failure_message");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<decimal?>("MinAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("min_amount");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("PipelineId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pipeline_id");
+
+                    b.Property<bool>("RequireLineItems")
+                        .HasColumnType("boolean")
+                        .HasColumnName("require_line_items");
+
+                    b.PrimitiveCollection<string[]>("RequiredFields")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("required_fields");
+
+                    b.Property<Guid>("StageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("stage_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_deal_stage_gates");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_deal_stage_gates_tenant_id");
+
+                    b.HasIndex("TenantId", "PipelineId", "StageId")
+                        .HasDatabaseName("ix_deal_stage_gates_tenant_id_pipeline_id_stage_id");
+
+                    b.ToTable("deal_stage_gates", (string)null);
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.DealStageHistory", b =>
                 {
                     b.Property<Guid>("Id")
