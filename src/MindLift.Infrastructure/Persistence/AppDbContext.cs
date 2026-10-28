@@ -133,6 +133,9 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<VisitorSession> VisitorSessions { get; set; } = null!;
     public DbSet<VisitorPageView> VisitorPageViews { get; set; } = null!;
     public DbSet<EmailTemplate> EmailTemplates { get; set; } = null!;
+    public DbSet<GdprConsentRecord> GdprConsentRecords { get; set; } = null!;
+    public DbSet<SubscriptionPreferenceToken> SubscriptionPreferenceTokens { get; set; } = null!;
+    public DbSet<GdprErasureRecord> GdprErasureRecords { get; set; } = null!;
 
     /// <summary>Tenant used by query filters. Guid.Empty when no tenant is set, so no rows match.</summary>
     protected Guid CurrentTenantId => tenant.TenantId ?? Guid.Empty;
@@ -1226,6 +1229,38 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.Property(x => x.ThumbnailUrl).HasMaxLength(2048);
             b.HasIndex(x => new { x.TenantId, x.Category, x.IsActive });
             b.HasIndex(x => new { x.TenantId, x.Name });
+        });
+
+        builder.Entity<GdprConsentRecord>(b =>
+        {
+            b.ToTable("gdpr_consent_records");
+            b.Property(x => x.Email).HasMaxLength(320);
+            b.Property(x => x.Topic).HasMaxLength(100).HasDefaultValue("Marketing");
+            b.Property(x => x.Source).HasMaxLength(100);
+            b.Property(x => x.IpAddress).HasMaxLength(100);
+            b.Property(x => x.UserAgent).HasMaxLength(500);
+            b.Property(x => x.Notes).HasMaxLength(1000);
+            b.HasIndex(x => new { x.TenantId, x.Email, x.Channel, x.Topic });
+            b.HasIndex(x => new { x.TenantId, x.EffectiveAt });
+        });
+
+        builder.Entity<SubscriptionPreferenceToken>(b =>
+        {
+            b.ToTable("subscription_preference_tokens");
+            b.Property(x => x.Token).HasMaxLength(100);
+            b.Property(x => x.Email).HasMaxLength(320);
+            b.HasIndex(x => x.Token).IsUnique();
+            b.HasIndex(x => new { x.TenantId, x.Email });
+        });
+
+        builder.Entity<GdprErasureRecord>(b =>
+        {
+            b.ToTable("gdpr_erasure_records");
+            b.Property(x => x.Email).HasMaxLength(320);
+            b.Property(x => x.RequestedBy).HasMaxLength(200);
+            b.Property(x => x.Status).HasMaxLength(50).HasDefaultValue("Completed");
+            b.Property(x => x.Summary).HasMaxLength(2000);
+            b.HasIndex(x => new { x.TenantId, x.ExecutedAt });
         });
     }
 
