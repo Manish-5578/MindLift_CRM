@@ -61,10 +61,16 @@ public sealed class ContactsController(ContactService contacts, ImportNotifier i
     public async Task<ActionResult<IReadOnlyList<DuplicateCandidateDto>>> CheckDuplicates([FromBody] CheckDuplicatesRequest request, CancellationToken cancellationToken)
         => Ok(await contacts.CheckDuplicatesAsync(request, cancellationToken));
 
+    [HasPermission(AppModule.Contacts, PermissionAction.View)]
+    [RequiresFeature("duplicate-merge")]
+    [HttpGet("{id:guid}/duplicates")]
+    public async Task<ActionResult<IReadOnlyList<DuplicateCandidateDto>>> GetDuplicates(Guid id, CancellationToken cancellationToken)
+        => Ok(await contacts.GetDuplicatesForContactAsync(id, cancellationToken));
+
     [HasPermission(AppModule.Contacts, PermissionAction.Delete)]
     [HttpPost("{id:guid}/merge")]
     public async Task<ActionResult<ContactDto>> Merge(Guid id, [FromBody] MergeContactsRequest request, CancellationToken cancellationToken)
-        => Ok(await contacts.MergeAsync(id, request.DuplicateIds, cancellationToken));
+        => Ok(await contacts.MergeAsync(id, request.DuplicateIds, request.FieldOverrides, cancellationToken));
 
     /// <summary>CSV body (text/csv). Max 5,000 rows.</summary>
     [HasPermission(AppModule.Contacts, PermissionAction.Import)]

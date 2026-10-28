@@ -67,10 +67,16 @@ public sealed class LeadsController(LeadService leads, ImportNotifier imports) :
     public async Task<ActionResult<IReadOnlyList<DuplicateCandidateDto>>> CheckDuplicates([FromBody] CheckDuplicatesRequest request, CancellationToken cancellationToken)
         => Ok(await leads.CheckDuplicatesAsync(request, cancellationToken));
 
+    [HasPermission(AppModule.Leads, PermissionAction.View)]
+    [RequiresFeature("duplicate-merge")]
+    [HttpGet("{id:guid}/duplicates")]
+    public async Task<ActionResult<IReadOnlyList<DuplicateCandidateDto>>> GetDuplicates(Guid id, CancellationToken cancellationToken)
+        => Ok(await leads.GetDuplicatesForLeadAsync(id, cancellationToken));
+
     [HasPermission(AppModule.Leads, PermissionAction.Delete)]
     [HttpPost("{id:guid}/merge")]
     public async Task<ActionResult<LeadDto>> Merge(Guid id, [FromBody] MergeLeadsRequest request, CancellationToken cancellationToken)
-        => Ok(await leads.MergeAsync(id, request.DuplicateIds, cancellationToken));
+        => Ok(await leads.MergeAsync(id, request.DuplicateIds, request.FieldOverrides, cancellationToken));
 
     /// <summary>CSV body (text/csv). Max 5,000 rows.</summary>
     [HasPermission(AppModule.Leads, PermissionAction.Import)]

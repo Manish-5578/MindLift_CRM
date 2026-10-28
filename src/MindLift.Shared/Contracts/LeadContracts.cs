@@ -106,4 +106,4 @@ public sealed record PublicFormSubmission(string FirstName, string LastName, str
 
 public sealed record PublicFormResult(string Message, bool Duplicate);
 
-public sealed record MergeLeadsRequest(IReadOnlyList<Guid> DuplicateIds);
+public sealed record MergeLeadsRequest(IReadOnlyList<Guid> DuplicateIds, IReadOnlyDictionary<string, string?>? FieldOverrides = null);

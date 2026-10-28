@@ -148,7 +148,7 @@ internal static class RecordHelpers
 
 /// <summary>Contact records: list, read, create, edit, delete, duplicates, merge, import, export and the contact summary.</summary>
 public sealed class ContactService(AppDbContext db, ITenantContext tenant, IClock clock, FieldSettingsService fields, IDataScopeService scope, INotificationService notifications, IRecordSavePipeline savePipeline,
-    MindLift.Infrastructure.Common.BulkQueue bulkQueue, IPermissionService permissions)
+    MindLift.Infrastructure.Common.BulkQueue bulkQueue, IPermissionService permissions, ITimelineEventBus timeline, IFeatureFlags featureFlags)
 {
     private const int MaxExportRows = 10000;
 
@@ -352,20 +352,36 @@ public sealed class ContactService(AppDbContext db, ITenantContext tenant, ICloc
             email != null && c.NormalizedEmail == email ? "Same email" : "Same phone")).ToList();
     }
 
+    public async Task<IReadOnlyList<DuplicateCandidateDto>> GetDuplicatesForContactAsync(Guid contactId, CancellationToken cancellationToken = default)
+    {
+        var contact = await LoadScopedAsync(contactId, cancellationToken);
+        var checkRequest = new CheckDuplicatesRequest(contact.FirstName, contact.LastName, contact.Email, contact.Phone, null);
+        var candidates = await CheckDuplicatesAsync(checkRequest, cancellationToken);
+        return candidates.Where(c => c.Id != contactId).ToList();
+    }
+
     public static bool IsDuplicateCandidate(Contact master, Contact other)
     {
         if (master.Id == other.Id) return false;
         var emailMatch = !string.IsNullOrWhiteSpace(master.NormalizedEmail) && master.NormalizedEmail == other.NormalizedEmail;
         var phoneMatch = !string.IsNullOrWhiteSpace(master.NormalizedPhone) && master.NormalizedPhone == other.NormalizedPhone;
-        return emailMatch || phoneMatch;
+        var nameMatch = !string.IsNullOrWhiteSpace(master.FirstName) && !string.IsNullOrWhiteSpace(master.LastName)
+            && string.Equals(master.FirstName.Trim(), other.FirstName.Trim(), StringComparison.OrdinalIgnoreCase)
+            && string.Equals(master.LastName.Trim(), other.LastName.Trim(), StringComparison.OrdinalIgnoreCase);
+        return emailMatch || phoneMatch || nameMatch;
     }
 
-    /// <summary>Moves what is useful from the duplicates into the master, repoints their activities, and removes the duplicates.</summary>
-    public async Task<ContactDto> MergeAsync(Guid masterId, IReadOnlyList<Guid> duplicateIds, CancellationToken cancellationToken = default)
+    /// <summary>Moves what is useful from the duplicates into the master, repoints their activities and all relations, and removes the duplicates (soft delete).</summary>
+    public async Task<ContactDto> MergeAsync(
+        Guid masterId,
+        IReadOnlyList<Guid> duplicateIds,
+        IReadOnlyDictionary<string, string?>? fieldOverrides = null,
+        CancellationToken cancellationToken = default)
     {
-        if (!await permissions.HasAsync(AppModule.Contacts, PermissionAction.Delete, cancellationToken))
+        if (!await permissions.HasAsync(AppModule.Contacts, PermissionAction.Edit, cancellationToken) ||
+            !await permissions.HasAsync(AppModule.Contacts, PermissionAction.Delete, cancellationToken))
         {
-            throw new ForbiddenException("Merging removes contacts, so it needs permission to delete contacts.", "forbidden");
+            throw new ForbiddenException("Merging contacts requires both Edit and Delete permissions.", "forbidden");
         }
 
         if (duplicateIds == null || duplicateIds.Count == 0)
@@ -383,6 +399,19 @@ public sealed class ContactService(AppDbContext db, ITenantContext tenant, ICloc
             throw new ValidationException("duplicateIds", "Duplicate contact IDs must be unique.");
         }
 
+        if (fieldOverrides != null && fieldOverrides.Count > 0)
+        {
+            if (!await featureFlags.IsEnabledAsync("duplicate-merge", cancellationToken))
+            {
+                throw new ForbiddenException("Advanced side-by-side duplicate merge requires the 'duplicate-merge' feature flag.", "feature_disabled");
+            }
+
+            if (duplicateIds.Count > 2)
+            {
+                throw new ValidationException("duplicateIds", "Side-by-side merge allows merging at most 2 duplicate records into the master record (up to 3 records total).");
+            }
+        }
+
         var master = await LoadScopedAsync(masterId, cancellationToken);
         var requested = duplicateIds.ToList();
         var duplicates = await (await ScopedAsync(cancellationToken)).Where(c => requested.Contains(c.Id)).ToListAsync(cancellationToken);
@@ -396,7 +425,42 @@ public sealed class ContactService(AppDbContext db, ITenantContext tenant, ICloc
         {
             if (!IsDuplicateCandidate(master, duplicate))
             {
-                throw new ValidationException("duplicateIds", $"Contact '{duplicate.FirstName} {duplicate.LastName}' (ID: {duplicate.Id}) is not a duplicate of the master contact. Both records must share a matching normalized email or phone number.");
+                throw new ValidationException("duplicateIds", $"Contact '{duplicate.FirstName} {duplicate.LastName}' (ID: {duplicate.Id}) is not a duplicate of the master contact. Both records must share a matching normalized email, phone number, or full name.");
+            }
+        }
+
+        // Apply explicit field overrides (from side-by-side comparison selection)
+        if (fieldOverrides != null && fieldOverrides.Count > 0)
+        {
+            foreach (var (k, v) in fieldOverrides)
+            {
+                var key = k.Trim().ToLowerInvariant();
+                switch (key)
+                {
+                    case "firstname" or "first_name":
+                        if (!string.IsNullOrWhiteSpace(v)) master.FirstName = v.Trim();
+                        break;
+                    case "lastname" or "last_name":
+                        if (!string.IsNullOrWhiteSpace(v)) master.LastName = v.Trim();
+                        break;
+                    case "email":
+                        master.Email = v?.Trim();
+                        master.NormalizedEmail = LeadNormalizer.Email(v);
+                        break;
+                    case "phone":
+                        master.Phone = v?.Trim();
+                        master.NormalizedPhone = LeadNormalizer.Phone(v);
+                        break;
+                    case "jobtitle" or "job_title" or "title":
+                        master.JobTitle = v?.Trim();
+                        break;
+                    case "description":
+                        master.Description = v?.Trim();
+                        break;
+                    case "accountid" or "account_id":
+                        if (Guid.TryParse(v, out var parsedAccId)) master.AccountId = parsedAccId;
+                        break;
+                }
             }
         }
 
@@ -409,10 +473,122 @@ public sealed class ContactService(AppDbContext db, ITenantContext tenant, ICloc
             master.JobTitle ??= duplicate.JobTitle;
             master.Description ??= duplicate.Description;
             master.AccountId ??= duplicate.AccountId;
-            await db.Activities.Where(a => a.ContactId == duplicate.Id).ExecuteUpdateAsync(s => s.SetProperty(a => a.ContactId, masterId), cancellationToken);
-            await db.Leads.Where(l => l.ConvertedContactId == duplicate.Id).ExecuteUpdateAsync(s => s.SetProperty(l => l.ConvertedContactId, masterId), cancellationToken);
+
+            // Emit timeline events
+            await timeline.PublishAsync(new TimelineEventInput(
+                EntityType: "contact",
+                EntityId: masterId,
+                Kind: "contact_merged",
+                Summary: $"Merged duplicate contact '{duplicate.FirstName} {duplicate.LastName}' into this contact",
+                Source: "crm",
+                DetailJson: JsonSerializer.Serialize(new { DuplicateId = duplicate.Id, duplicate.Email, duplicate.Phone, duplicate.JobTitle }),
+                ActorUserId: tenant.UserId,
+                OccurredAt: clock.UtcNow
+            ), cancellationToken);
+
+            await timeline.PublishAsync(new TimelineEventInput(
+                EntityType: "contact",
+                EntityId: duplicate.Id,
+                Kind: "contact_merged_into",
+                Summary: $"Merged into master contact '{master.FirstName} {master.LastName}' ({masterId})",
+                Source: "crm",
+                DetailJson: JsonSerializer.Serialize(new { MasterId = masterId }),
+                ActorUserId: tenant.UserId,
+                OccurredAt: clock.UtcNow
+            ), cancellationToken);
+
             db.Contacts.Remove(duplicate);
         }
+
+        // 1. Activities
+        await db.Activities
+            .Where(a => a.ContactId.HasValue && requested.Contains(a.ContactId.Value))
+            .ExecuteUpdateAsync(s => s.SetProperty(a => a.ContactId, masterId), cancellationToken);
+
+        // 2. Leads (converted contact link)
+        await db.Leads
+            .Where(l => l.ConvertedContactId.HasValue && requested.Contains(l.ConvertedContactId.Value))
+            .ExecuteUpdateAsync(s => s.SetProperty(l => l.ConvertedContactId, masterId), cancellationToken);
+
+        // 3. Deals (primary contact)
+        await db.Deals
+            .Where(d => d.PrimaryContactId.HasValue && requested.Contains(d.PrimaryContactId.Value))
+            .ExecuteUpdateAsync(s => s.SetProperty(d => d.PrimaryContactId, masterId), cancellationToken);
+
+        // 4. DealContacts (many-to-many: avoid composite key conflicts)
+        var masterDealIds = await db.DealContacts
+            .Where(dc => dc.ContactId == masterId)
+            .Select(dc => dc.DealId)
+            .ToListAsync(cancellationToken);
+
+        var dupDealContacts = await db.DealContacts
+            .Where(dc => requested.Contains(dc.ContactId))
+            .ToListAsync(cancellationToken);
+
+        foreach (var dc in dupDealContacts)
+        {
+            if (!masterDealIds.Contains(dc.DealId))
+            {
+                db.DealContacts.Add(new DealContact { DealId = dc.DealId, ContactId = masterId, Role = dc.Role, IsPrimary = dc.IsPrimary });
+                masterDealIds.Add(dc.DealId);
+            }
+            db.DealContacts.Remove(dc);
+        }
+
+        // 5. ContactAccountLinks (many-to-many: avoid duplicate links)
+        var masterAccountIds = await db.ContactAccountLinks
+            .Where(l => l.ContactId == masterId)
+            .Select(l => l.AccountId)
+            .ToListAsync(cancellationToken);
+
+        var dupAccountLinks = await db.ContactAccountLinks
+            .Where(l => requested.Contains(l.ContactId))
+            .ToListAsync(cancellationToken);
+
+        foreach (var link in dupAccountLinks)
+        {
+            if (!masterAccountIds.Contains(link.AccountId))
+            {
+                db.ContactAccountLinks.Add(new ContactAccountLink
+                {
+                    ContactId = masterId,
+                    AccountId = link.AccountId,
+                    Role = link.Role
+                });
+                masterAccountIds.Add(link.AccountId);
+            }
+            db.ContactAccountLinks.Remove(link);
+        }
+
+        // 6. BusinessDocuments
+        await db.BusinessDocuments
+            .Where(d => d.AssociatedContactId.HasValue && requested.Contains(d.AssociatedContactId.Value))
+            .ExecuteUpdateAsync(s => s.SetProperty(d => d.AssociatedContactId, masterId), cancellationToken);
+
+        // 7. Messages
+        await db.Messages
+            .Where(m => m.ContactId.HasValue && requested.Contains(m.ContactId.Value))
+            .ExecuteUpdateAsync(s => s.SetProperty(m => m.ContactId, masterId), cancellationToken);
+
+        // 8. Bookings
+        await db.Bookings
+            .Where(b => b.ContactId.HasValue && requested.Contains(b.ContactId.Value))
+            .ExecuteUpdateAsync(s => s.SetProperty(b => b.ContactId, masterId), cancellationToken);
+
+        // 9. Tickets
+        await db.Tickets
+            .Where(t => t.ContactId.HasValue && requested.Contains(t.ContactId.Value))
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.ContactId, masterId), cancellationToken);
+
+        // 10. Quotes
+        await db.Quotes
+            .Where(q => q.ContactId.HasValue && requested.Contains(q.ContactId.Value))
+            .ExecuteUpdateAsync(s => s.SetProperty(q => q.ContactId, masterId), cancellationToken);
+
+        // 11. Invoices
+        await db.Invoices
+            .Where(i => i.ContactId.HasValue && requested.Contains(i.ContactId.Value))
+            .ExecuteUpdateAsync(s => s.SetProperty(i => i.ContactId, masterId), cancellationToken);
 
         await db.SaveChangesAsync(cancellationToken);
         return await MapAsync(master, cancellationToken);

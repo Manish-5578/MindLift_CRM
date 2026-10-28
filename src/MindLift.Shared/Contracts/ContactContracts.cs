@@ -44,7 +44,7 @@ public sealed record SaveContactRequest(
     Guid? OwnerId,
     IReadOnlyDictionary<string, JsonElement>? CustomFields);
 
-public sealed record MergeContactsRequest(IReadOnlyList<Guid> DuplicateIds);
+public sealed record MergeContactsRequest(IReadOnlyList<Guid> DuplicateIds, IReadOnlyDictionary<string, string?>? FieldOverrides = null);
 
 /// <summary>A lead that was converted into a contact, shown on the contact so its history is not lost.</summary>
 public sealed record ConvertedLeadDto(Guid LeadId, string FullName, string? Source, DateTime CreatedAtUtc, DateTime ConvertedAtUtc);

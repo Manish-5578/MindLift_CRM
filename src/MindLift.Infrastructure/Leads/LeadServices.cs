@@ -53,7 +53,9 @@ public sealed class LeadService(
     INotificationService notifications,
     IRecordSavePipeline savePipeline,
     MindLift.Infrastructure.Common.BulkQueue bulkQueue,
-    IPermissionService permissions)
+    IPermissionService permissions,
+    ITimelineEventBus timeline,
+    IFeatureFlags featureFlags)
 {
     private const int MaxImportRows = 5000;
     private const int MaxExportRows = 10000;
@@ -495,10 +497,23 @@ public sealed class LeadService(
         return results;
     }
 
-    /// <summary>Moves the useful values of the duplicates into the master and removes the duplicates (soft delete).</summary>
-    public async Task<LeadDto> MergeAsync(Guid masterId, IReadOnlyList<Guid> duplicateIds, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<DuplicateCandidateDto>> GetDuplicatesForLeadAsync(Guid leadId, CancellationToken cancellationToken = default)
     {
-        // Merging removes the duplicates, so it needs the right to delete leads, and every duplicate must be in scope.
+        var lead = await LoadScopedAsync(leadId, cancellationToken);
+        var checkRequest = new CheckDuplicatesRequest(lead.FirstName, lead.LastName, lead.Email, lead.Phone, lead.CompanyName);
+        var candidates = await CheckDuplicatesAsync(checkRequest, cancellationToken);
+        return candidates.Where(c => c.Id != leadId).ToList();
+    }
+
+    /// <summary>Moves the useful values of the duplicates into the master, re-parents children, and removes the duplicates (soft delete).</summary>
+    public async Task<LeadDto> MergeAsync(
+        Guid masterId,
+        IReadOnlyList<Guid> duplicateIds,
+        IReadOnlyDictionary<string, string?>? fieldOverrides = null,
+        CancellationToken cancellationToken = default)
+    {
+        // Merging modifies the master and removes the duplicates, so it requires both Edit and Delete permissions.
+        await RequireAsync(AppModule.Leads, PermissionAction.Edit, true, cancellationToken);
         await RequireAsync(AppModule.Leads, PermissionAction.Delete, true, cancellationToken);
 
         if (duplicateIds == null || duplicateIds.Count == 0)
@@ -514,6 +529,19 @@ public sealed class LeadService(
         if (duplicateIds.Distinct().Count() != duplicateIds.Count)
         {
             throw new ValidationException("duplicateIds", "Duplicate lead IDs must be unique.");
+        }
+
+        if (fieldOverrides != null && fieldOverrides.Count > 0)
+        {
+            if (!await featureFlags.IsEnabledAsync("duplicate-merge", cancellationToken))
+            {
+                throw new ForbiddenException("Advanced side-by-side duplicate merge requires the 'duplicate-merge' feature flag.", "feature_disabled");
+            }
+
+            if (duplicateIds.Count > 2)
+            {
+                throw new ValidationException("duplicateIds", "Side-by-side merge allows merging at most 2 duplicate records into the master record (up to 3 records total).");
+            }
         }
 
         var master = await LoadScopedAsync(masterId, cancellationToken);
@@ -548,6 +576,47 @@ public sealed class LeadService(
             }
         }
 
+        // Apply explicit field overrides (from side-by-side comparison selection)
+        if (fieldOverrides != null && fieldOverrides.Count > 0)
+        {
+            foreach (var (k, v) in fieldOverrides)
+            {
+                var key = k.Trim().ToLowerInvariant();
+                switch (key)
+                {
+                    case "firstname" or "first_name":
+                        if (!string.IsNullOrWhiteSpace(v)) master.FirstName = v.Trim();
+                        break;
+                    case "lastname" or "last_name":
+                        if (!string.IsNullOrWhiteSpace(v)) master.LastName = v.Trim();
+                        break;
+                    case "email":
+                        master.Email = v?.Trim();
+                        master.NormalizedEmail = LeadNormalizer.Email(v);
+                        break;
+                    case "phone":
+                        master.Phone = v?.Trim();
+                        master.NormalizedPhone = LeadNormalizer.Phone(v);
+                        break;
+                    case "companyname" or "company_name" or "company":
+                        master.CompanyName = v?.Trim();
+                        break;
+                    case "status":
+                        if (!string.IsNullOrWhiteSpace(v)) master.Status = v.Trim();
+                        break;
+                    case "source":
+                        master.Source = v?.Trim();
+                        break;
+                    case "rating":
+                        master.Rating = v?.Trim();
+                        break;
+                    case "description":
+                        master.Description = v?.Trim();
+                        break;
+                }
+            }
+        }
+
         foreach (var duplicate in duplicates)
         {
             master.Email ??= duplicate.Email;
@@ -556,9 +625,48 @@ public sealed class LeadService(
             master.NormalizedPhone ??= duplicate.NormalizedPhone;
             master.CompanyName ??= duplicate.CompanyName;
             master.Description ??= duplicate.Description;
-            master.Tags = master.Tags.Union(duplicate.Tags).ToArray();
+            master.Source ??= duplicate.Source;
+            master.Rating ??= duplicate.Rating;
+            master.Tags = master.Tags.Union(duplicate.Tags).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+
+            // Emit timeline events
+            await timeline.PublishAsync(new TimelineEventInput(
+                EntityType: "lead",
+                EntityId: masterId,
+                Kind: "lead_merged",
+                Summary: $"Merged duplicate lead '{duplicate.FirstName} {duplicate.LastName}' into this lead",
+                Source: "crm",
+                DetailJson: JsonSerializer.Serialize(new { DuplicateId = duplicate.Id, duplicate.Email, duplicate.Phone, duplicate.CompanyName }),
+                ActorUserId: tenant.UserId,
+                OccurredAt: clock.UtcNow
+            ), cancellationToken);
+
+            await timeline.PublishAsync(new TimelineEventInput(
+                EntityType: "lead",
+                EntityId: duplicate.Id,
+                Kind: "lead_merged_into",
+                Summary: $"Merged into master lead '{master.FirstName} {master.LastName}' ({masterId})",
+                Source: "crm",
+                DetailJson: JsonSerializer.Serialize(new { MasterId = masterId }),
+                ActorUserId: tenant.UserId,
+                OccurredAt: clock.UtcNow
+            ), cancellationToken);
+
             db.Leads.Remove(duplicate);
         }
+
+        // Re-parent activities, communication messages, and bookings to master lead
+        await db.Activities
+            .Where(a => a.LeadId.HasValue && requested.Contains(a.LeadId.Value))
+            .ExecuteUpdateAsync(s => s.SetProperty(a => a.LeadId, masterId), cancellationToken);
+
+        await db.Messages
+            .Where(m => m.LeadId.HasValue && requested.Contains(m.LeadId.Value))
+            .ExecuteUpdateAsync(s => s.SetProperty(m => m.LeadId, masterId), cancellationToken);
+
+        await db.Bookings
+            .Where(b => b.LeadId.HasValue && requested.Contains(b.LeadId.Value))
+            .ExecuteUpdateAsync(s => s.SetProperty(b => b.LeadId, masterId), cancellationToken);
 
         await db.SaveChangesAsync(cancellationToken);
         return Map(master);
