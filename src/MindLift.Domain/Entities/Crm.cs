@@ -128,6 +128,7 @@ public sealed class Deal : TenantEntity, IOwnedEntity, IHasCustomFields, ISample
 
     public ICollection<DealLineItem> LineItems { get; set; } = new List<DealLineItem>();
     public ICollection<DealSplit> Splits { get; set; } = new List<DealSplit>();
+    public ICollection<DealCompetitor> Competitors { get; set; } = new List<DealCompetitor>();
 }
 
 [Audited]
@@ -301,6 +302,37 @@ public sealed class FxSyncLog : TenantEntity
     public string Status { get; set; } = "Success";
     public string? ErrorMessage { get; set; }
     public DateTime SyncedAt { get; set; }
+}
+
+[Audited]
+public sealed class Competitor : TenantEntity
+{
+    public string Name { get; set; } = string.Empty;
+    public string? Website { get; set; }
+    public string? Strengths { get; set; }
+    public string? Weaknesses { get; set; }
+    public string? Battlecard { get; set; }
+    public string? PricingStrategy { get; set; }
+    public bool IsActive { get; set; } = true;
+
+    public ICollection<DealCompetitor> DealAssociations { get; set; } = new List<DealCompetitor>();
+}
+
+[Audited]
+public sealed class DealCompetitor : TenantEntity
+{
+    public Guid DealId { get; set; }
+    public Guid CompetitorId { get; set; }
+
+    /// <summary>Low, Medium, or High.</summary>
+    public string ThreatLevel { get; set; } = "Medium";
+
+    public string? StrengthsObserved { get; set; }
+    public string? WeaknessesObserved { get; set; }
+    public string? Notes { get; set; }
+
+    public Deal? Deal { get; set; }
+    public Competitor? Competitor { get; set; }
 }
 
 

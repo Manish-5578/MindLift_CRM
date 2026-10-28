@@ -2383,6 +2383,92 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.ToTable("communication_opt_outs", (string)null);
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.Competitor", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Battlecard")
+                        .HasColumnType("text")
+                        .HasColumnName("battlecard");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("PricingStrategy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("pricing_strategy");
+
+                    b.Property<string>("Strengths")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("strengths");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.Property<string>("Weaknesses")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("weaknesses");
+
+                    b.Property<string>("Website")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("website");
+
+                    b.HasKey("Id")
+                        .HasName("pk_competitors");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_competitors_tenant_id");
+
+                    b.HasIndex("TenantId", "Name")
+                        .HasDatabaseName("ix_competitors_tenant_id_name");
+
+                    b.ToTable("competitors", (string)null);
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.Contact", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3127,6 +3213,96 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_deals_tenant_id_pipeline_id_stage_id_status");
 
                     b.ToTable("deals", (string)null);
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.DealCompetitor", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompetitorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competitor_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<Guid>("DealId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deal_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("notes");
+
+                    b.Property<string>("StrengthsObserved")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("strengths_observed");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("ThreatLevel")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("threat_level");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.Property<string>("WeaknessesObserved")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("weaknesses_observed");
+
+                    b.HasKey("Id")
+                        .HasName("pk_deal_competitors");
+
+                    b.HasIndex("CompetitorId")
+                        .HasDatabaseName("ix_deal_competitors_competitor_id");
+
+                    b.HasIndex("DealId")
+                        .HasDatabaseName("ix_deal_competitors_deal_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_deal_competitors_tenant_id");
+
+                    b.HasIndex("TenantId", "CompetitorId")
+                        .HasDatabaseName("ix_deal_competitors_tenant_id_competitor_id");
+
+                    b.HasIndex("TenantId", "DealId")
+                        .HasDatabaseName("ix_deal_competitors_tenant_id_deal_id");
+
+                    b.ToTable("deal_competitors", (string)null);
                 });
 
             modelBuilder.Entity("MindLift.Domain.Entities.DealContact", b =>
@@ -9099,6 +9275,27 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_asp_net_user_tokens_asp_net_users_user_id");
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.DealCompetitor", b =>
+                {
+                    b.HasOne("MindLift.Domain.Entities.Competitor", "Competitor")
+                        .WithMany("DealAssociations")
+                        .HasForeignKey("CompetitorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_deal_competitors_competitors_competitor_id");
+
+                    b.HasOne("MindLift.Domain.Entities.Deal", "Deal")
+                        .WithMany("Competitors")
+                        .HasForeignKey("DealId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_deal_competitors_deals_deal_id");
+
+                    b.Navigation("Competitor");
+
+                    b.Navigation("Deal");
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.DealLineItem", b =>
                 {
                     b.HasOne("MindLift.Domain.Entities.Deal", "Deal")
@@ -9320,8 +9517,15 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.Navigation("Report");
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.Competitor", b =>
+                {
+                    b.Navigation("DealAssociations");
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.Deal", b =>
                 {
+                    b.Navigation("Competitors");
+
                     b.Navigation("LineItems");
 
                     b.Navigation("Splits");

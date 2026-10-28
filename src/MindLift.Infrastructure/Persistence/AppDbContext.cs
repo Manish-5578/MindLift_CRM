@@ -69,6 +69,8 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<SavedView> SavedViews { get; set; } = null!;
     public DbSet<ExchangeRate> ExchangeRates { get; set; } = null!;
     public DbSet<FxSyncLog> FxSyncLogs { get; set; } = null!;
+    public DbSet<Competitor> Competitors { get; set; } = null!;
+    public DbSet<DealCompetitor> DealCompetitors { get; set; } = null!;
     public DbSet<AssignmentRule> AssignmentRules { get; set; } = null!;
     public DbSet<WebForm> WebForms { get; set; } = null!;
     public DbSet<AutomationRule> AutomationRules { get; set; } = null!;
@@ -934,6 +936,37 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.Property(x => x.Status).HasMaxLength(30);
             b.Property(x => x.ErrorMessage).HasMaxLength(1000);
             b.HasIndex(x => new { x.TenantId, x.SyncedAt });
+        });
+
+        builder.Entity<Competitor>(b =>
+        {
+            b.ToTable("competitors");
+            b.Property(x => x.Name).HasMaxLength(200);
+            b.Property(x => x.Website).HasMaxLength(300);
+            b.Property(x => x.Strengths).HasMaxLength(2000);
+            b.Property(x => x.Weaknesses).HasMaxLength(2000);
+            b.Property(x => x.Battlecard).HasColumnType("text");
+            b.Property(x => x.PricingStrategy).HasMaxLength(100);
+            b.HasIndex(x => new { x.TenantId, x.Name });
+        });
+
+        builder.Entity<DealCompetitor>(b =>
+        {
+            b.ToTable("deal_competitors");
+            b.Property(x => x.ThreatLevel).HasMaxLength(30);
+            b.Property(x => x.StrengthsObserved).HasMaxLength(1000);
+            b.Property(x => x.WeaknessesObserved).HasMaxLength(1000);
+            b.Property(x => x.Notes).HasMaxLength(2000);
+            b.HasIndex(x => new { x.TenantId, x.DealId });
+            b.HasIndex(x => new { x.TenantId, x.CompetitorId });
+            b.HasOne(x => x.Deal)
+                .WithMany(d => d.Competitors)
+                .HasForeignKey(x => x.DealId)
+                .OnDelete(DeleteBehavior.Cascade);
+            b.HasOne(x => x.Competitor)
+                .WithMany(c => c.DealAssociations)
+                .HasForeignKey(x => x.CompetitorId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 

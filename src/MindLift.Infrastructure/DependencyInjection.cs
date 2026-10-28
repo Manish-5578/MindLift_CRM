@@ -166,6 +166,8 @@ public static class DependencyInjection
         services.AddHttpClient<MindLift.Infrastructure.Currencies.IFxRateProvider, MindLift.Infrastructure.Currencies.LiveFxRateProvider>(c => c.Timeout = TimeSpan.FromSeconds(5));
         services.AddScoped<MindLift.Application.Abstractions.IFxSyncService, MindLift.Infrastructure.Currencies.FxSyncService>();
         services.AddScoped<MindLift.Infrastructure.Currencies.FxSyncService>();
+        services.AddScoped<MindLift.Application.Abstractions.ICompetitorService, MindLift.Infrastructure.Deals.CompetitorService>();
+        services.AddScoped<MindLift.Infrastructure.Deals.CompetitorService>();
         services.AddScoped<MindLift.Infrastructure.Activities.ActivityService>();
         services.AddScoped<MindLift.Infrastructure.Activities.QuickLogService>();
         services.AddScoped<MindLift.Infrastructure.Activities.ChecklistService>();
