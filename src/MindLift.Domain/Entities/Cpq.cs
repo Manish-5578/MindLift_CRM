@@ -220,3 +220,42 @@ public sealed class BusinessDocument : TenantEntity
     /// <summary>JSON list of page numbers that read poorly.</summary>
     public string? LowConfidencePagesJson { get; set; }
 }
+
+[Audited]
+public sealed class PaymentLink : TenantEntity
+{
+    public string LinkNumber { get; set; } = string.Empty;
+    public string Title { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public string Currency { get; set; } = "USD";
+    public decimal Amount { get; set; }
+    public decimal PaidAmount { get; set; }
+    public string Status { get; set; } = "Active"; // Active, Paid, PartiallyPaid, Expired, Cancelled
+    public Guid? InvoiceId { get; set; }
+    public Invoice? Invoice { get; set; }
+    public Guid? QuoteId { get; set; }
+    public Quote? Quote { get; set; }
+    public string? CustomerEmail { get; set; }
+    public string? CustomerName { get; set; }
+    public string PaymentToken { get; set; } = string.Empty;
+    public string GatewayProvider { get; set; } = "Hosted";
+    public string? GatewayReference { get; set; }
+    public DateTime? ExpiresAt { get; set; }
+    public bool AllowPartial { get; set; }
+    public DateTime? PaidAt { get; set; }
+    public string? PaymentMethodUsed { get; set; }
+    public string? ReceiptNumber { get; set; }
+}
+
+[Audited]
+public sealed class PaymentWebhookLog : TenantEntity
+{
+    public string Provider { get; set; } = string.Empty;
+    public string EventId { get; set; } = string.Empty;
+    public string EventType { get; set; } = string.Empty;
+    public string PayloadJson { get; set; } = string.Empty;
+    public string Status { get; set; } = "Processed"; // Processed, Ignored, Failed
+    public string? ErrorMessage { get; set; }
+    public DateTime ReceivedAt { get; set; } = DateTime.UtcNow;
+}
+

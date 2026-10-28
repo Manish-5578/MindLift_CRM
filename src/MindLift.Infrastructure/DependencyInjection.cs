@@ -172,6 +172,8 @@ public static class DependencyInjection
         services.AddScoped<MindLift.Infrastructure.Deals.WinLossAnalysisService>();
         services.AddScoped<MindLift.Application.Abstractions.IQuoteESignService, MindLift.Infrastructure.Cpq.QuoteESignService>();
         services.AddScoped<MindLift.Infrastructure.Cpq.QuoteESignService>();
+        services.AddScoped<MindLift.Application.Abstractions.IPaymentLinkService, MindLift.Infrastructure.Cpq.PaymentLinkService>();
+        services.AddScoped<MindLift.Infrastructure.Cpq.PaymentLinkService>();
         services.AddScoped<MindLift.Infrastructure.Activities.ActivityService>();
         services.AddScoped<MindLift.Infrastructure.Activities.QuickLogService>();
         services.AddScoped<MindLift.Infrastructure.Activities.ChecklistService>();

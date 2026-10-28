@@ -95,6 +95,8 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<Invoice> Invoices { get; set; } = null!;
     public DbSet<InvoiceLineItem> InvoiceLineItems { get; set; } = null!;
     public DbSet<PaymentRecord> Payments { get; set; } = null!;
+    public DbSet<PaymentLink> PaymentLinks { get; set; } = null!;
+    public DbSet<PaymentWebhookLog> PaymentWebhookLogs { get; set; } = null!;
     public DbSet<BusinessDocument> BusinessDocuments { get; set; } = null!;
     public DbSet<PortalSettings> PortalSettings { get; set; } = null!;
     public DbSet<PortalUser> PortalUsers { get; set; } = null!;
@@ -741,6 +743,51 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
                 .WithMany(x => x.Payments)
                 .HasForeignKey(x => x.InvoiceId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<PaymentLink>(b =>
+        {
+            b.ToTable("payment_links");
+            b.Property(x => x.LinkNumber).HasMaxLength(50);
+            b.Property(x => x.Title).HasMaxLength(200);
+            b.Property(x => x.Description).HasMaxLength(500);
+            b.Property(x => x.Currency).HasMaxLength(3);
+            b.Property(x => x.Amount).HasPrecision(18, 2);
+            b.Property(x => x.PaidAmount).HasPrecision(18, 2);
+            b.Property(x => x.Status).HasMaxLength(30).HasDefaultValue("Active");
+            b.Property(x => x.CustomerEmail).HasMaxLength(255);
+            b.Property(x => x.CustomerName).HasMaxLength(150);
+            b.Property(x => x.PaymentToken).HasMaxLength(100);
+            b.Property(x => x.GatewayProvider).HasMaxLength(50).HasDefaultValue("Hosted");
+            b.Property(x => x.GatewayReference).HasMaxLength(200);
+            b.Property(x => x.PaymentMethodUsed).HasMaxLength(50);
+            b.Property(x => x.ReceiptNumber).HasMaxLength(100);
+            b.HasIndex(x => new { x.TenantId, x.LinkNumber });
+            b.HasIndex(x => new { x.TenantId, x.Status });
+            b.HasIndex(x => new { x.TenantId, x.InvoiceId });
+            b.HasIndex(x => new { x.TenantId, x.QuoteId });
+            b.HasIndex(x => x.PaymentToken);
+            b.HasOne(x => x.Invoice)
+                .WithMany()
+                .HasForeignKey(x => x.InvoiceId)
+                .OnDelete(DeleteBehavior.SetNull);
+            b.HasOne(x => x.Quote)
+                .WithMany()
+                .HasForeignKey(x => x.QuoteId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        builder.Entity<PaymentWebhookLog>(b =>
+        {
+            b.ToTable("payment_webhook_logs");
+            b.Property(x => x.Provider).HasMaxLength(50);
+            b.Property(x => x.EventId).HasMaxLength(150);
+            b.Property(x => x.EventType).HasMaxLength(100);
+            b.Property(x => x.PayloadJson).HasColumnType("text");
+            b.Property(x => x.Status).HasMaxLength(30);
+            b.Property(x => x.ErrorMessage).HasMaxLength(2000);
+            b.HasIndex(x => new { x.TenantId, x.Provider, x.EventId });
+            b.HasIndex(x => new { x.TenantId, x.ReceivedAt });
         });
 
         builder.Entity<BusinessDocument>(b =>
