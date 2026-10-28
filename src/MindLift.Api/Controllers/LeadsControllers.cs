@@ -62,6 +62,12 @@ public sealed class LeadsController(LeadService leads, ImportNotifier imports) :
     public async Task<ActionResult<ConvertLeadResult>> Convert(Guid id, [FromBody] ConvertLeadRequest request, CancellationToken cancellationToken)
         => Ok(await leads.ConvertAsync(id, request, cancellationToken));
 
+    [HasPermission(AppModule.Leads, PermissionAction.View)]
+    [RequiresFeature("lead-conversion")]
+    [HttpGet("{id:guid}/convert-options")]
+    public async Task<ActionResult<LeadConvertOptionsDto>> GetConvertOptions(Guid id, CancellationToken cancellationToken)
+        => Ok(await leads.GetConvertOptionsAsync(id, cancellationToken));
+
     [HasPermission(AppModule.Leads, PermissionAction.Create)]
     [HttpPost("check-duplicates")]
     public async Task<ActionResult<IReadOnlyList<DuplicateCandidateDto>>> CheckDuplicates([FromBody] CheckDuplicatesRequest request, CancellationToken cancellationToken)

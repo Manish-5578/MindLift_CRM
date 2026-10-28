@@ -87,6 +87,17 @@ public sealed record ConvertLeadRequest(
 
 public sealed record ConvertLeadResult(Guid ContactId, Guid? AccountId, Guid? DealId);
 
+public sealed record LeadConvertOptionsDto(
+    Guid LeadId,
+    string LeadName,
+    string? CompanyName,
+    string? Email,
+    string? Phone,
+    IReadOnlyList<SearchHitDto> MatchingAccounts,
+    IReadOnlyList<SearchHitDto> MatchingContacts,
+    IReadOnlyList<PipelineDto> AvailablePipelines,
+    string BaseCurrency);
+
 public sealed record DuplicateCandidateDto(Guid Id, string Kind, string FullName, string? Email, string? Phone, string Reason);
 
 public sealed record CheckDuplicatesRequest(string FirstName, string LastName, string? Email, string? Phone, string? CompanyName);

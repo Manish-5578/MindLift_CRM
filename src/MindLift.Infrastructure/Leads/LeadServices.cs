@@ -451,9 +451,126 @@ public sealed class LeadService(
             await db.SaveChangesAsync(cancellationToken);
         }
 
+        // Re-parent messages and bookings
+        await db.Messages.Where(m => m.LeadId == lead.Id)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(m => m.ContactId, contact.Id)
+                .SetProperty(m => m.AccountId, account != null ? account.Id : null)
+                .SetProperty(m => m.DealId, deal != null ? deal.Id : null), cancellationToken);
+
+        await db.Bookings.Where(b => b.LeadId == lead.Id)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(b => b.ContactId, contact.Id), cancellationToken);
+
+        // Ensure ContactAccountLink is present
+        if (account is not null)
+        {
+            if (!await db.ContactAccountLinks.AnyAsync(l => l.ContactId == contact.Id && l.AccountId == account.Id, cancellationToken))
+            {
+                db.ContactAccountLinks.Add(new ContactAccountLink
+                {
+                    ContactId = contact.Id,
+                    AccountId = account.Id,
+                    Role = "Primary"
+                });
+                await db.SaveChangesAsync(cancellationToken);
+            }
+        }
+
+        // Timeline events (F6)
+        await timeline.PublishAsync(new TimelineEventInput(
+            EntityType: "lead",
+            EntityId: lead.Id,
+            Kind: "lead_converted",
+            Summary: $"Converted lead to contact '{contact.FirstName} {contact.LastName}'" + (account != null ? $", account '{account.Name}'" : "") + (deal != null ? $", deal '{deal.Name}'" : ""),
+            Source: "crm",
+            DetailJson: JsonSerializer.Serialize(new { ContactId = contact.Id, AccountId = account?.Id, DealId = deal?.Id }),
+            ActorUserId: tenant.UserId,
+            OccurredAt: clock.UtcNow
+        ), cancellationToken);
+
+        await timeline.PublishAsync(new TimelineEventInput(
+            EntityType: "contact",
+            EntityId: contact.Id,
+            Kind: "contact_created",
+            Summary: $"Created contact from lead '{lead.FirstName} {lead.LastName}'",
+            Source: "crm",
+            DetailJson: JsonSerializer.Serialize(new { ConvertedFromLeadId = lead.Id }),
+            ActorUserId: tenant.UserId,
+            OccurredAt: clock.UtcNow
+        ), cancellationToken);
+
+        if (deal != null)
+        {
+            await timeline.PublishAsync(new TimelineEventInput(
+                EntityType: "deal",
+                EntityId: deal.Id,
+                Kind: "deal_created",
+                Summary: $"Created deal from lead conversion '{deal.Name}'",
+                Source: "crm",
+                DetailJson: JsonSerializer.Serialize(new { ConvertedFromLeadId = lead.Id, ContactId = contact.Id, AccountId = account?.Id }),
+                ActorUserId: tenant.UserId,
+                OccurredAt: clock.UtcNow
+            ), cancellationToken);
+        }
+
         await tx.CommitAsync(cancellationToken);
 
         return new ConvertLeadResult(contact.Id, account?.Id, deal?.Id);
+    }
+
+    /// <summary>Returns recommended existing accounts, contacts, and pipelines for the conversion dialog.</summary>
+    public async Task<LeadConvertOptionsDto> GetConvertOptionsAsync(Guid leadId, CancellationToken cancellationToken = default)
+    {
+        var lead = await LoadScopedAsync(leadId, cancellationToken);
+        var settings = await db.TenantSettings.AsNoTracking().FirstAsync(cancellationToken);
+
+        var matchingAccounts = new List<SearchHitDto>();
+        if (!string.IsNullOrWhiteSpace(lead.CompanyName))
+        {
+            var company = lead.CompanyName.Trim().ToLower();
+            var accScope = await scope.GetScopeUserIdsAsync(AppModule.Accounts, cancellationToken);
+            var accQuery = db.Accounts.AsNoTracking().Where(a => a.Name.ToLower().Contains(company));
+            if (accScope is not null) accQuery = accQuery.Where(a => accScope.Contains(a.OwnerId));
+            var accs = await accQuery.Take(5).ToListAsync(cancellationToken);
+            matchingAccounts.AddRange(accs.Select(a => new SearchHitDto("account", a.Id, a.Name, a.Website)));
+        }
+
+        var matchingContacts = new List<SearchHitDto>();
+        var email = lead.NormalizedEmail;
+        var phone = lead.NormalizedPhone;
+        var name = $"{lead.FirstName} {lead.LastName}".Trim().ToLower();
+
+        var conScope = await scope.GetScopeUserIdsAsync(AppModule.Contacts, cancellationToken);
+        var conQuery = db.Contacts.AsNoTracking().AsQueryable();
+        if (conScope is not null) conQuery = conQuery.Where(c => conScope.Contains(c.OwnerId));
+
+        var contacts = await conQuery
+            .Where(c => (email != null && c.NormalizedEmail == email) || (phone != null && c.NormalizedPhone == phone) || (c.FirstName.ToLower() + " " + c.LastName.ToLower()).Contains(name))
+            .Take(5)
+            .ToListAsync(cancellationToken);
+
+        matchingContacts.AddRange(contacts.Select(c => new SearchHitDto("contact", c.Id, $"{c.FirstName} {c.LastName}".Trim(), c.Email ?? c.Phone)));
+
+        var pipelines = await db.Pipelines.AsNoTracking()
+            .Where(p => p.IsActive)
+            .OrderBy(p => p.SortOrder)
+            .Select(p => new PipelineDto(p.Id, p.Name, p.NameAr, p.IsDefault, p.IsActive, p.SortOrder,
+                db.PipelineStages.AsNoTracking().Where(s => s.PipelineId == p.Id).OrderBy(s => s.SortOrder)
+                    .Select(s => new PipelineStageDto(s.Id, s.Name, s.NameAr, s.SortOrder, s.Probability, s.StageType, s.Color, s.RottingDays)).ToList()))
+            .ToListAsync(cancellationToken);
+
+        return new LeadConvertOptionsDto(
+            lead.Id,
+            $"{lead.FirstName} {lead.LastName}".Trim(),
+            lead.CompanyName,
+            lead.Email,
+            lead.Phone,
+            matchingAccounts,
+            matchingContacts,
+            pipelines,
+            settings.BaseCurrency
+        );
     }
 
     public async Task<IReadOnlyList<DuplicateCandidateDto>> CheckDuplicatesAsync(CheckDuplicatesRequest request, CancellationToken cancellationToken = default)
