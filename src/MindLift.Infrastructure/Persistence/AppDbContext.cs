@@ -125,6 +125,8 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<Territory> Territories { get; set; } = null!;
     public DbSet<TerritoryMember> TerritoryMembers { get; set; } = null!;
     public DbSet<LeadRoutingLog> LeadRoutingLogs { get; set; } = null!;
+    public DbSet<LeadScoringRule> LeadScoringRules { get; set; } = null!;
+    public DbSet<LeadScoreLog> LeadScoreLogs { get; set; } = null!;
 
     /// <summary>Tenant used by query filters. Guid.Empty when no tenant is set, so no rows match.</summary>
     protected Guid CurrentTenantId => tenant.TenantId ?? Guid.Empty;
@@ -1131,6 +1133,25 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.HasIndex(x => new { x.TenantId, x.LeadId });
             b.HasIndex(x => new { x.TenantId, x.TerritoryId });
             b.HasIndex(x => new { x.TenantId, x.RoutedAt });
+        });
+
+        builder.Entity<LeadScoringRule>(b =>
+        {
+            b.ToTable("lead_scoring_rules");
+            b.Property(x => x.Name).HasMaxLength(200);
+            b.Property(x => x.RuleType).HasMaxLength(50).HasDefaultValue("Demographic");
+            b.Property(x => x.ConditionField).HasMaxLength(100);
+            b.Property(x => x.Operator).HasMaxLength(50).HasDefaultValue("Equals");
+            b.Property(x => x.ConditionValue).HasMaxLength(500);
+            b.HasIndex(x => new { x.TenantId, x.IsActive, x.Order });
+        });
+
+        builder.Entity<LeadScoreLog>(b =>
+        {
+            b.ToTable("lead_score_logs");
+            b.Property(x => x.RuleName).HasMaxLength(200);
+            b.Property(x => x.Reason).HasMaxLength(1000);
+            b.HasIndex(x => new { x.TenantId, x.LeadId, x.ScoredAt });
         });
     }
 

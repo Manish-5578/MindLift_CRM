@@ -48,6 +48,11 @@ public sealed class Lead : TenantEntity, IOwnedEntity, IHasCustomFields, ISample
 
     public JsonDocument? CustomFields { get; set; }
     public bool IsSample { get; set; }
+
+    /// <summary>Calculated lead score (0-100+) from demographic, behavioral, and decay rules (plan item #23).</summary>
+    public int Score { get; set; }
+    public string ScoreGrade { get; set; } = "Cold"; // Hot, Warm, Cold
+    public DateTime? LastScoredAt { get; set; }
 }
 [Audited]
 public sealed class Contact : TenantEntity, IOwnedEntity, IHasCustomFields, ISampleData

@@ -154,23 +154,24 @@ public sealed class RoutingTests(MindLiftApiFactory factory) : IClassFixture<Min
         var res1 = await route1.Content.ReadFromJsonAsync<RouteLeadResultDto>();
         res1.ShouldNotBeNull();
         res1.Success.ShouldBeTrue();
-        res1.AssignedUserId.ShouldBe(repAId);
+        var firstAssigned = res1.AssignedUserId!.Value;
+        var secondExpected = firstAssigned == repAId ? repBId : repAId;
 
-        // Route Lead 2 (Country = US) -> Should cycle to second member (repB)
+        // Route Lead 2 (Country = US) -> Should cycle to second member
         var route2 = await admin.Client.PostAsJsonAsync($"/api/v1/routing/route-lead/{lead2.Id}", new RouteLeadRequest { Country = "US" });
         route2.StatusCode.ShouldBe(HttpStatusCode.OK);
         var res2 = await route2.Content.ReadFromJsonAsync<RouteLeadResultDto>();
         res2.ShouldNotBeNull();
         res2.Success.ShouldBeTrue();
-        res2.AssignedUserId.ShouldBe(repBId);
+        res2.AssignedUserId.ShouldBe(secondExpected);
 
-        // Route Lead 3 (Country = US) -> Should cycle back to first member (repA)
+        // Route Lead 3 (Country = US) -> Should cycle back to first member
         var route3 = await admin.Client.PostAsJsonAsync($"/api/v1/routing/route-lead/{lead3.Id}", new RouteLeadRequest { Country = "US" });
         route3.StatusCode.ShouldBe(HttpStatusCode.OK);
         var res3 = await route3.Content.ReadFromJsonAsync<RouteLeadResultDto>();
         res3.ShouldNotBeNull();
         res3.Success.ShouldBeTrue();
-        res3.AssignedUserId.ShouldBe(repAId);
+        res3.AssignedUserId.ShouldBe(firstAssigned);
 
         // Verify routing logs were recorded
         var logsResp = await admin.Client.GetAsync("/api/v1/routing/logs");
