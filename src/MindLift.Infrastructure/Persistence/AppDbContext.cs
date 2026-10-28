@@ -148,6 +148,8 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<BccDropboxAddress> BccDropboxAddresses { get; set; } = null!;
     public DbSet<BccDropboxSettings> BccDropboxSettings { get; set; } = null!;
     public DbSet<BccDropboxLog> BccDropboxLogs { get; set; } = null!;
+    public DbSet<TelephonySettings> TelephonySettings { get; set; } = null!;
+    public DbSet<CallSession> CallSessions { get; set; } = null!;
 
     /// <summary>Tenant used by query filters. Guid.Empty when no tenant is set, so no rows match.</summary>
     protected Guid CurrentTenantId => tenant.TenantId ?? Guid.Empty;
@@ -1408,6 +1410,31 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.Property(x => x.ActionTaken).HasMaxLength(100);
             b.HasIndex(x => new { x.TenantId, x.UserId });
             b.HasIndex(x => new { x.TenantId, x.ReceivedAtUtc });
+        });
+
+        builder.Entity<TelephonySettings>(b =>
+        {
+            b.ToTable("telephony_settings");
+            b.Property(x => x.Provider).HasMaxLength(50).HasDefaultValue("MockTelephony");
+            b.Property(x => x.AccountSid).HasMaxLength(100);
+            b.Property(x => x.CallerId).HasMaxLength(50).HasDefaultValue("+18005550199");
+            b.HasIndex(x => x.TenantId).IsUnique();
+        });
+
+        builder.Entity<CallSession>(b =>
+        {
+            b.ToTable("call_sessions");
+            b.Property(x => x.CallSid).HasMaxLength(100);
+            b.Property(x => x.FromNumber).HasMaxLength(50);
+            b.Property(x => x.ToNumber).HasMaxLength(50);
+            b.Property(x => x.Direction).HasMaxLength(20).HasDefaultValue("Outbound");
+            b.Property(x => x.Status).HasMaxLength(50).HasDefaultValue("Initiated");
+            b.Property(x => x.Disposition).HasMaxLength(100);
+            b.Property(x => x.RecordingUrl).HasMaxLength(2048);
+            b.Property(x => x.TranscriptionStatus).HasMaxLength(50).HasDefaultValue("None");
+            b.HasIndex(x => x.CallSid).IsUnique();
+            b.HasIndex(x => new { x.TenantId, x.UserId });
+            b.HasIndex(x => new { x.TenantId, x.StartedAtUtc });
         });
     }
 
