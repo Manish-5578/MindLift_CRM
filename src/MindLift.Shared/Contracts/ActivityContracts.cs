@@ -92,3 +92,63 @@ public sealed record OnboardingProgressDto(Guid TemplateId, string TemplateName,
 
 /// <summary>One line of a record's timeline. Kind is activity, created, changed, stage, converted, deal or contact.</summary>
 public sealed record TimelineEntryDto(string Kind, DateTime WhenUtc, string Title, string? Detail, string? ActorName, string? Href, string? ActivityType);
+
+// ---------- Quick Log Dock (quick-log-dock) ----------
+
+public sealed record QuickLogRequest(
+    string TargetType,
+    Guid TargetId,
+    string ActivityType,
+    string Subject,
+    string? Notes = null,
+    string? Direction = null,
+    string? CallOutcome = null,
+    int? DurationMinutes = null,
+    DateTime? DueAt = null,
+    DateTime? EndAt = null,
+    string? Priority = null,
+    string? Location = null,
+    IReadOnlyList<string>? AttendeeEmails = null,
+    bool MarkCompleted = false,
+    string? FollowUpSubject = null,
+    DateTime? FollowUpDueAt = null);
+
+public sealed record QuickLogCallRequest(
+    string TargetType,
+    Guid TargetId,
+    string Subject,
+    string? Notes = null,
+    string Direction = "Outbound",
+    string? CallOutcome = null,
+    int? DurationMinutes = null,
+    string? FollowUpSubject = null,
+    DateTime? FollowUpDueAt = null);
+
+public sealed record QuickLogNoteRequest(
+    string TargetType,
+    Guid TargetId,
+    string Subject,
+    string? Notes = null);
+
+public sealed record QuickLogTaskRequest(
+    string TargetType,
+    Guid TargetId,
+    string Subject,
+    string? Notes = null,
+    DateTime? DueAt = null,
+    string? Priority = "Normal");
+
+public sealed record QuickLogMeetingRequest(
+    string TargetType,
+    Guid TargetId,
+    string Subject,
+    string? Notes = null,
+    DateTime? StartAt = null,
+    DateTime? EndAt = null,
+    string? Location = null,
+    IReadOnlyList<string>? AttendeeEmails = null);
+
+public sealed record QuickLogResult(
+    ActivityDto Activity,
+    ActivityDto? FollowUp = null);
+

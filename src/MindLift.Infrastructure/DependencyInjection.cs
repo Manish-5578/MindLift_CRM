@@ -148,6 +148,7 @@ public static class DependencyInjection
         services.AddScoped<MindLift.Infrastructure.Deals.DealLineItemService>();
         services.AddScoped<MindLift.Infrastructure.Deals.DealStageGateService>();
         services.AddScoped<MindLift.Infrastructure.Activities.ActivityService>();
+        services.AddScoped<MindLift.Infrastructure.Activities.QuickLogService>();
         services.AddScoped<MindLift.Infrastructure.Activities.ChecklistService>();
         services.AddScoped<MindLift.Infrastructure.Activities.TimelineService>();
 
