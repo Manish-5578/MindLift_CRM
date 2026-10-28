@@ -114,6 +114,8 @@ public static class DependencyInjection
         services.AddScoped<MindLift.Application.Abstractions.ICredentialVault, MindLift.Infrastructure.Platform.CredentialVault>();
         services.AddScoped<MindLift.Application.Abstractions.ITimelineEventBus, MindLift.Infrastructure.Platform.TimelineEventBus>();
         services.AddScoped<MindLift.Application.Abstractions.IWebhookIngress, MindLift.Infrastructure.Platform.WebhookIngress>();
+        services.AddScoped<MindLift.Application.Abstractions.IRecycleBinService, MindLift.Infrastructure.Platform.RecycleBinService>();
+        services.AddScoped<MindLift.Infrastructure.Platform.RecycleBinService>();
         services.AddScoped<MindLift.Infrastructure.Platform.IdempotencyCleanupJob>();
 
         // Settings and configuration (M3).
