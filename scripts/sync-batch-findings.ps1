@@ -31,16 +31,16 @@ $batchIssues = @(
     @{
         title = "Anonymous booking-management tokens are exposed in request and error logs"
         severity = "Medium"
-        area = @("Backend", "Security")
-        whatHappened = "Booking-management tokens were carried in the URL path (/booking/manage/{token}), exposing credentials in HTTP access logs, Serilog request logging, and unhandled exception logs."
-        causeFix = "Added support for passing management tokens via X-Booking-Token or Authorization Bearer headers, and in POST request bodies. Suppressed /booking/manage request logs in Serilog request logging. Sanitized token-bearing URL paths and query strings in GlobalExceptionHandler. Rotated and invalidated management tokens on cancellation and reschedule in PublicBookingService."
+        area = @("Backend", "Frontend", "Security")
+        whatHappened = "Booking-management tokens were carried in the URL path (/booking/manage/{token}), exposing credentials in HTTP access logs, Serilog request logging, and unhandled exception reports sent to Sentry."
+        causeFix = "Switched ManageBooking.razor web client to header (X-Booking-Token) and body (Token) flow, immediately scrubbing tokens from the browser URL. Added Sentry BeforeSend event processor in Program.cs that redacts /manage/[^/?]+ and ([?&]token=)[^&]+ from request URLs and query strings before events are forwarded. Explicitly sanitized RequestPath in Serilog EnrichDiagnosticContext so tokens cannot leak even under Verbose logging. Rotated and invalidated management tokens on booking mutation."
     },
     @{
         title = "Portal access JWTs remain usable after PortalUser session termination"
         severity = "Medium"
         area = @("Backend", "Security")
-        whatHappened = "Portal bearer scheme validated token integrity and lifetime but did not revalidate PortalUser or session state, allowing access after password change, deactivation, portal shutdown, or contact deletion."
-        causeFix = "Added JwtBearerEvents.OnTokenValidated handler for Portal scheme: validates user exists, IsActive, not deleted; validates linked contact exists and is not deleted; verifies portal module and settings enabled; enforces token iat >= PasswordChangedAt session cutoff; and derives contact/account authorization scope dynamically from server-side user. Updated ContactServices.DeleteAsync to invalidate linked portal users."
+        whatHappened = "Ordinary portal requests revalidated user state, but portal access JWTs were not tied to a revocable server-side session, allowing already-issued bearer tokens to be replayed until expiry even after logout, password change, or contact deletion."
+        causeFix = "Added server-side portal session versioning / security stamp mechanism: persisted user.Version on PortalUser, embedded it as 'ver' claim when minting access JWTs in TokenService, and enforced token 'ver' matches user.Version in JwtBearerEvents.OnTokenValidated on every request. On logout (LogoutAsync), password change (ChangePasswordAsync), user deactivation, and contact deletion/reassignment (ContactServices), incremented user.Version and set PasswordChangedAt, revoking active access tokens instantaneously."
     },
     @{
         title = "Deal onboarding endpoint bypasses owner scope"
@@ -52,9 +52,9 @@ $batchIssues = @(
     @{
         title = "Portal magic-link and invitation bearer tokens are exposed in query strings"
         severity = "Medium"
-        area = @("Frontend", "Security")
-        whatHappened = "Invitation bearer tokens remained in the browser URL and history upon loading AcceptInvite.razor, risking disclosure through shoulder surfing, browser history, or referrer headers."
-        causeFix = "In AcceptInvite.razor, cached the invitation token in component state on load and immediately replaced the URL/history entry with a clean path via Nav.NavigateTo(Link('accept-invite'), replace: true). Sanitized query string tokens in server error logs."
+        area = @("Frontend", "Backend", "Security")
+        whatHappened = "Backend issued live magic-link and invitation bearer tokens in ?token= query strings, exposing them to server/proxy logs, browser history, and referrers."
+        causeFix = "Replaced query string token delivery with URI fragment delivery (#token=...) in PortalService (SendMagicLinkAsync and InviteContactAsync), ensuring bearer tokens are never transmitted in HTTP request lines to servers, proxies, or telemetry. In MagicVerify.razor and AcceptInvite.razor, extracted the fragment token into component memory and immediately replaced the browser URL/history via Nav.NavigateTo(..., replace: true)."
     },
     @{
         title = "Authenticated document uploads and OCR admission permit durable resource exhaustion"
@@ -199,7 +199,7 @@ $taskProps = @{
         "rich_text" = @(
             @{
                 "text" = @{
-                    "content" = "Remediated all 9 security findings across Deal contact write scopes, Booking token redaction/rotation, Portal JWT session revalidation, Onboarding deal scope, AcceptInvite URL scrubbing, Upload/OCR storage quotas, Invoice payment overpayment & lifecycle guards, Webhook SSRF redirect blocking, and Signup account enumeration elimination. All 545 unit tests and 206 UI tests passed."
+                    "content" = "Remediated all security findings across Deal contact write scopes, Booking token header/body flow & Sentry/Serilog redaction, Portal JWT session versioning & instantaneous revocation, Onboarding deal scope, Fragment-delivered magic-link and invitation tokens with URL scrubbing, Upload/OCR quotas, Invoice payment overpayment guards, Webhook SSRF redirect blocking, and Signup account enumeration elimination. All 551 unit tests and 206 UI tests passed."
                 }
             }
         )

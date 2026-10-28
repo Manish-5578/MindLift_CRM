@@ -80,7 +80,8 @@ public sealed class TokenService(IOptions<JwtOptions> options, IClock clock)
         Guid? accountId,
         string email,
         string customerName,
-        string language)
+        string language,
+        int sessionVersion = 1)
     {
         var now = clock.UtcNow;
         var expires = now.AddMinutes(_options.AccessTokenMinutes);
@@ -93,7 +94,9 @@ public sealed class TokenService(IOptions<JwtOptions> options, IClock clock)
             new("email", email),
             new("name", customerName),
             new("kind", "portal"),
-            new("lang", language)
+            new("lang", language),
+            new("ver", sessionVersion.ToString()),
+            new("iat", new DateTimeOffset(now).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
         };
 
         if (accountId.HasValue)

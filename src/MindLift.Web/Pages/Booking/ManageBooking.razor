@@ -1,8 +1,10 @@
+@page "/booking/manage"
 @page "/booking/manage/{Token}"
 @using System.Globalization
 @layout AuthLayout
 @inject HttpClient Http
 @inject Translator T
+@inject NavigationManager Nav
 
 <PageTitle>@T["Your booking"] · MindLift</PageTitle>
 
@@ -43,8 +45,9 @@
 </div>
 
 @code {
-    [Parameter] public string Token { get; set; } = string.Empty;
+    [Parameter] public string? Token { get; set; }
 
+    private string? _cachedToken;
     private ManageBookingDto? _booking;
     private bool _loading = true;
     private bool _busy;
@@ -59,12 +62,87 @@
         _ => "Confirmed",
     };
 
-    protected override async Task OnParametersSetAsync()
+    protected override async Task OnInitializedAsync()
+    {
+        ExtractAndScrubToken();
+        await LoadBookingAsync();
+    }
+
+    private void ExtractAndScrubToken()
+    {
+        if (!string.IsNullOrWhiteSpace(Token))
+        {
+            _cachedToken = Token.Trim();
+            Nav.NavigateTo("/booking/manage", replace: true);
+            return;
+        }
+
+        var fullUri = Nav.Uri;
+        if (!string.IsNullOrWhiteSpace(fullUri))
+        {
+            var hashIdx = fullUri.IndexOf('#');
+            if (hashIdx >= 0 && hashIdx < fullUri.Length - 1)
+            {
+                var fragment = fullUri[(hashIdx + 1)..];
+                var pairs = fragment.Split('&');
+                foreach (var pair in pairs)
+                {
+                    var kv = pair.Split('=', 2);
+                    if (kv.Length == 2 && string.Equals(kv[0], "token", StringComparison.OrdinalIgnoreCase))
+                    {
+                        _cachedToken = Uri.UnescapeDataString(kv[1]).Trim();
+                        Nav.NavigateTo("/booking/manage", replace: true);
+                        return;
+                    }
+                }
+            }
+
+            var qIdx = fullUri.IndexOf('?');
+            if (qIdx >= 0)
+            {
+                var query = fullUri[(qIdx + 1)..];
+                if (hashIdx > qIdx)
+                {
+                    query = query[..(hashIdx - qIdx - 1)];
+                }
+                var pairs = query.Split('&');
+                foreach (var pair in pairs)
+                {
+                    var kv = pair.Split('=', 2);
+                    if (kv.Length == 2 && string.Equals(kv[0], "token", StringComparison.OrdinalIgnoreCase))
+                    {
+                        _cachedToken = Uri.UnescapeDataString(kv[1]).Trim();
+                        Nav.NavigateTo("/booking/manage", replace: true);
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    private async Task LoadBookingAsync()
     {
         _loading = true;
         try
         {
-            _booking = await Http.GetFromJsonAsync<ManageBookingDto>($"api/v1/public/booking/manage/{Uri.EscapeDataString(Token)}");
+            var token = _cachedToken ?? Token;
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                _booking = null;
+                return;
+            }
+
+            using var req = new HttpRequestMessage(HttpMethod.Get, "api/v1/public/booking/manage");
+            req.Headers.Add("X-Booking-Token", token);
+            var res = await Http.SendAsync(req);
+            if (res.IsSuccessStatusCode)
+            {
+                _booking = await res.Content.ReadFromJsonAsync<ManageBookingDto>();
+            }
+            else
+            {
+                _booking = null;
+            }
         }
         catch (HttpRequestException)
         {
@@ -82,7 +160,8 @@
         _error = null;
         try
         {
-            var response = await Http.PostAsJsonAsync($"api/v1/public/booking/manage/{Uri.EscapeDataString(Token)}/cancel", new CancelBookingRequest(string.IsNullOrWhiteSpace(_reason) ? null : _reason));
+            var token = _cachedToken ?? Token;
+            var response = await Http.PostAsJsonAsync("api/v1/public/booking/manage/cancel", new CancelBookingRequest(string.IsNullOrWhiteSpace(_reason) ? null : _reason, Token: token));
             if (!response.IsSuccessStatusCode)
             {
                 _error = await ProblemText.FromAsync(response, T["We could not cancel this booking."]);
@@ -90,7 +169,7 @@
             }
 
             _done = T["Your booking is cancelled. We have emailed you a confirmation."];
-            await OnParametersSetAsync();
+            await LoadBookingAsync();
         }
         catch (HttpRequestException)
         {

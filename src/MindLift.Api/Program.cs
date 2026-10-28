@@ -52,6 +52,22 @@ if (builder.Configuration["Sentry:Dsn"] is { Length: > 0 } sentryDsn)
         options.Environment = builder.Environment.EnvironmentName;
         options.SendDefaultPii = false;   // no personal data leaves the server
         options.TracesSampleRate = builder.Configuration.GetValue<double?>("Sentry:TracesSampleRate") ?? 0.0;
+        options.SetBeforeSend((sentryEvent, hint) =>
+        {
+            if (sentryEvent.Request is { } req)
+            {
+                if (req.Url != null)
+                {
+                    req.Url = System.Text.RegularExpressions.Regex.Replace(req.Url, @"/manage/[^/?]+", "/manage/[REDACTED]", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    req.Url = System.Text.RegularExpressions.Regex.Replace(req.Url, @"([?&]token=)[^&]+", "$1[REDACTED]", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                }
+                if (req.QueryString != null)
+                {
+                    req.QueryString = System.Text.RegularExpressions.Regex.Replace(req.QueryString, @"([?&]token=)[^&]+", "$1[REDACTED]", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                }
+            }
+            return sentryEvent;
+        });
     });
 }
 
@@ -184,6 +200,14 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 if (!portalSettings)
                 {
                     context.Fail("Customer portal is disabled for this company.");
+                    return;
+                }
+
+                // Check portal session version claim against database PortalUser.Version
+                var verStr = principal.FindFirst("ver")?.Value;
+                if (!int.TryParse(verStr, out var tokenVer) || tokenVer != user.Version)
+                {
+                    context.Fail("Portal session version mismatch. Token has been revoked.");
                     return;
                 }
 
@@ -412,6 +436,7 @@ app.Use(async (context, next) =>
 app.UseMiddleware<MindLift.Api.Middleware.CorrelationIdMiddleware>();
 app.UseSerilogRequestLogging(options =>
 {
+    options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms";
     options.GetLevel = (httpContext, elapsed, ex) =>
     {
         var path = httpContext.Request.Path.Value ?? string.Empty;
@@ -425,6 +450,11 @@ app.UseSerilogRequestLogging(options =>
     };
     options.EnrichDiagnosticContext = (diagnostics, http) =>
     {
+        var rawPath = http.Request.Path.Value ?? string.Empty;
+        var rawQuery = http.Request.QueryString.Value ?? string.Empty;
+        var safePath = System.Text.RegularExpressions.Regex.Replace(rawPath, @"/manage/[^/?]+", "/manage/[REDACTED]", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        var safeQuery = System.Text.RegularExpressions.Regex.Replace(rawQuery, @"([?&]token=)[^&]+", "$1[REDACTED]", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        diagnostics.Set("RequestPath", $"{safePath}{safeQuery}");
         diagnostics.Set("CorrelationId", http.TraceIdentifier);
         diagnostics.Set("TenantId", http.User.FindFirst("tid")?.Value ?? "-");
         diagnostics.Set("UserId", http.User.FindFirst("sub")?.Value ?? "-");

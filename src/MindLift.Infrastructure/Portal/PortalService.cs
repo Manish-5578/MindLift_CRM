@@ -158,7 +158,7 @@ public sealed class PortalService(
         db.PortalTokens.Add(token);
         await db.SaveChangesAsync(ct);
 
-        var magicUrl = $"{app.Value.BaseUrl.TrimEnd('/')}/portal/{t.Slug}/magic?token={plainToken}";
+        var magicUrl = $"{app.Value.BaseUrl.TrimEnd('/')}/portal/{t.Slug}/magic#token={plainToken}";
         var subject = $"Your {t.Name} Portal Sign-In Link";
         var body = $"""
             Hello,
@@ -321,9 +321,15 @@ public sealed class PortalService(
         var hash = TokenService.Hash(refreshToken.Trim());
         var token = await db.PortalTokens.IgnoreQueryFilters()
             .FirstOrDefaultAsync(x => x.TenantId == t.Id && x.TokenHash == hash && x.Purpose == RefreshPurpose && !x.IsDeleted, ct);
-        if (token is { UsedAt: null })
+        if (token is not null)
         {
             token.UsedAt = DateTime.UtcNow;
+            var user = await db.PortalUsers.FirstOrDefaultAsync(u => u.Id == token.PortalUserId, ct);
+            if (user is not null)
+            {
+                user.Version++;
+                user.PasswordChangedAt = DateTime.UtcNow;
+            }
             await db.SaveChangesAsync(ct);
         }
     }
@@ -384,6 +390,7 @@ public sealed class PortalService(
         user.FailedLoginCount = 0;
         user.PasswordHash = Hasher.HashPassword(user, req.NewPassword);
         user.PasswordChangedAt = DateTime.UtcNow;
+        user.Version++;
         await db.SaveChangesAsync(ct);
 
         // When a portal password is changed, revoke all outstanding portal bearer tokens (refresh, magic-link, invite)
@@ -513,7 +520,7 @@ public sealed class PortalService(
 
         var customerName = $"{contact.FirstName} {contact.LastName}".Trim();
         var (accessToken, expiresAt) = tokenService.CreatePortalAccessToken(
-            user.Id, tenantId, contact.Id, account?.Id, user.Email, customerName, user.Language);
+            user.Id, tenantId, contact.Id, account?.Id, user.Email, customerName, user.Language, user.Version);
 
         return new PortalLoginResponse(
             AccessToken: accessToken,
@@ -961,7 +968,7 @@ public sealed class PortalService(
         await db.SaveChangesAsync(ct);
 
         var tenantEntity = await db.Tenants.IgnoreQueryFilters().FirstAsync(t => t.Id == CurrentTenantId, ct);
-        var inviteUrl = $"{app.Value.BaseUrl.TrimEnd('/')}/portal/{tenantEntity.Slug}/accept-invite?token={plainToken}";
+        var inviteUrl = $"{app.Value.BaseUrl.TrimEnd('/')}/portal/{tenantEntity.Slug}/accept-invite#token={plainToken}";
 
         QueueEmail(
             user.Email,

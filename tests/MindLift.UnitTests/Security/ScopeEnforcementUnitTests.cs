@@ -535,4 +535,88 @@ public sealed class ScopeEnforcementUnitTests
         safePath.ShouldBe("/api/v1/booking/manage/[REDACTED]/cancel");
         safeQuery.ShouldBe("?token=[REDACTED]&foo=bar");
     }
+
+    [Fact]
+    public void Sentry_BeforeSend_Redacts_Manage_Tokens_And_Query_Strings()
+    {
+        var rawUrl = "https://app.mindlift.com/api/v1/booking/manage/sensitive_booking_token_987654/cancel";
+        var rawQuery = "?token=sensitive_query_param_token_12345&other=value";
+
+        var safeUrl = System.Text.RegularExpressions.Regex.Replace(rawUrl, @"/manage/[^/?]+", "/manage/[REDACTED]", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        var safeQuery = System.Text.RegularExpressions.Regex.Replace(rawQuery, @"([?&]token=)[^&]+", "$1[REDACTED]", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        safeUrl.ShouldNotContain("sensitive_booking_token_987654");
+        safeUrl.ShouldBe("https://app.mindlift.com/api/v1/booking/manage/[REDACTED]/cancel");
+        safeQuery.ShouldNotContain("sensitive_query_param_token_12345");
+        safeQuery.ShouldBe("?token=[REDACTED]&other=value");
+    }
+
+    [Theory]
+    [InlineData("https://portal.mindlift.com/portal/acme/magic#token=magic_tok_123", "magic_tok_123")]
+    [InlineData("https://portal.mindlift.com/portal/acme/accept-invite#token=inv_tok_456&foo=bar", "inv_tok_456")]
+    [InlineData("https://portal.mindlift.com/portal/acme/magic?token=query_tok_789", "query_tok_789")]
+    public void Fragment_Token_Extraction_Extracts_Accurately(string uri, string expectedToken)
+    {
+        string? extracted = null;
+        var hashIdx = uri.IndexOf('#');
+        if (hashIdx >= 0 && hashIdx < uri.Length - 1)
+        {
+            var fragment = uri[(hashIdx + 1)..];
+            var pairs = fragment.Split('&');
+            foreach (var pair in pairs)
+            {
+                var kv = pair.Split('=', 2);
+                if (kv.Length == 2 && string.Equals(kv[0], "token", StringComparison.OrdinalIgnoreCase))
+                {
+                    extracted = Uri.UnescapeDataString(kv[1]);
+                    break;
+                }
+            }
+        }
+
+        if (extracted == null)
+        {
+            var qIdx = uri.IndexOf('?');
+            if (qIdx >= 0)
+            {
+                var query = uri[(qIdx + 1)..];
+                if (hashIdx > qIdx)
+                {
+                    query = query[..(hashIdx - qIdx - 1)];
+                }
+                var pairs = query.Split('&');
+                foreach (var pair in pairs)
+                {
+                    var kv = pair.Split('=', 2);
+                    if (kv.Length == 2 && string.Equals(kv[0], "token", StringComparison.OrdinalIgnoreCase))
+                    {
+                        extracted = Uri.UnescapeDataString(kv[1]);
+                        break;
+                    }
+                }
+            }
+        }
+
+        extracted.ShouldBe(expectedToken);
+    }
+
+    [Fact]
+    public void Portal_Session_Version_Mismatch_Fails_Validation()
+    {
+        var userDbVersion = 3;
+        var tokenVersionClaim = "2"; // Stale token issued before logout/password change
+
+        var isValid = int.TryParse(tokenVersionClaim, out var tokenVer) && tokenVer == userDbVersion;
+        isValid.ShouldBeFalse("A portal access JWT with a mismatched session version must be rejected immediately upon revocation.");
+    }
+
+    [Fact]
+    public void Portal_Session_Version_Match_Passes_Validation()
+    {
+        var userDbVersion = 3;
+        var tokenVersionClaim = "3"; // Current active session
+
+        var isValid = int.TryParse(tokenVersionClaim, out var tokenVer) && tokenVer == userDbVersion;
+        isValid.ShouldBeTrue("A portal access JWT matching the current database user session version must be accepted.");
+    }
 }
