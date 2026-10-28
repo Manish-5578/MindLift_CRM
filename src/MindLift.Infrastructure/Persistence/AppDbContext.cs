@@ -109,6 +109,8 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<CustomObjectRecord> CustomObjectRecords { get; set; } = null!;
     public DbSet<VisualWorkflow> VisualWorkflows { get; set; } = null!;
     public DbSet<VisualWorkflowExecution> VisualWorkflowExecutions { get; set; } = null!;
+    public DbSet<BackupScheduleConfig> BackupScheduleConfigs { get; set; } = null!;
+    public DbSet<BackupArchiveRecord> BackupArchiveRecords { get; set; } = null!;
 
     /// <summary>Tenant used by query filters. Guid.Empty when no tenant is set, so no rows match.</summary>
     protected Guid CurrentTenantId => tenant.TenantId ?? Guid.Empty;
@@ -879,6 +881,26 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.Property(x => x.Status).HasMaxLength(30);
             b.Property(x => x.ExecutionLogJson).HasColumnType("jsonb");
             b.HasIndex(x => new { x.TenantId, x.WorkflowId, x.ExecutedAt });
+        });
+
+        builder.Entity<BackupScheduleConfig>(b =>
+        {
+            b.ToTable("backup_schedule_configs");
+            b.Property(x => x.Frequency).HasMaxLength(30);
+            b.Property(x => x.Format).HasMaxLength(20);
+            b.HasIndex(x => x.TenantId).IsUnique();
+        });
+
+        builder.Entity<BackupArchiveRecord>(b =>
+        {
+            b.ToTable("backup_archive_records");
+            b.Property(x => x.Status).HasMaxLength(30);
+            b.Property(x => x.Format).HasMaxLength(20);
+            b.Property(x => x.ChecksumSha256).HasMaxLength(64);
+            b.Property(x => x.RecordCountsJson).HasColumnType("jsonb");
+            b.Property(x => x.PayloadContent).HasColumnType("text");
+            b.Property(x => x.DownloadToken).HasMaxLength(64);
+            b.HasIndex(x => new { x.TenantId, x.CreatedAt });
         });
     }
 

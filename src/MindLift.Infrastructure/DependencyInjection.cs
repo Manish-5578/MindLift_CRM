@@ -131,6 +131,8 @@ public static class DependencyInjection
         services.AddScoped<MindLift.Infrastructure.Settings.CustomObjectService>();
         services.AddScoped<MindLift.Application.Abstractions.IVisualWorkflowService, MindLift.Infrastructure.Settings.VisualWorkflowService>();
         services.AddScoped<MindLift.Infrastructure.Settings.VisualWorkflowService>();
+        services.AddScoped<MindLift.Application.Abstractions.IBackupService, MindLift.Infrastructure.Settings.BackupService>();
+        services.AddScoped<MindLift.Infrastructure.Settings.BackupService>();
         services.AddScoped<SavedViewService>();
         services.AddScoped<BootstrapService>();
 
