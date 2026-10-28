@@ -7501,6 +7501,163 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.ToTable("lead_sla_trackers", (string)null);
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.MeetingLink", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("BookingCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("booking_count");
+
+                    b.Property<Guid?>("BookingPageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("booking_page_id");
+
+                    b.Property<int>("ClickCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("click_count");
+
+                    b.Property<Guid?>("ContactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("contact_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<string>("CustomerEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("customer_email");
+
+                    b.Property<string>("CustomerName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("customer_name");
+
+                    b.Property<string>("CustomerPhone")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("customer_phone");
+
+                    b.Property<Guid?>("DealId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deal_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
+                    b.Property<int>("DurationMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("duration_minutes");
+
+                    b.Property<DateTime?>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at_utc");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<bool>("IsSingleUse")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_single_use");
+
+                    b.Property<bool>("IsUsed")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_used");
+
+                    b.Property<Guid?>("LeadId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lead_id");
+
+                    b.Property<string>("LocationType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("Video")
+                        .HasColumnName("location_type");
+
+                    b.Property<string>("LocationValue")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("location_value");
+
+                    b.Property<string>("ShareableUrl")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("shareable_url");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("slug");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_meeting_links");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_meeting_links_tenant_id");
+
+                    b.HasIndex("TenantId", "DealId")
+                        .HasDatabaseName("ix_meeting_links_tenant_id_deal_id");
+
+                    b.HasIndex("TenantId", "Slug")
+                        .IsUnique()
+                        .HasDatabaseName("ix_meeting_links_tenant_id_slug");
+
+                    b.HasIndex("TenantId", "UserId")
+                        .HasDatabaseName("ix_meeting_links_tenant_id_user_id");
+
+                    b.ToTable("meeting_links", (string)null);
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.Message", b =>
                 {
                     b.Property<Guid>("Id")

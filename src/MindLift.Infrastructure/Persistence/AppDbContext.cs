@@ -158,6 +158,7 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<SharedThread> SharedThreads { get; set; } = null!;
     public DbSet<SharedThreadMessage> SharedThreadMessages { get; set; } = null!;
     public DbSet<SharedThreadCollisionLock> SharedThreadCollisionLocks { get; set; } = null!;
+    public DbSet<MeetingLink> MeetingLinks { get; set; } = null!;
 
     /// <summary>Tenant used by query filters. Guid.Empty when no tenant is set, so no rows match.</summary>
     protected Guid CurrentTenantId => tenant.TenantId ?? Guid.Empty;
@@ -1530,6 +1531,22 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.Property(x => x.Action).HasMaxLength(50).HasDefaultValue("Drafting");
             b.HasIndex(x => new { x.TenantId, x.ThreadId, x.UserId }).IsUnique();
             b.HasIndex(x => new { x.TenantId, x.ExpiresAtUtc });
+        });
+
+        builder.Entity<MeetingLink>(b =>
+        {
+            b.ToTable("meeting_links");
+            b.Property(x => x.Slug).HasMaxLength(100);
+            b.Property(x => x.Title).HasMaxLength(200);
+            b.Property(x => x.LocationType).HasMaxLength(50).HasDefaultValue("Video");
+            b.Property(x => x.LocationValue).HasMaxLength(500);
+            b.Property(x => x.CustomerEmail).HasMaxLength(256);
+            b.Property(x => x.CustomerName).HasMaxLength(200);
+            b.Property(x => x.CustomerPhone).HasMaxLength(50);
+            b.Property(x => x.ShareableUrl).HasMaxLength(1000);
+            b.HasIndex(x => new { x.TenantId, x.Slug }).IsUnique();
+            b.HasIndex(x => new { x.TenantId, x.UserId });
+            b.HasIndex(x => new { x.TenantId, x.DealId });
         });
     }
 
