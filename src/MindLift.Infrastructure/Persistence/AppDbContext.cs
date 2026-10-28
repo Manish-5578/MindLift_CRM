@@ -136,6 +136,8 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<GdprConsentRecord> GdprConsentRecords { get; set; } = null!;
     public DbSet<SubscriptionPreferenceToken> SubscriptionPreferenceTokens { get; set; } = null!;
     public DbSet<GdprErasureRecord> GdprErasureRecords { get; set; } = null!;
+    public DbSet<EnrichmentLog> EnrichmentLogs { get; set; } = null!;
+    public DbSet<EnrichmentConfig> EnrichmentConfigs { get; set; } = null!;
 
     /// <summary>Tenant used by query filters. Guid.Empty when no tenant is set, so no rows match.</summary>
     protected Guid CurrentTenantId => tenant.TenantId ?? Guid.Empty;
@@ -1261,6 +1263,27 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.Property(x => x.Status).HasMaxLength(50).HasDefaultValue("Completed");
             b.Property(x => x.Summary).HasMaxLength(2000);
             b.HasIndex(x => new { x.TenantId, x.ExecutedAt });
+        });
+
+        builder.Entity<EnrichmentLog>(b =>
+        {
+            b.ToTable("enrichment_logs");
+            b.Property(x => x.EntityType).HasMaxLength(50).HasDefaultValue("Lead");
+            b.Property(x => x.Domain).HasMaxLength(255);
+            b.Property(x => x.Email).HasMaxLength(320);
+            b.Property(x => x.Status).HasMaxLength(50).HasDefaultValue("Enriched");
+            b.Property(x => x.Provider).HasMaxLength(100);
+            b.Property(x => x.EnrichedDataJson).HasColumnType("jsonb");
+            b.HasIndex(x => new { x.TenantId, x.EntityType, x.EntityId });
+            b.HasIndex(x => new { x.TenantId, x.Domain });
+            b.HasIndex(x => new { x.TenantId, x.EnrichedAt });
+        });
+
+        builder.Entity<EnrichmentConfig>(b =>
+        {
+            b.ToTable("enrichment_configs");
+            b.Property(x => x.DefaultProvider).HasMaxLength(100).HasDefaultValue("MindLift Intelligence");
+            b.HasIndex(x => x.TenantId).IsUnique();
         });
     }
 

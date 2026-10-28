@@ -4595,6 +4595,194 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.ToTable("email_templates", (string)null);
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.EnrichmentConfig", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("AutoEnrichNewAccounts")
+                        .HasColumnType("boolean")
+                        .HasColumnName("auto_enrich_new_accounts");
+
+                    b.Property<bool>("AutoEnrichNewLeads")
+                        .HasColumnType("boolean")
+                        .HasColumnName("auto_enrich_new_leads");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<string>("DefaultProvider")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasDefaultValue("MindLift Intelligence")
+                        .HasColumnName("default_provider");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.PrimitiveCollection<string[]>("ExcludedDomains")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("excluded_domains");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<bool>("OverwriteExistingFields")
+                        .HasColumnType("boolean")
+                        .HasColumnName("overwrite_existing_fields");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_enrichment_configs");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_enrichment_configs_tenant_id");
+
+                    b.ToTable("enrichment_configs", (string)null);
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.EnrichmentLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<double>("ConfidenceScore")
+                        .HasColumnType("double precision")
+                        .HasColumnName("confidence_score");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("Domain")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("domain");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("email");
+
+                    b.Property<DateTime>("EnrichedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("enriched_at");
+
+                    b.Property<string>("EnrichedDataJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("enriched_data_json");
+
+                    b.Property<Guid>("EntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("entity_id");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("Lead")
+                        .HasColumnName("entity_type");
+
+                    b.PrimitiveCollection<string[]>("FieldsUpdated")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("fields_updated");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("Enriched")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_enrichment_logs");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_enrichment_logs_tenant_id");
+
+                    b.HasIndex("TenantId", "Domain")
+                        .HasDatabaseName("ix_enrichment_logs_tenant_id_domain");
+
+                    b.HasIndex("TenantId", "EnrichedAt")
+                        .HasDatabaseName("ix_enrichment_logs_tenant_id_enriched_at");
+
+                    b.HasIndex("TenantId", "EntityType", "EntityId")
+                        .HasDatabaseName("ix_enrichment_logs_tenant_id_entity_type_entity_id");
+
+                    b.ToTable("enrichment_logs", (string)null);
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.ExchangeRate", b =>
                 {
                     b.Property<Guid>("Id")
