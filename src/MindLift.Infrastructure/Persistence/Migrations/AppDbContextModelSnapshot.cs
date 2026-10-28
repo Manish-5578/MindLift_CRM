@@ -2302,6 +2302,76 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.ToTable("contacts", (string)null);
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.ContactAccountLink", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<Guid>("ContactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("contact_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Role")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("role");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_contact_account_links");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_contact_account_links_tenant_id");
+
+                    b.HasIndex("TenantId", "AccountId")
+                        .HasDatabaseName("ix_contact_account_links_tenant_id_account_id");
+
+                    b.HasIndex("TenantId", "ContactId", "AccountId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_contact_account_links_tenant_id_contact_id_account_id")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("contact_account_links", (string)null);
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.CustomFieldDefinition", b =>
                 {
                     b.Property<Guid>("Id")

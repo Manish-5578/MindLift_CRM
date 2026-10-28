@@ -139,6 +139,7 @@ public static class DependencyInjection
 
         // Contacts and accounts (M7).
         services.AddScoped<MindLift.Infrastructure.Contacts.ContactService>();
+        services.AddScoped<MindLift.Infrastructure.Contacts.ContactAccountLinkService>();
         services.AddScoped<MindLift.Infrastructure.Contacts.AccountService>();
         services.AddScoped<MindLift.Infrastructure.Contacts.GlobalSearchService>();
 

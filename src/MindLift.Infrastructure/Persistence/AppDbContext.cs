@@ -100,6 +100,7 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<IdempotencyRecord> IdempotencyRecords { get; set; } = null!;
     public DbSet<IntegrationCredential> IntegrationCredentials { get; set; } = null!;
     public DbSet<TimelineEvent> TimelineEvents { get; set; } = null!;
+    public DbSet<ContactAccountLink> ContactAccountLinks { get; set; } = null!;
 
     /// <summary>Tenant used by query filters. Guid.Empty when no tenant is set, so no rows match.</summary>
     protected Guid CurrentTenantId => tenant.TenantId ?? Guid.Empty;
@@ -754,6 +755,14 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.Property(x => x.Summary).HasMaxLength(300);
             b.Property(x => x.DetailJson).HasMaxLength(8000);
             b.HasIndex(x => new { x.TenantId, x.EntityType, x.EntityId, x.OccurredAt });
+        });
+
+        builder.Entity<ContactAccountLink>(b =>
+        {
+            b.ToTable("contact_account_links");
+            b.Property(x => x.Role).HasMaxLength(100);
+            b.HasIndex(x => new { x.TenantId, x.ContactId, x.AccountId }).IsUnique().HasFilter("is_deleted = false");
+            b.HasIndex(x => new { x.TenantId, x.AccountId });
         });
     }
 
