@@ -159,6 +159,7 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<SharedThreadMessage> SharedThreadMessages { get; set; } = null!;
     public DbSet<SharedThreadCollisionLock> SharedThreadCollisionLocks { get; set; } = null!;
     public DbSet<MeetingLink> MeetingLinks { get; set; } = null!;
+    public DbSet<CustomerSurvey> CustomerSurveys { get; set; } = null!;
 
     /// <summary>Tenant used by query filters. Guid.Empty when no tenant is set, so no rows match.</summary>
     protected Guid CurrentTenantId => tenant.TenantId ?? Guid.Empty;
@@ -1547,6 +1548,22 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.HasIndex(x => new { x.TenantId, x.Slug }).IsUnique();
             b.HasIndex(x => new { x.TenantId, x.UserId });
             b.HasIndex(x => new { x.TenantId, x.DealId });
+        });
+
+        builder.Entity<CustomerSurvey>(b =>
+        {
+            b.ToTable("customer_surveys");
+            b.Property(x => x.Type).HasMaxLength(20);
+            b.Property(x => x.Sentiment).HasMaxLength(30);
+            b.Property(x => x.Channel).HasMaxLength(30);
+            b.Property(x => x.CustomerEmail).HasMaxLength(256);
+            b.Property(x => x.CustomerName).HasMaxLength(200);
+            b.Property(x => x.CustomerPhone).HasMaxLength(50);
+            b.Property(x => x.Comment).HasMaxLength(2000);
+            b.HasIndex(x => new { x.TenantId, x.Type });
+            b.HasIndex(x => new { x.TenantId, x.AccountId });
+            b.HasIndex(x => new { x.TenantId, x.ContactId });
+            b.HasIndex(x => new { x.TenantId, x.Sentiment });
         });
     }
 
