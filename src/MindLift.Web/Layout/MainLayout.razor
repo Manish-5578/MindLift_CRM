@@ -130,7 +130,9 @@
             if (App.CanView(AppModule.Activities)) items.Add(new(App.ModuleLabel(AppModule.Activities), "/activities", Icons.Material.Outlined.TaskAlt));
             if (App.CanView(AppModule.Calendar)) items.Add(new(App.ModuleLabel(AppModule.Calendar), "/calendar", Icons.Material.Outlined.CalendarMonth));
             if (App.CanView(AppModule.Communication)) items.Add(new("Unified Inbox", "/inbox", Icons.Material.Outlined.MarkChatUnread));
+            if (App.CanView(AppModule.Communication)) items.Add(new("Booking Links", "/booking/links", Icons.Material.Outlined.EventAvailable));
             if (App.CanView(AppModule.Reports)) items.Add(new(App.ModuleLabel(AppModule.Reports), "/reports", Icons.Material.Outlined.Insights));
+            if (App.CanView(AppModule.Reports)) items.Add(new("Leaderboards", "/leaderboards", Icons.Material.Outlined.EmojiEvents));
             if (App.CanView(AppModule.Products)) items.Add(new(App.ModuleLabel(AppModule.Products), "/products", Icons.Material.Outlined.Inventory2));
             if (App.CanView(AppModule.Quotations)) items.Add(new(App.ModuleLabel(AppModule.Quotations), "/quotes", Icons.Material.Outlined.RequestQuote));
             if (App.CanView(AppModule.Invoices)) items.Add(new(App.ModuleLabel(AppModule.Invoices), "/invoices", Icons.Material.Outlined.ReceiptLong));

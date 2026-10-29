@@ -1,0 +1,251 @@
+@page "/booking/links"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+@inject Translator T
+@using MindLift.Shared.Contracts
+
+<PageTitle>@T["Meeting Booking Links"] · MindLift</PageTitle>
+
+<div class="ml-page ml-page--wide">
+    <div class="d-flex align-center justify-space-between flex-wrap gap-4 mb-6">
+        <div>
+            <div class="d-flex align-center gap-2">
+                <MudIcon Icon="@Icons.Material.Filled.EventAvailable" Color="Color.Primary" Size="Size.Large" />
+                <MudText Typo="Typo.h4" Style="font-weight:700">@T["Meeting Booking Links"]</MudText>
+            </div>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">@T["Share your personalized booking links with clients to eliminate scheduling back-and-forth."]</MudText>
+        </div>
+
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenCreateDialog">
+            @T["New Booking Link"]
+        </MudButton>
+    </div>
+
+    @if (_loading)
+    {
+        <SkeletonTable Rows="4" Columns="4" />
+    }
+    else if (_links is null)
+    {
+        <ErrorState OnRetry="LoadAsync" />
+    }
+    else if (_links.Count == 0)
+    {
+        <EmptyState Title="No booking links created yet" Message="Create your first personalized scheduling link to share with prospects." ActionLabel="Create Booking Link" OnAction="OpenCreateDialog" />
+    }
+    else
+    {
+        <MudGrid Spacing="3">
+            @foreach (var link in _links)
+            {
+                <MudItem xs="12" md="6" lg="4">
+                    <MudCard Class="elevation-1 d-flex flex-column justify-space-between h-100" Style="border-radius:12px; border: 1px solid var(--mud-palette-divider);">
+                        <MudCardContent>
+                            <div class="d-flex align-start justify-space-between gap-2 mb-2">
+                                <div>
+                                    <MudText Typo="Typo.h6" Style="font-weight:700">@link.Title</MudText>
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined" Class="mt-1">
+                                        /@link.Slug
+                                    </MudChip>
+                                </div>
+                                <MudChip T="string" Size="Size.Small" Color="@(link.IsActive ? Color.Success : Color.Default)">
+                                    @(link.IsActive ? T["Active"] : T["Inactive"])
+                                </MudChip>
+                            </div>
+
+                            @if (!string.IsNullOrWhiteSpace(link.Description))
+                            {
+                                <MudText Typo="Typo.body2" Class="mud-text-secondary my-2">@link.Description</MudText>
+                            }
+
+                            <div class="d-flex align-center flex-wrap gap-2 my-3">
+                                <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Filled.Schedule" Variant="Variant.Text">
+                                    @link.DurationMinutes @T["mins"]
+                                </MudChip>
+                                <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Filled.VideoCameraFront" Variant="Variant.Text">
+                                    @link.LocationType
+                                </MudChip>
+                                @if (link.IsSingleUse)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Outlined">
+                                        @T["Single-Use"]
+                                    </MudChip>
+                                }
+                            </div>
+
+                            <MudDivider Class="my-3" />
+
+                            <div class="d-flex align-center justify-space-between">
+                                <div>
+                                    <MudText Typo="Typo.caption" Class="mud-text-secondary">@T["Views"]</MudText>
+                                    <MudText Typo="Typo.subtitle2" Style="font-weight:700">@link.ClickCount</MudText>
+                                </div>
+                                <div>
+                                    <MudText Typo="Typo.caption" Class="mud-text-secondary">@T["Bookings"]</MudText>
+                                    <MudText Typo="Typo.subtitle2" Style="font-weight:700">@link.BookingCount</MudText>
+                                </div>
+                                <div>
+                                    <MudText Typo="Typo.caption" Class="mud-text-secondary">@T["Conversion"]</MudText>
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Success" Style="font-weight:700">@link.ConversionRate%</MudText>
+                                </div>
+                            </div>
+                        </MudCardContent>
+
+                        <MudCardActions Class="px-4 py-3 d-flex justify-space-between" Style="background: var(--mud-palette-background-grey); border-top: 1px solid var(--mud-palette-divider);">
+                            <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.ContentCopy" OnClick="@(() => CopyUrlAsync(link.ShareableUrl))">
+                                @T["Copy Link"]
+                            </MudButton>
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteAsync(link.Id))" Title="@T["Delete link"]" />
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+</div>
+
+@* Simple Create Dialog modal *@
+<MudDialog @bind-Visible="_showCreateDialog" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">@T["Create Personalized Meeting Link"]</MudText>
+    </TitleContent>
+    <DialogContent>
+        <div class="ml-stack">
+            <MudTextField @bind-Value="_createSlug" Label="@T["URL Slug (e.g. 30min-discovery)"]" Variant="Variant.Outlined" Required="true" Margin="Margin.Dense" />
+            <MudTextField @bind-Value="_createTitle" Label="@T["Meeting Title"]" Variant="Variant.Outlined" Required="true" Margin="Margin.Dense" />
+            <MudTextField @bind-Value="_createDesc" Label="@T["Description"]" Variant="Variant.Outlined" Lines="2" Margin="Margin.Dense" />
+            <MudGrid Spacing="2">
+                <MudItem xs="6">
+                    <MudNumericField @bind-Value="_createDuration" Label="@T["Duration (mins)"]" Variant="Variant.Outlined" Min="5" Max="480" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudNumericField @bind-Value="_createBuffer" Label="@T["Buffer (mins)"]" Variant="Variant.Outlined" Min="0" Max="120" Margin="Margin.Dense" />
+                </MudItem>
+            </MudGrid>
+            <MudSelect T="string" @bind-Value="_createLocation" Label="@T["Location Type"]" Variant="Variant.Outlined" Margin="Margin.Dense">
+                <MudSelectItem Value="@("Google Meet")">Google Meet</MudSelectItem>
+                <MudSelectItem Value="@("Zoom")">Zoom</MudSelectItem>
+                <MudSelectItem Value="@("Microsoft Teams")">Microsoft Teams</MudSelectItem>
+                <MudSelectItem Value="@("Phone Call")">Phone Call</MudSelectItem>
+                <MudSelectItem Value="@("In Person")">In Person</MudSelectItem>
+            </MudSelect>
+            <MudSwitch @bind-Value="_createSingleUse" Label="@T["Single-Use Link (expires immediately after booking)"]" Color="Color.Primary" />
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showCreateDialog = false)">@T["Cancel"]</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveCreateAsync" Disabled="_saving">@T["Create Link"]</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<MeetingLinkDto>? _links;
+    private bool _loading = true;
+    private bool _saving = false;
+    private bool _showCreateDialog = false;
+    private DialogOptions _dialogOptions = new() { MaxWidth = MaxWidth.Small, FullWidth = true };
+
+    private string _createSlug = "quick-chat";
+    private string _createTitle = "30-Minute Intro Call";
+    private string _createDesc = "Quick sync to discuss requirements and next steps.";
+    private int _createDuration = 30;
+    private int _createBuffer = 10;
+    private string _createLocation = "Google Meet";
+    private bool _createSingleUse = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _links = await Http.GetFromJsonAsync<List<MeetingLinkDto>>("api/v1/communication/meeting-links");
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            Snackbar.Add("Meeting Links feature is currently OFF. Please turn it on in Settings > Feature flags.", Severity.Warning);
+            _links = [];
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+            _links = null;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OpenCreateDialog()
+    {
+        _createSlug = $"chat-{Random.Shared.Next(100, 999)}";
+        _showCreateDialog = true;
+    }
+
+    private async Task SaveCreateAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_createSlug) || string.IsNullOrWhiteSpace(_createTitle))
+        {
+            Snackbar.Add("Slug and Title are required.", Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var req = new CreateMeetingLinkRequest(
+                Title: _createTitle.Trim(),
+                Slug: _createSlug.Trim(),
+                Description: _createDesc,
+                DurationMinutes: _createDuration,
+                LocationType: _createLocation,
+                IsSingleUse: _createSingleUse);
+
+            var res = await Http.PostAsJsonAsync("api/v1/communication/meeting-links", req);
+            if (res.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Meeting link created successfully!", Severity.Success);
+                _showCreateDialog = false;
+                await LoadAsync();
+            }
+            else
+            {
+                Snackbar.Add("Could not create meeting link.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task DeleteAsync(Guid id)
+    {
+        var res = await Http.DeleteAsync($"api/v1/communication/meeting-links/{id}");
+        if (res.IsSuccessStatusCode)
+        {
+            Snackbar.Add("Link deleted", Severity.Success);
+            await LoadAsync();
+        }
+        else
+        {
+            Snackbar.Add("Failed to delete link", Severity.Error);
+        }
+    }
+
+    private async Task CopyUrlAsync(string url)
+    {
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", url);
+        Snackbar.Add("Copied booking URL to clipboard!", Severity.Info);
+    }
+}

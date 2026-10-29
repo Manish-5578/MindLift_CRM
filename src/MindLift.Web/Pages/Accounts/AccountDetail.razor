@@ -113,6 +113,42 @@
                         <div><a href="@("/accounts/" + child.Id)" class="ml-link" data-testid="child-link">@child.Name</a></div>
                     }
                 </MlCard>
+
+                @if (_health is not null)
+                {
+                    <MlCard Title="Customer Health & NPS">
+                        <div class="d-flex align-center justify-space-between mb-3">
+                            <div class="d-flex align-center gap-2">
+                                <MudIcon Icon="@Icons.Material.Filled.Favorite" Color="@GetHealthColor(_health.HealthScore)" Size="Size.Medium" />
+                                <div>
+                                    <MudText Typo="Typo.h6" Style="font-weight:700" Color="@GetHealthColor(_health.HealthScore)">@_health.HealthScore / 100</MudText>
+                                    <MudText Typo="Typo.caption" Class="mud-text-secondary">@_health.HealthStatus</MudText>
+                                </div>
+                            </div>
+                            <MudChip T="string" Color="@GetHealthColor(_health.HealthScore)" Size="Size.Small" Variant="Variant.Filled">
+                                @_health.Trend
+                            </MudChip>
+                        </div>
+                        <MudDivider Class="my-2" />
+                        <div class="ml-kv">
+                            <div class="ml-kv__label">Average NPS</div><div class="ml-kv__value">@(_health.AverageNps.HasValue ? _health.AverageNps.Value.ToString("F1") : "—")</div>
+                            <div class="ml-kv__label">Open tickets</div><div class="ml-kv__value">@_health.OpenTicketsCount</div>
+                            <div class="ml-kv__label">Recent activities</div><div class="ml-kv__value">@_health.RecentActivitiesCount</div>
+                        </div>
+                    </MlCard>
+                }
+
+                @if (_hierarchy is not null && _hierarchy.TotalRollup.SubtreeAccountCount > 1)
+                {
+                    <MlCard Title="Account Hierarchy Tree">
+                        <div class="ml-kv">
+                            <div class="ml-kv__label">Tree Revenue</div><div class="ml-kv__value">@_hierarchy.TotalRollup.OpenDealsValue.ToString("N0")</div>
+                            <div class="ml-kv__label">Tree Open Deals</div><div class="ml-kv__value">@_hierarchy.TotalRollup.OpenDealsCount</div>
+                            <div class="ml-kv__label">Tree Contacts</div><div class="ml-kv__value">@_hierarchy.TotalRollup.TotalContactsCount</div>
+                            <div class="ml-kv__label">Subtree Accounts</div><div class="ml-kv__value">@_hierarchy.TotalRollup.SubtreeAccountCount</div>
+                        </div>
+                    </MlCard>
+                }
             </Aside>
         </RecordDetailLayout>
     }
@@ -123,6 +159,10 @@
 
 @code {
     private RecordTimeline? _timeline;
+    private AccountHealthScoreDto? _health;
+    private AccountHierarchyTreeDto? _hierarchy;
+
+    private static Color GetHealthColor(int score) => score >= 70 ? Color.Success : score >= 40 ? Color.Warning : Color.Error;
 
     private async Task ReloadTimelineAsync()
     {
@@ -169,6 +209,11 @@
         {
             var response = await Http.GetAsync($"api/v1/accounts/{Id}/summary");
             _summary = response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<AccountSummaryDto>() : null;
+            if (_summary != null)
+            {
+                try { _health = await Http.GetFromJsonAsync<AccountHealthScoreDto>($"api/v1/customer-health/accounts/{Id}"); } catch { _health = null; }
+                try { _hierarchy = await Http.GetFromJsonAsync<AccountHierarchyTreeDto>($"api/v1/accounts/{Id}/hierarchy"); } catch { _hierarchy = null; }
+            }
             if (!response.IsSuccessStatusCode)
             {
                 _error = await ProblemText.FromAsync(response, T["We could not open this account."]);

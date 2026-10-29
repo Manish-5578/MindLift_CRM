@@ -4,13 +4,23 @@
     <div class="ml-state__icon"><MudIcon Icon="@Icon" Style="font-size:36px" /></div>
     <MudText Typo="Typo.h6">@T[Title]</MudText>
     @if (Message is not null) { <MudText Typo="Typo.body1" Class="ml-state__message">@T[Message]</MudText> }
+    @if (Subtitle is not null) { <MudText Typo="Typo.body2" Class="ml-state__message">@T[Subtitle]</MudText> }
     @if (Actions is not null) { <div class="ml-state__actions">@Actions</div> }
+    @if (!string.IsNullOrWhiteSpace(ActionLabel))
+    {
+        <div class="ml-state__actions">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OnAction">@T[ActionLabel]</MudButton>
+        </div>
+    }
 </div>
 
 @code {
     [Parameter] public string Icon { get; set; } = Icons.Material.Outlined.Inbox;
     [Parameter, EditorRequired] public string Title { get; set; } = "";
     [Parameter] public string? Message { get; set; }
+    [Parameter] public string? Subtitle { get; set; }
     [Parameter] public RenderFragment? Actions { get; set; }
+    [Parameter] public string? ActionLabel { get; set; }
+    [Parameter] public EventCallback OnAction { get; set; }
     [Parameter] public bool Compact { get; set; }
 }

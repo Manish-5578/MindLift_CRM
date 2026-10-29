@@ -1,0 +1,314 @@
+@page "/settings/features"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject Translator T
+@using MindLift.Shared.Contracts
+
+<PageTitle>@T["Feature flags"] · MindLift</PageTitle>
+
+<div class="ml-page ml-page--wide">
+    <PageHeader Title="Feature Flags & Capabilities" Subtitle="Explore and toggle all 43 Zoho-parity CRM features across every phase for your workspace." />
+    <SettingsNav Current="/settings/features" />
+
+    @if (_loading)
+    {
+        <SkeletonTable Rows="8" Columns="3" />
+    }
+    else if (_features is null)
+    {
+        <ErrorState OnRetry="LoadAsync" />
+    }
+    else
+    {
+        <div class="d-flex align-center justify-space-between flex-wrap gap-4 mb-6">
+            <div class="d-flex align-center gap-3">
+                <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Size="Size.Medium" Icon="@Icons.Material.Filled.Bolt">
+                    @_features.Count(f => f.Enabled) / @_features.Count @T["Features Active"]
+                </MudChip>
+                <MudChip T="string" Color="Color.Info" Variant="Variant.Outlined" Size="Size.Small">
+                    @T["Per-Tenant Isolated"]
+                </MudChip>
+            </div>
+            <div class="d-flex align-center gap-3">
+                <MudTextField @bind-Value="_search" Placeholder="Filter capabilities..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Clearable="true" Style="min-width:240px" />
+                <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.DoneAll" Size="Size.Small" OnClick="EnableAllAsync" Disabled="_updating">
+                    @T["Enable All"]
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.ClearAll" Size="Size.Small" OnClick="DisableAllAsync" Disabled="_updating">
+                    @T["Disable All"]
+                </MudButton>
+            </div>
+        </div>
+
+        @foreach (var phaseGroup in GroupedFeatures)
+        {
+            <MudCard Class="mb-6 elevation-1" Style="border-radius:12px; border: 1px solid var(--mud-palette-divider); overflow:hidden;">
+                <div class="d-flex align-center justify-space-between px-6 py-4" style="background: var(--mud-palette-background-grey); border-bottom: 1px solid var(--mud-palette-divider);">
+                    <div class="d-flex align-center gap-3">
+                        <MudAvatar Color="@GetPhaseColor(phaseGroup.Phase)" Size="Size.Medium">
+                            @phaseGroup.Phase
+                        </MudAvatar>
+                        <div>
+                            <MudText Typo="Typo.h6" Style="font-weight:600">@GetPhaseTitle(phaseGroup.Phase)</MudText>
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                @phaseGroup.Items.Count(i => i.Enabled) of @phaseGroup.Items.Count @T["active"]
+                            </MudText>
+                        </div>
+                    </div>
+                    <div class="d-flex align-center gap-2">
+                        <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => TogglePhaseAsync(phaseGroup.Items, true))" Disabled="_updating">
+                            @T["Enable Phase"]
+                        </MudButton>
+                        <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Default" OnClick="@(() => TogglePhaseAsync(phaseGroup.Items, false))" Disabled="_updating">
+                            @T["Disable Phase"]
+                        </MudButton>
+                    </div>
+                </div>
+
+                <div class="pa-2">
+                    <MudGrid Spacing="2">
+                        @foreach (var feature in phaseGroup.Items)
+                        {
+                            <MudItem xs="12" md="6" lg="4">
+                                <MudPaper Class="pa-4 d-flex flex-column justify-space-between h-100" Elevation="0" Style="@(feature.Enabled ? "border: 1px solid var(--mud-palette-primary); background: rgba(var(--mud-palette-primary-rgb), 0.04); border-radius:8px;" : "border: 1px solid var(--mud-palette-divider); border-radius:8px;")">
+                                    <div class="d-flex align-start justify-space-between gap-2 mb-2">
+                                        <div class="d-flex align-center gap-2">
+                                            <MudIcon Icon="@GetFeatureIcon(feature.Key)" Color="@(feature.Enabled ? Color.Primary : Color.Default)" Size="Size.Medium" />
+                                            <div>
+                                                <MudText Typo="Typo.subtitle2" Style="font-weight:600">@feature.Name</MudText>
+                                                <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Class="pa-0 ma-0" Style="font-size:11px; color: var(--mud-palette-text-disabled);">
+                                                    @feature.Key
+                                                </MudChip>
+                                            </div>
+                                        </div>
+                                        <MudSwitch T="bool" Value="@feature.Enabled" ValueChanged="@((bool val) => ToggleFeatureAsync(feature.Key, val))" Color="Color.Primary" Disabled="_updating" />
+                                    </div>
+                                    <div class="d-flex align-center justify-space-between mt-2 pt-2" style="border-top: 1px dashed var(--mud-palette-divider);">
+                                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@GetFeatureDescription(feature.Key)</MudText>
+                                        <MudChip T="string" Size="Size.Small" Color="@(feature.Enabled ? Color.Success : Color.Default)" Variant="Variant.Filled" Style="font-size:11px; height:20px;">
+                                            @(feature.Enabled ? T["ACTIVE"] : T["OFF"])
+                                        </MudChip>
+                                    </div>
+                                </MudPaper>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                </div>
+            </MudCard>
+        }
+    }
+</div>
+
+@code {
+    private List<FeatureFlagDto>? _features;
+    private bool _loading = true;
+    private bool _updating = false;
+    private string _search = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _features = await Http.GetFromJsonAsync<List<FeatureFlagDto>>("api/v1/features");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading features: {ex.Message}", Severity.Error);
+            _features = null;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private IEnumerable<(string Phase, List<FeatureFlagDto> Items)> GroupedFeatures
+    {
+        get
+        {
+            if (_features == null) return [];
+            var filtered = string.IsNullOrWhiteSpace(_search)
+                ? _features
+                : _features.Where(f => f.Name.Contains(_search, StringComparison.OrdinalIgnoreCase) || f.Key.Contains(_search, StringComparison.OrdinalIgnoreCase));
+
+            return filtered
+                .GroupBy(f => f.Phase)
+                .OrderBy(g => g.Key)
+                .Select(g => (Phase: g.Key, Items: g.ToList()));
+        }
+    }
+
+    private async Task ToggleFeatureAsync(string key, bool enabled)
+    {
+        _updating = true;
+        try
+        {
+            var res = await Http.PutAsJsonAsync($"api/v1/features/{key}", new SetFeatureRequest(enabled));
+            if (res.IsSuccessStatusCode)
+            {
+                var idx = _features?.FindIndex(f => f.Key == key) ?? -1;
+                if (idx >= 0 && _features != null)
+                {
+                    _features[idx] = _features[idx] with { Enabled = enabled };
+                }
+                Snackbar.Add($"{key} {(enabled ? "enabled" : "disabled")}", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add($"Failed to update {key}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _updating = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task EnableAllAsync()
+    {
+        if (_features == null) return;
+        _updating = true;
+        int count = 0;
+        foreach (var f in _features.Where(f => !f.Enabled))
+        {
+            var res = await Http.PutAsJsonAsync($"api/v1/features/{f.Key}", new SetFeatureRequest(true));
+            if (res.IsSuccessStatusCode) count++;
+        }
+        await LoadAsync();
+        _updating = false;
+        Snackbar.Add($"Enabled {count} features", Severity.Success);
+    }
+
+    private async Task DisableAllAsync()
+    {
+        if (_features == null) return;
+        _updating = true;
+        int count = 0;
+        foreach (var f in _features.Where(f => f.Enabled))
+        {
+            var res = await Http.PutAsJsonAsync($"api/v1/features/{f.Key}", new SetFeatureRequest(false));
+            if (res.IsSuccessStatusCode) count++;
+        }
+        await LoadAsync();
+        _updating = false;
+        Snackbar.Add($"Disabled {count} features", Severity.Info);
+    }
+
+    private async Task TogglePhaseAsync(List<FeatureFlagDto> items, bool enabled)
+    {
+        _updating = true;
+        foreach (var item in items.Where(i => i.Enabled != enabled))
+        {
+            await Http.PutAsJsonAsync($"api/v1/features/{item.Key}", new SetFeatureRequest(enabled));
+        }
+        await LoadAsync();
+        _updating = false;
+        Snackbar.Add($"Phase features updated", Severity.Success);
+    }
+
+    private static Color GetPhaseColor(string phase) => phase switch
+    {
+        "1" => Color.Primary,
+        "2" => Color.Info,
+        "3" => Color.Success,
+        "4" => Color.Warning,
+        "5" => Color.Secondary,
+        "6" => Color.Tertiary,
+        _ => Color.Default
+    };
+
+    private static string GetPhaseTitle(string phase) => phase switch
+    {
+        "1" => "Phase 1: Core Sales Data Model",
+        "2" => "Phase 2: Platform & Customization",
+        "3" => "Phase 3: Sales & Deal Management",
+        "4" => "Phase 4: Lead Capture & Automation",
+        "5" => "Phase 5: Communication Channels & Omnichannel",
+        "6" => "Phase 6: Analytics, Hierarchy & Mobile PWA",
+        _ => $"Phase {phase}"
+    };
+
+    private static string GetFeatureIcon(string key) => key switch
+    {
+        "lead-conversion" => Icons.Material.Filled.Transform,
+        "contact-multi-account" => Icons.Material.Filled.Hub,
+        "duplicate-merge" => Icons.Material.Filled.MergeType,
+        "deal-line-items" => Icons.Material.Filled.ListAlt,
+        "deal-stage-gating" => Icons.Material.Filled.Rule,
+        "quick-log-dock" => Icons.Material.Filled.FlashOn,
+        "recycle-bin" => Icons.Material.Filled.DeleteSweep,
+        "dependent-picklists" => Icons.Material.Filled.AccountTree,
+        "layout-rules" => Icons.Material.Filled.ViewQuilt,
+        "custom-objects" => Icons.Material.Filled.Extension,
+        "workflow-builder" => Icons.Material.Filled.AltRoute,
+        "scheduled-backups" => Icons.Material.Filled.Backup,
+        "deal-splits" => Icons.Material.Filled.CallSplit,
+        "forecasting" => Icons.Material.Filled.TrendingUp,
+        "fx-sync" => Icons.Material.Filled.CurrencyExchange,
+        "competitors" => Icons.Material.Filled.Shield,
+        "win-loss" => Icons.Material.Filled.PieChart,
+        "quote-esign" => Icons.Material.Filled.Draw,
+        "payment-links" => Icons.Material.Filled.CreditCard,
+        "cadences" => Icons.Material.Filled.Repeat,
+        "lead-routing" => Icons.Material.Filled.Route,
+        "lead-scoring" => Icons.Material.Filled.Grade,
+        "response-sla" => Icons.Material.Filled.Timer,
+        "visitor-tracking" => Icons.Material.Filled.Visibility,
+        "email-template-builder" => Icons.Material.Filled.DesignServices,
+        "unsubscribe-center" => Icons.Material.Filled.Unsubscribe,
+        "data-enrichment" => Icons.Material.Filled.AutoFixHigh,
+        "email-sync" => Icons.Material.Filled.Sync,
+        "email-tracking" => Icons.Material.Filled.TrackChanges,
+        "bcc-dropbox" => Icons.Material.Filled.MoveToInbox,
+        "click-to-call" => Icons.Material.Filled.Phone,
+        "call-recording" => Icons.Material.Filled.Mic,
+        "whatsapp" => Icons.Custom.Brands.WhatsApp,
+        "shared-inbox" => Icons.Material.Filled.GroupWork,
+        "meeting-links" => Icons.Material.Filled.EventAvailable,
+        "account-hierarchy" => Icons.Material.Filled.AccountTree,
+        "customer-health" => Icons.Material.Filled.Favorite,
+        "linkedin-lookup" => Icons.Custom.Brands.LinkedIn,
+        "dashboard-widgets" => Icons.Material.Filled.Widgets,
+        "velocity-reports" => Icons.Material.Filled.Speed,
+        "leaderboards" => Icons.Material.Filled.EmojiEvents,
+        "pwa-offline" => Icons.Material.Filled.WifiOff,
+        _ => Icons.Material.Filled.Settings
+    };
+
+    private static string GetFeatureDescription(string key) => key switch
+    {
+        "whatsapp" => "Meta WhatsApp Cloud API integration & conversation care window",
+        "shared-inbox" => "Team mailboxes with collision detection and locks",
+        "meeting-links" => "Personalized rep booking links with auto-calendar sync",
+        "click-to-call" => "Twilio telephony with in-browser click-to-call",
+        "call-recording" => "Dual-channel recording and automated transcription",
+        "email-sync" => "Two-way IMAP/SMTP sync with conversation threading",
+        "email-tracking" => "Pixel open detection and click URL tracking",
+        "bcc-dropbox" => "Unique rep BCC addresses to capture outgoing client emails",
+        "account-hierarchy" => "Multi-tier parent/child account tree & rollup calculations",
+        "customer-health" => "Automated health scoring, NPS and CSAT survey ingress",
+        "linkedin-lookup" => "One-click contact & company LinkedIn profile enrichment",
+        "dashboard-widgets" => "Configurable KPI cards and dynamic chart widgets",
+        "velocity-reports" => "Deal stage duration, conversion rates & funnel analytics",
+        "leaderboards" => "Gamified sales rep rankings, podium medals & quotas",
+        "pwa-offline" => "Offline progressive web app, local queuing & delta sync",
+        "lead-scoring" => "Predictive behavioral score & qualification thresholds",
+        "quote-esign" => "Audit-logged electronic signature for CPQ quotations",
+        "payment-links" => "Stripe payment links for instant invoice settlement",
+        "cadences" => "Automated multi-step outreach schedules",
+        "response-sla" => "First-response SLA timers and manager escalations",
+        "lead-conversion" => "Convert leads to Contacts, Accounts, and Deals simultaneously",
+        _ => "Zoho-parity enterprise CRM capability"
+    };
+}

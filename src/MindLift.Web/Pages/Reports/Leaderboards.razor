@@ -1,0 +1,229 @@
+@page "/leaderboards"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject Translator T
+@using MindLift.Shared.Contracts
+
+<PageTitle>@T["Sales Leaderboards"] · MindLift</PageTitle>
+
+<div class="ml-page ml-page--wide">
+    <div class="d-flex align-center justify-space-between flex-wrap gap-4 mb-6">
+        <div>
+            <div class="d-flex align-center gap-2">
+                <MudIcon Icon="@Icons.Material.Filled.EmojiEvents" Color="Color.Warning" Size="Size.Large" />
+                <MudText Typo="Typo.h4" Style="font-weight:700">@T["Sales Leaderboards"]</MudText>
+            </div>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">@T["Gamified performance rankings, quotas, and podium achievements."]</MudText>
+        </div>
+
+        <div class="d-flex align-center gap-3">
+            <MudSelect T="string" Value="@_metric" ValueChanged="OnMetricChanged" Label="@T["Ranking Metric"]" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Style="min-width:180px">
+                <MudSelectItem Value="@("revenue")">💰 @T["Revenue Won"]</MudSelectItem>
+                <MudSelectItem Value="@("deals_won")">🎯 @T["Deals Won Count"]</MudSelectItem>
+                <MudSelectItem Value="@("quota")">📈 @T["Quota Attainment %"]</MudSelectItem>
+                <MudSelectItem Value="@("activities")">⚡ @T["Activity Volume"]</MudSelectItem>
+            </MudSelect>
+
+            <MudSelect T="string" Value="@_period" ValueChanged="OnPeriodChanged" Label="@T["Time Window"]" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Style="min-width:160px">
+                <MudSelectItem Value="@("this_month")">@T["This Month"]</MudSelectItem>
+                <MudSelectItem Value="@("this_quarter")">@T["This Quarter"]</MudSelectItem>
+                <MudSelectItem Value="@("this_year")">@T["This Year"]</MudSelectItem>
+            </MudSelect>
+
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh" Color="Color.Primary" OnClick="LoadAsync" Disabled="_loading" Title="@T["Refresh rankings"]" />
+        </div>
+    </div>
+
+    @if (_loading)
+    {
+        <SkeletonTable Rows="6" Columns="5" />
+    }
+    else if (_data is null)
+    {
+        <ErrorState OnRetry="LoadAsync" />
+    }
+    else
+    {
+        @* Personal Rank Banner *@
+        @if (_data.MyRank is { } myRank)
+        {
+            <MudPaper Class="pa-4 mb-6 d-flex align-center justify-space-between flex-wrap gap-4 elevation-1" Style="border-left: 6px solid var(--mud-palette-primary); border-radius:8px; background: linear-gradient(90deg, rgba(var(--mud-palette-primary-rgb), 0.08), transparent);">
+                <div class="d-flex align-center gap-4">
+                    <MudAvatar Color="Color.Primary" Size="Size.Large">#@myRank.Rank</MudAvatar>
+                    <div>
+                        <MudText Typo="Typo.subtitle1" Style="font-weight:600">@T["Your Standing: #{0} on the Leaderboard", myRank.Rank]</MudText>
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                            @if (myRank.Rank == 1)
+                            {
+                                <span>🏆 @T["You are currently leading the leaderboard! Keep crushing it."]</span>
+                            }
+                            else if (myRank.GapToNextRank > 0)
+                            {
+                                <span>🚀 @T["You are only {0:N0} away from passing {1} to claim #{2}!", myRank.GapToNextRank, myRank.NextRankUserName ?? "the next rank", myRank.Rank - 1]</span>
+                            }
+                        </MudText>
+                    </div>
+                </div>
+                <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled">@T["Score: {0:N0}", myRank.Score]</MudChip>
+            </MudPaper>
+        }
+
+        @* Podium: Top 3 Reps *@
+        @if (_data.Entries.Count >= 3)
+        {
+            var first = _data.Entries[0];
+            var second = _data.Entries[1];
+            var third = _data.Entries[2];
+
+            <MudGrid Spacing="3" Class="mb-6 justify-center">
+                @* 2nd Place Silver *@
+                <MudItem xs="12" sm="4" Class="d-flex flex-column align-center" Style="order: 2;">
+                    <MudCard Class="pa-4 text-center w-100 elevation-2" Style="border-top: 4px solid #94A3B8; border-radius:12px; background: linear-gradient(180deg, rgba(148, 163, 184, 0.1), transparent);">
+                        <MudText Typo="Typo.h3">🥈</MudText>
+                        <MudAvatar Color="Color.Secondary" Size="Size.Large" Class="my-2">@GetInitials(second.UserName)</MudAvatar>
+                        <MudText Typo="Typo.h6" Style="font-weight:700">@second.UserName</MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@second.UserEmail</MudText>
+                        <MudDivider Class="my-2" />
+                        <MudText Typo="Typo.h5" Color="Color.Primary" Style="font-weight:700">@second.FormattedScore</MudText>
+                        <MudChip T="string" Color="Color.Secondary" Size="Size.Small" Variant="Variant.Filled" Class="mt-2">@second.Tier</MudChip>
+                    </MudCard>
+                </MudItem>
+
+                @* 1st Place Gold *@
+                <MudItem xs="12" sm="4" Class="d-flex flex-column align-center" Style="order: 1; transform: scale(1.05);">
+                    <MudCard Class="pa-5 text-center w-100 elevation-4" Style="border-top: 5px solid #F59E0B; border-radius:12px; background: linear-gradient(180deg, rgba(245, 158, 11, 0.15), transparent);">
+                        <MudText Typo="Typo.h2">👑</MudText>
+                        <MudAvatar Color="Color.Warning" Size="Size.Large" Class="my-2" Style="width:64px; height:64px; font-size:24px;">@GetInitials(first.UserName)</MudAvatar>
+                        <MudText Typo="Typo.h5" Style="font-weight:800">@first.UserName</MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@first.UserEmail</MudText>
+                        <MudDivider Class="my-2" />
+                        <MudText Typo="Typo.h4" Color="Color.Warning" Style="font-weight:800">@first.FormattedScore</MudText>
+                        <MudChip T="string" Color="Color.Warning" Size="Size.Small" Variant="Variant.Filled" Class="mt-2">🏆 @first.Tier Champion</MudChip>
+                    </MudCard>
+                </MudItem>
+
+                @* 3rd Place Bronze *@
+                <MudItem xs="12" sm="4" Class="d-flex flex-column align-center" Style="order: 3;">
+                    <MudCard Class="pa-4 text-center w-100 elevation-2" Style="border-top: 4px solid #D97706; border-radius:12px; background: linear-gradient(180deg, rgba(217, 119, 6, 0.1), transparent);">
+                        <MudText Typo="Typo.h3">🥉</MudText>
+                        <MudAvatar Color="Color.Tertiary" Size="Size.Large" Class="my-2">@GetInitials(third.UserName)</MudAvatar>
+                        <MudText Typo="Typo.h6" Style="font-weight:700">@third.UserName</MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@third.UserEmail</MudText>
+                        <MudDivider Class="my-2" />
+                        <MudText Typo="Typo.h5" Color="Color.Primary" Style="font-weight:700">@third.FormattedScore</MudText>
+                        <MudChip T="string" Color="Color.Tertiary" Size="Size.Small" Variant="Variant.Filled" Class="mt-2">@third.Tier</MudChip>
+                    </MudCard>
+                </MudItem>
+            </MudGrid>
+        }
+
+        @* Full Leaderboard Table *@
+        <MudCard Elevation="1" Style="border-radius:12px; overflow:hidden;">
+            <MudTable Items="_data.Entries" Hover="true" Breakpoint="Breakpoint.Sm" Elevation="0">
+                <HeaderContent>
+                    <MudTh Style="width:70px">@T["Rank"]</MudTh>
+                    <MudTh>@T["Sales Rep"]</MudTh>
+                    <MudTh Style="text-align:right">@T["Score"]</MudTh>
+                    <MudTh Style="text-align:center">@T["Quota Attainment"]</MudTh>
+                    <MudTh Style="text-align:center">@T["Performance Tier"]</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Rank">
+                        <div class="d-flex align-center gap-2">
+                            @if (context.Rank == 1) { <span style="font-size:20px">🥇</span> }
+                            else if (context.Rank == 2) { <span style="font-size:20px">🥈</span> }
+                            else if (context.Rank == 3) { <span style="font-size:20px">🥉</span> }
+                            else { <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">#@context.Rank</MudChip> }
+                        </div>
+                    </MudTd>
+                    <MudTd DataLabel="Sales Rep">
+                        <div class="d-flex align-center gap-3">
+                            <MudAvatar Color="Color.Primary" Size="Size.Small">@GetInitials(context.UserName)</MudAvatar>
+                            <div>
+                                <MudText Typo="Typo.body2" Style="font-weight:600">@context.UserName</MudText>
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary">@context.UserEmail</MudText>
+                            </div>
+                        </div>
+                    </MudTd>
+                    <MudTd DataLabel="Score" Style="text-align:right; font-weight:700">
+                        @context.FormattedScore
+                    </MudTd>
+                    <MudTd DataLabel="Quota" Style="text-align:center">
+                        <div class="d-flex align-center justify-center gap-2">
+                            <MudProgressLinear Color="@((context.AttainmentPercentage ?? 0) >= 100 ? Color.Success : (context.AttainmentPercentage ?? 0) >= 70 ? Color.Info : Color.Warning)" Value="@((double)Math.Min(100, context.AttainmentPercentage ?? 0))" Style="width:100px; height:8px; border-radius:4px" />
+                            <MudText Typo="Typo.caption" Style="font-weight:600; width:45px">@(context.AttainmentPercentage.HasValue ? $"{context.AttainmentPercentage.Value:F0}%" : "—")</MudText>
+                        </div>
+                    </MudTd>
+                    <MudTd DataLabel="Tier" Style="text-align:center">
+                        <MudChip T="string" Color="@GetTierColor(context.Tier)" Size="Size.Small" Variant="Variant.Filled">
+                            @context.Tier
+                        </MudChip>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudCard>
+    }
+</div>
+
+@code {
+    private LeaderboardResponseDto? _data;
+    private bool _loading = true;
+    private string _metric = "revenue";
+    private string _period = "this_month";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task OnMetricChanged(string val)
+    {
+        _metric = val;
+        await LoadAsync();
+    }
+
+    private async Task OnPeriodChanged(string val)
+    {
+        _period = val;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _data = await Http.GetFromJsonAsync<LeaderboardResponseDto>($"api/v1/leaderboards?metric={_metric}&period={_period}");
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            Snackbar.Add("Leaderboards feature is currently OFF. Please turn it on in Settings > Feature flags.", Severity.Warning);
+            _data = null;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading leaderboard: {ex.Message}", Severity.Error);
+            _data = null;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static string GetInitials(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "U";
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length > 1 ? $"{parts[0][0]}{parts[1][0]}".ToUpper() : $"{name[0]}".ToUpper();
+    }
+
+    private static Color GetTierColor(string tier) => tier switch
+    {
+        "Diamond" => Color.Tertiary,
+        "Platinum" => Color.Primary,
+        "Gold" => Color.Warning,
+        "Silver" => Color.Secondary,
+        _ => Color.Default
+    };
+}

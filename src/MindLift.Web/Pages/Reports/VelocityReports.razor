@@ -1,0 +1,199 @@
+@page "/reports/velocity"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject Translator T
+@using MindLift.Shared.Contracts
+
+<PageTitle>@T["Velocity & Funnel Reports"] · MindLift</PageTitle>
+
+<div class="ml-page ml-page--wide">
+    <div class="d-flex align-center justify-space-between flex-wrap gap-4 mb-6">
+        <div>
+            <div class="d-flex align-center gap-2">
+                <MudIcon Icon="@Icons.Material.Filled.Speed" Color="Color.Secondary" Size="Size.Large" />
+                <MudText Typo="Typo.h4" Style="font-weight:700">@T["Velocity & Funnel Reports"]</MudText>
+            </div>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">@T["Track stage durations, sales velocity equation metrics, and funnel conversion."]</MudText>
+        </div>
+
+        <div class="d-flex align-center gap-3">
+            <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/reports">
+                @T["Back to Reports"]
+            </MudButton>
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh" Color="Color.Primary" OnClick="LoadAsync" Disabled="_loading" Title="@T["Refresh report"]" />
+        </div>
+    </div>
+
+    @if (_loading)
+    {
+        <SkeletonTable Rows="6" Columns="4" />
+    }
+    else if (_funnel is null && _velocity is null)
+    {
+        <ErrorState OnRetry="LoadAsync" />
+    }
+    else
+    {
+        @* Sales Velocity Equation Cards *@
+        @if (_velocity is not null)
+        {
+            <MudGrid Spacing="3" Class="mb-6">
+                <MudItem xs="12" sm="3">
+                    <MudPaper Class="pa-4 elevation-1" Style="border-left: 5px solid var(--mud-palette-primary); border-radius:8px;">
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@T["Sales Velocity / Day"]</MudText>
+                        <MudText Typo="Typo.h4" Style="font-weight:700" Color="Color.Primary">
+                            @_velocity.Currency @_velocity.SalesVelocityPerDay.ToString("N0")
+                        </MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@T["daily pipeline revenue speed"]</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudPaper Class="pa-4 elevation-1" Style="border-left: 5px solid var(--mud-palette-success); border-radius:8px;">
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@T["Win Rate %"]</MudText>
+                        <MudText Typo="Typo.h4" Style="font-weight:700" Color="Color.Success">
+                            @_velocity.WinRatePercentage.ToString("F1")%
+                        </MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@T["deals closed won"]</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudPaper Class="pa-4 elevation-1" Style="border-left: 5px solid var(--mud-palette-info); border-radius:8px;">
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@T["Avg Deal Size"]</MudText>
+                        <MudText Typo="Typo.h4" Style="font-weight:700" Color="Color.Info">
+                            @_velocity.Currency @_velocity.AverageDealSize.ToString("N0")
+                        </MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@T["average deal revenue"]</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="3">
+                    <MudPaper Class="pa-4 elevation-1" Style="border-left: 5px solid var(--mud-palette-warning); border-radius:8px;">
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@T["Sales Cycle Length"]</MudText>
+                        <MudText Typo="Typo.h4" Style="font-weight:700" Color="Color.Warning">
+                            @_velocity.SalesCycleLengthDays.ToString("F0") @T["days"]
+                        </MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@T["average days to close"]</MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        }
+
+        @* Visual Funnel Pipeline *@
+        @if (_funnel is not null)
+        {
+            <MudCard Class="mb-6 elevation-1" Style="border-radius:12px; border: 1px solid var(--mud-palette-divider);">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6" Style="font-weight:700">@T["Pipeline Funnel Stages: {0}", _funnel.PipelineName]</MudText>
+                        <div class="d-flex align-center gap-3 mt-1">
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@T["Total Entered: {0}", _funnel.TotalDealsEntered]</MudChip>
+                            <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Filled">@T["Won: {0}", _funnel.TotalDealsWon]</MudChip>
+                            <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Filled">@T["Lost: {0}", _funnel.TotalDealsLost]</MudChip>
+                            <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">@T["Conversion: {0:F1}%", _funnel.OverallConversionRate]</MudChip>
+                        </div>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <div class="d-flex flex-column gap-3">
+                        @foreach (var stage in _funnel.Stages)
+                        {
+                            var widthPct = Math.Max(15, Math.Min(100, stage.ConversionRateToNext));
+                            <div>
+                                <div class="d-flex align-center justify-space-between mb-1">
+                                    <div class="d-flex align-center gap-2">
+                                        <MudText Typo="Typo.body2" Style="font-weight:600">@stage.StageName</MudText>
+                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@stage.StageType</MudChip>
+                                    </div>
+                                    <div class="d-flex align-center gap-3">
+                                        <MudText Typo="Typo.caption">@stage.DealsCount @T["deals"] (@stage.DealsValue.ToString("N0"))</MudText>
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled">
+                                            @stage.ConversionRateToNext.ToString("F1")% @T["next"]
+                                        </MudChip>
+                                    </div>
+                                </div>
+                                <div class="d-flex align-center gap-2">
+                                    <MudProgressLinear Color="@(stage.StageType == "Won" ? Color.Success : stage.StageType == "Lost" ? Color.Error : Color.Primary)" Value="@((double)widthPct)" Style="height:16px; border-radius:8px;" />
+                                    <MudText Typo="Typo.caption" Style="font-weight:600; width:55px">@stage.AverageDurationDays.ToString("F1") d</MudText>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        }
+
+        @* Rep Velocity Table *@
+        @if (_velocity?.RepVelocities.Count > 0)
+        {
+            <MudCard Elevation="1" Style="border-radius:12px; overflow:hidden;">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6" Style="font-weight:700">@T["Sales Rep Velocity Breakdown"]</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudTable Items="_velocity.RepVelocities" Hover="true" Elevation="0">
+                    <HeaderContent>
+                        <MudTh>@T["Sales Rep"]</MudTh>
+                        <MudTh Style="text-align:right">@T["Velocity / Day"]</MudTh>
+                        <MudTh Style="text-align:center">@T["Opportunities"]</MudTh>
+                        <MudTh Style="text-align:right">@T["Win Rate"]</MudTh>
+                        <MudTh Style="text-align:right">@T["Avg Deal Size"]</MudTh>
+                        <MudTh Style="text-align:right">@T["Avg Cycle"]</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Sales Rep" Style="font-weight:600">@context.OwnerName</MudTd>
+                        <MudTd DataLabel="Velocity / Day" Style="text-align:right; font-weight:700" Color="Color.Primary">
+                            @context.SalesVelocityPerDay.ToString("N0")
+                        </MudTd>
+                        <MudTd DataLabel="Opportunities" Style="text-align:center">
+                            @context.OpportunitiesCount
+                        </MudTd>
+                        <MudTd DataLabel="Win Rate" Style="text-align:right" Color="Color.Success">
+                            @context.WinRatePercentage.ToString("F1")%
+                        </MudTd>
+                        <MudTd DataLabel="Avg Deal Size" Style="text-align:right">
+                            @context.AverageDealSize.ToString("N0")
+                        </MudTd>
+                        <MudTd DataLabel="Avg Cycle" Style="text-align:right">
+                            @context.AverageCycleDays.ToString("F0") @T["days"]
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            </MudCard>
+        }
+    }
+</div>
+
+@code {
+    private PipelineFunnelReportDto? _funnel;
+    private SalesVelocityReportDto? _velocity;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _funnel = await Http.GetFromJsonAsync<PipelineFunnelReportDto>("api/v1/reports/velocity/funnel");
+            _velocity = await Http.GetFromJsonAsync<SalesVelocityReportDto>("api/v1/reports/velocity/sales-velocity");
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            Snackbar.Add("Velocity reports feature is currently OFF. Please turn it on in Settings > Feature flags.", Severity.Warning);
+            _funnel = null;
+            _velocity = null;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

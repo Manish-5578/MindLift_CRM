@@ -1,0 +1,389 @@
+@using MindLift.Shared.Contracts
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+@inject Translator T
+
+<MudDialog MaxWidth="MaxWidth.Medium" FullWidth="true">
+    <TitleContent>
+        <div class="d-flex align-center gap-3">
+            <MudAvatar Color="Color.Primary" Variant="Variant.Filled" Size="Size.Medium">
+                <MudIcon Icon="@Icons.Material.Filled.Transform" />
+            </MudAvatar>
+            <div>
+                <MudText Typo="Typo.h6" Style="font-weight:700">@T["Convert Lead to Customer"]</MudText>
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">@T["Transform this lead into an active contact, organization account, and deal pipeline opportunity."]</MudText>
+            </div>
+        </div>
+    </TitleContent>
+
+    <DialogContent>
+        @if (_loading)
+        {
+            <div class="pa-8 d-flex flex-column align-center justify-center gap-3">
+                <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">@T["Loading conversion options and matching existing records..."]</MudText>
+            </div>
+        }
+        else if (_result is not null)
+        {
+            @* Conversion Success Celebration Screen *@
+            <div class="pa-4 text-center">
+                <MudAvatar Color="Color.Success" Variant="Variant.Filled" Style="width:72px; height:72px; margin: 0 auto 16px auto;">
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Style="font-size:40px" />
+                </MudAvatar>
+                <MudText Typo="Typo.h5" Style="font-weight:700" Class="mb-1">@T["Lead Successfully Converted!"]</MudText>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary mb-6">
+                    @T["All historical notes, activities, and communication records have been preserved and moved to the new records."]
+                </MudText>
+
+                <MudGrid Spacing="3" Class="text-left mb-4">
+                    <MudItem xs="12" sm="@(_result.DealId.HasValue ? 4 : 6)">
+                        <MudCard Elevation="1" Class="pa-4 h-100" Style="border: 1px solid var(--mud-palette-divider); border-radius:10px;">
+                            <div class="d-flex align-center gap-2 mb-2">
+                                <MudIcon Icon="@Icons.Material.Filled.Person" Color="Color.Primary" />
+                                <MudText Typo="Typo.subtitle2" Style="font-weight:700">@T["Contact"]</MudText>
+                            </div>
+                            <MudText Typo="Typo.body2" Class="text-truncate">@_options?.LeadName</MudText>
+                            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Href="@($"/contacts/{_result.ContactId}")" Class="mt-2 pa-0">
+                                @T["View Contact →"]
+                            </MudButton>
+                        </MudCard>
+                    </MudItem>
+
+                    @if (_result.AccountId.HasValue)
+                    {
+                        <MudItem xs="12" sm="@(_result.DealId.HasValue ? 4 : 6)">
+                            <MudCard Elevation="1" Class="pa-4 h-100" Style="border: 1px solid var(--mud-palette-divider); border-radius:10px;">
+                                <div class="d-flex align-center gap-2 mb-2">
+                                    <MudIcon Icon="@Icons.Material.Filled.Business" Color="Color.Info" />
+                                    <MudText Typo="Typo.subtitle2" Style="font-weight:700">@T["Account"]</MudText>
+                                </div>
+                                <MudText Typo="Typo.body2" Class="text-truncate">@(_accountMode == "create" ? _accountName : _selectedAccountName)</MudText>
+                                <MudButton Variant="Variant.Text" Color="Color.Info" Size="Size.Small" Href="@($"/accounts/{_result.AccountId}")" Class="mt-2 pa-0">
+                                    @T["View Account →"]
+                                </MudButton>
+                            </MudCard>
+                        </MudItem>
+                    }
+
+                    @if (_result.DealId.HasValue)
+                    {
+                        <MudItem xs="12" sm="4">
+                            <MudCard Elevation="1" Class="pa-4 h-100" Style="border: 1px solid var(--mud-palette-divider); border-radius:10px;">
+                                <div class="d-flex align-center gap-2 mb-2">
+                                    <MudIcon Icon="@Icons.Material.Filled.MonetizationOn" Color="Color.Success" />
+                                    <MudText Typo="Typo.subtitle2" Style="font-weight:700">@T["Deal Opportunity"]</MudText>
+                                </div>
+                                <MudText Typo="Typo.body2" Class="text-truncate">@_dealName</MudText>
+                                <MudButton Variant="Variant.Text" Color="Color.Success" Size="Size.Small" Href="@($"/deals/{_result.DealId}")" Class="mt-2 pa-0">
+                                    @T["View Deal →"]
+                                </MudButton>
+                            </MudCard>
+                        </MudItem>
+                    }
+                </MudGrid>
+            </div>
+        }
+        else if (_options is not null)
+        {
+            <div class="ml-stack" style="gap:20px">
+                @* Section 1: Account Organization *@
+                <MudCard Elevation="0" Outlined="true" Style="border-radius:10px; overflow:hidden;">
+                    <div class="pa-3" style="background: var(--mud-palette-background-grey); border-bottom: 1px solid var(--mud-palette-divider);">
+                        <div class="d-flex align-center gap-2">
+                            <MudIcon Icon="@Icons.Material.Filled.Business" Color="Color.Primary" Size="Size.Small" />
+                            <MudText Typo="Typo.subtitle2" Style="font-weight:700">1. @T["Company Account"]</MudText>
+                        </div>
+                    </div>
+                    <div class="pa-4">
+                        @if (_options.MatchingAccounts.Count > 0)
+                        {
+                            <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3" Icon="@Icons.Material.Filled.Search">
+                                @T["We detected {0} existing company account(s) matching '{1}'. You can link to it or create a new one.", _options.MatchingAccounts.Count, _options.CompanyName ?? _options.LeadName]
+                            </MudAlert>
+                        }
+
+                        <MudRadioGroup T="string" @bind-Value="_accountMode" Class="mb-3">
+                            <MudRadio T="string" Value="@("create")" Color="Color.Primary">@T["Create new company account"]</MudRadio>
+                            @if (_options.MatchingAccounts.Count > 0)
+                            {
+                                <MudRadio T="string" Value="@("existing")" Color="Color.Primary">@T["Link to existing matching company"]</MudRadio>
+                            }
+                            <MudRadio T="string" Value="@("none")" Color="Color.Default">@T["Do not create or link an account (Individual)"]</MudRadio>
+                        </MudRadioGroup>
+
+                        @if (_accountMode == "create")
+                        {
+                            <MudTextField @bind-Value="_accountName" Label="@T["Company Name *"]" Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" />
+                        }
+                        else if (_accountMode == "existing" && _options.MatchingAccounts.Count > 0)
+                        {
+                            <MudSelect T="Guid?" @bind-Value="_selectedAccountId" Label="@T["Select Existing Account"]" Variant="Variant.Outlined" Margin="Margin.Dense">
+                                @foreach (var hit in _options.MatchingAccounts)
+                                {
+                                    <MudSelectItem T="Guid?" Value="@hit.Id">@hit.Title (@(hit.Subtitle ?? "Account"))</MudSelectItem>
+                                }
+                            </MudSelect>
+                        }
+                    </div>
+                </MudCard>
+
+                @* Section 2: Contact Person *@
+                <MudCard Elevation="0" Outlined="true" Style="border-radius:10px; overflow:hidden;">
+                    <div class="pa-3" style="background: var(--mud-palette-background-grey); border-bottom: 1px solid var(--mud-palette-divider);">
+                        <div class="d-flex align-center gap-2">
+                            <MudIcon Icon="@Icons.Material.Filled.Person" Color="Color.Primary" Size="Size.Small" />
+                            <MudText Typo="Typo.subtitle2" Style="font-weight:700">2. @T["Contact Person"]</MudText>
+                        </div>
+                    </div>
+                    <div class="pa-4">
+                        @if (_options.MatchingContacts.Count > 0)
+                        {
+                            <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3" Icon="@Icons.Material.Filled.Warning">
+                                @T["An existing contact with email '{0}' already exists in your CRM.", _options.Email]
+                            </MudAlert>
+
+                            <MudRadioGroup T="string" @bind-Value="_contactMode" Class="mb-3">
+                                <MudRadio T="string" Value="@("create")" Color="Color.Primary">@T["Create new contact anyway"]</MudRadio>
+                                <MudRadio T="string" Value="@("existing")" Color="Color.Warning">@T["Link to existing contact ({0})", _options.MatchingContacts[0].Title]</MudRadio>
+                            </MudRadioGroup>
+                        }
+
+                        <div class="d-flex align-center gap-3">
+                            <MudChip T="string" Icon="@Icons.Material.Filled.Badge" Variant="Variant.Text">@_options.LeadName</MudChip>
+                            @if (!string.IsNullOrWhiteSpace(_options.Email))
+                            {
+                                <MudChip T="string" Icon="@Icons.Material.Filled.Email" Variant="Variant.Text">@_options.Email</MudChip>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(_options.Phone))
+                            {
+                                <MudChip T="string" Icon="@Icons.Material.Filled.Phone" Variant="Variant.Text">@_options.Phone</MudChip>
+                            }
+                        </div>
+                    </div>
+                </MudCard>
+
+                @* Section 3: Deal Opportunity *@
+                <MudCard Elevation="0" Outlined="true" Style="border-radius:10px; overflow:hidden;">
+                    <div class="pa-3 d-flex align-center justify-space-between" style="background: var(--mud-palette-background-grey); border-bottom: 1px solid var(--mud-palette-divider);">
+                        <div class="d-flex align-center gap-2">
+                            <MudIcon Icon="@Icons.Material.Filled.MonetizationOn" Color="Color.Primary" Size="Size.Small" />
+                            <MudText Typo="Typo.subtitle2" Style="font-weight:700">3. @T["Sales Deal Pipeline"]</MudText>
+                        </div>
+                        <MudSwitch @bind-Value="_createDeal" Color="Color.Primary" Label="@T["Create a Deal for this Account"]" />
+                    </div>
+
+                    @if (_createDeal)
+                    {
+                        <div class="pa-4 ml-stack" style="gap:16px">
+                            <MudTextField @bind-Value="_dealName" Label="@T["Deal Opportunity Name *"]" Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" />
+
+                            <MudGrid Spacing="2">
+                                <MudItem xs="12" sm="6">
+                                    <MudSelect T="Guid?" Value="_selectedPipelineId" ValueChanged="OnPipelineChanged" Label="@T["Sales Pipeline"]" Variant="Variant.Outlined" Margin="Margin.Dense">
+                                        @foreach (var pipe in _options.AvailablePipelines)
+                                        {
+                                            <MudSelectItem T="Guid?" Value="@pipe.Id">@pipe.Name</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudSelect T="Guid?" @bind-Value="_selectedStageId" Label="@T["Pipeline Stage"]" Variant="Variant.Outlined" Margin="Margin.Dense">
+                                        @foreach (var stage in CurrentStages)
+                                        {
+                                            <MudSelectItem T="Guid?" Value="@stage.Id">@stage.Name</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                </MudItem>
+                            </MudGrid>
+
+                            <MudGrid Spacing="2">
+                                <MudItem xs="12" sm="6">
+                                    <MudNumericField @bind-Value="_dealAmount" Label="@T["Expected Deal Amount"]" Adornment="Adornment.Start" AdornmentText="@_options.BaseCurrency" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0m" />
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudDatePicker @bind-Date="_expectedCloseDate" Label="@T["Expected Close Date"]" Variant="Variant.Outlined" Margin="Margin.Dense" DateFormat="yyyy-MM-dd" />
+                                </MudItem>
+                            </MudGrid>
+                        </div>
+                    }
+                </MudCard>
+            </div>
+        }
+    </DialogContent>
+
+    <DialogActions>
+        @if (_result is not null)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Done">
+                @T["Done"]
+            </MudButton>
+        }
+        else
+        {
+            <MudButton Variant="Variant.Text" OnClick="Cancel" Disabled="_converting">
+                @T["Cancel"]
+            </MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Transform" OnClick="SubmitConversionAsync" Disabled="_converting || _loading">
+                @(_converting ? T["Converting..."] : T["Convert Lead"])
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public Guid LeadId { get; set; }
+
+    private bool _loading = true;
+    private bool _converting = false;
+    private LeadConvertOptionsDto? _options;
+    private ConvertLeadResult? _result;
+
+    private string _accountMode = "create";
+    private string _accountName = "";
+    private Guid? _selectedAccountId;
+    private string _selectedAccountName = "";
+
+    private string _contactMode = "create";
+    private Guid? _selectedContactId;
+
+    private bool _createDeal = true;
+    private string _dealName = "";
+    private Guid? _selectedPipelineId;
+    private Guid? _selectedStageId;
+    private decimal? _dealAmount;
+    private DateTime? _expectedCloseDate = DateTime.UtcNow.AddDays(30);
+
+    private IEnumerable<PipelineStageDto> CurrentStages
+    {
+        get
+        {
+            if (_options == null || !_selectedPipelineId.HasValue) return [];
+            var pipe = _options.AvailablePipelines.FirstOrDefault(p => p.Id == _selectedPipelineId.Value);
+            return pipe?.Stages.OrderBy(s => s.SortOrder) ?? Enumerable.Empty<PipelineStageDto>();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOptionsAsync();
+    }
+
+    private async Task LoadOptionsAsync()
+    {
+        _loading = true;
+        try
+        {
+            _options = await Http.GetFromJsonAsync<LeadConvertOptionsDto>($"api/v1/leads/{LeadId}/convert-options");
+            if (_options != null)
+            {
+                _accountName = !string.IsNullOrWhiteSpace(_options.CompanyName)
+                    ? _options.CompanyName
+                    : $"{_options.LeadName} Co";
+
+                if (_options.MatchingAccounts.Count > 0)
+                {
+                    _selectedAccountId = _options.MatchingAccounts[0].Id;
+                    _selectedAccountName = _options.MatchingAccounts[0].Title;
+                }
+
+                if (_options.MatchingContacts.Count > 0)
+                {
+                    _selectedContactId = _options.MatchingContacts[0].Id;
+                }
+
+                _dealName = $"{_accountName} - Initial Deal";
+
+                if (_options.AvailablePipelines.Count > 0)
+                {
+                    var defaultPipe = _options.AvailablePipelines.FirstOrDefault(p => p.IsDefault) ?? _options.AvailablePipelines[0];
+                    _selectedPipelineId = defaultPipe.Id;
+                    _selectedStageId = defaultPipe.Stages.OrderBy(s => s.SortOrder).FirstOrDefault()?.Id;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading conversion options: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OnPipelineChanged(Guid? pipelineId)
+    {
+        _selectedPipelineId = pipelineId;
+        if (_options != null && pipelineId.HasValue)
+        {
+            var pipe = _options.AvailablePipelines.FirstOrDefault(p => p.Id == pipelineId.Value);
+            _selectedStageId = pipe?.Stages.OrderBy(s => s.SortOrder).FirstOrDefault()?.Id;
+        }
+    }
+
+    private async Task SubmitConversionAsync()
+    {
+        if (_accountMode == "create" && string.IsNullOrWhiteSpace(_accountName))
+        {
+            Snackbar.Add("Company name is required.", Severity.Warning);
+            return;
+        }
+
+        if (_createDeal && string.IsNullOrWhiteSpace(_dealName))
+        {
+            Snackbar.Add("Deal name is required.", Severity.Warning);
+            return;
+        }
+
+        _converting = true;
+        try
+        {
+            var request = new ConvertLeadRequest(
+                AccountMode: _accountMode,
+                ExistingAccountId: _accountMode == "existing" ? _selectedAccountId : null,
+                AccountName: _accountMode == "create" ? _accountName.Trim() : null,
+                ContactMode: _contactMode,
+                ExistingContactId: _contactMode == "existing" ? _selectedContactId : null,
+                CreateDeal: _createDeal,
+                DealName: _createDeal ? _dealName.Trim() : null,
+                PipelineId: _createDeal ? _selectedPipelineId : null,
+                StageId: _createDeal ? _selectedStageId : null,
+                Amount: _createDeal ? _dealAmount : null,
+                Currency: _createDeal ? _options?.BaseCurrency : null,
+                ExpectedCloseDate: _createDeal ? _expectedCloseDate : null);
+
+            var res = await Http.PostAsJsonAsync($"api/v1/leads/{LeadId}/convert", request);
+            if (res.IsSuccessStatusCode)
+            {
+                _result = await res.Content.ReadFromJsonAsync<ConvertLeadResult>();
+                Snackbar.Add("Lead converted successfully!", Severity.Success);
+            }
+            else
+            {
+                var err = await res.Content.ReadAsStringAsync();
+                Snackbar.Add($"Conversion failed: {err}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error converting lead: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _converting = false;
+        }
+    }
+
+    private void Done()
+    {
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}

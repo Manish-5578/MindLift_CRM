@@ -26,7 +26,7 @@
                 @if (!_converted && !_disqualified)
                 {
                     <MudButton Variant="Variant.Outlined" OnClick="FindDuplicatesAsync" data-testid="find-duplicates">@T["Find duplicates"]</MudButton>
-                    <MudButton Variant="Variant.Outlined" OnClick="() => _showConvert = !_showConvert">@T["Convert"]</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Transform" OnClick="OpenConvertDialogAsync" data-testid="convert-lead-btn">@T["Convert"]</MudButton>
                     <MudButton Variant="Variant.Outlined" OnClick="() => _showDisqualify = !_showDisqualify">@T["Disqualify"]</MudButton>
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenEdit" data-testid="primary-action">@T["Edit"]</MudButton>
                 }
@@ -102,24 +102,6 @@
             </MlCard>
         }
 
-        @if (_showConvert && !_converted)
-        {
-            <MlCard Title="Convert to a customer" Subtitle="Creates the contact, the company and a deal. Activities move with them." Class="mb-4">
-                <div class="ml-stack">
-                    <MudTextField @bind-Value="_accountName" Label="@T["Company name"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="convert-account" />
-                    <MudCheckBox @bind-Value="_createDeal" Label="@T["Create a deal"]" Color="Color.Primary" />
-                    @if (_createDeal)
-                    {
-                        <MudTextField @bind-Value="_dealName" Label="@T["Deal name"]" Variant="Variant.Outlined" Margin="Margin.Dense" />
-                        <MudNumericField @bind-Value="_amount" Label="@T["Amount"]" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0m" />
-                    }
-                    <div class="ml-row" style="justify-content:flex-end">
-                        <MudButton OnClick="() => _showConvert = false">@T["Cancel"]</MudButton>
-                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ConvertAsync" data-testid="convert-submit">@T["Convert lead"]</MudButton>
-                    </div>
-                </div>
-            </MlCard>
-        }
 
         <MudGrid Spacing="4">
             <MudItem xs="12" md="6">
@@ -342,27 +324,25 @@
         await LoadAsync();
     }
 
-    private async Task ConvertAsync()
+    private async Task OpenConvertDialogAsync()
     {
-        var mode = string.IsNullOrWhiteSpace(_accountName) ? "none" : "create";
-        var response = await Http.PostAsJsonAsync($"api/v1/leads/{Id}/convert", new ConvertLeadRequest(
-            mode, null, _accountName, "create", null, _createDeal, _dealName, null, null, _amount, null, null));
-
-        if (response.StatusCode == System.Net.HttpStatusCode.Conflict && await ProblemText.FromAsync(response, "") is var msg && msg.Contains("already exists", StringComparison.Ordinal))
+        var parameters = new DialogParameters<LeadConvertDialog>
         {
-            Snackbar.Add(T["A company with this name already exists. Link it from the company page once it is available."], Severity.Warning);
-            return;
-        }
-
-        if (!response.IsSuccessStatusCode)
+            { x => x.LeadId, Id }
+        };
+        var options = new DialogOptions
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, T["Could not convert this lead."]), Severity.Error);
-            return;
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseButton = true,
+            CloseOnEscapeKey = true
+        };
+        var dialog = await Dialogs.ShowAsync<LeadConvertDialog>(T["Convert Lead"], parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            await LoadAsync();
         }
-
-        Snackbar.Add(T["Lead converted. Contact, company and deal are created."], Severity.Success);
-        _showConvert = false;
-        await LoadAsync();
     }
 
     private IReadOnlyList<(string Label, string? Value)> Details()
