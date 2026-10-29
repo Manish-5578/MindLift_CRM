@@ -103,14 +103,72 @@
                 <RecordFiles EntityType="contacts" EntityId="Id" />
             </ChildContent>
             <Aside>
-                <MlCard Title="Company">
-                    @if (contact.AccountId is { } accountId)
+                <MlCard Title="@(_multiAccountFeatureAvailable ? T["Accounts ({0})", _linkedAccounts.Count > 0 ? _linkedAccounts.Count : (contact.AccountId.HasValue ? 1 : 0)] : T["Company"])">
+                    @if (!_multiAccountFeatureAvailable)
                     {
-                        <a href="@("/accounts/" + accountId)" class="ml-link" data-testid="contact-account-link">@contact.AccountName</a>
+                        @if (contact.AccountId is { } accountId)
+                        {
+                            <a href="@("/accounts/" + accountId)" class="ml-link" data-testid="contact-account-link">@contact.AccountName</a>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.body2" Class="ml-muted">@T["Not linked to a company."]</MudText>
+                        }
                     }
                     else
                     {
-                        <MudText Typo="Typo.body2" Class="ml-muted">@T["Not linked to a company."]</MudText>
+                        <div class="d-flex flex-column gap-2">
+                            @if (_linkedAccounts.Count == 0 && !contact.AccountId.HasValue)
+                            {
+                                <MudText Typo="Typo.body2" Class="ml-muted">@T["Not linked to any company."]</MudText>
+                            }
+                            else if (_linkedAccounts.Count == 0 && contact.AccountId.HasValue)
+                            {
+                                <div class="d-flex align-center justify-space-between pa-2 rounded" style="background:var(--mud-palette-background-grey)">
+                                    <div class="d-flex flex-column">
+                                        <a href="@("/accounts/" + contact.AccountId)" class="ml-link" style="font-weight:600;" data-testid="contact-account-link">@contact.AccountName</a>
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled" Class="mt-1" Style="font-size:10px;height:18px;padding:0 6px;">@T["Primary"]</MudChip>
+                                    </div>
+                                </div>
+                            }
+                            else
+                            {
+                                @foreach (var acc in _linkedAccounts)
+                                {
+                                    <div class="d-flex align-center justify-space-between pa-2 rounded" style="border:1px solid var(--ml-border, #e2e8f0); background:var(--mud-palette-surface);" data-testid="linked-account-row">
+                                        <div class="d-flex flex-column" style="overflow:hidden; text-overflow:ellipsis;">
+                                            <div class="d-flex align-center gap-1">
+                                                <MudIcon Icon="@Icons.Material.Filled.Business" Size="Size.Small" Color="Color.Default" Style="font-size:16px;" />
+                                                <a href="@("/accounts/" + acc.AccountId)" class="ml-link" style="font-weight:600;" data-testid="account-link-item">@acc.AccountName</a>
+                                            </div>
+                                            <div class="d-flex align-center gap-1 mt-1">
+                                                @if (acc.IsPrimary)
+                                                {
+                                                    <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined" Style="font-size:10px;height:18px;padding:0 6px;">@T["Primary"]</MudChip>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(acc.Role))
+                                                {
+                                                    <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Filled" Style="font-size:10px;height:18px;padding:0 6px;">@acc.Role</MudChip>
+                                                }
+                                            </div>
+                                        </div>
+                                        @if (!acc.IsPrimary && acc.LinkId.HasValue && Can(p => p.CanEdit))
+                                        {
+                                            <MudTooltip Text="@T["Unlink Account"]">
+                                                <MudIconButton Icon="@Icons.Material.Filled.LinkOff" Size="Size.Small" Color="Color.Error" OnClick="() => UnlinkAccountAsync(acc.LinkId.Value)" Disabled="_linking" data-testid="unlink-account-btn" />
+                                            </MudTooltip>
+                                        }
+                                    </div>
+                                }
+                            }
+
+                            @if (Can(p => p.CanEdit))
+                            {
+                                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Filled.AddLink" OnClick="OpenLinkAccountDialog" Class="mt-2" data-testid="link-account-btn">
+                                    @T["Link Another Account"]
+                                </MudButton>
+                            }
+                        </div>
                     }
                 </MlCard>
                 <MlCard Title="@($"Deals ({_summary.DealCount})")">
@@ -132,6 +190,42 @@
 </div>
 
 <ContactFormDrawer @ref="_form" @bind-Open="_drawer" OnSaved="OnSaved" />
+
+<MudDialog @bind-Visible="_linkAccountDialogOpen" Options="new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true }">
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.Hub" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">@T["Link Account to Contact"]</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <div class="d-flex flex-column gap-3 py-2">
+            <MudText Typo="Typo.body2" Class="ml-muted">
+                @T["Associate this contact with an additional company, e.g. as an external advisor, board member, partner, or legal counsel."]
+            </MudText>
+            <RecordPicker Search="@((text, ct) => RecordLookups.AccountsAsync(Http, text, ct))"
+                          Label="@T["Select Account"]"
+                          Value="_selectedAccountId"
+                          Text="@_selectedAccountName"
+                          ValueChanged="v => _selectedAccountId = v" />
+            <MudTextField @bind-Value="_linkRole" Label="@T["Role at Company (Optional)"]" Placeholder="e.g. Legal Counsel, Board Member, Consultant" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _linkAccountDialogOpen = false" Disabled="_linking">@T["Cancel"]</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveLinkedAccountAsync" Disabled="@(_linking || !_selectedAccountId.HasValue)" data-testid="confirm-link-account">
+            @if (_linking)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <span class="ms-2">@T["Linking..."]</span>
+            }
+            else
+            {
+                @T["Link Account"]
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
 
 @code {
     [Parameter] public Guid Id { get; set; }
@@ -196,6 +290,7 @@
         }
 
         await LoadPortalAsync();
+        await LoadLinkedAccountsAsync();
     }
 
     private const string NotInvited = "NotInvited";
@@ -342,6 +437,100 @@
         finally
         {
             _inviting = false;
+        }
+    }
+
+    private IReadOnlyList<ContactAccountDto> _linkedAccounts = [];
+    private bool _multiAccountFeatureAvailable;
+    private bool _linkAccountDialogOpen;
+    private Guid? _selectedAccountId;
+    private string? _selectedAccountName;
+    private string? _linkRole;
+    private bool _linking;
+
+    private async Task LoadLinkedAccountsAsync()
+    {
+        try
+        {
+            var response = await Http.GetAsync($"api/v1/contacts/{Id}/accounts");
+            if (response.IsSuccessStatusCode)
+            {
+                _multiAccountFeatureAvailable = true;
+                _linkedAccounts = await response.Content.ReadFromJsonAsync<List<ContactAccountDto>>() ?? [];
+            }
+            else
+            {
+                _multiAccountFeatureAvailable = false;
+                _linkedAccounts = [];
+            }
+        }
+        catch
+        {
+            _multiAccountFeatureAvailable = false;
+            _linkedAccounts = [];
+        }
+    }
+
+    private void OpenLinkAccountDialog()
+    {
+        _selectedAccountId = null;
+        _selectedAccountName = null;
+        _linkRole = null;
+        _linkAccountDialogOpen = true;
+    }
+
+    private async Task SaveLinkedAccountAsync()
+    {
+        if (!_selectedAccountId.HasValue) return;
+        _linking = true;
+        try
+        {
+            var req = new AddContactAccountRequest(_selectedAccountId.Value, string.IsNullOrWhiteSpace(_linkRole) ? null : _linkRole.Trim());
+            var response = await Http.PostAsJsonAsync($"api/v1/contacts/{Id}/accounts", req);
+            if (response.IsSuccessStatusCode)
+            {
+                _linkedAccounts = await response.Content.ReadFromJsonAsync<List<ContactAccountDto>>() ?? [];
+                Snackbar.Add(T["Account linked successfully."], Severity.Success);
+                _linkAccountDialogOpen = false;
+            }
+            else
+            {
+                Snackbar.Add(await ProblemText.FromAsync(response, T["Could not link account."]), Severity.Error);
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _linking = false;
+        }
+    }
+
+    private async Task UnlinkAccountAsync(Guid linkId)
+    {
+        _linking = true;
+        try
+        {
+            var response = await Http.DeleteAsync($"api/v1/contacts/{Id}/accounts/{linkId}");
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add(T["Account unlinked successfully."], Severity.Success);
+                await LoadLinkedAccountsAsync();
+            }
+            else
+            {
+                Snackbar.Add(await ProblemText.FromAsync(response, T["Could not unlink account."]), Severity.Error);
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _linking = false;
         }
     }
 }

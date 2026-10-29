@@ -67,7 +67,15 @@
                             <div class="ml-row" style="padding:6px 0;border-bottom:1px solid var(--ml-border)" data-testid="account-contact">
                                 <UserAvatar Name="@contact.FullName" Id="@contact.Id" Size="32" />
                                 <div class="ml-grow">
-                                    <a href="@("/contacts/" + contact.Id)" class="ml-link">@contact.FullName</a>
+                                    <div class="d-flex align-center gap-2">
+                                        <a href="@("/contacts/" + contact.Id)" class="ml-link">@contact.FullName</a>
+                                        @if (!contact.IsPrimary)
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Outlined" Style="font-size:10px;height:18px;padding:0 6px;">
+                                                @(string.IsNullOrWhiteSpace(contact.Role) ? T["Secondary"] : contact.Role)
+                                            </MudChip>
+                                        }
+                                    </div>
                                     <MudText Typo="Typo.caption" Class="ml-muted">@(contact.JobTitle ?? contact.Email ?? contact.Phone ?? "—")</MudText>
                                 </div>
                             </div>

@@ -827,8 +827,15 @@ public sealed class AccountService(AppDbContext db, ITenantContext tenant, ICloc
     {
         var account = await LoadScopedAsync(id, cancellationToken);
         var scopedContacts = await RecordHelpers.InScopeAsync(db.Contacts.AsNoTracking(), scope, AppModule.Contacts, c => c.OwnerId, cancellationToken);
-        var contacts = await scopedContacts.Where(c => c.AccountId == id).OrderBy(c => c.FirstName).Take(200)
-            .Select(c => new AccountContactDto(c.Id, (c.FirstName + " " + c.LastName).Trim(), c.Email, c.Phone, c.JobTitle)).ToListAsync(cancellationToken);
+        var primaryContacts = await scopedContacts.Where(c => c.AccountId == id).OrderBy(c => c.FirstName).Take(200)
+            .Select(c => new AccountContactDto(c.Id, (c.FirstName + " " + c.LastName).Trim(), c.Email, c.Phone, c.JobTitle, null, true)).ToListAsync(cancellationToken);
+        var secondaryContacts = await (from l in db.ContactAccountLinks.AsNoTracking()
+                                       join c in scopedContacts on l.ContactId equals c.Id
+                                       where l.AccountId == id
+                                       orderby c.FirstName
+                                       select new AccountContactDto(c.Id, (c.FirstName + " " + c.LastName).Trim(), c.Email, c.Phone, c.JobTitle, l.Role, false))
+                                      .Take(200).ToListAsync(cancellationToken);
+        var contacts = primaryContacts.Concat(secondaryContacts).ToList();
         var scopedAccounts = await ScopedAsync(cancellationToken);
         var children = await scopedAccounts.AsNoTracking().Where(a => a.ParentAccountId == id).OrderBy(a => a.Name).Select(a => new AccountChildDto(a.Id, a.Name)).ToListAsync(cancellationToken);
         var scopedDeals = await RecordHelpers.InScopeAsync(db.Deals.AsNoTracking(), scope, AppModule.Deals, d => d.OwnerId, cancellationToken);

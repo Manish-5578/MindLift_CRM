@@ -43,7 +43,31 @@
         @if (_converted)
         {
             <MudAlert Severity="Severity.Success" Class="mb-4" data-testid="converted-banner">
-                @T["This lead was converted"] <DateText Value="@_lead.ConvertedAtUtc" />. Continue in the contact and deal.
+                <div class="d-flex flex-column gap-2">
+                    <div>
+                        <strong>@T["This lead was converted"]</strong> <DateText Value="@_lead.ConvertedAtUtc" />.
+                    </div>
+                    <div class="d-flex align-center gap-2 flex-wrap mt-1">
+                        @if (_lead.ConvertedContactId.HasValue)
+                        {
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Filled.Person" Href="@($"/contacts/{_lead.ConvertedContactId}")">
+                                @T["View Contact"]
+                            </MudButton>
+                        }
+                        @if (_lead.ConvertedAccountId.HasValue)
+                        {
+                            <MudButton Variant="Variant.Outlined" Color="Color.Info" Size="Size.Small" StartIcon="@Icons.Material.Filled.Business" Href="@($"/accounts/{_lead.ConvertedAccountId}")">
+                                @T["View Account"]
+                            </MudButton>
+                        }
+                        @if (_lead.ConvertedDealId.HasValue)
+                        {
+                            <MudButton Variant="Variant.Outlined" Color="Color.Success" Size="Size.Small" StartIcon="@Icons.Material.Filled.MonetizationOn" Href="@($"/deals/{_lead.ConvertedDealId}")">
+                                @T["View Deal"]
+                            </MudButton>
+                        }
+                    </div>
+                </div>
             </MudAlert>
         }
 

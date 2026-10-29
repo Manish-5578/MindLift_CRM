@@ -139,4 +139,33 @@ public sealed class ContactMultiAccountTests(MindLiftApiFactory factory) : IClas
         (await staff.Client.GetAsync($"/api/v1/contacts/{ownersContact}/accounts")).StatusCode.ShouldBe(HttpStatusCode.NotFound);
         (await staff.Client.PostAsJsonAsync($"/api/v1/contacts/{ownersContact}/accounts", new AddContactAccountRequest(extra, null))).StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
+
+    [Fact]
+    public async Task Secondary_contacts_appear_in_account_summary()
+    {
+        var owner = await Workspaces.SignupAsync(factory);
+        await EnableAsync(owner);
+        var primaryAcct = await AccountAsync(owner, "Primary Corp");
+        var secondaryAcct = await AccountAsync(owner, "Advisory Board Inc");
+        var contact = await ContactAsync(owner, primaryAcct);
+
+        // Link contact as secondary to secondaryAcct
+        (await owner.Client.PostAsJsonAsync($"/api/v1/contacts/{contact}/accounts", new AddContactAccountRequest(secondaryAcct, "Board Advisor"))).EnsureSuccessStatusCode();
+
+        // Check summary of secondaryAcct
+        var summary = await owner.Client.GetFromJsonAsync<AccountSummaryDto>($"/api/v1/accounts/{secondaryAcct}/summary");
+        summary.ShouldNotBeNull();
+        summary.Contacts.Count.ShouldBe(1);
+        summary.Contacts[0].Id.ShouldBe(contact);
+        summary.Contacts[0].IsPrimary.ShouldBeFalse();
+        summary.Contacts[0].Role.ShouldBe("Board Advisor");
+
+        // Check summary of primaryAcct
+        var primarySummary = await owner.Client.GetFromJsonAsync<AccountSummaryDto>($"/api/v1/accounts/{primaryAcct}/summary");
+        primarySummary.ShouldNotBeNull();
+        primarySummary.Contacts.Count.ShouldBe(1);
+        primarySummary.Contacts[0].Id.ShouldBe(contact);
+        primarySummary.Contacts[0].IsPrimary.ShouldBeTrue();
+    }
 }
+
