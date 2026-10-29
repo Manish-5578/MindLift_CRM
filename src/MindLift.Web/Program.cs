@@ -21,7 +21,7 @@ builder.Services.AddScoped(sp => new HttpClient(new AuthHandler(sp.GetRequiredSe
 
 builder.Services.AddMudServices(config =>
 {
-    config.SnackbarConfiguration.PositionClass = Defaults.Classes.Position.BottomEnd;
+    config.SnackbarConfiguration.PositionClass = Defaults.Classes.Position.TopRight;
     config.SnackbarConfiguration.VisibleStateDuration = 4000;
     config.SnackbarConfiguration.ShowCloseIcon = true;
     config.SnackbarConfiguration.SnackbarVariant = Variant.Filled;
