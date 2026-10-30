@@ -1,0 +1,144 @@
+@using MindLift.Shared.Contracts
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject Translator T
+
+<MudDialog MaxWidth="MaxWidth.Large" FullWidth="true">
+    <TitleContent>
+        <div class="ml-row" style="align-items:center;gap:10px;">
+            <MudAvatar Color="Color.Info" Variant="Variant.Filled" Size="Size.Small">
+                <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small" />
+            </MudAvatar>
+            <div>
+                <MudText Typo="Typo.h6">@T["Execution History: {0}", Workflow.Name]</MudText>
+                <div class="text-caption ml-muted">@T["Audit trail of live and simulated DAG workflow runs."]</div>
+            </div>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (_loading)
+        {
+            <SkeletonTable Rows="5" Columns="5" />
+        }
+        else if (_executions.Count == 0)
+        {
+            <MlCard Class="pa-8 text-center">
+                <EmptyState Title="@T["No Executions Recorded"]"
+                            Message="@T["No execution runs have been logged for this workflow yet. Run a simulation with 'Record this simulation run' checked or trigger an event."]"
+                            Compact="true" />
+            </MlCard>
+        }
+        else
+        {
+            <MudTable Items="_executions" Dense="true" Hover="true" Elevation="0" Outlined="true">
+                <HeaderContent>
+                    <MudTh>@T["Executed At"]</MudTh>
+                    <MudTh>@T["Entity Type"]</MudTh>
+                    <MudTh>@T["Status"]</MudTh>
+                    <MudTh>@T["Duration"]</MudTh>
+                    <MudTh>@T["Steps Traversed"]</MudTh>
+                    <MudTh>@T["Actions"]</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.ExecutedAt.ToLocalTime().ToString("MMM dd, yyyy HH:mm:ss")</MudTd>
+                    <MudTd><MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@context.EntityType</MudChip></MudTd>
+                    <MudTd>
+                        <MudChip T="string" Size="Size.Small" Color="@(context.Status == "Success" ? Color.Success : Color.Error)">
+                            @context.Status
+                        </MudChip>
+                    </MudTd>
+                    <MudTd>@context.DurationMs ms</MudTd>
+                    <MudTd>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled">
+                            @T["{0} Steps", context.Steps.Count]
+                        </MudChip>
+                    </MudTd>
+                    <MudTd>
+                        <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Primary"
+                                   OnClick="@(() => ToggleExpand(context.Id))">
+                            @(_expandedId == context.Id ? T["Hide Steps"] : T["View Steps"])
+                        </MudButton>
+                    </MudTd>
+                </RowTemplate>
+                <ChildRowContent>
+                    @if (_expandedId == context.Id)
+                    {
+                        <td colspan="6" style="background:var(--mud-palette-background-grey);padding:16px;">
+                            <div class="ml-card pa-3">
+                                <div style="font-weight:600;font-size:0.9rem;margin-bottom:8px;">@T["Step Execution Breakdown:"]</div>
+                                <MudTable Items="context.Steps" Dense="true" Elevation="0">
+                                    <HeaderContent>
+                                        <MudTh>#</MudTh>
+                                        <MudTh>@T["Node Label"]</MudTh>
+                                        <MudTh>@T["Type"]</MudTh>
+                                        <MudTh>@T["Status"]</MudTh>
+                                        <MudTh>@T["Output / Mutation"]</MudTh>
+                                    </HeaderContent>
+                                    <RowTemplate Context="step">
+                                        <MudTd><code>@step.NodeId</code></MudTd>
+                                        <MudTd><strong>@step.NodeLabel</strong></MudTd>
+                                        <MudTd><MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@step.NodeType</MudChip></MudTd>
+                                        <MudTd>
+                                            <MudChip T="string" Size="Size.Small" Color="@(step.Status.Contains("True") || step.Status == "Success" ? Color.Success : Color.Warning)">
+                                                @step.Status
+                                            </MudChip>
+                                        </MudTd>
+                                        <MudTd>
+                                            @if (!string.IsNullOrWhiteSpace(step.Output))
+                                            {
+                                                <code>@step.Output</code>
+                                            }
+                                        </MudTd>
+                                    </RowTemplate>
+                                </MudTable>
+                            </div>
+                        </td>
+                    }
+                </ChildRowContent>
+            </MudTable>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Close">@T["Close"]</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public VisualWorkflowDto Workflow { get; set; } = default!;
+
+    private bool _loading = true;
+    private List<VisualWorkflowExecutionDto> _executions = [];
+    private Guid? _expandedId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadExecutionsAsync();
+    }
+
+    private async Task LoadExecutionsAsync()
+    {
+        _loading = true;
+        try
+        {
+            var res = await Http.GetFromJsonAsync<List<VisualWorkflowExecutionDto>>($"api/v1/workflows/{Workflow.Id}/executions?limit=50");
+            _executions = res ?? [];
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void ToggleExpand(Guid id)
+    {
+        _expandedId = _expandedId == id ? null : id;
+    }
+
+    private void Close() => MudDialog.Close();
+}

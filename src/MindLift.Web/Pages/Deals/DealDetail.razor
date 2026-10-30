@@ -49,6 +49,18 @@
                         }
                     </div>
                     <MudText Typo="Typo.caption" Class="ml-muted mt-2" data-testid="days-in-stage">@T["In this stage for {0} days", (int)(DateTime.UtcNow - _deal.StageChangedAtUtc).TotalDays]</MudText>
+                    @if (!string.IsNullOrWhiteSpace(_stageMoveError))
+                    {
+                        <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-3" Variant="Variant.Outlined"
+                                  ShowCloseIcon="true" CloseIconClicked="() => _stageMoveError = null" data-testid="stage-gating-alert">
+                            <div class="d-flex align-center gap-2">
+                                <MudIcon Icon="@Icons.Material.Filled.Security" Size="Size.Small" Color="Color.Warning" />
+                                <div>
+                                    <strong>@T["Stage Move Blocked:"]</strong> @_stageMoveError
+                                </div>
+                            </div>
+                        </MudAlert>
+                    }
                 </MlCard>
 
                 <MlCard Title="Details">
@@ -74,6 +86,142 @@
                         }
                     </div>
                 </MlCard>
+
+                @if (_lineItemsFeatureAvailable)
+                {
+                    <MlCard Title="Products & Line Items" TestId="deal-line-items-card">
+                        <HeaderActions>
+                            @if (Can(p => p.CanEdit))
+                            {
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                                           StartIcon="@Icons.Material.Filled.AddShoppingCart"
+                                           OnClick="OpenAddLineItemDialog" data-testid="add-line-item-btn">
+                                    @T["Add Product / Item"]
+                                </MudButton>
+                            }
+                        </HeaderActions>
+                        <ChildContent>
+                            @if (_lineItemsLoading)
+                            {
+                                <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-2" />
+                            }
+                            else if (_lineItemsSummary is null || _lineItemsSummary.Items.Count == 0)
+                            {
+                                <div class="pa-4 text-center">
+                                    <MudIcon Icon="@Icons.Material.Outlined.Inventory2" Color="Color.Default" Style="font-size: 2.5rem; opacity: 0.5;" />
+                                    <MudText Typo="Typo.body2" Class="ml-muted mt-2">
+                                        @T["No products or line items added to this deal yet. Add items to track products and calculate the total."]
+                                    </MudText>
+                                </div>
+                            }
+                            else
+                            {
+                                <MudSimpleTable Dense="true" Hover="true" Elevation="0" Style="background: transparent;">
+                                    <thead>
+                                        <tr>
+                                            <th>@T["Item / Product"]</th>
+                                            <th style="text-align: right;">@T["Qty"]</th>
+                                            <th style="text-align: right;">@T["Unit Price"]</th>
+                                            <th style="text-align: right;">@T["Discount"]</th>
+                                            <th style="text-align: right;">@T["Tax"]</th>
+                                            <th style="text-align: right;">@T["Total"]</th>
+                                            @if (Can(p => p.CanEdit))
+                                            {
+                                                <th style="width: 48px;"></th>
+                                            }
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var item in _lineItemsSummary.Items)
+                                        {
+                                            <tr>
+                                                <td>
+                                                    <div class="d-flex flex-column">
+                                                        <div class="d-flex align-center gap-2">
+                                                            <span style="font-weight: 500;">@item.ProductName</span>
+                                                            @if (!string.IsNullOrWhiteSpace(item.ProductSku))
+                                                            {
+                                                                <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Default" Class="pa-1" Style="font-size: 11px; height: 18px;">
+                                                                    @item.ProductSku
+                                                                </MudChip>
+                                                            }
+                                                        </div>
+                                                        @if (!string.IsNullOrWhiteSpace(item.Description))
+                                                        {
+                                                            <MudText Typo="Typo.caption" Class="ml-muted">@item.Description</MudText>
+                                                        }
+                                                    </div>
+                                                </td>
+                                                <td style="text-align: right;">@item.Quantity.ToString("G29")</td>
+                                                <td style="text-align: right;">@item.UnitPrice.ToString("N2") @_lineItemsSummary.Currency</td>
+                                                <td style="text-align: right;">
+                                                    @if (item.DiscountPercent > 0)
+                                                    {
+                                                        <span style="color: var(--mud-palette-error);">@item.DiscountPercent% (-@item.DiscountAmount.ToString("N2"))</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="ml-muted">—</span>
+                                                    }
+                                                </td>
+                                                <td style="text-align: right;">
+                                                    @if (item.TaxRate > 0)
+                                                    {
+                                                        <span>@item.TaxRate%</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="ml-muted">—</span>
+                                                    }
+                                                </td>
+                                                <td style="text-align: right; font-weight: 600;">
+                                                    @item.TotalAmount.ToString("N2") @_lineItemsSummary.Currency
+                                                </td>
+                                                @if (Can(p => p.CanEdit))
+                                                {
+                                                    <td style="text-align: center;">
+                                                        <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Color="Color.Error"
+                                                                       OnClick="() => DeleteLineItemAsync(item.Id, item.ProductName)"
+                                                                       data-testid="@($"delete-line-item-{item.Id}")" />
+                                                    </td>
+                                                }
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </MudSimpleTable>
+
+                                <div class="d-flex justify-end mt-4 pt-3" style="border-top: 1px solid var(--mud-palette-divider);">
+                                    <div style="min-width: 240px;" class="d-flex flex-column gap-1">
+                                        <div class="d-flex justify-space-between text-caption">
+                                            <span class="ml-muted">@T["Subtotal:"]</span>
+                                            <span>@_lineItemsSummary.SubTotal.ToString("N2") @_lineItemsSummary.Currency</span>
+                                        </div>
+                                        @if (_lineItemsSummary.TotalDiscount > 0)
+                                        {
+                                            <div class="d-flex justify-space-between text-caption">
+                                                <span class="ml-muted">@T["Total Discount:"]</span>
+                                                <span style="color: var(--mud-palette-error);">-@_lineItemsSummary.TotalDiscount.ToString("N2") @_lineItemsSummary.Currency</span>
+                                            </div>
+                                        }
+                                        @if (_lineItemsSummary.TotalTax > 0)
+                                        {
+                                            <div class="d-flex justify-space-between text-caption">
+                                                <span class="ml-muted">@T["Total Tax:"]</span>
+                                                <span>+@_lineItemsSummary.TotalTax.ToString("N2") @_lineItemsSummary.Currency</span>
+                                            </div>
+                                        }
+                                        <div class="d-flex justify-space-between align-center pt-2 mt-1" style="border-top: 1px dashed var(--mud-palette-divider); font-weight: 600;">
+                                            <span>@T["Grand Total:"]</span>
+                                            <span style="color: var(--mud-palette-primary); font-size: 1.1rem;">
+                                                @_lineItemsSummary.GrandTotal.ToString("N2") @_lineItemsSummary.Currency
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </ChildContent>
+                    </MlCard>
+                }
 
                 <MlCard Title="Stage history">
                     <Timeline Items="HistoryItems()" EmptyText="No moves yet." />
@@ -146,6 +294,10 @@
     private IReadOnlyList<DealStageHistoryDto> _history = [];
     private IReadOnlyList<OnboardingProgressDto> _onboarding = [];
     private List<UserListItem> _users = [];
+    private bool _lineItemsLoading = false;
+    private bool _lineItemsFeatureAvailable = false;
+    private DealLineItemsSummaryDto? _lineItemsSummary;
+    private string? _stageMoveError;
 
     private string BaseCurrency => App.Bootstrap?.Currencies.BaseCurrency ?? string.Empty;
 
@@ -192,6 +344,7 @@
             {
                 _history = await Http.GetFromJsonAsync<List<DealStageHistoryDto>>($"api/v1/deals/{Id}/history") ?? [];
                 _onboarding = _deal!.Status == "Won" ? await Http.GetFromJsonAsync<List<OnboardingProgressDto>>($"api/v1/activities/onboarding/{Id}") ?? [] : [];
+                await LoadLineItemsAsync();
             }
         }
         catch (HttpRequestException)
@@ -254,7 +407,13 @@
         var response = await Http.PatchAsJsonAsync($"api/v1/deals/{Id}/stage", new ChangeDealStageRequest(stage.Id, lostReason, lostNotes, null, _deal.Version));
         if (!response.IsSuccessStatusCode)
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not move this deal."]), Severity.Error);
+            var problemMsg = await ProblemText.FromAsync(response, T["We could not move this deal."]);
+            Snackbar.Add(problemMsg, Severity.Error);
+            _stageMoveError = problemMsg;
+        }
+        else
+        {
+            _stageMoveError = null;
         }
 
         await LoadAsync();
@@ -282,5 +441,67 @@
 
         Snackbar.Add(T["Deal deleted"], Severity.Success);
         Nav.NavigateTo("/deals");
+    }
+
+    private async Task LoadLineItemsAsync()
+    {
+        _lineItemsLoading = true;
+        try
+        {
+            var res = await Http.GetAsync($"api/v1/deals/{Id}/line-items");
+            if (res.IsSuccessStatusCode)
+            {
+                _lineItemsSummary = await res.Content.ReadFromJsonAsync<DealLineItemsSummaryDto>();
+                _lineItemsFeatureAvailable = true;
+            }
+            else if (res.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                _lineItemsFeatureAvailable = false;
+                _lineItemsSummary = null;
+            }
+        }
+        catch
+        {
+            _lineItemsFeatureAvailable = false;
+            _lineItemsSummary = null;
+        }
+        finally
+        {
+            _lineItemsLoading = false;
+        }
+    }
+
+    private async Task OpenAddLineItemDialog()
+    {
+        var parameters = new DialogParameters<DealLineItemDialog>
+        {
+            { x => x.DealId, Id },
+            { x => x.Currency, _deal?.Currency ?? "USD" }
+        };
+        var reference = await Dialogs.ShowAsync<DealLineItemDialog>(T["Add Product or Line Item"], parameters);
+        var result = await reference.Result;
+        if (result is { Canceled: false })
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task DeleteLineItemAsync(Guid lineItemId, string productName)
+    {
+        if (!await Dialogs.ConfirmAsync($"Remove {productName}?", T["This item will be removed and the deal amount will be recalculated."], T["Remove"], danger: true))
+        {
+            return;
+        }
+
+        var response = await Http.DeleteAsync($"api/v1/deals/{Id}/line-items/{lineItemId}");
+        if (response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(T["Item removed"], Severity.Success);
+            await LoadAsync();
+        }
+        else
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, T["Could not remove item."]), Severity.Error);
+        }
     }
 }

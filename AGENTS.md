@@ -7,6 +7,7 @@ Always synchronize project activities and findings with the connected Notion wor
 ### Connected Databases
 - **Mindlift Track (Roadmap & Tasks):** `eabcafae-aef0-4183-bd4f-1581ac35d947`
 - **Mindlift CRM Issues (Defects & Security Findings):** `ba347b03-95f3-468c-be6d-79a4889d5abd`
+- **MindLift Features (Capabilities & Metrics Tracker):** `4080c080-692b-8150-9c69-f5f9cd788cc7`
 - **Integration Token:** `ntn_r3229641003aI51XEx4XJ0OtSpLhnW0TTWY3FZktw2A0ds`
 - **API Endpoint:** `https://api.notion.com/v1/` (Header `Notion-Version: 2022-06-28`)
 

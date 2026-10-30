@@ -1,0 +1,328 @@
+@using MindLift.Shared.Contracts
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject Translator T
+
+<MudDialog MaxWidth="MaxWidth.Medium" FullWidth="true">
+    <TitleContent>
+        <div class="ml-row" style="align-items:center;gap:12px;">
+            <MudIcon Icon="@Icons.Material.Filled.ViewQuilt" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">
+                @(ExistingRule == null ? T["New Layout Rule"] : T["Edit Layout Rule: {0}", ExistingRule.Name])
+            </MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <div class="ml-stack" style="gap:16px;">
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true" Class="mb-2">@_error</MudAlert>
+            }
+
+            <div class="ml-row" style="justify-content:space-between;align-items:center;">
+                <MudText Typo="Typo.subtitle2" Color="Color.Primary">@T["Rule Information"]</MudText>
+                @if (ExistingRule == null)
+                {
+                    <MudMenu Label="@T["Load Quick Preset"]" Variant="Variant.Outlined" Size="Size.Small" EndIcon="@Icons.Material.Filled.KeyboardArrowDown">
+                        <MudMenuItem OnClick="@(() => LoadPreset("deal-lost"))">@T["Deal: Closed Lost Details"]</MudMenuItem>
+                        <MudMenuItem OnClick="@(() => LoadPreset("lead-qualified"))">@T["Lead: Qualified Requirements"]</MudMenuItem>
+                        <MudMenuItem OnClick="@(() => LoadPreset("contact-vendor"))">@T["Contact: Vendor Layout"]</MudMenuItem>
+                    </MudMenu>
+                }
+            </div>
+
+            <MudGrid Spacing="2">
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_name" Label="@T["Rule Name *"]" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  Placeholder="e.g. Closed Lost Requirements" Required="true" data-testid="rule-name-input" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="string" @bind-Value="_entityType" Label="@T["Entity / Module *"]" Variant="Variant.Outlined" Margin="Margin.Dense"
+                               Disabled="@(ExistingRule != null)" data-testid="rule-entity-select">
+                        <MudSelectItem Value="@("deals")">@T["Deals"]</MudSelectItem>
+                        <MudSelectItem Value="@("leads")">@T["Leads"]</MudSelectItem>
+                        <MudSelectItem Value="@("contacts")">@T["Contacts"]</MudSelectItem>
+                        <MudSelectItem Value="@("accounts")">@T["Accounts"]</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_description" Label="@T["Description"]" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  Placeholder="e.g. Dynamically requires lost reasons and hides next step when deal is lost" />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudNumericField @bind-Value="_priority" Label="@T["Evaluation Priority"]" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                     Min="1" Max="999" HelperText="@T["Lower numbers execute first (1-999)"]" />
+                </MudItem>
+                <MudItem xs="6" Class="d-flex align-center">
+                    <MudSwitch @bind-Value="_isActive" Color="Color.Success" Label="@T["Active"]" />
+                </MudItem>
+            </MudGrid>
+
+            <MudDivider Class="my-2" />
+
+            <!-- Trigger Condition -->
+            <MudText Typo="Typo.subtitle2" Color="Color.Primary">@T["When Record Meets Criteria (Trigger Condition)"]</MudText>
+            <MudPaper Outlined="true" Class="pa-3" Style="background:var(--mud-palette-background-grey);">
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="4">
+                        <MudTextField @bind-Value="_triggerField" Label="@T["Field Key *"]" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                      Placeholder="e.g. stage, status, source" HelperText="@T["Standard or custom field key"]" Required="true" data-testid="trigger-field-input" />
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudSelect T="string" @bind-Value="_triggerOperator" Label="@T["Operator *"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="trigger-operator-select">
+                            <MudSelectItem Value="@("eq")">@T["Equals (eq)"]</MudSelectItem>
+                            <MudSelectItem Value="@("neq")">@T["Not Equals (neq)"]</MudSelectItem>
+                            <MudSelectItem Value="@("contains")">@T["Contains"]</MudSelectItem>
+                            <MudSelectItem Value="@("notContains")">@T["Does Not Contain"]</MudSelectItem>
+                            <MudSelectItem Value="@("in")">@T["In List (comma separated)"]</MudSelectItem>
+                            <MudSelectItem Value="@("gt")">@T["Greater Than (gt)"]</MudSelectItem>
+                            <MudSelectItem Value="@("gte")">@T["Greater Or Equal (gte)"]</MudSelectItem>
+                            <MudSelectItem Value="@("lt")">@T["Less Than (lt)"]</MudSelectItem>
+                            <MudSelectItem Value="@("lte")">@T["Less Or Equal (lte)"]</MudSelectItem>
+                            <MudSelectItem Value="@("isEmpty")">@T["Is Empty"]</MudSelectItem>
+                            <MudSelectItem Value="@("isNotEmpty")">@T["Is Not Empty"]</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        @if (_triggerOperator is not "isEmpty" and not "isNotEmpty")
+                        {
+                            <MudTextField @bind-Value="_triggerValue" Label="@T["Value *"]" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                          Placeholder="e.g. Closed Lost" data-testid="trigger-value-input" />
+                        }
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+
+            <MudDivider Class="my-2" />
+
+            <!-- Conditional Actions -->
+            <MudText Typo="Typo.subtitle2" Color="Color.Primary">@T["Conditional Layout Actions"]</MudText>
+            <MudGrid Spacing="2">
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_showFieldsText" Label="@T["Show Fields (comma separated)"]" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  Placeholder="e.g. lost_reason, lost_notes" HelperText="@T["Fields to reveal when condition is met"]"
+                                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Visibility" AdornmentColor="Color.Success" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_hideFieldsText" Label="@T["Hide Fields (comma separated)"]" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  Placeholder="e.g. next_step, probability" HelperText="@T["Fields to hide when condition is met"]"
+                                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.VisibilityOff" AdornmentColor="Color.Default" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_mandatoryFieldsText" Label="@T["Make Mandatory (comma separated)"]" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  Placeholder="e.g. lost_reason" HelperText="@T["Fields required to save when condition is met"]"
+                                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Star" AdornmentColor="Color.Warning" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_readOnlyFieldsText" Label="@T["Make Read-Only (comma separated)"]" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  Placeholder="e.g. amount, expected_close_date" HelperText="@T["Fields locked from edit when condition is met"]"
+                                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Lock" AdornmentColor="Color.Info" />
+                </MudItem>
+            </MudGrid>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">@T["Cancel"]</MudButton>
+        <MudButton OnClick="SaveAsync" Variant="Variant.Filled" Color="Color.Primary" Disabled="_saving" data-testid="save-rule-btn">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            @T["Save Layout Rule"]
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public LayoutRuleDto? ExistingRule { get; set; }
+    [Parameter] public string DefaultEntityType { get; set; } = "deals";
+
+    private string _name = string.Empty;
+    private string? _description;
+    private string _entityType = "deals";
+    private int _priority = 10;
+    private bool _isActive = true;
+
+    private string _triggerField = "stage";
+    private string _triggerOperator = "eq";
+    private string? _triggerValue = "Closed Lost";
+
+    private string _showFieldsText = string.Empty;
+    private string _hideFieldsText = string.Empty;
+    private string _mandatoryFieldsText = string.Empty;
+    private string _readOnlyFieldsText = string.Empty;
+
+    private bool _saving;
+    private string? _error;
+
+    protected override void OnInitialized()
+    {
+        if (ExistingRule != null)
+        {
+            _name = ExistingRule.Name;
+            _description = ExistingRule.Description;
+            _entityType = ExistingRule.EntityType;
+            _priority = ExistingRule.Priority;
+            _isActive = ExistingRule.IsActive;
+
+            if (ExistingRule.Condition != null)
+            {
+                _triggerField = ExistingRule.Condition.Field ?? "stage";
+                _triggerOperator = ExistingRule.Condition.Operator ?? "eq";
+                _triggerValue = ExistingRule.Condition.Value ?? (ExistingRule.Condition.Values != null ? string.Join(", ", ExistingRule.Condition.Values) : null);
+            }
+
+            _showFieldsText = string.Join(", ", ExistingRule.ShowFields);
+            _hideFieldsText = string.Join(", ", ExistingRule.HideFields);
+            _mandatoryFieldsText = string.Join(", ", ExistingRule.MandatoryFields);
+            _readOnlyFieldsText = string.Join(", ", ExistingRule.ReadOnlyFields);
+        }
+        else
+        {
+            _entityType = DefaultEntityType;
+        }
+    }
+
+    private void LoadPreset(string preset)
+    {
+        switch (preset)
+        {
+            case "deal-lost":
+                _name = "Closed Lost Details & Requirements";
+                _entityType = "deals";
+                _description = "Displays and requires lost reasons when deal is lost, and locks amount";
+                _triggerField = "stage";
+                _triggerOperator = "eq";
+                _triggerValue = "Closed Lost";
+                _showFieldsText = "lost_reason, lost_notes";
+                _hideFieldsText = "next_step";
+                _mandatoryFieldsText = "lost_reason";
+                _readOnlyFieldsText = "amount";
+                break;
+            case "lead-qualified":
+                _name = "Qualified Lead Details";
+                _entityType = "leads";
+                _description = "Requires phone and company name when lead becomes Qualified";
+                _triggerField = "status";
+                _triggerOperator = "eq";
+                _triggerValue = "Qualified";
+                _showFieldsText = "phone, companyName";
+                _hideFieldsText = "";
+                _mandatoryFieldsText = "phone, companyName";
+                _readOnlyFieldsText = "";
+                break;
+            case "contact-vendor":
+                _name = "Vendor Contact Profile";
+                _entityType = "contacts";
+                _description = "Adjusts layout fields for vendor contacts";
+                _triggerField = "jobTitle";
+                _triggerOperator = "contains";
+                _triggerValue = "Vendor";
+                _showFieldsText = "cf_tax_id, cf_payment_terms";
+                _hideFieldsText = "lead_source";
+                _mandatoryFieldsText = "cf_tax_id";
+                _readOnlyFieldsText = "";
+                break;
+        }
+    }
+
+    private List<string> ParseList(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return [];
+        return text.Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Select(x => x.Trim().ToLowerInvariant())
+            .Where(x => !string.IsNullOrEmpty(x))
+            .Distinct()
+            .ToList();
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task SaveAsync()
+    {
+        _error = null;
+        if (string.IsNullOrWhiteSpace(_name))
+        {
+            _error = T["Rule name is required."];
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_triggerField))
+        {
+            _error = T["Trigger field key is required."];
+            return;
+        }
+
+        RuleNode condition;
+        if (_triggerOperator == "in")
+        {
+            var vals = (_triggerValue ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            condition = RuleNode.WhenIn(_triggerField.Trim().ToLowerInvariant(), _triggerOperator, vals);
+        }
+        else if (_triggerOperator is "isEmpty" or "isNotEmpty")
+        {
+            condition = RuleNode.When(_triggerField.Trim().ToLowerInvariant(), _triggerOperator);
+        }
+        else
+        {
+            condition = RuleNode.When(_triggerField.Trim().ToLowerInvariant(), _triggerOperator, _triggerValue?.Trim());
+        }
+
+        var showFields = ParseList(_showFieldsText);
+        var hideFields = ParseList(_hideFieldsText);
+        var mandatoryFields = ParseList(_mandatoryFieldsText);
+        var readOnlyFields = ParseList(_readOnlyFieldsText);
+
+        if (showFields.Count == 0 && hideFields.Count == 0 && mandatoryFields.Count == 0 && readOnlyFields.Count == 0)
+        {
+            _error = T["At least one layout action (show, hide, mandatory, or read-only) must be configured."];
+            return;
+        }
+
+        var request = new SaveLayoutRuleRequest(
+            EntityType: _entityType.Trim().ToLowerInvariant(),
+            Name: _name.Trim(),
+            Description: string.IsNullOrWhiteSpace(_description) ? null : _description.Trim(),
+            IsActive: _isActive,
+            Priority: _priority,
+            Condition: condition,
+            ShowFields: showFields,
+            HideFields: hideFields,
+            MandatoryFields: mandatoryFields,
+            ReadOnlyFields: readOnlyFields
+        );
+
+        _saving = true;
+        try
+        {
+            HttpResponseMessage response;
+            if (ExistingRule == null)
+            {
+                response = await Http.PostAsJsonAsync("api/v1/layout-rules", request);
+            }
+            else
+            {
+                response = await Http.PutAsJsonAsync($"api/v1/layout-rules/{ExistingRule.Id}", request);
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            Snackbar.Add(ExistingRule == null ? T["Layout rule created successfully."] : T["Layout rule updated."], Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

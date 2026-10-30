@@ -1,0 +1,377 @@
+@using MindLift.Shared.Contracts
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject Translator T
+
+<MudDialog Options="new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true, CloseButton = true }">
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.MergeType" Color="Color.Primary" Size="Size.Medium" />
+            <div>
+                <MudText Typo="Typo.h6" Style="font-weight:600">@T["Side-by-Side Merge & Deduplication"]</MudText>
+                <MudText Typo="Typo.caption" Class="ml-muted">
+                    @T["Compare records, choose which fields survive, and cleanly re-parent all child activities." ]
+                </MudText>
+            </div>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (_loading)
+        {
+            <div class="d-flex flex-column align-center justify-center pa-8 gap-3">
+                <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+                <MudText Typo="Typo.body2" Class="ml-muted">@T["Loading record comparison..."]</MudText>
+            </div>
+        }
+        else if (_records.Count < 2)
+        {
+            <MudAlert Severity="Severity.Error">@T["Could not load records for comparison."]</MudAlert>
+        }
+        else
+        {
+            <div class="d-flex flex-column gap-4 py-2">
+                <MudAlert Severity="Severity.Info" Dense="true" Icon="@Icons.Material.Outlined.Info">
+                    @T["Select the preferred value for each field. All logged activities, timeline events, and notes from duplicate records will be transferred into the Master record." ]
+                </MudAlert>
+
+                <div style="overflow-x: auto; border: 1px solid var(--mud-palette-divider); border-radius: 8px;">
+                    <table class="mud-table-root" style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                        <thead>
+                            <tr style="background: var(--mud-palette-background-grey); border-bottom: 2px solid var(--mud-palette-divider);">
+                                <th style="padding: 12px 16px; width: 180px; text-align: left; font-weight: 600;">@T["Field"]</th>
+                                @for (int i = 0; i < _records.Count; i++)
+                                {
+                                    var rec = _records[i];
+                                    var isMaster = i == 0;
+                                    <th style="padding: 12px 16px; text-align: left; border-left: 1px solid var(--mud-palette-divider); background: @(isMaster ? "rgba(var(--mud-palette-primary-rgb), 0.05)" : "transparent");">
+                                        <div class="d-flex align-center justify-space-between gap-2">
+                                            <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                                <div style="font-weight: 600;">@rec.Title</div>
+                                                <div style="font-size: 11px;" class="ml-muted">@rec.Subtitle</div>
+                                            </div>
+                                            <MudChip T="string" Size="Size.Small" Color="@(isMaster ? Color.Primary : Color.Secondary)" Variant="Variant.Filled" Style="font-size: 10px; height: 18px; padding: 0 6px;">
+                                                @(isMaster ? T["Master"] : T["Duplicate #{0}", i])
+                                            </MudChip>
+                                        </div>
+                                    </th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var field in _comparisonFields)
+                            {
+                                var currentField = field;
+                                var selectedVal = _selectedOverrides.GetValueOrDefault(currentField.Key);
+
+                                <tr style="border-bottom: 1px solid var(--mud-palette-divider);">
+                                    <td style="padding: 10px 16px; font-weight: 600; background: var(--mud-palette-background-grey); vertical-align: middle;">
+                                        @currentField.Label
+                                    </td>
+                                    @for (int i = 0; i < _records.Count; i++)
+                                    {
+                                        var rec = _records[i];
+                                        var val = rec.Values.GetValueOrDefault(currentField.Key);
+                                        var isSelected = (selectedVal == val) || (selectedVal == null && i == 0 && !string.IsNullOrWhiteSpace(val));
+                                        var cellBg = isSelected ? "rgba(var(--mud-palette-primary-rgb), 0.08)" : (i == 0 ? "rgba(var(--mud-palette-primary-rgb), 0.02)" : "transparent");
+
+                                        <td style="padding: 8px 12px; border-left: 1px solid var(--mud-palette-divider); background: @cellBg; cursor: pointer; transition: background 0.15s;"
+                                            @onclick="() => SelectFieldValue(currentField.Key, val)">
+                                            <div class="d-flex align-center gap-2">
+                                                <MudIcon Icon="@(isSelected ? Icons.Material.Filled.RadioButtonChecked : Icons.Material.Filled.RadioButtonUnchecked)"
+                                                         Color="@(isSelected ? Color.Primary : Color.Default)"
+                                                         Size="Size.Small" />
+                                                <div class="ml-grow" style="word-break: break-word;">
+                                                    @if (string.IsNullOrWhiteSpace(val))
+                                                    {
+                                                        <span class="ml-muted" style="font-style: italic; font-size: 12px;">@T["(empty)"]</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span style="@(isSelected ? "font-weight:600;" : "")">@val</span>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="d-flex align-center justify-space-between px-2 pt-1">
+                    <MudText Typo="Typo.caption" Class="ml-muted">
+                        @T["{0} records selected for consolidation.", _records.Count]
+                    </MudText>
+                    <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small" OnClick="ResetToMasterDefaults">
+                        @T["Reset to Master defaults"]
+                    </MudButton>
+                </div>
+            </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="_submitting">@T["Cancel"]</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.MergeType"
+                   OnClick="SubmitMergeAsync" Disabled="@(_submitting || _loading || _records.Count < 2)"
+                   data-testid="confirm-side-by-side-merge">
+            @if (_submitting)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <span class="ms-2">@T["Merging..."]</span>
+            }
+            else
+            {
+                @T["Consolidate & Merge"]
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public string EntityType { get; set; } = "lead"; // "lead" or "contact"
+    [Parameter] public Guid MasterId { get; set; }
+    [Parameter] public IReadOnlyList<Guid> DuplicateIds { get; set; } = [];
+
+    private sealed record ComparisonField(string Key, string Label);
+    private sealed record RecordColumn(Guid Id, string Title, string Subtitle, Dictionary<string, string?> Values);
+
+    private bool _loading = true;
+    private bool _submitting = false;
+    private List<RecordColumn> _records = [];
+    private List<ComparisonField> _comparisonFields = [];
+    private Dictionary<string, string?> _selectedOverrides = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRecordsAsync();
+    }
+
+    private async Task LoadRecordsAsync()
+    {
+        _loading = true;
+        try
+        {
+            _records.Clear();
+            _comparisonFields.Clear();
+            _selectedOverrides.Clear();
+
+            if (EntityType.Equals("contact", StringComparison.OrdinalIgnoreCase))
+            {
+                _comparisonFields =
+                [
+                    new("first_name", T["First Name"]),
+                    new("last_name", T["Last Name"]),
+                    new("email", T["Email Address"]),
+                    new("phone", T["Phone Number"]),
+                    new("job_title", T["Job Title"]),
+                    new("description", T["Notes / Description"])
+                ];
+
+                var masterRes = await Http.GetFromJsonAsync<ContactDto>($"api/v1/contacts/{MasterId}");
+                if (masterRes != null)
+                {
+                    _records.Add(new RecordColumn(
+                        masterRes.Id,
+                        $"{masterRes.FirstName} {masterRes.LastName}".Trim(),
+                        masterRes.AccountName ?? masterRes.Email ?? T["Contact"],
+                        new Dictionary<string, string?>
+                        {
+                            ["first_name"] = masterRes.FirstName,
+                            ["last_name"] = masterRes.LastName,
+                            ["email"] = masterRes.Email,
+                            ["phone"] = masterRes.Phone,
+                            ["job_title"] = masterRes.JobTitle,
+                            ["description"] = masterRes.Description
+                        }
+                    ));
+                }
+
+                foreach (var dupId in DuplicateIds.Take(2))
+                {
+                    try
+                    {
+                        var dupRes = await Http.GetFromJsonAsync<ContactDto>($"api/v1/contacts/{dupId}");
+                        if (dupRes != null)
+                        {
+                            _records.Add(new RecordColumn(
+                                dupRes.Id,
+                                $"{dupRes.FirstName} {dupRes.LastName}".Trim(),
+                                dupRes.AccountName ?? dupRes.Email ?? T["Duplicate Contact"],
+                                new Dictionary<string, string?>
+                                {
+                                    ["first_name"] = dupRes.FirstName,
+                                    ["last_name"] = dupRes.LastName,
+                                    ["email"] = dupRes.Email,
+                                    ["phone"] = dupRes.Phone,
+                                    ["job_title"] = dupRes.JobTitle,
+                                    ["description"] = dupRes.Description
+                                }
+                            ));
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore individual load failures
+                    }
+                }
+            }
+            else // Default to lead
+            {
+                _comparisonFields =
+                [
+                    new("first_name", T["First Name"]),
+                    new("last_name", T["Last Name"]),
+                    new("email", T["Email Address"]),
+                    new("phone", T["Phone Number"]),
+                    new("company_name", T["Company Name"]),
+                    new("status", T["Status"]),
+                    new("source", T["Lead Source"]),
+                    new("rating", T["Rating"]),
+                    new("description", T["Notes / Description"])
+                ];
+
+                var masterRes = await Http.GetFromJsonAsync<LeadDto>($"api/v1/leads/{MasterId}");
+                if (masterRes != null)
+                {
+                    _records.Add(new RecordColumn(
+                        masterRes.Id,
+                        $"{masterRes.FirstName} {masterRes.LastName}".Trim(),
+                        masterRes.CompanyName ?? masterRes.Email ?? T["Lead"],
+                        new Dictionary<string, string?>
+                        {
+                            ["first_name"] = masterRes.FirstName,
+                            ["last_name"] = masterRes.LastName,
+                            ["email"] = masterRes.Email,
+                            ["phone"] = masterRes.Phone,
+                            ["company_name"] = masterRes.CompanyName,
+                            ["status"] = masterRes.Status,
+                            ["source"] = masterRes.Source,
+                            ["rating"] = masterRes.Rating,
+                            ["description"] = masterRes.Description
+                        }
+                    ));
+                }
+
+                foreach (var dupId in DuplicateIds.Take(2))
+                {
+                    try
+                    {
+                        var dupRes = await Http.GetFromJsonAsync<LeadDto>($"api/v1/leads/{dupId}");
+                        if (dupRes != null)
+                        {
+                            _records.Add(new RecordColumn(
+                                dupRes.Id,
+                                $"{dupRes.FirstName} {dupRes.LastName}".Trim(),
+                                dupRes.CompanyName ?? dupRes.Email ?? T["Duplicate Lead"],
+                                new Dictionary<string, string?>
+                                {
+                                    ["first_name"] = dupRes.FirstName,
+                                    ["last_name"] = dupRes.LastName,
+                                    ["email"] = dupRes.Email,
+                                    ["phone"] = dupRes.Phone,
+                                    ["company_name"] = dupRes.CompanyName,
+                                    ["status"] = dupRes.Status,
+                                    ["source"] = dupRes.Source,
+                                    ["rating"] = dupRes.Rating,
+                                    ["description"] = dupRes.Description
+                                }
+                            ));
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore individual load failures
+                    }
+                }
+            }
+
+            ResetToMasterDefaults();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error preparing merge comparison: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void ResetToMasterDefaults()
+    {
+        _selectedOverrides.Clear();
+        if (_records.Count == 0) return;
+
+        var master = _records[0];
+        foreach (var field in _comparisonFields)
+        {
+            var masterVal = master.Values.GetValueOrDefault(field.Key);
+            if (!string.IsNullOrWhiteSpace(masterVal))
+            {
+                _selectedOverrides[field.Key] = masterVal;
+            }
+            else
+            {
+                // If master is empty, default to the first duplicate that has a non-empty value
+                var fallback = _records.Skip(1)
+                    .Select(r => r.Values.GetValueOrDefault(field.Key))
+                    .FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
+                _selectedOverrides[field.Key] = fallback ?? string.Empty;
+            }
+        }
+    }
+
+    private void SelectFieldValue(string key, string? value)
+    {
+        _selectedOverrides[key] = value ?? string.Empty;
+    }
+
+    private async Task SubmitMergeAsync()
+    {
+        _submitting = true;
+        try
+        {
+            var duplicateIdsToMerge = _records.Skip(1).Select(r => r.Id).ToList();
+            if (duplicateIdsToMerge.Count == 0)
+            {
+                Snackbar.Add(T["No duplicates available to merge."], Severity.Warning);
+                return;
+            }
+
+            HttpResponseMessage response;
+            if (EntityType.Equals("contact", StringComparison.OrdinalIgnoreCase))
+            {
+                var req = new MergeContactsRequest(duplicateIdsToMerge, _selectedOverrides);
+                response = await Http.PostAsJsonAsync($"api/v1/contacts/{MasterId}/merge", req);
+            }
+            else
+            {
+                var req = new MergeLeadsRequest(duplicateIdsToMerge, _selectedOverrides);
+                response = await Http.PostAsJsonAsync($"api/v1/leads/{MasterId}/merge", req);
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add(T["Records consolidated and merged successfully"], Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Add(await ProblemText.FromAsync(response, T["Merge could not be completed."]), Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

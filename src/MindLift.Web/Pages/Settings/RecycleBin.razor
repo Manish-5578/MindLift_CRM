@@ -1,0 +1,477 @@
+@page "/settings/recycle-bin"
+@using MindLift.Shared.Contracts
+@using MindLift.Shared.Enums
+@inject HttpClient Http
+@inject AuthSession Session
+@inject AppState App
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+@inject NavigationManager Nav
+@inject Translator T
+
+<PageTitle>@T["Recycle Bin"] · MindLift</PageTitle>
+
+<div class="ml-page">
+    <PageHeader Title="Recycle bin" Subtitle="Review, restore, or permanently purge soft-deleted records. Items are retained for 60 days before automatic cleanup.">
+        <Actions>
+            @if (_selectedIds.Count > 0)
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.DeleteForever"
+                           OnClick="ConfirmPurgeSelectedAsync" Disabled="_actionBusy" data-testid="bulk-purge-btn">
+                    @T["Purge Selected ({0})", _selectedIds.Count]
+                </MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.RestoreFromTrash"
+                           OnClick="RestoreSelectedAsync" Disabled="_actionBusy" data-testid="bulk-restore-btn">
+                    @T["Restore Selected ({0})", _selectedIds.Count]
+                </MudButton>
+            }
+        </Actions>
+    </PageHeader>
+
+    <SettingsNav Current="/settings/recycle-bin" />
+
+    @if (_featureDisabled)
+    {
+        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-4">
+            <div class="d-flex justify-space-between align-center">
+                <div>
+                    <div style="font-weight:600;">@T["Recycle Bin is currently disabled"]</div>
+                    <div class="text-caption">@T["Enable the 'recycle-bin' feature flag to access soft-deleted items and restore records."]</div>
+                </div>
+                <MudButton Variant="Variant.Filled" Color="Color.Warning" Size="Size.Small" OnClick="EnableFeatureAsync" Disabled="_enabling">
+                    @(_enabling ? T["Enabling..."] : T["Enable Recycle Bin"])
+                </MudButton>
+            </div>
+        </MudAlert>
+    }
+    else
+    {
+        @* Filters Bar *@
+        <div class="d-flex justify-space-between align-center mb-3 gap-3 flex-wrap">
+            <div class="d-flex gap-1 align-center flex-wrap">
+                <MudChip T="string" Variant="@(string.IsNullOrEmpty(_selectedEntityType) || _selectedEntityType == "all" ? Variant.Filled : Variant.Outlined)"
+                         Color="Color.Primary" OnClick="@(() => FilterByEntity("all"))" data-testid="filter-all">
+                    @T["All Records"]
+                </MudChip>
+                <MudChip T="string" Variant="@(_selectedEntityType == "leads" ? Variant.Filled : Variant.Outlined)"
+                         Color="Color.Primary" OnClick="@(() => FilterByEntity("leads"))" data-testid="filter-leads">
+                    @T["Leads"]
+                </MudChip>
+                <MudChip T="string" Variant="@(_selectedEntityType == "contacts" ? Variant.Filled : Variant.Outlined)"
+                         Color="Color.Primary" OnClick="@(() => FilterByEntity("contacts"))" data-testid="filter-contacts">
+                    @T["Contacts"]
+                </MudChip>
+                <MudChip T="string" Variant="@(_selectedEntityType == "accounts" ? Variant.Filled : Variant.Outlined)"
+                         Color="Color.Primary" OnClick="@(() => FilterByEntity("accounts"))" data-testid="filter-accounts">
+                    @T["Accounts"]
+                </MudChip>
+                <MudChip T="string" Variant="@(_selectedEntityType == "deals" ? Variant.Filled : Variant.Outlined)"
+                         Color="Color.Primary" OnClick="@(() => FilterByEntity("deals"))" data-testid="filter-deals">
+                    @T["Deals"]
+                </MudChip>
+            </div>
+
+            <div style="min-width: 260px;">
+                <MudTextField @bind-Value="_search" Placeholder="@T["Search deleted records..."]"
+                              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.Search"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true"
+                              DebounceInterval="300" OnDebounceIntervalElapsed="OnSearchChanged" />
+            </div>
+        </div>
+
+        <MlCard Flush="true" TestId="recycle-bin-card">
+            @if (_loading)
+            {
+                <div class="pa-6 d-flex justify-center">
+                    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+                </div>
+            }
+            else if (_items.Count == 0)
+            {
+                <div class="pa-8 text-center">
+                    <MudIcon Icon="@Icons.Material.Filled.DeleteSweep" Color="Color.Default" Style="font-size: 3rem; opacity: 0.4;" />
+                    <MudText Typo="Typo.h6" Class="mt-2" Style="font-weight: 500;">@T["The recycle bin is empty"]</MudText>
+                    <MudText Typo="Typo.body2" Class="ml-muted mt-1">@T["No deleted records match your criteria."]</MudText>
+                </div>
+            }
+            else
+            {
+                <MudSimpleTable Hover="true" Dense="true" Elevation="0">
+                    <thead>
+                        <tr>
+                            <th style="width: 48px;">
+                                <MudCheckBox T="bool" Value="AllSelected" ValueChanged="ToggleSelectAll" Color="Color.Primary" />
+                            </th>
+                            <th>@T["Record Name"]</th>
+                            <th>@T["Module"]</th>
+                            <th>@T["Deleted At"]</th>
+                            <th>@T["Deleted By"]</th>
+                            <th>@T["Retention"]</th>
+                            <th style="width: 140px; text-align: right;">@T["Actions"]</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in _items)
+                        {
+                            var isSelected = _selectedIds.Contains(item.Id);
+                            <tr>
+                                <td>
+                                    <MudCheckBox T="bool" Value="isSelected" ValueChanged="v => ToggleItemSelection(item.Id, v)" Color="Color.Primary" />
+                                </td>
+                                <td>
+                                    <span style="font-weight: 600;">@item.DisplayName</span>
+                                </td>
+                                <td>
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="@EntityColor(item.EntityType)" Style="height: 20px; font-size: 11px;">
+                                        @EntityLabel(item.EntityType)
+                                    </MudChip>
+                                </td>
+                                <td>
+                                    <DateText Value="@item.DeletedAtUtc" />
+                                </td>
+                                <td>
+                                    <span class="ml-muted">@(item.DeletedByUserName ?? "—")</span>
+                                </td>
+                                <td>
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="@(item.DaysRemaining <= 7 ? Color.Error : Color.Default)" Style="height: 20px; font-size: 11px;">
+                                        @T["{0} days left", item.DaysRemaining]
+                                    </MudChip>
+                                </td>
+                                <td style="text-align: right;">
+                                    <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Success"
+                                               StartIcon="@Icons.Material.Filled.Restore"
+                                               OnClick="() => RestoreSingleAsync(item)"
+                                               data-testid="@($"restore-btn-{item.Id}")">
+                                        @T["Restore"]
+                                    </MudButton>
+                                    <MudIconButton Icon="@Icons.Material.Outlined.DeleteForever" Size="Size.Small" Color="Color.Error"
+                                                   OnClick="() => ConfirmPurgeSingleAsync(item)"
+                                                   aria-label="@T["Purge forever"]"
+                                                   data-testid="@($"purge-btn-{item.Id}")" />
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+
+                @* Pagination *@
+                @if (_totalCount > _pageSize)
+                {
+                    <div class="d-flex justify-space-between align-center pa-3" style="border-top: 1px solid var(--mud-palette-divider);">
+                        <MudText Typo="Typo.caption" Class="ml-muted">
+                            @T["Showing {0}–{1} of {2} records", ((_page - 1) * _pageSize) + 1, Math.Min(_page * _pageSize, _totalCount), _totalCount]
+                        </MudText>
+                        <MudPagination Count="@((_totalCount + _pageSize - 1) / _pageSize)" Selected="_page" SelectedChanged="OnPageChanged" Size="Size.Small" />
+                    </div>
+                }
+            }
+        </MlCard>
+    }
+</div>
+
+@code {
+    private bool _loading = true;
+    private bool _featureDisabled = false;
+    private bool _enabling = false;
+    private bool _actionBusy = false;
+
+    private List<RecycleBinItemDto> _items = [];
+    private int _totalCount = 0;
+    private int _page = 1;
+    private int _pageSize = 50;
+    private string _selectedEntityType = "all";
+    private string _search = "";
+
+    private HashSet<Guid> _selectedIds = [];
+
+    private bool AllSelected => _items.Count > 0 && _items.All(i => _selectedIds.Contains(i.Id));
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.IsSignedIn)
+        {
+            Nav.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _featureDisabled = false;
+        try
+        {
+            var url = $"api/v1/recycle-bin?page={_page}&pageSize={_pageSize}";
+            if (!string.IsNullOrWhiteSpace(_selectedEntityType) && _selectedEntityType != "all")
+            {
+                url += $"&entityType={Uri.EscapeDataString(_selectedEntityType)}";
+            }
+            if (!string.IsNullOrWhiteSpace(_search))
+            {
+                url += $"&search={Uri.EscapeDataString(_search.Trim())}";
+            }
+
+            var res = await Http.GetAsync(url);
+            if (res.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                _featureDisabled = true;
+                _items = [];
+                _totalCount = 0;
+            }
+            else if (res.IsSuccessStatusCode)
+            {
+                var paged = await res.Content.ReadFromJsonAsync<RecycleBinPagedResult>();
+                _items = paged?.Items?.ToList() ?? [];
+                _totalCount = paged?.TotalCount ?? 0;
+            }
+            else
+            {
+                Snackbar.Add(await ProblemText.FromAsync(res, T["Could not load recycle bin."]), Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            // Clear selections that no longer exist
+            _selectedIds.IntersectWith(_items.Select(i => i.Id));
+        }
+    }
+
+    private async Task EnableFeatureAsync()
+    {
+        _enabling = true;
+        try
+        {
+            var res = await Http.PutAsJsonAsync("api/v1/features/recycle-bin", new SetFeatureRequest(true));
+            if (res.IsSuccessStatusCode)
+            {
+                Snackbar.Add(T["Recycle Bin feature enabled"], Severity.Success);
+                await LoadAsync();
+            }
+            else
+            {
+                Snackbar.Add(T["Could not enable feature"], Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _enabling = false;
+        }
+    }
+
+    private async Task FilterByEntity(string entityType)
+    {
+        _selectedEntityType = entityType;
+        _page = 1;
+        _selectedIds.Clear();
+        await LoadAsync();
+    }
+
+    private async Task OnSearchChanged(string text)
+    {
+        _page = 1;
+        _selectedIds.Clear();
+        await LoadAsync();
+    }
+
+    private async Task OnPageChanged(int newPage)
+    {
+        _page = newPage;
+        await LoadAsync();
+    }
+
+    private void ToggleItemSelection(Guid id, bool selected)
+    {
+        if (selected) _selectedIds.Add(id);
+        else _selectedIds.Remove(id);
+    }
+
+    private void ToggleSelectAll(bool selectAll)
+    {
+        if (selectAll)
+        {
+            foreach (var item in _items) _selectedIds.Add(item.Id);
+        }
+        else
+        {
+            _selectedIds.Clear();
+        }
+    }
+
+    private async Task RestoreSingleAsync(RecycleBinItemDto item)
+    {
+        _actionBusy = true;
+        try
+        {
+            var req = new RestoreRecordsRequest(item.EntityType, [item.Id]);
+            var res = await Http.PostAsJsonAsync("api/v1/recycle-bin/restore", req);
+            if (res.IsSuccessStatusCode)
+            {
+                Snackbar.Add(T["Restored: {0}", item.DisplayName], Severity.Success);
+                _selectedIds.Remove(item.Id);
+                await LoadAsync();
+            }
+            else
+            {
+                Snackbar.Add(await ProblemText.FromAsync(res, T["Could not restore record."]), Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _actionBusy = false;
+        }
+    }
+
+    private async Task ConfirmPurgeSingleAsync(RecycleBinItemDto item)
+    {
+        if (!await Dialogs.ConfirmAsync(
+            $"Permanently delete {item.DisplayName}?",
+            T["This record and its associated history will be permanently deleted and cannot be recovered."],
+            T["Purge forever"],
+            danger: true))
+        {
+            return;
+        }
+
+        _actionBusy = true;
+        try
+        {
+            var req = new PurgeRecordsRequest(item.EntityType, [item.Id]);
+            var res = await Http.PostAsJsonAsync("api/v1/recycle-bin/purge", req);
+            if (res.IsSuccessStatusCode)
+            {
+                Snackbar.Add(T["Permanently purged: {0}", item.DisplayName], Severity.Success);
+                _selectedIds.Remove(item.Id);
+                await LoadAsync();
+            }
+            else
+            {
+                Snackbar.Add(await ProblemText.FromAsync(res, T["Could not purge record."]), Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _actionBusy = false;
+        }
+    }
+
+    private async Task RestoreSelectedAsync()
+    {
+        if (_selectedIds.Count == 0) return;
+
+        _actionBusy = true;
+        try
+        {
+            // Group selections by entity type
+            var selectedItems = _items.Where(i => _selectedIds.Contains(i.Id)).ToList();
+            var byType = selectedItems.GroupBy(i => i.EntityType);
+
+            int restoredCount = 0;
+            foreach (var group in byType)
+            {
+                var req = new RestoreRecordsRequest(group.Key, group.Select(x => x.Id).ToList());
+                var res = await Http.PostAsJsonAsync("api/v1/recycle-bin/restore", req);
+                if (res.IsSuccessStatusCode)
+                {
+                    var result = await res.Content.ReadFromJsonAsync<RecycleBinOperationResult>();
+                    restoredCount += result?.ProcessedCount ?? group.Count();
+                }
+            }
+
+            Snackbar.Add(T["Restored {0} records", restoredCount], Severity.Success);
+            _selectedIds.Clear();
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _actionBusy = false;
+        }
+    }
+
+    private async Task ConfirmPurgeSelectedAsync()
+    {
+        if (_selectedIds.Count == 0) return;
+
+        if (!await Dialogs.ConfirmAsync(
+            $"Permanently delete {_selectedIds.Count} selected records?",
+            T["These records will be completely removed from your database and cannot be recovered."],
+            T["Purge forever"],
+            danger: true))
+        {
+            return;
+        }
+
+        _actionBusy = true;
+        try
+        {
+            var selectedItems = _items.Where(i => _selectedIds.Contains(i.Id)).ToList();
+            var byType = selectedItems.GroupBy(i => i.EntityType);
+
+            int purgedCount = 0;
+            foreach (var group in byType)
+            {
+                var req = new PurgeRecordsRequest(group.Key, group.Select(x => x.Id).ToList());
+                var res = await Http.PostAsJsonAsync("api/v1/recycle-bin/purge", req);
+                if (res.IsSuccessStatusCode)
+                {
+                    var result = await res.Content.ReadFromJsonAsync<RecycleBinOperationResult>();
+                    purgedCount += result?.ProcessedCount ?? group.Count();
+                }
+            }
+
+            Snackbar.Add(T["Permanently purged {0} records", purgedCount], Severity.Success);
+            _selectedIds.Clear();
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _actionBusy = false;
+        }
+    }
+
+    private static Color EntityColor(string entityType) => entityType.ToLowerInvariant() switch
+    {
+        "lead" or "leads" => Color.Warning,
+        "contact" or "contacts" => Color.Info,
+        "account" or "accounts" => Color.Primary,
+        "deal" or "deals" => Color.Success,
+        _ => Color.Default
+    };
+
+    private static string EntityLabel(string entityType) => entityType.ToLowerInvariant() switch
+    {
+        "lead" or "leads" => "Lead",
+        "contact" or "contacts" => "Contact",
+        "account" or "accounts" => "Account",
+        "deal" or "deals" => "Deal",
+        _ => entityType
+    };
+}

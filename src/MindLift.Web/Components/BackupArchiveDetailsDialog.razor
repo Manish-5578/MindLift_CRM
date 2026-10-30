@@ -1,0 +1,114 @@
+@inject Translator T
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+<MudDialog MaxWidth="MaxWidth.Medium" FullWidth="true">
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.VerifiedUser" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">@T["Backup Archive Details & Integrity"]</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (Archive != null)
+        {
+            <div class="d-flex flex-column gap-4">
+                <MudCard Elevation="0" Outlined="true" Class="pa-3">
+                    <MudGrid>
+                        <MudItem xs="12" sm="6">
+                            <MudText Typo="Typo.caption" Class="ml-muted">@T["Archive ID"]</MudText>
+                            <MudText Typo="Typo.body2" Style="font-family:monospace">@Archive.Id</MudText>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudText Typo="Typo.caption" Class="ml-muted">@T["Status"]</MudText>
+                            <div>
+                                <MudChip T="string" Size="Size.Small" Color="@(Archive.Status == "Completed" ? Color.Success : Color.Warning)" Variant="Variant.Filled">
+                                    @Archive.Status
+                                </MudChip>
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="text-uppercase">
+                                    @Archive.Format
+                                </MudChip>
+                            </div>
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudText Typo="Typo.caption" Class="ml-muted">@T["Created At"]</MudText>
+                            <MudText Typo="Typo.body2">@Archive.CreatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm:ss")</MudText>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudText Typo="Typo.caption" Class="ml-muted">@T["Expires At"]</MudText>
+                            <MudText Typo="Typo.body2">@Archive.ExpiresAt.ToLocalTime().ToString("dd MMM yyyy HH:mm:ss")</MudText>
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudText Typo="Typo.caption" Class="ml-muted">@T["File Size"]</MudText>
+                            <MudText Typo="Typo.body2">@FormatSize(Archive.SizeBytes)</MudText>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudText Typo="Typo.caption" Class="ml-muted">@T["Download Count"]</MudText>
+                            <MudText Typo="Typo.body2">@Archive.DownloadCount @T["times downloaded"]</MudText>
+                        </MudItem>
+                    </MudGrid>
+                </MudCard>
+
+                <MudCard Elevation="0" Outlined="true" Class="pa-3">
+                    <MudText Typo="Typo.subtitle2" Class="fw-semibold mb-2">@T["Cryptographic Integrity (SHA-256)"]</MudText>
+                    <div class="d-flex align-center gap-2 pa-2 rounded" style="background:var(--mud-palette-background-grey)">
+                        <MudText Typo="Typo.body2" Style="font-family:monospace; word-break:break-all; flex-grow:1;">
+                            @Archive.ChecksumSha256
+                        </MudText>
+                        <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" OnClick="CopyChecksumAsync" Title="Copy SHA-256" />
+                    </div>
+                    <MudText Typo="Typo.caption" Class="ml-muted mt-1 d-block">
+                        @T["Use this hash to verify the file was not altered in transit or modified after snapshot."]
+                    </MudText>
+                </MudCard>
+
+                <MudCard Elevation="0" Outlined="true" Class="pa-3">
+                    <MudText Typo="Typo.subtitle2" Class="fw-semibold mb-2">@T["Record Counts Breakdown"]</MudText>
+                    <div class="d-flex flex-wrap gap-2">
+                        @if (Archive.RecordCounts != null && Archive.RecordCounts.Count > 0)
+                        {
+                            @foreach (var kvp in Archive.RecordCounts)
+                            {
+                                <MudChip T="string" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small">
+                                    <span class="text-capitalize">@kvp.Key</span>: <b>@kvp.Value</b>
+                                </MudChip>
+                            }
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.body2" Class="ml-muted">@T["No record statistics available."]</MudText>
+                        }
+                    </div>
+                </MudCard>
+            </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Close">@T["Close"]</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public BackupArchiveDto? Archive { get; set; }
+
+    private void Close() => MudDialog.Close();
+
+    private async Task CopyChecksumAsync()
+    {
+        if (Archive?.ChecksumSha256 is { } hash)
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", hash);
+            Snackbar.Add(T["SHA-256 checksum copied to clipboard."], Severity.Success);
+        }
+    }
+
+    private static string FormatSize(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024.0):F2} MB";
+    }
+}

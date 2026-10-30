@@ -1,0 +1,451 @@
+@using MindLift.Shared.Contracts
+@using MindLift.Shared.Enums
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject AppState App
+@inject Translator T
+
+<MudDialog Options="new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true }">
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.Security" Color="Color.Primary" />
+            <MudText Typo="Typo.h6" Style="font-weight:600">
+                @T["Stage Gating Rules: {0}", StageName]
+            </MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (_featureDisabled)
+        {
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="my-3">
+                <div class="d-flex justify-space-between align-center">
+                    <div>
+                        <div style="font-weight:600;">@T["Deal Stage Gating Feature is Disabled"]</div>
+                        <div class="text-caption">@T["Enable the 'deal-stage-gating' feature flag to enforce stage gating and validation rules across deals."]</div>
+                    </div>
+                    <MudButton Variant="Variant.Filled" Color="Color.Warning" Size="Size.Small" OnClick="EnableFeatureAsync" Disabled="_enabling">
+                        @(_enabling ? T["Enabling..."] : T["Enable Feature"])
+                    </MudButton>
+                </div>
+            </MudAlert>
+        }
+        else if (_loading)
+        {
+            <div class="d-flex justify-center pa-6">
+                <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+            </div>
+        }
+        else if (_editingGate is not null)
+        {
+            @* Gate Editor Form *@
+            <div class="d-flex flex-column gap-3 py-2">
+                <div class="d-flex align-center justify-space-between">
+                    <MudText Typo="Typo.subtitle1" Style="font-weight:600;">
+                        @(_editingGateId.HasValue ? T["Edit Stage Gate"] : T["New Stage Gate"])
+                    </MudText>
+                    <MudSwitch @bind-Value="_formIsActive" Color="Color.Success" Label="@(_formIsActive ? T["Active"] : T["Inactive"])" />
+                </div>
+
+                <MudTextField @bind-Value="_formName" Label="@T["Gate Rule Name *"]" Placeholder="e.g. Proposal Minimum Criteria"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Required="true"
+                              Error="@(_formError != null && string.IsNullOrWhiteSpace(_formName))" />
+
+                <MudTextField @bind-Value="_formDescription" Label="@T["Description (Optional)"]"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />
+
+                <div class="d-flex gap-3">
+                    <MudNumericField @bind-Value="_formMinAmount" Label="@T["Minimum Deal Amount"]"
+                                     Variant="Variant.Outlined" Margin="Margin.Dense" Min="0m" Step="500m" Format="N2"
+                                     Adornment="Adornment.End" AdornmentText="@Currency"
+                                     HelperText="@T["Leave empty for no minimum threshold"]" Clearable="true" />
+
+                    <div class="d-flex align-center ps-2" style="border: 1px solid var(--mud-palette-divider); border-radius: 4px; flex: 1;">
+                        <MudCheckBox @bind-Value="_formRequireLineItems" Color="Color.Primary" Label="@T["Require at least 1 Product Line Item"]" />
+                    </div>
+                </div>
+
+                <MudSelect T="string" MultiSelection="true" @bind-SelectedValues="_formRequiredFields"
+                           Label="@T["Required Fields"]" Variant="Variant.Outlined" Margin="Margin.Dense"
+                           HelperText="@T["Select fields that must not be empty before entering this stage"]">
+                    @foreach (var field in _availableFields)
+                    {
+                        <MudSelectItem T="string" Value="@field.Key">@field.Label</MudSelectItem>
+                    }
+                </MudSelect>
+
+                @if (_availableRoles.Count > 0)
+                {
+                    <MudSelect T="string" MultiSelection="true" @bind-SelectedValues="_formAllowedRoles"
+                               Label="@T["Role Restrictions (Optional)"]" Variant="Variant.Outlined" Margin="Margin.Dense"
+                               HelperText="@T["Leave empty to allow all roles. If selected, only users with these roles can move deals to this stage."]">
+                        @foreach (var role in _availableRoles)
+                        {
+                            <MudSelectItem T="string" Value="@role.Name">@role.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                }
+
+                <MudTextField @bind-Value="_formFailureMessage" Label="@T["Custom Failure Message (Optional)"]"
+                              Placeholder="@T["e.g. Deals in this stage must have an account and at least 1 product attached."]"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2"
+                              HelperText="@T["Displayed to sales reps if criteria are not met."]" />
+
+                @if (!string.IsNullOrWhiteSpace(_formError))
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true">@_formError</MudAlert>
+                }
+
+                <div class="d-flex justify-end gap-2 pt-2">
+                    <MudButton OnClick="CancelEdit">@T["Cancel"]</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveGateAsync" Disabled="_saving" data-testid="save-gate-btn">
+                        @if (_saving)
+                        {
+                            <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                            <span class="ms-2">@T["Saving..."]</span>
+                        }
+                        else
+                        {
+                            @T["Save Gate"]
+                        }
+                    </MudButton>
+                </div>
+            </div>
+        }
+        else
+        {
+            @* Gates List *@
+            <div class="d-flex justify-space-between align-center mb-3">
+                <MudText Typo="Typo.body2" Class="ml-muted">
+                    @T["Rules that evaluate before a deal can be advanced or moved into this stage."]
+                </MudText>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.Add" OnClick="StartNewGate" data-testid="add-gate-btn">
+                    @T["Add Gate Rule"]
+                </MudButton>
+            </div>
+
+            @if (_gates.Count == 0)
+            {
+                <div class="pa-6 text-center rounded" style="background: var(--mud-palette-background-grey); border: 1px dashed var(--mud-palette-divider);">
+                    <MudIcon Icon="@Icons.Material.Outlined.GppMaybe" Color="Color.Default" Style="font-size: 2.5rem; opacity: 0.5;" />
+                    <MudText Typo="Typo.body1" Class="mt-2" Style="font-weight: 500;">@T["No Stage Gates Configured"]</MudText>
+                    <MudText Typo="Typo.body2" Class="ml-muted">@T["Deals can transition into {0} without additional validation checks.", StageName]</MudText>
+                </div>
+            }
+            else
+            {
+                <div class="d-flex flex-column gap-3">
+                    @foreach (var gate in _gates)
+                    {
+                        <div class="pa-3 rounded" style="border: 1px solid var(--mud-palette-divider); background: var(--mud-palette-surface);">
+                            <div class="d-flex justify-space-between align-center">
+                                <div class="d-flex align-center gap-2">
+                                    <MudIcon Icon="@Icons.Material.Filled.Shield" Color="@(gate.IsActive ? Color.Success : Color.Default)" Size="Size.Small" />
+                                    <MudText Typo="Typo.subtitle2" Style="font-weight: 600;">@gate.Name</MudText>
+                                    @if (gate.IsActive)
+                                    {
+                                        <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Text" Style="height: 20px;">@T["Active"]</MudChip>
+                                    }
+                                    else
+                                    {
+                                        <MudChip T="string" Color="Color.Default" Size="Size.Small" Variant="Variant.Text" Style="height: 20px;">@T["Inactive"]</MudChip>
+                                    }
+                                </div>
+                                <div class="d-flex gap-1">
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="() => EditGate(gate)" aria-label="@T["Edit Gate"]" />
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Color="Color.Error" OnClick="() => DeleteGateAsync(gate)" aria-label="@T["Delete Gate"]" />
+                                </div>
+                            </div>
+
+                            @if (!string.IsNullOrWhiteSpace(gate.Description))
+                            {
+                                <MudText Typo="Typo.body2" Class="ml-muted mt-1">@gate.Description</MudText>
+                            }
+
+                            <div class="d-flex flex-wrap gap-1 mt-2">
+                                @if (gate.MinAmount.HasValue)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Info" Icon="@Icons.Material.Outlined.AttachMoney">
+                                        @T["Min Amount:"] @gate.MinAmount.Value.ToString("N0") @Currency
+                                    </MudChip>
+                                }
+                                @if (gate.RequireLineItems)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" Icon="@Icons.Material.Outlined.ShoppingCart">
+                                        @T["Line Items Required"]
+                                    </MudChip>
+                                }
+                                @if (gate.RequiredFields.Count > 0)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning" Icon="@Icons.Material.Outlined.AssignmentLate">
+                                        @T["Required:"] @string.Join(", ", gate.RequiredFields.Select(FriendlyFieldName))
+                                    </MudChip>
+                                }
+                                @if (gate.AllowedRoles.Count > 0)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Secondary" Icon="@Icons.Material.Outlined.Lock">
+                                        @T["Roles:"] @string.Join(", ", gate.AllowedRoles)
+                                    </MudChip>
+                                }
+                            </div>
+
+                            @if (!string.IsNullOrWhiteSpace(gate.FailureMessage))
+                            {
+                                <div class="mt-2 pa-2 rounded" style="background: var(--mud-palette-background-grey); font-size: 12px; font-style: italic;">
+                                    <span class="ml-muted">@T["Failure Notice:"]</span> "@gate.FailureMessage"
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close">@T["Close"]</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public Guid PipelineId { get; set; }
+    [Parameter] public Guid StageId { get; set; }
+    [Parameter] public string StageName { get; set; } = "";
+    [Parameter] public string Currency { get; set; } = "USD";
+
+    private List<DealStageGateDto> _gates = [];
+    private bool _loading = true;
+    private bool _featureDisabled = false;
+    private bool _enabling = false;
+
+    // Gate editor state
+    private DealStageGateDto? _editingGate;
+    private Guid? _editingGateId;
+    private string _formName = "";
+    private string? _formDescription;
+    private bool _formIsActive = true;
+    private decimal? _formMinAmount;
+    private bool _formRequireLineItems = false;
+    private IReadOnlyCollection<string> _formRequiredFields = [];
+    private IReadOnlyCollection<string> _formAllowedRoles = [];
+    private string? _formFailureMessage;
+    private bool _saving = false;
+    private string? _formError;
+
+    private List<(string Key, string Label)> _availableFields = [];
+    private List<RoleDto> _availableRoles = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        InitFields();
+        await LoadRolesAsync();
+        await LoadGatesAsync();
+    }
+
+    private void InitFields()
+    {
+        _availableFields =
+        [
+            ("account_id", T["Account / Company Attached"]),
+            ("expected_close_date", T["Expected Close Date"]),
+            ("description", T["Description / Notes"]),
+            ("probability", T["Probability %"]),
+            ("owner_id", T["Assigned Owner"])
+        ];
+
+        // Add custom fields if configured
+        var custom = App.Bootstrap?.Fields.GetValueOrDefault("deals")?.Where(f => f.IsCustom).ToList() ?? [];
+        foreach (var c in custom)
+        {
+            _availableFields.Add((c.Key, c.Label));
+        }
+    }
+
+    private async Task LoadRolesAsync()
+    {
+        try
+        {
+            _availableRoles = await Http.GetFromJsonAsync<List<RoleDto>>("api/v1/roles") ?? [];
+        }
+        catch
+        {
+            _availableRoles = [];
+        }
+    }
+
+    private async Task LoadGatesAsync()
+    {
+        _loading = true;
+        _featureDisabled = false;
+        try
+        {
+            var res = await Http.GetAsync($"api/v1/settings/pipelines/{PipelineId}/stages/{StageId}/gates");
+            if (res.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                _featureDisabled = true;
+                _gates = [];
+            }
+            else if (res.IsSuccessStatusCode)
+            {
+                _gates = await res.Content.ReadFromJsonAsync<List<DealStageGateDto>>() ?? [];
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task EnableFeatureAsync()
+    {
+        _enabling = true;
+        try
+        {
+            var res = await Http.PutAsJsonAsync("api/v1/features/deal-stage-gating", new SetFeatureRequest(true));
+            if (res.IsSuccessStatusCode)
+            {
+                Snackbar.Add(T["Stage Gating enabled"], Severity.Success);
+                await LoadGatesAsync();
+            }
+            else
+            {
+                Snackbar.Add(T["Could not enable feature"], Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _enabling = false;
+        }
+    }
+
+    private void StartNewGate()
+    {
+        _editingGate = new DealStageGateDto(Guid.Empty, PipelineId, StageId, "", null, true, [], null, false, null, [], null);
+        _editingGateId = null;
+        _formName = "";
+        _formDescription = null;
+        _formIsActive = true;
+        _formMinAmount = null;
+        _formRequireLineItems = false;
+        _formRequiredFields = [];
+        _formAllowedRoles = [];
+        _formFailureMessage = null;
+        _formError = null;
+    }
+
+    private void EditGate(DealStageGateDto gate)
+    {
+        _editingGate = gate;
+        _editingGateId = gate.Id;
+        _formName = gate.Name;
+        _formDescription = gate.Description;
+        _formIsActive = gate.IsActive;
+        _formMinAmount = gate.MinAmount;
+        _formRequireLineItems = gate.RequireLineItems;
+        _formRequiredFields = gate.RequiredFields.ToList();
+        _formAllowedRoles = gate.AllowedRoles.ToList();
+        _formFailureMessage = gate.FailureMessage;
+        _formError = null;
+    }
+
+    private void CancelEdit()
+    {
+        _editingGate = null;
+        _editingGateId = null;
+        _formError = null;
+    }
+
+    private async Task SaveGateAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_formName))
+        {
+            _formError = T["Gate rule name is required."];
+            return;
+        }
+
+        _saving = true;
+        _formError = null;
+        try
+        {
+            var req = new SaveDealStageGateRequest(
+                Name: _formName.Trim(),
+                Description: string.IsNullOrWhiteSpace(_formDescription) ? null : _formDescription.Trim(),
+                IsActive: _formIsActive,
+                RequiredFields: _formRequiredFields.ToList(),
+                MinAmount: _formMinAmount,
+                RequireLineItems: _formRequireLineItems,
+                Condition: null,
+                AllowedRoles: _formAllowedRoles.ToList(),
+                FailureMessage: string.IsNullOrWhiteSpace(_formFailureMessage) ? null : _formFailureMessage.Trim()
+            );
+
+            HttpResponseMessage res;
+            if (_editingGateId.HasValue)
+            {
+                res = await Http.PutAsJsonAsync($"api/v1/settings/pipelines/{PipelineId}/stages/{StageId}/gates/{_editingGateId.Value}", req);
+            }
+            else
+            {
+                res = await Http.PostAsJsonAsync($"api/v1/settings/pipelines/{PipelineId}/stages/{StageId}/gates", req);
+            }
+
+            if (res.IsSuccessStatusCode)
+            {
+                Snackbar.Add(T["Stage gate saved"], Severity.Success);
+                _editingGate = null;
+                _editingGateId = null;
+                await LoadGatesAsync();
+            }
+            else
+            {
+                _formError = await ProblemText.FromAsync(res, T["Could not save stage gate."]);
+            }
+        }
+        catch (Exception ex)
+        {
+            _formError = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task DeleteGateAsync(DealStageGateDto gate)
+    {
+        try
+        {
+            var res = await Http.DeleteAsync($"api/v1/settings/pipelines/{PipelineId}/stages/{StageId}/gates/{gate.Id}");
+            if (res.IsSuccessStatusCode)
+            {
+                Snackbar.Add(T["Stage gate removed"], Severity.Success);
+                await LoadGatesAsync();
+            }
+            else
+            {
+                Snackbar.Add(await ProblemText.FromAsync(res, T["Could not delete stage gate."]), Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private string FriendlyFieldName(string key)
+    {
+        var match = _availableFields.FirstOrDefault(f => string.Equals(f.Key, key, StringComparison.OrdinalIgnoreCase));
+        return match.Label ?? key;
+    }
+
+    private void Close() => MudDialog.Close();
+}

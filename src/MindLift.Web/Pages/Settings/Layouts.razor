@@ -8,7 +8,16 @@
 <PageTitle>@T["Fields & layouts"] · MindLift</PageTitle>
 
 <div class="ml-page ml-page--form">
-    <PageHeader Title="Fields & layouts" Subtitle="Choose which fields appear on each record form and detail page, in what order, and in which section." />
+    <PageHeader Title="Fields & layouts" Subtitle="Choose which fields appear on each record form and detail page, in what order, and in which section.">
+        <Actions>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.ViewQuilt" Href="/settings/layout-rules">
+                @T["Layout Rules"]
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Widgets" Href="/settings/custom-objects">
+                @T["Custom Objects"]
+            </MudButton>
+        </Actions>
+    </PageHeader>
     <SettingsNav Current="/settings/layouts" />
 
     <MlCard Class="mb-4" TestId="layout-picker">
@@ -94,7 +103,7 @@
             </div>
         </MlCard>
 
-        <div class="ml-row ml-row--wrap" style="justify-content:space-between">
+        <div class="ml-row ml-row--wrap" style="justify-content:space-between; margin-top:24px; margin-bottom:96px;">
             <MudButton Variant="Variant.Outlined" OnClick="AddSection">@T["Add section"]</MudButton>
             <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_busy" OnClick="SaveAsync" data-testid="primary-action">@T["Save layout"]</MudButton>
         </div>

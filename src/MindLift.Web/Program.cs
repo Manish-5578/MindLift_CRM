@@ -10,13 +10,19 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
-var apiBase = new Uri(builder.HostEnvironment.BaseAddress);
+var baseUri = new Uri(builder.HostEnvironment.BaseAddress);
+var apiBase = builder.Configuration["ApiBaseUrl"] is { Length: > 0 } configured
+    ? new Uri(configured)
+    : (baseUri.Host is "localhost" or "127.0.0.1" && baseUri.Port == 5073)
+        ? new Uri("http://localhost:5082/")
+        : baseUri;
 
 builder.Services.AddMindLiftLocalization();
 builder.Services.AddScoped<AuthSession>();
 builder.Services.AddScoped<AppState>();
 builder.Services.AddScoped<NotificationClient>();
 builder.Services.AddScoped<PlatformNotifier>();
+builder.Services.AddScoped<QuickLogDockState>();
 builder.Services.AddScoped(sp => new HttpClient(new AuthHandler(sp.GetRequiredService<AuthSession>(), apiBase)) { BaseAddress = apiBase });
 
 builder.Services.AddMudServices(config =>

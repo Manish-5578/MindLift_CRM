@@ -1,0 +1,350 @@
+@page "/settings/custom-objects"
+@using MindLift.Shared.Contracts
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+@inject NavigationManager Nav
+@inject AppState App
+@inject Translator T
+
+<PageTitle>@T["Custom Objects"] · MindLift</PageTitle>
+
+<div class="ml-page ml-page--form" data-testid="custom-objects-page">
+    <PageHeader Title="Custom Objects" Subtitle="Define user-created business entities, manage schema fields, and track dynamic custom records.">
+        <Actions>
+            <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.GridView"
+                       Href="/custom-objects" Class="mr-2">
+                @T["Custom Objects Hub"]
+            </MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="@(() => OpenDefinitionDialog(null))" data-testid="new-custom-object-btn">
+                @T["New Custom Object"]
+            </MudButton>
+        </Actions>
+    </PageHeader>
+
+    <SettingsNav Current="/settings/custom-objects" />
+
+    @if (!_featureEnabled)
+    {
+        <MudAlert Severity="Severity.Warning" Variant="Variant.Filled" Class="mb-4">
+            <div class="ml-row" style="align-items:center;justify-content:space-between;width:100%;">
+                <div>
+                    <div style="font-weight:600;">@T["Custom Objects Feature is Disabled"]</div>
+                    <div class="text-caption">@T["Enable the 'custom-objects' feature flag to unlock entity schemas and custom records."]</div>
+                </div>
+                <MudButton Variant="Variant.Outlined" Color="Color.Inherit" Size="Size.Small" OnClick="EnableFeatureFlagAsync">@T["Enable Feature"]</MudButton>
+            </div>
+        </MudAlert>
+    }
+
+    <!-- Metrics Bar & Search Filter -->
+    <div class="ml-grid ml-grid--3col mb-4">
+        <MlCard Class="pa-4 text-center">
+            <MudText Typo="Typo.h5" Color="Color.Primary" Style="font-weight:700;">@_definitions.Count</MudText>
+            <MudText Typo="Typo.caption" Class="ml-muted">@T["Total Custom Objects"]</MudText>
+        </MlCard>
+        <MlCard Class="pa-4 text-center">
+            <MudText Typo="Typo.h5" Color="Color.Success" Style="font-weight:700;">@_definitions.Count(d => d.IsActive)</MudText>
+            <MudText Typo="Typo.caption" Class="ml-muted">@T["Active Entities"]</MudText>
+        </MlCard>
+        <MlCard Class="pa-4 text-center">
+            <MudText Typo="Typo.h5" Color="Color.Secondary" Style="font-weight:700;">@_definitions.Sum(d => d.Fields.Count)</MudText>
+            <MudText Typo="Typo.caption" Class="ml-muted">@T["Custom Schema Fields"]</MudText>
+        </MlCard>
+    </div>
+
+    <MudPaper Elevation="0" Outlined="true" Class="pa-2 mb-4">
+        <div class="ml-row" style="align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+            <div style="max-width:340px;flex:1;">
+                <MudTextField @bind-Value="_searchQuery" Placeholder="@T["Search custom objects by name or slug..."]"
+                              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Clearable="true" />
+            </div>
+            <div class="ml-row" style="align-items:center;gap:8px;">
+                <MudChip T="string" Variant="@(_filterActiveOnly ? Variant.Filled : Variant.Outlined)"
+                         Color="Color.Primary" Size="Size.Small" OnClick="@(() => _filterActiveOnly = !_filterActiveOnly)">
+                    @T["Active only"]
+                </MudChip>
+            </div>
+        </div>
+    </MudPaper>
+
+    <!-- Definitions Grid -->
+    @if (_loading)
+    {
+        <SkeletonTable Rows="4" Columns="4" />
+    }
+    else if (FilteredDefinitions.Count == 0)
+    {
+        <MlCard Class="pa-8 text-center">
+            <EmptyState Title="@(_definitions.Count == 0 ? T["No Custom Objects Configured"] : T["No matching custom objects"])"
+                        Message="@(_definitions.Count == 0 ? T["Build your first custom business entity to extend the CRM beyond leads and deals."] : T["Try clearing your search filter."])"
+                        Compact="true" />
+            @if (_definitions.Count == 0)
+            {
+                <div class="mt-4 ml-row" style="justify-content:center;gap:12px;flex-wrap:wrap;">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                               OnClick="@(() => OpenDefinitionDialog(null))">
+                        @T["Create Custom Object"]
+                    </MudButton>
+                </div>
+            }
+        </MlCard>
+    }
+    else
+    {
+        <div class="ml-grid ml-grid--2col">
+            @foreach (var def in FilteredDefinitions)
+            {
+                <MudPaper Elevation="1" Class="pa-4 mb-4" Style="border:1px solid var(--mud-palette-lines-default);border-radius:12px;">
+                    <div class="ml-row" style="align-items:flex-start;justify-content:space-between;margin-bottom:8px;">
+                        <div class="ml-row" style="align-items:center;gap:12px;">
+                            <MudAvatar Color="Color.Primary" Variant="Variant.Filled">
+                                <MudIcon Icon="@GetIcon(def.Icon)" />
+                            </MudAvatar>
+                            <div>
+                                <div class="ml-row" style="align-items:center;gap:8px;">
+                                    <span style="font-weight:700;font-size:1.1rem;">@def.Name</span>
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Default">
+                                        <code>/@def.Slug</code>
+                                    </MudChip>
+                                </div>
+                                <span class="text-caption ml-muted">@def.PluralName</span>
+                            </div>
+                        </div>
+
+                        <div class="ml-row" style="align-items:center;gap:6px;">
+                            <MudSwitch T="bool" Value="@def.IsActive" ValueChanged="@(async v => await ToggleActiveAsync(def, v))"
+                                       Color="Color.Success" Size="Size.Small" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Default"
+                                           OnClick="@(() => OpenDefinitionDialog(def))" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                           OnClick="@(() => DeleteDefinitionAsync(def))" />
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(def.Description))
+                    {
+                        <MudText Typo="Typo.body2" Class="mb-3 ml-muted">@def.Description</MudText>
+                    }
+
+                    <div class="ml-row" style="gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" Icon="@Icons.Material.Filled.Label">
+                            @T["Title: {0}", def.TitleField]
+                        </MudChip>
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Info" Icon="@Icons.Material.Filled.ViewColumn">
+                            @T["{0} Fields", def.Fields.Count]
+                        </MudChip>
+                        @if (def.IsActive)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Success">@T["Active"]</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Default">@T["Inactive"]</MudChip>
+                        }
+                    </div>
+
+                    <!-- Schema Fields Pill Preview -->
+                    <div class="pa-2 mb-3" style="background:var(--mud-palette-background-grey);border-radius:6px;font-size:0.8rem;">
+                        <div class="ml-muted mb-1" style="font-size:0.75rem;font-weight:600;">@T["FIELDS SCHEMA:"]</div>
+                        <div style="display:flex;gap:4px;flex-wrap:wrap;">
+                            @foreach (var f in def.Fields.Take(6))
+                            {
+                                <span class="pa-1 px-2" style="background:var(--mud-palette-surface);border:1px solid var(--mud-palette-lines-default);border-radius:4px;">
+                                    <strong>@f.Label</strong> <span class="ml-muted">(@f.Type)</span>
+                                </span>
+                            }
+                            @if (def.Fields.Count > 6)
+                            {
+                                <span class="pa-1 px-2 ml-muted">+@(def.Fields.Count - 6) @T["more"]</span>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="ml-row" style="justify-content:space-between;align-items:center;border-top:1px solid var(--mud-palette-lines-default);padding-top:12px;">
+                        <span class="text-caption ml-muted">@T["Created {0:MMM dd, yyyy}", def.CreatedAt]</span>
+                        <div class="ml-row" style="gap:8px;">
+                            <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Edit"
+                                       OnClick="@(() => OpenDefinitionDialog(def))">
+                                @T["Edit Schema"]
+                            </MudButton>
+                            <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Primary" StartIcon="@Icons.Material.Filled.TableRows"
+                                       Href="@($"/custom-objects/{def.Slug}")">
+                                @T["Manage Records"]
+                            </MudButton>
+                        </div>
+                    </div>
+                </MudPaper>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<CustomObjectDefinitionDto> _definitions = [];
+    private bool _loading = true;
+    private bool _featureEnabled = true;
+    private string _searchQuery = "";
+    private bool _filterActiveOnly;
+
+    private List<CustomObjectDefinitionDto> FilteredDefinitions => _definitions
+        .Where(d => !_filterActiveOnly || d.IsActive)
+        .Where(d => string.IsNullOrWhiteSpace(_searchQuery)
+            || d.Name.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase)
+            || d.PluralName.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase)
+            || d.Slug.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase))
+        .OrderBy(d => d.Name)
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckFeatureFlagAsync();
+        await LoadDefinitionsAsync();
+    }
+
+    private async Task CheckFeatureFlagAsync()
+    {
+        try
+        {
+            var flags = await Http.GetFromJsonAsync<List<FeatureFlagDto>>("api/v1/features");
+            var coFlag = flags?.FirstOrDefault(f => f.Key == "custom-objects");
+            _featureEnabled = coFlag?.Enabled ?? true;
+        }
+        catch
+        {
+            _featureEnabled = true;
+        }
+    }
+
+    private async Task EnableFeatureFlagAsync()
+    {
+        try
+        {
+            var res = await Http.PutAsJsonAsync("api/v1/features/custom-objects", new SetFeatureRequest(true));
+            if (res.IsSuccessStatusCode)
+            {
+                _featureEnabled = true;
+                Snackbar.Add(T["Custom Objects feature enabled."], Severity.Success);
+                await LoadDefinitionsAsync();
+            }
+            else
+            {
+                Snackbar.Add(T["Failed to enable feature."], Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task LoadDefinitionsAsync()
+    {
+        _loading = true;
+        try
+        {
+            var res = await Http.GetFromJsonAsync<List<CustomObjectDefinitionDto>>("api/v1/custom-objects/definitions");
+            _definitions = res ?? [];
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenDefinitionDialog(CustomObjectDefinitionDto? def)
+    {
+        var parameters = new DialogParameters<CustomObjectDialog>
+        {
+            { x => x.Definition, def }
+        };
+
+        var dialog = await Dialogs.ShowAsync<CustomObjectDialog>(def is null ? T["New Custom Object"] : T["Edit Custom Object"], parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
+        {
+            await LoadDefinitionsAsync();
+        }
+    }
+
+    private async Task ToggleActiveAsync(CustomObjectDefinitionDto def, bool isActive)
+    {
+        try
+        {
+            var req = new SaveCustomObjectDefinitionRequest(
+                Name: def.Name,
+                PluralName: def.PluralName,
+                Slug: def.Slug,
+                Description: def.Description,
+                Icon: def.Icon,
+                TitleField: def.TitleField,
+                IsActive: isActive,
+                Fields: def.Fields
+            );
+
+            var res = await Http.PutAsJsonAsync($"api/v1/custom-objects/definitions/{def.Id}", req);
+            if (res.IsSuccessStatusCode)
+            {
+                Snackbar.Add(T["Status updated."], Severity.Success);
+                await LoadDefinitionsAsync();
+            }
+            else
+            {
+                Snackbar.Add(await ProblemText.FromAsync(res, T["Failed to update status."]), Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task DeleteDefinitionAsync(CustomObjectDefinitionDto def)
+    {
+        var confirmed = await Dialogs.ConfirmAsync(
+            T["Delete Custom Object?"],
+            T["Are you sure you want to delete '{0}'? All associated custom records will be removed.", def.Name],
+            T["Delete"],
+            danger: true
+        );
+
+        if (!confirmed) return;
+
+        try
+        {
+            var res = await Http.DeleteAsync($"api/v1/custom-objects/definitions/{def.Id}");
+            if (res.IsSuccessStatusCode)
+            {
+                Snackbar.Add(T["Custom object '{0}' deleted.", def.Name], Severity.Success);
+                await LoadDefinitionsAsync();
+            }
+            else
+            {
+                Snackbar.Add(await ProblemText.FromAsync(res, T["Failed to delete custom object."]), Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private static string GetIcon(string? icon) => (icon?.ToLowerInvariant()) switch
+    {
+        "print" => Icons.Material.Filled.Print,
+        "folder" => Icons.Material.Filled.Folder,
+        "directionscar" or "car" => Icons.Material.Filled.DirectionsCar,
+        "build" or "machinery" => Icons.Material.Filled.Build,
+        "inventory2" or "inventory" => Icons.Material.Filled.Inventory2,
+        "shoppingbag" or "order" => Icons.Material.Filled.ShoppingBag,
+        "localshipping" or "shipping" => Icons.Material.Filled.LocalShipping,
+        "devices" => Icons.Material.Filled.Devices,
+        _ => Icons.Material.Filled.Widgets
+    };
+}

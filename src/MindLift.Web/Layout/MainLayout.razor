@@ -5,6 +5,7 @@
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @using MindLift.Shared.Validation
+@using MindLift.Shared.Contracts
 @implements IDisposable
 
 <MudThemeProvider Theme="_theme" @bind-IsDarkMode="_isDark" />
@@ -45,6 +46,20 @@
                     {
                         <MudNavLink Href="@item.Href" Icon="@item.Icon">@T[item.Label]</MudNavLink>
                     }
+                    @if (_customObjects.Count > 0)
+                    {
+                        <MudNavGroup Title="@T["Custom Objects"]" Icon="@Icons.Material.Outlined.Widgets" Expanded="true">
+                            <MudNavLink Href="/custom-objects" Match="NavLinkMatch.All" Icon="@Icons.Material.Outlined.DashboardCustomize">@T["All Objects"]</MudNavLink>
+                            @foreach (var co in _customObjects)
+                            {
+                                <MudNavLink Href="@($"/custom-objects/{co.Slug}")" Icon="@GetCustomObjectIcon(co.Icon)">@co.PluralName</MudNavLink>
+                            }
+                        </MudNavGroup>
+                    }
+                    else
+                    {
+                        <MudNavLink Href="/custom-objects" Icon="@Icons.Material.Outlined.Widgets">@T["Custom Objects"]</MudNavLink>
+                    }
                     <MudDivider Class="my-2" />
                     @if (App.CanView(AppModule.Settings))
                     {
@@ -73,6 +88,11 @@
             }
             @* A new key when the language changes makes every screen draw itself again in the new language. *@
             <div @key="T.Language" class="ml-lang-root">@Body</div>
+
+            @if (Session.IsSignedIn && App.Bootstrap is not null)
+            {
+                <QuickLogDock />
+            }
         </MudMainContent>
     </MudLayout>
 </MudRTLProvider>
@@ -152,6 +172,7 @@
         ApplyBrandColor();
         RedirectToSetupIfPending();
         _ = StartNotificationsAsync();
+        _ = LoadCustomObjectsAsync();
     }
 
     /// <summary>Listens for new notifications once the person is signed in and the app has loaded.</summary>
@@ -168,6 +189,7 @@
         ApplyBrandColor();
         RedirectToSetupIfPending();
         _ = StartNotificationsAsync();
+        _ = LoadCustomObjectsAsync();
         StateHasChanged();
     }
 
@@ -241,6 +263,38 @@
 
     [Inject] private HttpClient Http { get; set; } = default!;
     [Inject] private NotificationClient Notifications { get; set; } = default!;
+
+    private List<CustomObjectDefinitionDto> _customObjects = [];
+
+    private async Task LoadCustomObjectsAsync()
+    {
+        if (Session.IsSignedIn && App.Bootstrap is not null)
+        {
+            try
+            {
+                var defs = await Http.GetFromJsonAsync<List<CustomObjectDefinitionDto>>("api/v1/custom-objects/definitions?activeOnly=true");
+                _customObjects = (defs ?? []).Where(d => d.IsActive).ToList();
+                StateHasChanged();
+            }
+            catch
+            {
+                _customObjects = [];
+            }
+        }
+    }
+
+    private static string GetCustomObjectIcon(string? icon) => (icon?.ToLowerInvariant()) switch
+    {
+        "print" => Icons.Material.Outlined.Print,
+        "folder" => Icons.Material.Outlined.Folder,
+        "directionscar" or "car" => Icons.Material.Outlined.DirectionsCar,
+        "build" or "machinery" => Icons.Material.Outlined.Build,
+        "inventory2" or "inventory" => Icons.Material.Outlined.Inventory2,
+        "shoppingbag" or "order" => Icons.Material.Outlined.ShoppingBag,
+        "localshipping" or "shipping" => Icons.Material.Outlined.LocalShipping,
+        "devices" => Icons.Material.Outlined.Devices,
+        _ => Icons.Material.Outlined.Widgets
+    };
 
     public void Dispose()
     {

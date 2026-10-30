@@ -1,0 +1,501 @@
+@using MindLift.Shared.Contracts
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject Translator T
+
+<MudDialog MaxWidth="MaxWidth.Medium" FullWidth="true">
+    <TitleContent>
+        <div class="ml-row" style="align-items:center;gap:10px;">
+            <MudIcon Icon="@GetIcon(Definition?.Icon ?? _icon)" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">
+                @(Definition is null ? T["New Custom Object"] : T["Edit Custom Object: {0}", Definition.Name])
+            </MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <!-- Quick Preset Selector -->
+        @if (Definition is null)
+        {
+            <div class="mb-4 pa-3" style="background:var(--mud-palette-background-grey);border-radius:8px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+                <div>
+                    <MudText Typo="Typo.subtitle2" Style="font-weight:600;">@T["Start with a Quick Preset"]</MudText>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@T["Pre-configure standard entities and fields with one click."]</MudText>
+                </div>
+                <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small" Color="Color.Primary">
+                    <MudButton OnClick="@(() => LoadPreset("printing"))">@T["Printing Orders"]</MudButton>
+                    <MudButton OnClick="@(() => LoadPreset("projects"))">@T["Projects"]</MudButton>
+                    <MudButton OnClick="@(() => LoadPreset("vehicles"))">@T["Vehicles"]</MudButton>
+                </MudButtonGroup>
+            </div>
+        }
+
+        <!-- Entity Identity Information -->
+        <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-2" Style="font-weight:600;">@T["Entity Information"]</MudText>
+        <div class="ml-grid ml-grid--2col mb-3">
+            <MudTextField @bind-Value="_name" Label="@T["Object Name (Singular) *"]" Placeholder="e.g. Printing Order, Project"
+                          Required="true" Margin="Margin.Dense" Variant="Variant.Outlined" TextChanged="OnNameChanged" />
+
+            <MudTextField @bind-Value="_pluralName" Label="@T["Plural Name *"]" Placeholder="e.g. Printing Orders, Projects"
+                          Required="true" Margin="Margin.Dense" Variant="Variant.Outlined" />
+
+            <MudTextField @bind-Value="_slug" Label="@T["URL / API Slug *"]" Placeholder="e.g. printing-orders, projects"
+                          Required="true" Margin="Margin.Dense" Variant="Variant.Outlined" HelperText="@T["Lowercase alphanumeric and hyphens (^[a-z0-9_-]+$). Used in URL /custom-objects/{slug}."]" />
+
+            <MudSelect @bind-Value="_icon" Label="@T["Icon"]" Margin="Margin.Dense" Variant="Variant.Outlined">
+                <MudSelectItem Value="@("Print")">
+                    <div class="ml-row" style="align-items:center;gap:8px;"><MudIcon Icon="@Icons.Material.Filled.Print" Size="Size.Small" /> Print / Printing</div>
+                </MudSelectItem>
+                <MudSelectItem Value="@("Folder")">
+                    <div class="ml-row" style="align-items:center;gap:8px;"><MudIcon Icon="@Icons.Material.Filled.Folder" Size="Size.Small" /> Folder / Project</div>
+                </MudSelectItem>
+                <MudSelectItem Value="@("DirectionsCar")">
+                    <div class="ml-row" style="align-items:center;gap:8px;"><MudIcon Icon="@Icons.Material.Filled.DirectionsCar" Size="Size.Small" /> Vehicle / Fleet</div>
+                </MudSelectItem>
+                <MudSelectItem Value="@("Build")">
+                    <div class="ml-row" style="align-items:center;gap:8px;"><MudIcon Icon="@Icons.Material.Filled.Build" Size="Size.Small" /> Equipment / Machinery</div>
+                </MudSelectItem>
+                <MudSelectItem Value="@("Inventory2")">
+                    <div class="ml-row" style="align-items:center;gap:8px;"><MudIcon Icon="@Icons.Material.Filled.Inventory2" Size="Size.Small" /> Inventory / Assets</div>
+                </MudSelectItem>
+                <MudSelectItem Value="@("ShoppingBag")">
+                    <div class="ml-row" style="align-items:center;gap:8px;"><MudIcon Icon="@Icons.Material.Filled.ShoppingBag" Size="Size.Small" /> Order / Product</div>
+                </MudSelectItem>
+                <MudSelectItem Value="@("LocalShipping")">
+                    <div class="ml-row" style="align-items:center;gap:8px;"><MudIcon Icon="@Icons.Material.Filled.LocalShipping" Size="Size.Small" /> Logistics / Delivery</div>
+                </MudSelectItem>
+                <MudSelectItem Value="@("Devices")">
+                    <div class="ml-row" style="align-items:center;gap:8px;"><MudIcon Icon="@Icons.Material.Filled.Devices" Size="Size.Small" /> Hardware / Devices</div>
+                </MudSelectItem>
+            </MudSelect>
+        </div>
+
+        <div class="ml-grid ml-grid--2col mb-4">
+            <MudTextField @bind-Value="_description" Label="@T["Description"]" Placeholder="e.g. Tracks client custom printing jobs and production specs"
+                          Margin="Margin.Dense" Variant="Variant.Outlined" Lines="2" />
+
+            <div>
+                <MudSelect @bind-Value="_titleField" Label="@T["Title / Primary Display Field *"]" Margin="Margin.Dense" Variant="Variant.Outlined"
+                           HelperText="@T["This field is displayed as the clickable title in lists and search results."]">
+                    @foreach (var f in _fields)
+                    {
+                        <MudSelectItem Value="@f.Key">@f.Label (@f.Key)</MudSelectItem>
+                    }
+                </MudSelect>
+                <div class="mt-2">
+                    <MudSwitch @bind-Value="_isActive" Color="Color.Success" Label="@T["Active (Enabled for tenant)"]" />
+                </div>
+            </div>
+        </div>
+
+        <MudDivider Class="my-3" />
+
+        <!-- Fields Schema Designer -->
+        <div class="ml-row" style="align-items:center;justify-content:space-between;margin-bottom:12px;">
+            <div>
+                <MudText Typo="Typo.subtitle2" Color="Color.Primary" Style="font-weight:600;">@T["Custom Fields Schema"] (@_fields.Count)</MudText>
+                <MudText Typo="Typo.caption" Class="ml-muted">@T["Define the data attributes that records of this custom object will store."]</MudText>
+            </div>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddField">
+                @T["Add Field"]
+            </MudButton>
+        </div>
+
+        @if (_fields.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-3">
+                @T["No fields defined yet. Add at least one field to act as the primary title field (e.g. 'name' or 'title')."]
+            </MudAlert>
+        }
+        else
+        {
+            <MudTable Items="_fields" Dense="true" Hover="true" Elevation="0" Outlined="true" Class="mb-3">
+                <HeaderContent>
+                    <MudTh>@T["Field Label"]</MudTh>
+                    <MudTh>@T["Field Key"]</MudTh>
+                    <MudTh>@T["Type"]</MudTh>
+                    <MudTh>@T["Required"]</MudTh>
+                    <MudTh>@T["Options / Extra"]</MudTh>
+                    <MudTh Style="width:60px;">@T["Actions"]</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Label">
+                        <span style="font-weight:600;">@context.Label</span>
+                        @if (context.Key == _titleField)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled" Class="ml-2">@T["Primary Title"]</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Key"><code>@context.Key</code></MudTd>
+                    <MudTd DataLabel="Type">
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Default">@context.Type</MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Required">
+                        @if (context.IsRequired)
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Error" Size="Size.Small" />
+                        }
+                        else
+                        {
+                            <span class="ml-muted">-</span>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Options">
+                        @if (context.Options is { Count: > 0 })
+                        {
+                            <span class="text-caption">@string.Join(", ", context.Options.Take(3))@(context.Options.Count > 3 ? "..." : "")</span>
+                        }
+                        else if (!string.IsNullOrWhiteSpace(context.DefaultValue))
+                        {
+                            <span class="text-caption ml-muted">Def: @context.DefaultValue</span>
+                        }
+                        else
+                        {
+                            <span class="ml-muted">-</span>
+                        }
+                    </MudTd>
+                    <MudTd>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                       OnClick="@(() => RemoveField(context))" Disabled="@(context.Key == _titleField && _fields.Count == 1)" />
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+
+        <!-- Add Field Inline Box -->
+        @if (_showAddField)
+        {
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-3" Style="background:var(--mud-palette-background-grey);border-radius:8px;">
+                <MudText Typo="Typo.subtitle2" Class="mb-2" Style="font-weight:600;">@T["New Schema Field"]</MudText>
+                <div class="ml-grid ml-grid--3col mb-2">
+                    <MudTextField @bind-Value="_newFieldLabel" Label="@T["Field Label *"]" Placeholder="e.g. Paper Stock, Budget"
+                                  Margin="Margin.Dense" Variant="Variant.Outlined" TextChanged="OnNewFieldLabelChanged" />
+
+                    <MudTextField @bind-Value="_newFieldKey" Label="@T["Field Key *"]" Placeholder="e.g. paper_stock, budget"
+                                  Margin="Margin.Dense" Variant="Variant.Outlined" HelperText="@T["^[a-z0-9_]+$"]" />
+
+                    <MudSelect @bind-Value="_newFieldType" Label="@T["Field Type *"]" Margin="Margin.Dense" Variant="Variant.Outlined">
+                        <MudSelectItem Value="@("text")">@T["Single Line Text"]</MudSelectItem>
+                        <MudSelectItem Value="@("number")">@T["Number / Currency"]</MudSelectItem>
+                        <MudSelectItem Value="@("date")">@T["Date"]</MudSelectItem>
+                        <MudSelectItem Value="@("datetime")">@T["Date & Time"]</MudSelectItem>
+                        <MudSelectItem Value="@("picklist")">@T["Dropdown Picklist"]</MudSelectItem>
+                        <MudSelectItem Value="@("boolean")">@T["Checkbox (Yes / No)"]</MudSelectItem>
+                        <MudSelectItem Value="@("textarea")">@T["Multi-line Text Area"]</MudSelectItem>
+                        <MudSelectItem Value="@("email")">@T["Email Address"]</MudSelectItem>
+                        <MudSelectItem Value="@("phone")">@T["Phone Number"]</MudSelectItem>
+                        <MudSelectItem Value="@("url")">@T["Website URL"]</MudSelectItem>
+                    </MudSelect>
+                </div>
+
+                <div class="ml-grid ml-grid--2col mb-2">
+                    @if (_newFieldType == "picklist")
+                    {
+                        <MudTextField @bind-Value="_newFieldOptions" Label="@T["Picklist Options (comma-separated) *"]"
+                                      Placeholder="e.g. Glossy, Matte, Cardstock 350gsm" Margin="Margin.Dense" Variant="Variant.Outlined" />
+                    }
+                    else
+                    {
+                        <MudTextField @bind-Value="_newFieldDefaultValue" Label="@T["Default Value (Optional)"]"
+                                      Margin="Margin.Dense" Variant="Variant.Outlined" />
+                    }
+
+                    <div class="ml-row" style="align-items:center;gap:16px;">
+                        <MudCheckBox @bind-Value="_newFieldRequired" Label="@T["Required field"]" Color="Color.Primary" Dense="true" />
+                        <div class="ml-auto" style="display:flex;gap:8px;">
+                            <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => _showAddField = false)">@T["Cancel"]</MudButton>
+                            <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveNewField">@T["Save Field"]</MudButton>
+                        </div>
+                    </div>
+                </div>
+            </MudPaper>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">@T["Cancel"]</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="_saving">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            @T["Save Custom Object"]
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public CustomObjectDefinitionDto? Definition { get; set; }
+
+    private string _name = "";
+    private string _pluralName = "";
+    private string _slug = "";
+    private string? _description;
+    private string _icon = "Print";
+    private string _titleField = "name";
+    private bool _isActive = true;
+    private List<CustomObjectFieldDto> _fields = [];
+    private bool _saving;
+
+    // Add field state
+    private bool _showAddField;
+    private string _newFieldLabel = "";
+    private string _newFieldKey = "";
+    private string _newFieldType = "text";
+    private bool _newFieldRequired;
+    private string? _newFieldDefaultValue;
+    private string _newFieldOptions = "";
+
+    protected override void OnInitialized()
+    {
+        if (Definition is not null)
+        {
+            _name = Definition.Name;
+            _pluralName = Definition.PluralName;
+            _slug = Definition.Slug;
+            _description = Definition.Description;
+            _icon = Definition.Icon ?? "Print";
+            _titleField = Definition.TitleField;
+            _isActive = Definition.IsActive;
+            _fields = Definition.Fields.ToList();
+        }
+        else
+        {
+            // Default initial field for title
+            _fields = [
+                new("name", "Name", Type: "text", IsRequired: true)
+            ];
+            _titleField = "name";
+        }
+    }
+
+    private void OnNameChanged(string value)
+    {
+        _name = value;
+        if (Definition is null)
+        {
+            if (string.IsNullOrWhiteSpace(_pluralName))
+            {
+                _pluralName = value.EndsWith("s", StringComparison.OrdinalIgnoreCase) ? value : value + "s";
+            }
+            if (string.IsNullOrWhiteSpace(_slug) || _slug == Slugify(_name.Substring(0, Math.Max(0, _name.Length - 1))))
+            {
+                _slug = Slugify(_pluralName);
+            }
+        }
+    }
+
+    private void OnNewFieldLabelChanged(string value)
+    {
+        _newFieldLabel = value;
+        if (string.IsNullOrWhiteSpace(_newFieldKey) || _newFieldKey == SlugifyKey(_newFieldLabel.Substring(0, Math.Max(0, _newFieldLabel.Length - 1))))
+        {
+            _newFieldKey = SlugifyKey(value);
+        }
+    }
+
+    private void OpenAddField()
+    {
+        _newFieldLabel = "";
+        _newFieldKey = "";
+        _newFieldType = "text";
+        _newFieldRequired = false;
+        _newFieldDefaultValue = null;
+        _newFieldOptions = "";
+        _showAddField = true;
+    }
+
+    private void SaveNewField()
+    {
+        if (string.IsNullOrWhiteSpace(_newFieldLabel) || string.IsNullOrWhiteSpace(_newFieldKey))
+        {
+            Snackbar.Add(T["Field label and key are required."], Severity.Warning);
+            return;
+        }
+
+        var normKey = SlugifyKey(_newFieldKey);
+        if (_fields.Any(f => f.Key.Equals(normKey, StringComparison.OrdinalIgnoreCase)))
+        {
+            Snackbar.Add(T["A field with key '{0}' already exists in this entity.", normKey], Severity.Warning);
+            return;
+        }
+
+        IReadOnlyList<string>? opts = null;
+        if (_newFieldType == "picklist" && !string.IsNullOrWhiteSpace(_newFieldOptions))
+        {
+            opts = _newFieldOptions.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        }
+
+        _fields.Add(new CustomObjectFieldDto(
+            Key: normKey,
+            Label: _newFieldLabel.Trim(),
+            Type: _newFieldType,
+            IsRequired: _newFieldRequired,
+            DefaultValue: string.IsNullOrWhiteSpace(_newFieldDefaultValue) ? null : _newFieldDefaultValue.Trim(),
+            Options: opts
+        ));
+
+        if (string.IsNullOrWhiteSpace(_titleField))
+        {
+            _titleField = normKey;
+        }
+
+        _showAddField = false;
+    }
+
+    private void RemoveField(CustomObjectFieldDto field)
+    {
+        _fields.Remove(field);
+        if (_titleField == field.Key)
+        {
+            _titleField = _fields.FirstOrDefault()?.Key ?? "";
+        }
+    }
+
+    private void LoadPreset(string preset)
+    {
+        if (preset == "printing")
+        {
+            _name = "Printing Order";
+            _pluralName = "Printing Orders";
+            _slug = "printing-orders";
+            _icon = "Print";
+            _description = "Commercial printing batch orders, paper stock specifications, and delivery status.";
+            _titleField = "order_number";
+            _fields = [
+                new("order_number", "Order Number", Type: "text", IsRequired: true),
+                new("client_name", "Client / Account", Type: "text", IsRequired: true),
+                new("paper_stock", "Paper Stock", Type: "picklist", IsRequired: true, Options: ["Glossy 300gsm", "Matte 250gsm", "Cardstock 350gsm", "Linen Texture", "Recycled Kraft"]),
+                new("quantity", "Quantity", Type: "number", IsRequired: true),
+                new("total_price", "Total Price (INR)", Type: "number", IsRequired: false),
+                new("due_date", "Due Date", Type: "date", IsRequired: false),
+                new("status", "Production Status", Type: "picklist", IsRequired: true, Options: ["Pending Proof", "In Production", "Finishing & Binding", "Ready for Dispatch", "Delivered"])
+            ];
+        }
+        else if (preset == "projects")
+        {
+            _name = "Project";
+            _pluralName = "Projects";
+            _slug = "projects";
+            _icon = "Folder";
+            _description = "Client deliverables, sprint milestones, and project budgets.";
+            _titleField = "name";
+            _fields = [
+                new("name", "Project Name", Type: "text", IsRequired: true),
+                new("client", "Client Name", Type: "text", IsRequired: true),
+                new("stage", "Project Stage", Type: "picklist", IsRequired: true, Options: ["Planning", "In Progress", "Client Review", "Completed", "On Hold"]),
+                new("budget", "Budget Amount", Type: "number", IsRequired: false),
+                new("deadline", "Target Deadline", Type: "date", IsRequired: false)
+            ];
+        }
+        else if (preset == "vehicles")
+        {
+            _name = "Vehicle";
+            _pluralName = "Vehicles";
+            _slug = "vehicles";
+            _icon = "DirectionsCar";
+            _description = "Fleet assets, VINs, maintenance schedules, and registration numbers.";
+            _titleField = "vin";
+            _fields = [
+                new("vin", "VIN / Chassis No", Type: "text", IsRequired: true),
+                new("make", "Make / Manufacturer", Type: "text", IsRequired: true),
+                new("model", "Vehicle Model", Type: "text", IsRequired: true),
+                new("license_plate", "License Plate", Type: "text", IsRequired: true),
+                new("status", "Vehicle Status", Type: "picklist", IsRequired: true, Options: ["Active", "Dispatched", "Maintenance", "Decommissioned"])
+            ];
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_name) || string.IsNullOrWhiteSpace(_pluralName) || string.IsNullOrWhiteSpace(_slug))
+        {
+            Snackbar.Add(T["Name, plural name, and slug are required."], Severity.Warning);
+            return;
+        }
+
+        if (_fields.Count == 0)
+        {
+            Snackbar.Add(T["Please define at least one field for this entity."], Severity.Warning);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_titleField) || !_fields.Any(f => f.Key == _titleField))
+        {
+            _titleField = _fields[0].Key;
+        }
+
+        var req = new SaveCustomObjectDefinitionRequest(
+            Name: _name.Trim(),
+            PluralName: _pluralName.Trim(),
+            Slug: Slugify(_slug),
+            Description: _description?.Trim(),
+            Icon: _icon,
+            TitleField: _titleField,
+            IsActive: _isActive,
+            Fields: _fields
+        );
+
+        _saving = true;
+        try
+        {
+            HttpResponseMessage res;
+            if (Definition is null)
+            {
+                res = await Http.PostAsJsonAsync("api/v1/custom-objects/definitions", req);
+            }
+            else
+            {
+                res = await Http.PutAsJsonAsync($"api/v1/custom-objects/definitions/{Definition.Id}", req);
+            }
+
+            if (!res.IsSuccessStatusCode)
+            {
+                Snackbar.Add(await ProblemText.FromAsync(res, T["Failed to save custom object definition."]), Severity.Error);
+                return;
+            }
+
+            var saved = await res.Content.ReadFromJsonAsync<CustomObjectDefinitionDto>();
+            Snackbar.Add(T["Custom object '{0}' saved successfully.", _name], Severity.Success);
+            MudDialog.Close(DialogResult.Ok(saved));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private static string Slugify(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return "";
+        var slug = text.Trim().ToLowerInvariant();
+        slug = System.Text.RegularExpressions.Regex.Replace(slug, @"[^a-z0-9_-]", "-");
+        return System.Text.RegularExpressions.Regex.Replace(slug, @"-+", "-").Trim('-');
+    }
+
+    private static string SlugifyKey(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return "";
+        var key = text.Trim().ToLowerInvariant();
+        key = System.Text.RegularExpressions.Regex.Replace(key, @"[^a-z0-9_]", "_");
+        return System.Text.RegularExpressions.Regex.Replace(key, @"_+", "_").Trim('_');
+    }
+
+    private static string GetIcon(string? icon) => (icon?.ToLowerInvariant()) switch
+    {
+        "print" => Icons.Material.Filled.Print,
+        "folder" => Icons.Material.Filled.Folder,
+        "directionscar" or "car" => Icons.Material.Filled.DirectionsCar,
+        "build" or "machinery" => Icons.Material.Filled.Build,
+        "inventory2" or "inventory" => Icons.Material.Filled.Inventory2,
+        "shoppingbag" or "order" => Icons.Material.Filled.ShoppingBag,
+        "localshipping" or "shipping" => Icons.Material.Filled.LocalShipping,
+        "devices" => Icons.Material.Filled.Devices,
+        _ => Icons.Material.Filled.Widgets
+    };
+}

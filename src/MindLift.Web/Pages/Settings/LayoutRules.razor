@@ -1,0 +1,541 @@
+@page "/settings/layout-rules"
+@using MindLift.Shared.Contracts
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+@inject AppState App
+@inject Translator T
+
+<PageTitle>@T["Layout Rules"] · MindLift</PageTitle>
+
+<div class="ml-page ml-page--form" data-testid="layout-rules-page">
+    <PageHeader Title="Layout Rules" Subtitle="Configure conditional rules to dynamically show, hide, require, or lock fields on forms based on record criteria.">
+        <Actions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="@(() => OpenRuleDialog(null))" data-testid="create-rule-btn">
+                @T["New Layout Rule"]
+            </MudButton>
+        </Actions>
+    </PageHeader>
+
+    <SettingsNav Current="/settings/layout-rules" />
+
+    @if (!_featureEnabled)
+    {
+        <MudAlert Severity="Severity.Warning" Variant="Variant.Filled" Class="mb-4">
+            <div class="ml-row" style="align-items:center;justify-content:space-between;width:100%;">
+                <div>
+                    <div style="font-weight:600;">@T["Layout Rules Feature is Disabled"]</div>
+                    <div class="text-caption">@T["Enable the 'layout-rules' feature flag to activate conditional field evaluation and server-side validation."]</div>
+                </div>
+                <MudButton Variant="Variant.Outlined" Color="Color.Inherit" Size="Size.Small" OnClick="EnableFeatureFlagAsync">@T["Enable Feature"]</MudButton>
+            </div>
+        </MudAlert>
+    }
+
+    <!-- Entity / Module Filter Tabs -->
+    <MudPaper Elevation="0" Outlined="true" Class="pa-2 mb-4">
+        <div class="ml-row" style="align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+            <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small" Color="Color.Primary">
+                <MudButton Variant="@(_selectedEntity == null ? Variant.Filled : Variant.Outlined)" OnClick="@(() => SelectEntity(null))">@T["All Modules"]</MudButton>
+                <MudButton Variant="@(_selectedEntity == "deals" ? Variant.Filled : Variant.Outlined)" OnClick="@(() => SelectEntity("deals"))">@T["Deals"]</MudButton>
+                <MudButton Variant="@(_selectedEntity == "leads" ? Variant.Filled : Variant.Outlined)" OnClick="@(() => SelectEntity("leads"))">@T["Leads"]</MudButton>
+                <MudButton Variant="@(_selectedEntity == "contacts" ? Variant.Filled : Variant.Outlined)" OnClick="@(() => SelectEntity("contacts"))">@T["Contacts"]</MudButton>
+                <MudButton Variant="@(_selectedEntity == "accounts" ? Variant.Filled : Variant.Outlined)" OnClick="@(() => SelectEntity("accounts"))">@T["Accounts"]</MudButton>
+            </MudButtonGroup>
+
+            <div style="max-width:280px;flex:1;">
+                <MudTextField @bind-Value="_searchQuery" Placeholder="@T["Search rules or fields..."]" Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Clearable="true" />
+            </div>
+        </div>
+    </MudPaper>
+
+    <!-- Rules List -->
+    @if (_loading)
+    {
+        <SkeletonTable Rows="4" Columns="4" />
+    }
+    else if (FilteredRules.Count == 0)
+    {
+        <MlCard Class="pa-8 text-center">
+            <EmptyState Title="@(_rules.Count == 0 ? T["No Layout Rules Configured"] : T["No rules match your filter"])"
+                        Message="@(_rules.Count == 0 ? T["Create your first layout rule to conditionally toggle field visibility or mandatory requirements."] : T["Try selecting a different module or clearing the search query."])"
+                        Compact="true" />
+            @if (_rules.Count == 0)
+            {
+                <div class="mt-4">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="@(() => OpenRuleDialog(null))">
+                        @T["Create Layout Rule"]
+                    </MudButton>
+                </div>
+            }
+        </MlCard>
+    }
+    else
+    {
+        <div class="ml-stack" style="gap:12px;" data-testid="rules-list">
+            @foreach (var rule in FilteredRules)
+            {
+                <MudCard Outlined="true" Class="pa-4" Style="@(rule.IsActive ? "border-left: 4px solid var(--mud-palette-primary);" : "border-left: 4px solid var(--mud-palette-divider); opacity:0.8;")" data-testid="@($"rule-card-{rule.Id}")">
+                    <div class="ml-row" style="justify-content:space-between;align-items:flex-start;gap:16px;">
+                        <div class="ml-stack" style="gap:6px;flex:1;">
+                            <div class="ml-row" style="align-items:center;gap:8px;flex-wrap:wrap;">
+                                <MudText Typo="Typo.subtitle1" Style="font-weight:600;">@rule.Name</MudText>
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary">
+                                    @rule.EntityType.ToUpperInvariant()
+                                </MudChip>
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Default">
+                                    @T["Priority: {0}", rule.Priority]
+                                </MudChip>
+                                @if (rule.IsActive)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Success">@T["Active"]</MudChip>
+                                }
+                                else
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Default">@T["Inactive"]</MudChip>
+                                }
+                            </div>
+
+                            @if (!string.IsNullOrWhiteSpace(rule.Description))
+                            {
+                                <MudText Typo="Typo.body2" Class="ml-muted">@rule.Description</MudText>
+                            }
+
+                            <!-- Trigger Condition Pill -->
+                            <div class="ml-row" style="align-items:center;gap:6px;margin-top:4px;">
+                                <span class="text-caption ml-muted" style="font-weight:600;">@T["Trigger:"]</span>
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="Color.Dark" Icon="@Icons.Material.Filled.Bolt">
+                                    @FormatCondition(rule.Condition)
+                                </MudChip>
+                            </div>
+
+                            <!-- Actions Badges -->
+                            <div class="ml-row" style="align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;">
+                                @if (rule.ShowFields.Count > 0)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Success" Icon="@Icons.Material.Filled.Visibility">
+                                        @T["Show: {0}", string.Join(", ", rule.ShowFields)]
+                                    </MudChip>
+                                }
+                                @if (rule.HideFields.Count > 0)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Default" Icon="@Icons.Material.Filled.VisibilityOff">
+                                        @T["Hide: {0}", string.Join(", ", rule.HideFields)]
+                                    </MudChip>
+                                }
+                                @if (rule.MandatoryFields.Count > 0)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning" Icon="@Icons.Material.Filled.Star">
+                                        @T["Require: {0}", string.Join(", ", rule.MandatoryFields)]
+                                    </MudChip>
+                                }
+                                @if (rule.ReadOnlyFields.Count > 0)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Info" Icon="@Icons.Material.Filled.Lock">
+                                        @T["Read-Only: {0}", string.Join(", ", rule.ReadOnlyFields)]
+                                    </MudChip>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Card Actions -->
+                        <div class="ml-row" style="align-items:center;gap:8px;">
+                            <MudTooltip Text="@(rule.IsActive ? T["Deactivate rule"] : T["Activate rule"])">
+                                <MudSwitch T="bool" Value="@rule.IsActive" ValueChanged="@((bool val) => ToggleActiveAsync(rule, val))" Color="Color.Success" />
+                            </MudTooltip>
+                            <MudTooltip Text="@T["Test in Simulator"]">
+                                <MudIconButton Icon="@Icons.Material.Filled.PlayCircleOutline" Color="Color.Primary" Size="Size.Small" OnClick="@(() => LoadIntoSandbox(rule))" />
+                            </MudTooltip>
+                            <MudTooltip Text="@T["Edit"]">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Default" Size="Size.Small" OnClick="@(() => OpenRuleDialog(rule))" data-testid="@($"edit-rule-{rule.Id}")" />
+                            </MudTooltip>
+                            <MudTooltip Text="@T["Delete"]">
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => DeleteRuleAsync(rule))" data-testid="@($"delete-rule-{rule.Id}")" />
+                            </MudTooltip>
+                        </div>
+                    </div>
+                </MudCard>
+            }
+        </div>
+    }
+
+    <!-- Live Interactive Rule Sandbox & Evaluator -->
+    <MudCard Outlined="true" Class="pa-4 mt-6" Style="background:var(--mud-palette-background-grey);">
+        <div class="ml-row" style="align-items:center;justify-content:space-between;">
+            <div class="ml-row" style="align-items:center;gap:8px;">
+                <MudIcon Icon="@Icons.Material.Filled.Science" Color="Color.Secondary" />
+                <MudText Typo="Typo.subtitle1" Style="font-weight:600;">@T["Interactive Layout Rules Sandbox & Simulator"]</MudText>
+            </div>
+            <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Secondary">@T["Real-time /evaluate API"]</MudChip>
+        </div>
+        <MudText Typo="Typo.body2" Class="ml-muted mb-3">
+            @T["Simulate record field inputs to test how layout rules evaluate live in the CRM engine."]
+        </MudText>
+
+        <MudGrid Spacing="2">
+            <MudItem xs="12" sm="3">
+                <MudSelect T="string" @bind-Value="_sandboxEntity" Label="@T["Test Module"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="sandbox-entity-select">
+                    <MudSelectItem Value="@("deals")">@T["Deals"]</MudSelectItem>
+                    <MudSelectItem Value="@("leads")">@T["Leads"]</MudSelectItem>
+                    <MudSelectItem Value="@("contacts")">@T["Contacts"]</MudSelectItem>
+                    <MudSelectItem Value="@("accounts")">@T["Accounts"]</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudTextField @bind-Value="_sandboxFieldKey" Label="@T["Field Key"]" Placeholder="e.g. stage, status" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="sandbox-field-key" />
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudTextField @bind-Value="_sandboxFieldValue" Label="@T["Field Value"]" Placeholder="e.g. Closed Lost" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="sandbox-field-value" />
+            </MudItem>
+            <MudItem xs="12" sm="3" Class="d-flex align-center gap-2">
+                <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Bolt" OnClick="EvaluateSandboxAsync" Disabled="_evaluating" data-testid="sandbox-evaluate-btn">
+                    @if (_evaluating)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
+                    }
+                    @T["Evaluate"]
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="ValidateSandboxAsync" Disabled="_evaluating" data-testid="sandbox-validate-btn">
+                    @T["Validate"]
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+
+        <!-- Evaluation Results Display -->
+        @if (_evalResult != null)
+        {
+            <MudPaper Outlined="true" Class="pa-3 mt-3" Style="background:var(--mud-palette-surface);" data-testid="sandbox-eval-result">
+                <div class="ml-row" style="align-items:center;gap:8px;margin-bottom:8px;">
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="@(_evalResult.AppliedRules.Count > 0 ? Color.Success : Color.Default)" Size="Size.Small" />
+                    <MudText Typo="Typo.subtitle2">
+                        @(_evalResult.AppliedRules.Count > 0
+                            ? T["Applied Rules ({0}): {1}", _evalResult.AppliedRules.Count, string.Join(", ", _evalResult.AppliedRules)]
+                            : T["No layout rules triggered for these field values."])
+                    </MudText>
+                </div>
+
+                <div class="ml-row" style="gap:16px;flex-wrap:wrap;">
+                    <div>
+                        <MudText Typo="Typo.caption" Style="font-weight:600;" Color="Color.Success">@T["Visible Fields:"]</MudText>
+                        <MudText Typo="Typo.body2">@(_evalResult.VisibleFields.Count > 0 ? string.Join(", ", _evalResult.VisibleFields) : "—")</MudText>
+                    </div>
+                    <div>
+                        <MudText Typo="Typo.caption" Style="font-weight:600;" Color="Color.Default">@T["Hidden Fields:"]</MudText>
+                        <MudText Typo="Typo.body2">@(_evalResult.HiddenFields.Count > 0 ? string.Join(", ", _evalResult.HiddenFields) : "—")</MudText>
+                    </div>
+                    <div>
+                        <MudText Typo="Typo.caption" Style="font-weight:600;" Color="Color.Warning">@T["Mandatory Fields:"]</MudText>
+                        <MudText Typo="Typo.body2">@(_evalResult.MandatoryFields.Count > 0 ? string.Join(", ", _evalResult.MandatoryFields) : "—")</MudText>
+                    </div>
+                    <div>
+                        <MudText Typo="Typo.caption" Style="font-weight:600;" Color="Color.Info">@T["Read-Only Fields:"]</MudText>
+                        <MudText Typo="Typo.body2">@(_evalResult.ReadOnlyFields.Count > 0 ? string.Join(", ", _evalResult.ReadOnlyFields) : "—")</MudText>
+                    </div>
+                </div>
+            </MudPaper>
+        }
+
+        <!-- Validation Results Display -->
+        @if (_valResult != null)
+        {
+            <MudPaper Outlined="true" Class="pa-3 mt-3" Style="background:var(--mud-palette-surface);" data-testid="sandbox-val-result">
+                @if (_valResult.IsValid)
+                {
+                    <div class="ml-row" style="align-items:center;gap:8px;">
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" />
+                        <MudText Typo="Typo.subtitle2" Color="Color.Success">@T["Record is Valid: All required layout rules are satisfied."]</MudText>
+                    </div>
+                }
+                else
+                {
+                    <div class="ml-stack" style="gap:4px;">
+                        <div class="ml-row" style="align-items:center;gap:8px;">
+                            <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" />
+                            <MudText Typo="Typo.subtitle2" Color="Color.Error">@T["Validation Failed: Mandatory fields missing"]</MudText>
+                        </div>
+                        @foreach (var err in _valResult.Errors)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Error" Class="ml-6">• @err</MudText>
+                        }
+                    </div>
+                }
+            </MudPaper>
+        }
+    </MudCard>
+</div>
+
+@code {
+    private List<LayoutRuleDto> _rules = [];
+    private bool _loading = true;
+    private bool _featureEnabled = true;
+    private string? _selectedEntity;
+    private string _searchQuery = string.Empty;
+
+    // Sandbox
+    private string _sandboxEntity = "deals";
+    private string _sandboxFieldKey = "stage";
+    private string _sandboxFieldValue = "Closed Lost";
+    private bool _evaluating;
+    private LayoutRuleEvaluationResult? _evalResult;
+    private LayoutRuleValidationResult? _valResult;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckFeatureEnabledAsync();
+        await LoadRulesAsync();
+    }
+
+    private async Task CheckFeatureEnabledAsync()
+    {
+        try
+        {
+            var features = await Http.GetFromJsonAsync<List<FeatureFlagDto>>("api/v1/features");
+            _featureEnabled = features?.FirstOrDefault(f => f.Key == "layout-rules")?.Enabled ?? true;
+        }
+        catch
+        {
+            _featureEnabled = true;
+        }
+    }
+
+    private async Task EnableFeatureFlagAsync()
+    {
+        try
+        {
+            var res = await Http.PutAsJsonAsync("api/v1/features/layout-rules", new SetFeatureRequest(true));
+            if (res.IsSuccessStatusCode)
+            {
+                _featureEnabled = true;
+                Snackbar.Add(T["'layout-rules' feature enabled."], Severity.Success);
+                await LoadRulesAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task LoadRulesAsync()
+    {
+        _loading = true;
+        try
+        {
+            var url = string.IsNullOrWhiteSpace(_selectedEntity)
+                ? "api/v1/layout-rules"
+                : $"api/v1/layout-rules?entityType={_selectedEntity}";
+
+            var response = await Http.GetAsync(url);
+            if (response.IsSuccessStatusCode)
+            {
+                _rules = (await response.Content.ReadFromJsonAsync<List<LayoutRuleDto>>()) ?? [];
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                _featureEnabled = false;
+                _rules = [];
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(T["Failed to load layout rules: {0}", ex.Message], Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private List<LayoutRuleDto> FilteredRules
+    {
+        get
+        {
+            var q = _rules.AsEnumerable();
+            if (!string.IsNullOrWhiteSpace(_selectedEntity))
+            {
+                q = q.Where(r => r.EntityType.Equals(_selectedEntity, StringComparison.OrdinalIgnoreCase));
+            }
+            if (!string.IsNullOrWhiteSpace(_searchQuery))
+            {
+                var query = _searchQuery.Trim().ToLowerInvariant();
+                q = q.Where(r => r.Name.ToLowerInvariant().Contains(query) ||
+                                 (r.Description?.ToLowerInvariant().Contains(query) == true) ||
+                                 (r.Condition?.Field?.ToLowerInvariant().Contains(query) == true) ||
+                                 r.ShowFields.Any(f => f.ToLowerInvariant().Contains(query)) ||
+                                 r.MandatoryFields.Any(f => f.ToLowerInvariant().Contains(query)));
+            }
+            return q.OrderBy(r => r.Priority).ToList();
+        }
+    }
+
+    private async Task SelectEntity(string? entity)
+    {
+        _selectedEntity = entity;
+        if (!string.IsNullOrEmpty(entity))
+        {
+            _sandboxEntity = entity;
+        }
+        await LoadRulesAsync();
+    }
+
+    private static string FormatCondition(RuleNode? node)
+    {
+        if (node == null) return "Always True";
+        var field = node.Field ?? "record";
+        var op = node.Operator ?? "eq";
+        var val = node.Value ?? (node.Values != null ? string.Join(", ", node.Values) : "");
+        if (op == "isEmpty") return $"{field} is Empty";
+        if (op == "isNotEmpty") return $"{field} is Not Empty";
+        return $"{field} {op} '{val}'";
+    }
+
+    private async Task OpenRuleDialog(LayoutRuleDto? rule)
+    {
+        var parameters = new DialogParameters<LayoutRuleDialog>
+        {
+            { x => x.ExistingRule, rule },
+            { x => x.DefaultEntityType, _selectedEntity ?? "deals" }
+        };
+
+        var dialog = await Dialogs.ShowAsync<LayoutRuleDialog>(
+            rule == null ? T["New Layout Rule"] : T["Edit Layout Rule"],
+            parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true }
+        );
+
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
+        {
+            await LoadRulesAsync();
+        }
+    }
+
+    private async Task ToggleActiveAsync(LayoutRuleDto rule, bool active)
+    {
+        var request = new SaveLayoutRuleRequest(
+            EntityType: rule.EntityType,
+            Name: rule.Name,
+            Description: rule.Description,
+            IsActive: active,
+            Priority: rule.Priority,
+            Condition: rule.Condition,
+            ShowFields: rule.ShowFields,
+            HideFields: rule.HideFields,
+            MandatoryFields: rule.MandatoryFields,
+            ReadOnlyFields: rule.ReadOnlyFields
+        );
+
+        var res = await Http.PutAsJsonAsync($"api/v1/layout-rules/{rule.Id}", request);
+        if (res.IsSuccessStatusCode)
+        {
+            Snackbar.Add(active ? T["Rule activated."] : T["Rule deactivated."], Severity.Info);
+            await LoadRulesAsync();
+        }
+        else
+        {
+            Snackbar.Add(T["Failed to update rule."], Severity.Error);
+        }
+    }
+
+    private async Task DeleteRuleAsync(LayoutRuleDto rule)
+    {
+        var confirmed = await Dialogs.ConfirmAsync(
+            T["Delete Layout Rule"],
+            T["Are you sure you want to permanently delete rule '{0}'?", rule.Name],
+            T["Delete"],
+            danger: true
+        );
+
+        if (confirmed)
+        {
+            var res = await Http.DeleteAsync($"api/v1/layout-rules/{rule.Id}");
+            if (res.IsSuccessStatusCode)
+            {
+                Snackbar.Add(T["Layout rule deleted."], Severity.Success);
+                await LoadRulesAsync();
+            }
+            else
+            {
+                Snackbar.Add(T["Failed to delete rule."], Severity.Error);
+            }
+        }
+    }
+
+    private void LoadIntoSandbox(LayoutRuleDto rule)
+    {
+        _sandboxEntity = rule.EntityType;
+        if (rule.Condition != null && !string.IsNullOrEmpty(rule.Condition.Field))
+        {
+            _sandboxFieldKey = rule.Condition.Field;
+            _sandboxFieldValue = rule.Condition.Value ?? "";
+        }
+    }
+
+    private async Task EvaluateSandboxAsync()
+    {
+        _evaluating = true;
+        _evalResult = null;
+        _valResult = null;
+        try
+        {
+            var values = new Dictionary<string, object?>();
+            if (!string.IsNullOrWhiteSpace(_sandboxFieldKey))
+            {
+                values[_sandboxFieldKey.Trim()] = _sandboxFieldValue?.Trim();
+            }
+
+            var payload = new EvaluateLayoutRulesRequest(_sandboxEntity, values);
+            var res = await Http.PostAsJsonAsync("api/v1/layout-rules/evaluate", payload);
+            if (res.IsSuccessStatusCode)
+            {
+                _evalResult = await res.Content.ReadFromJsonAsync<LayoutRuleEvaluationResult>();
+            }
+            else
+            {
+                Snackbar.Add(T["Evaluation failed: {0}", res.StatusCode], Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _evaluating = false;
+        }
+    }
+
+    private async Task ValidateSandboxAsync()
+    {
+        _evaluating = true;
+        _valResult = null;
+        try
+        {
+            var values = new Dictionary<string, object?>();
+            if (!string.IsNullOrWhiteSpace(_sandboxFieldKey))
+            {
+                values[_sandboxFieldKey.Trim()] = _sandboxFieldValue?.Trim();
+            }
+
+            var payload = new ValidateLayoutRulesRequest(_sandboxEntity, values);
+            var res = await Http.PostAsJsonAsync("api/v1/layout-rules/validate", payload);
+            if (res.IsSuccessStatusCode)
+            {
+                _valResult = await res.Content.ReadFromJsonAsync<LayoutRuleValidationResult>();
+            }
+            else
+            {
+                Snackbar.Add(T["Validation failed: {0}", res.StatusCode], Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _evaluating = false;
+        }
+    }
+}

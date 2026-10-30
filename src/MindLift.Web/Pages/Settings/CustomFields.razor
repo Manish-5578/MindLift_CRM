@@ -51,7 +51,7 @@
             @if (_error is not null) { <MudAlert Severity="Severity.Error" Dense="true" data-testid="cf-error">@_error</MudAlert> }
             <MudGrid Spacing="3">
                 <MudItem xs="12" sm="6"><MudTextField @bind-Value="_key" Label="@T["Key (cf_…) *"]" Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="@T["Lowercase letters, digits and underscores. Starts with cf_."]" data-testid="cf-key" /></MudItem>
-                <MudItem xs="12" sm="6"><MudTextField @bind-Value="_label" Label="@T["Label *"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="cf-label" /></MudItem>
+                <MudItem xs="12" sm="6"><MudTextField T="string" Value="_label" ValueChanged="OnLabelChanged" Immediate="true" Label="@T["Label *"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="cf-label" /></MudItem>
             </MudGrid>
             <MudSelect T="string" @bind-Value="_type" Label="@T["Type *"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="cf-type">
                 @foreach (var (value, label) in Types)
@@ -89,10 +89,22 @@
     private bool _loading = true;
     private string _key = "cf_";
     private string _label = string.Empty;
+    private string _previousSlug = string.Empty;
     private string _type = "Text";
     private string _options = string.Empty;
     private bool _required;
     private string? _error;
+
+    private void OnLabelChanged(string label)
+    {
+        _label = label;
+        var clean = new string(label.ToLowerInvariant().Where(c => char.IsLetterOrDigit(c) || c == '_').ToArray()).Trim();
+        if (_key == "cf_" || _key == "cf_" + _previousSlug)
+        {
+            _key = string.IsNullOrEmpty(clean) ? "cf_" : "cf_" + clean;
+            _previousSlug = clean;
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {

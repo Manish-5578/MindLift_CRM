@@ -1,0 +1,512 @@
+@page "/settings/backups"
+@implements IDisposable
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject Translator T
+
+<PageTitle>@T["Scheduled Backups"] · MindLift</PageTitle>
+
+<div class="ml-page ml-page--wide">
+    <PageHeader Title="Scheduled backups" Subtitle="Automated recurring CRM data backups, cryptographic SHA-256 archives, and on-demand snapshots." />
+    <SettingsNav Current="/settings/backups" />
+
+    <!-- Metrics Bar -->
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Outlined="true" Class="pa-4 d-flex align-center gap-3">
+                <MudAvatar Color="@(_config?.IsEnabled == true ? Color.Success : Color.Default)" Variant="Variant.Filled">
+                    <MudIcon Icon="@Icons.Material.Filled.Schedule" />
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@T["Schedule Status"]</MudText>
+                    <MudText Typo="Typo.h6" Class="fw-bold">@(_config?.IsEnabled == true ? T["Active"] : T["Disabled"])</MudText>
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Outlined="true" Class="pa-4 d-flex align-center gap-3">
+                <MudAvatar Color="Color.Primary" Variant="Variant.Filled">
+                    <MudIcon Icon="@Icons.Material.Filled.Repeat" />
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@T["Cadence"]</MudText>
+                    <MudText Typo="Typo.h6" Class="fw-bold">@(_config?.Frequency ?? "-") (@(_config?.HourUtc ?? 0):00 UTC)</MudText>
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Outlined="true" Class="pa-4 d-flex align-center gap-3">
+                <MudAvatar Color="Color.Info" Variant="Variant.Filled">
+                    <MudIcon Icon="@Icons.Material.Filled.FolderZip" />
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@T["Total Archives"]</MudText>
+                    <MudText Typo="Typo.h6" Class="fw-bold">@_archives.Count</MudText>
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Outlined="true" Class="pa-4 d-flex align-center gap-3">
+                <MudAvatar Color="Color.Secondary" Variant="Variant.Filled">
+                    <MudIcon Icon="@Icons.Material.Filled.Timer" />
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@T["Retention Lifespan"]</MudText>
+                    <MudText Typo="Typo.h6" Class="fw-bold">@(_config?.RetentionDays ?? 30) @T["days"]</MudText>
+                </div>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudGrid>
+        <!-- Schedule Configuration Card -->
+        <MudItem xs="12" lg="5">
+            <MudCard Elevation="0" Outlined="true" Class="mb-4">
+                <MudCardHeader>
+                    <CardHeaderAvatar>
+                        <MudAvatar Color="Color.Primary" Variant="Variant.Filled">
+                            <MudIcon Icon="@Icons.Material.Filled.SettingsBackupRestore" />
+                        </MudAvatar>
+                    </CardHeaderAvatar>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.subtitle1" Class="fw-bold">@T["Automated Backup Schedule"]</MudText>
+                        <MudText Typo="Typo.caption" Class="ml-muted">@T["Configure recurring snapshot cadences, format, and alert recipients."]</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    @if (_loadingSchedule)
+                    {
+                        <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-3" />
+                    }
+                    <div class="d-flex flex-column gap-3">
+                            <MudSwitch @bind-Value="_schedEnabled" Color="Color.Success" Label="@T["Enable automated recurring backups"]" />
+
+                            <MudSelect T="string" Label="@T["Frequency"]" @bind-Value="_schedFrequency" Variant="Variant.Outlined" Dense="true" Disabled="@(!_schedEnabled)">
+                                <MudSelectItem Value="@("Daily")">@T["Daily"]</MudSelectItem>
+                                <MudSelectItem Value="@("Weekly")">@T["Weekly"]</MudSelectItem>
+                                <MudSelectItem Value="@("Monthly")">@T["Monthly"]</MudSelectItem>
+                            </MudSelect>
+
+                            @if (_schedFrequency == "Weekly")
+                            {
+                                <MudSelect T="DayOfWeek?" Label="@T["Day of Week"]" @bind-Value="_schedDayOfWeek" Variant="Variant.Outlined" Dense="true" Disabled="@(!_schedEnabled)">
+                                    <MudSelectItem T="DayOfWeek?" Value="@(DayOfWeek.Sunday)">@T["Sunday"]</MudSelectItem>
+                                    <MudSelectItem T="DayOfWeek?" Value="@(DayOfWeek.Monday)">@T["Monday"]</MudSelectItem>
+                                    <MudSelectItem T="DayOfWeek?" Value="@(DayOfWeek.Tuesday)">@T["Tuesday"]</MudSelectItem>
+                                    <MudSelectItem T="DayOfWeek?" Value="@(DayOfWeek.Wednesday)">@T["Wednesday"]</MudSelectItem>
+                                    <MudSelectItem T="DayOfWeek?" Value="@(DayOfWeek.Thursday)">@T["Thursday"]</MudSelectItem>
+                                    <MudSelectItem T="DayOfWeek?" Value="@(DayOfWeek.Friday)">@T["Friday"]</MudSelectItem>
+                                    <MudSelectItem T="DayOfWeek?" Value="@(DayOfWeek.Saturday)">@T["Saturday"]</MudSelectItem>
+                                </MudSelect>
+                            }
+
+                            @if (_schedFrequency == "Monthly")
+                            {
+                                <MudNumericField T="int?" Label="@T["Day of Month (1-28)"]" @bind-Value="_schedDayOfMonth" Min="1" Max="28" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@(!_schedEnabled)" />
+                            }
+
+                            <MudGrid>
+                                <MudItem xs="6">
+                                    <MudNumericField T="int" Label="@T["Hour (UTC 0-23)"]" @bind-Value="_schedHourUtc" Min="0" Max="23" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@(!_schedEnabled)" />
+                                </MudItem>
+                                <MudItem xs="6">
+                                    <MudNumericField T="int" Label="@T["Retention (Days)"]" @bind-Value="_schedRetentionDays" Min="1" Max="365" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@(!_schedEnabled)" />
+                                </MudItem>
+                            </MudGrid>
+
+                            <MudSelect T="string" Label="@T["Backup Format"]" @bind-Value="_schedFormat" Variant="Variant.Outlined" Dense="true" Disabled="@(!_schedEnabled)">
+                                <MudSelectItem Value="@("json")">JSON (@T["Full CRM Entity Tree"])</MudSelectItem>
+                                <MudSelectItem Value="@("csv")">CSV (@T["Tabular format"])</MudSelectItem>
+                            </MudSelect>
+
+                            <MudTextField T="string" Label="@T["Notification Emails (comma-separated)"]" @bind-Value="_notifyEmailsRaw" Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="@T["Send email confirmation and digest on backup completion."]" Disabled="@(!_schedEnabled)" />
+
+                            <div class="d-flex align-center justify-space-between pt-2">
+                                <MudText Typo="Typo.caption" Class="ml-muted">
+                                    @if (_config.LastRunAt is { } lr)
+                                    {
+                                        <span>@T["Last run:"] @lr.ToLocalTime().ToString("dd MMM yyyy HH:mm")</span>
+                                    }
+                                    else
+                                    {
+                                        <span>@T["No previous scheduled runs"]</span>
+                                    }
+                                </MudText>
+
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveScheduleAsync" Disabled="_savingSchedule" StartIcon="@Icons.Material.Filled.Save">
+                                    @(_savingSchedule ? T["Saving..."] : T["Save Schedule"])
+                                </MudButton>
+                            </div>
+                        </div>
+                </MudCardContent>
+            </MudCard>
+
+            <!-- On-Demand Trigger Card -->
+            <MudCard Elevation="0" Outlined="true">
+                <MudCardHeader>
+                    <CardHeaderAvatar>
+                        <MudAvatar Color="Color.Secondary" Variant="Variant.Filled">
+                            <MudIcon Icon="@Icons.Material.Filled.Bolt" />
+                        </MudAvatar>
+                    </CardHeaderAvatar>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.subtitle1" Class="fw-bold">@T["Trigger On-Demand Snapshot"]</MudText>
+                        <MudText Typo="Typo.caption" Class="ml-muted">@T["Immediately capture a full snapshot of Leads, Contacts, Accounts, Deals, Activities & Custom Objects."]</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <div class="d-flex flex-column gap-3">
+                        <MudSelect T="string" Label="@T["Export Format"]" @bind-Value="_triggerFormat" Variant="Variant.Outlined" Dense="true">
+                            <MudSelectItem Value="@("json")">JSON (.json)</MudSelectItem>
+                            <MudSelectItem Value="@("csv")">CSV (.csv)</MudSelectItem>
+                        </MudSelect>
+
+                        <MudButton Variant="Variant.Filled" Color="Color.Secondary" Size="Size.Medium" StartIcon="@Icons.Material.Filled.CloudUpload" OnClick="TriggerBackupAsync" Disabled="_triggering">
+                            @(_triggering ? T["Generating Snapshot..."] : T["Generate Snapshot Now"])
+                        </MudButton>
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <!-- Backup Archives List -->
+        <MudItem xs="12" lg="7">
+            <MudCard Elevation="0" Outlined="true">
+                <MudCardHeader>
+                    <CardHeaderAvatar>
+                        <MudAvatar Color="Color.Info" Variant="Variant.Filled">
+                            <MudIcon Icon="@Icons.Material.Filled.Archive" />
+                        </MudAvatar>
+                    </CardHeaderAvatar>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.subtitle1" Class="fw-bold">@T["Backup Archives & Snapshots"]</MudText>
+                        <MudText Typo="Typo.caption" Class="ml-muted">@T["Downloadable archives secured with cryptographic SHA-256 hashes."]</MudText>
+                    </CardHeaderContent>
+                    <CardHeaderActions>
+                        <MudIconButton Icon="@Icons.Material.Filled.Refresh" Color="Color.Default" OnClick="LoadArchivesAsync" Title="@T["Refresh archives"]" />
+                    </CardHeaderActions>
+                </MudCardHeader>
+
+                <MudCardContent Class="pa-0">
+                    @if (_loadingArchives)
+                    {
+                        <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+                    }
+                    @if (_archives.Count == 0 && !_loadingArchives)
+                    {
+                        <div class="pa-8 text-center ml-muted">
+                            <MudIcon Icon="@Icons.Material.Filled.Inbox" Size="Size.Large" Class="mb-2" />
+                            <MudText Typo="Typo.subtitle1">@T["No backup archives found"]</MudText>
+                            <MudText Typo="Typo.caption">@T["Click 'Generate Snapshot Now' or wait for the recurring schedule to create your first archive."]</MudText>
+                        </div>
+                    }
+                    else if (_archives.Count > 0)
+                    {
+                        <MudSimpleTable Dense="true" Hover="true" Style="background:transparent;">
+                            <thead>
+                                <tr>
+                                    <th>@T["Created"]</th>
+                                    <th>@T["Format / Status"]</th>
+                                    <th>@T["Size"]</th>
+                                    <th>@T["Records"]</th>
+                                    <th>@T["Integrity"]</th>
+                                    <th class="text-right">@T["Actions"]</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var a in _archives)
+                                {
+                                    var arch = a;
+                                    var isExpired = arch.ExpiresAt < DateTime.UtcNow;
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex flex-column">
+                                                <span class="fw-semibold">@arch.CreatedAt.ToLocalTime().ToString("dd MMM yyyy")</span>
+                                                <span class="ml-muted" style="font-size:0.75rem">@arch.CreatedAt.ToLocalTime().ToString("HH:mm:ss")</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-center gap-1">
+                                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="text-uppercase" Style="font-size:0.7rem; height:20px;">
+                                                    @arch.Format
+                                                </MudChip>
+                                                @if (isExpired)
+                                                {
+                                                    <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Filled" Style="font-size:0.7rem; height:20px;">
+                                                        @T["Expired"]
+                                                    </MudChip>
+                                                }
+                                                else
+                                                {
+                                                    <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Filled" Style="font-size:0.7rem; height:20px;">
+                                                        @arch.Status
+                                                    </MudChip>
+                                                }
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span>@FormatSize(arch.SizeBytes)</span>
+                                        </td>
+                                        <td>
+                                            @if (arch.RecordCounts != null && arch.RecordCounts.Count > 0)
+                                            {
+                                                var totalRecs = arch.RecordCounts.Values.Sum();
+                                                <MudTooltip Text="@string.Join(", ", arch.RecordCounts.Select(x => $"{x.Key}: {x.Value}"))">
+                                                    <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Text" Style="font-size:0.75rem; height:22px;">
+                                                        @totalRecs @T["records"]
+                                                    </MudChip>
+                                                </MudTooltip>
+                                            }
+                                            else
+                                            {
+                                                <span class="ml-muted">-</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <MudTooltip Text="@arch.ChecksumSha256">
+                                                <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Filled.Security" OnClick="() => ViewDetails(arch)" Style="font-family:monospace; font-size:0.7rem; padding:2px 6px;">
+                                                    @(arch.ChecksumSha256.Length >= 8 ? arch.ChecksumSha256[..8] + "…" : arch.ChecksumSha256)
+                                                </MudButton>
+                                            </MudTooltip>
+                                        </td>
+                                        <td class="text-right">
+                                            <div class="d-flex align-center justify-end gap-1">
+                                                <MudIconButton Icon="@Icons.Material.Filled.Info" Size="Size.Small" Color="Color.Default" OnClick="() => ViewDetails(arch)" Title="@T["View integrity details"]" />
+                                                <MudIconButton Icon="@Icons.Material.Filled.Download" Size="Size.Small" Color="Color.Primary" Disabled="@isExpired" OnClick="() => DownloadArchiveAsync(arch)" Title="@T["Download archive"]" />
+                                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="() => DeleteArchiveAsync(arch)" Title="@T["Delete archive"]" />
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+</div>
+
+@code {
+    private BackupScheduleConfigDto _config = new(
+        Id: Guid.Empty,
+        IsEnabled: true,
+        Frequency: "Daily",
+        DayOfWeek: DayOfWeek.Sunday,
+        DayOfMonth: 1,
+        HourUtc: 3,
+        RetentionDays: 45,
+        Format: "json",
+        NotifyEmails: [],
+        LastRunAt: null,
+        NextRunAt: null
+    );
+    private List<BackupArchiveDto> _archives = [];
+    private bool _loadingSchedule = false;
+    private bool _loadingArchives = true;
+    private bool _savingSchedule = false;
+    private bool _triggering = false;
+
+    // Form fields
+    private bool _schedEnabled = true;
+    private string _schedFrequency = "Daily";
+    private DayOfWeek? _schedDayOfWeek = DayOfWeek.Sunday;
+    private int? _schedDayOfMonth = 1;
+    private int _schedHourUtc = 3;
+    private int _schedRetentionDays = 45;
+    private string _schedFormat = "json";
+    private string _notifyEmailsRaw = "";
+
+    // On demand trigger
+    private string _triggerFormat = "json";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(LoadScheduleAsync(), LoadArchivesAsync());
+    }
+
+    private async Task LoadScheduleAsync()
+    {
+        _loadingSchedule = true;
+        try
+        {
+            var loaded = await Http.GetFromJsonAsync<BackupScheduleConfigDto>("api/v1/backups/schedule");
+            if (loaded != null)
+            {
+                _config = loaded;
+                _schedEnabled = _config.IsEnabled;
+                _schedFrequency = _config.Frequency;
+                _schedDayOfWeek = _config.DayOfWeek;
+                _schedDayOfMonth = _config.DayOfMonth;
+                _schedHourUtc = _config.HourUtc;
+                _schedRetentionDays = _config.RetentionDays;
+                _schedFormat = _config.Format;
+                _notifyEmailsRaw = string.Join(", ", _config.NotifyEmails ?? []);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(T["Failed to load backup schedule: {0}", ex.Message], Severity.Error);
+        }
+        finally
+        {
+            _loadingSchedule = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadArchivesAsync()
+    {
+        _loadingArchives = true;
+        try
+        {
+            _archives = await Http.GetFromJsonAsync<List<BackupArchiveDto>>("api/v1/backups/archives") ?? [];
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(T["Failed to load backup archives: {0}", ex.Message], Severity.Error);
+        }
+        finally
+        {
+            _loadingArchives = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SaveScheduleAsync()
+    {
+        _savingSchedule = true;
+        try
+        {
+            var emails = _notifyEmailsRaw
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
+
+            var req = new SaveBackupScheduleConfigRequest(
+                IsEnabled: _schedEnabled,
+                Frequency: _schedFrequency,
+                DayOfWeek: _schedFrequency == "Weekly" ? _schedDayOfWeek : null,
+                DayOfMonth: _schedFrequency == "Monthly" ? _schedDayOfMonth : null,
+                HourUtc: _schedHourUtc,
+                RetentionDays: _schedRetentionDays,
+                Format: _schedFormat,
+                NotifyEmails: emails
+            );
+
+            var res = await Http.PutAsJsonAsync("api/v1/backups/schedule", req);
+            if (res.IsSuccessStatusCode)
+            {
+                _config = await res.Content.ReadFromJsonAsync<BackupScheduleConfigDto>();
+                Snackbar.Add(T["Backup schedule successfully updated."], Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add(await ProblemText.FromAsync(res, T["Failed to update backup schedule."]), Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _savingSchedule = false;
+        }
+    }
+
+    private async Task TriggerBackupAsync()
+    {
+        _triggering = true;
+        try
+        {
+            var req = new TriggerBackupRequest(_triggerFormat);
+            var res = await Http.PostAsJsonAsync("api/v1/backups/trigger", req);
+            if (res.IsSuccessStatusCode)
+            {
+                var created = await res.Content.ReadFromJsonAsync<BackupArchiveDto>();
+                if (created != null)
+                {
+                    _archives.Insert(0, created);
+                }
+                Snackbar.Add(T["Backup snapshot generated successfully."], Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add(await ProblemText.FromAsync(res, T["Failed to trigger backup snapshot."]), Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _triggering = false;
+        }
+    }
+
+    private async Task DownloadArchiveAsync(BackupArchiveDto arch)
+    {
+        try
+        {
+            Nav.NavigateTo($"api/v1/backups/archives/{arch.Id}/download", forceLoad: true);
+            Snackbar.Add(T["Downloading backup archive..."], Severity.Info);
+            arch = arch with { DownloadCount = arch.DownloadCount + 1 };
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task ViewDetails(BackupArchiveDto arch)
+    {
+        var parameters = new DialogParameters { ["Archive"] = arch };
+        await Dialogs.ShowAsync<BackupArchiveDetailsDialog>(T["Backup Archive Details"], parameters);
+    }
+
+    private async Task DeleteArchiveAsync(BackupArchiveDto arch)
+    {
+        var confirm = await Dialogs.ShowMessageBoxAsync(
+            T["Delete Backup Archive"],
+            T["Are you sure you want to permanently delete this backup archive? This cannot be undone."],
+            yesText: T["Delete"],
+            cancelText: T["Cancel"]
+        );
+
+        if (confirm == true)
+        {
+            try
+            {
+                var res = await Http.DeleteAsync($"api/v1/backups/archives/{arch.Id}");
+                if (res.IsSuccessStatusCode)
+                {
+                    _archives.Remove(arch);
+                    Snackbar.Add(T["Backup archive deleted."], Severity.Success);
+                }
+                else
+                {
+                    Snackbar.Add(await ProblemText.FromAsync(res, T["Failed to delete backup archive."]), Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add(ex.Message, Severity.Error);
+            }
+        }
+    }
+
+    private static string FormatSize(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024.0):F2} MB";
+    }
+
+    public void Dispose()
+    {
+    }
+}

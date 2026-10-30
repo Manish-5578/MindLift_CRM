@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Components.WebAssembly.Http;
 using MindLift.Shared.Contracts;
 
 namespace MindLift.Web.Services;
@@ -15,6 +16,7 @@ public sealed class AuthHandler(AuthSession session, Uri baseAddress) : Delegati
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
+        request.SetBrowserRequestCredentials(BrowserRequestCredentials.Include);
         if (session.AccessToken is not null)
         {
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", session.AccessToken);
@@ -47,8 +49,13 @@ public sealed class AuthHandler(AuthSession session, Uri baseAddress) : Delegati
         await RefreshGate.WaitAsync(cancellationToken);
         try
         {
+            var req = new HttpRequestMessage(HttpMethod.Post, "api/v1/auth/refresh")
+            {
+                Content = JsonContent.Create(new RefreshRequest(null))
+            };
+            req.SetBrowserRequestCredentials(BrowserRequestCredentials.Include);
             using var client = new HttpClient(new HttpClientHandler()) { BaseAddress = baseAddress };
-            var response = await client.PostAsJsonAsync("api/v1/auth/refresh", new RefreshRequest(null), cancellationToken);
+            var response = await client.SendAsync(req, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 session.Clear();
@@ -68,6 +75,7 @@ public sealed class AuthHandler(AuthSession session, Uri baseAddress) : Delegati
     private static async Task<HttpRequestMessage> CloneAsync(HttpRequestMessage original)
     {
         var clone = new HttpRequestMessage(original.Method, original.RequestUri);
+        clone.SetBrowserRequestCredentials(BrowserRequestCredentials.Include);
         if (original.Content is not null)
         {
             var bytes = await original.Content.ReadAsByteArrayAsync();

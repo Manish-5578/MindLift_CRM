@@ -11,6 +11,25 @@ public static class ProblemText
         try
         {
             using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+            if (document.RootElement.TryGetProperty("errors", out var errors) && errors.ValueKind == JsonValueKind.Object)
+            {
+                var messages = new List<string>();
+                foreach (var prop in errors.EnumerateObject())
+                {
+                    foreach (var item in prop.Value.EnumerateArray())
+                    {
+                        if (item.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(item.GetString()))
+                        {
+                            messages.Add(item.GetString()!);
+                        }
+                    }
+                }
+                if (messages.Count > 0)
+                {
+                    return string.Join(" ", messages);
+                }
+            }
+
             if (document.RootElement.TryGetProperty("detail", out var detail) && detail.ValueKind == JsonValueKind.String)
             {
                 return detail.GetString() ?? fallback;

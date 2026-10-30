@@ -833,7 +833,7 @@ public sealed class AccountService(AppDbContext db, ITenantContext tenant, ICloc
                                        join c in scopedContacts on l.ContactId equals c.Id
                                        where l.AccountId == id
                                        orderby c.FirstName
-                                       select new AccountContactDto(c.Id, (c.FirstName + " " + c.LastName).Trim(), c.Email, c.Phone, c.JobTitle, l.Role, false))
+                                       select new AccountContactDto(c.Id, (c.FirstName + " " + c.LastName).Trim(), c.Email, c.Phone, c.JobTitle, l.Role, false, l.Id))
                                       .Take(200).ToListAsync(cancellationToken);
         var contacts = primaryContacts.Concat(secondaryContacts).ToList();
         var scopedAccounts = await ScopedAsync(cancellationToken);

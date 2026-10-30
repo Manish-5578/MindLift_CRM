@@ -82,6 +82,18 @@
                     </MlCard>
                 }
 
+                @if (_proactiveDuplicates.Count > 0 && !_showDuplicates)
+                {
+                    <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-4" Icon="@Icons.Material.Filled.WarningAmber">
+                        <div class="d-flex align-center justify-space-between flex-wrap gap-2">
+                            <span style="font-weight: 500;">@T["{0} potential duplicate contact(s) detected.", _proactiveDuplicates.Count]</span>
+                            <MudButton Variant="Variant.Filled" Color="Color.Warning" Size="Size.Small" StartIcon="@Icons.Material.Filled.CompareArrows" OnClick="OpenProactiveMergeAsync" data-testid="proactive-merge-contact-btn">
+                                @T["Compare & Merge"]
+                            </MudButton>
+                        </div>
+                    </MudAlert>
+                }
+
                 <MlCard Title="Details">
                     <div class="ml-kv" data-testid="contact-details">
                         <div class="ml-kv__label">@T["Email"]</div><div class="ml-kv__value"><FieldValue Kind="FormFieldKind.Email" Value="@contact.Email" /></div>
@@ -291,6 +303,23 @@
 
         await LoadPortalAsync();
         await LoadLinkedAccountsAsync();
+
+        try
+        {
+            var dupsRes = await Http.GetAsync($"api/v1/contacts/{Id}/duplicates");
+            if (dupsRes.IsSuccessStatusCode)
+            {
+                _proactiveDuplicates = (await dupsRes.Content.ReadFromJsonAsync<List<DuplicateCandidateDto>>() ?? []).Where(c => c.Id != Id).ToList();
+            }
+            else
+            {
+                _proactiveDuplicates = [];
+            }
+        }
+        catch
+        {
+            _proactiveDuplicates = [];
+        }
     }
 
     private const string NotInvited = "NotInvited";
@@ -384,6 +413,36 @@
         if (selected) _selectedIds.Add(id); else _selectedIds.Remove(id);
     }
 
+    private List<DuplicateCandidateDto> _proactiveDuplicates = [];
+
+    private async Task OpenProactiveMergeAsync()
+    {
+        if (_proactiveDuplicates.Count == 0) return;
+        var candidateIds = _proactiveDuplicates.Select(c => c.Id).Take(2).ToList();
+        if (candidateIds.Count == 0)
+        {
+            _showDuplicates = true;
+            _candidates = _proactiveDuplicates;
+            return;
+        }
+
+        var parameters = new DialogParameters
+        {
+            ["EntityType"] = "contact",
+            ["MasterId"] = Id,
+            ["DuplicateIds"] = candidateIds
+        };
+
+        var dialog = await Dialogs.ShowAsync<SideBySideMergeDialog>(string.Empty, parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled && result.Data is true)
+        {
+            _showDuplicates = false;
+            _selectedIds.Clear();
+            await LoadAsync();
+        }
+    }
+
     private async Task MergeAsync()
     {
         if (_selectedIds.Count == 0)
@@ -392,24 +451,27 @@
             return;
         }
 
-        var count = _selectedIds.Count;
-        var plural = count == 1 ? string.Empty : "s";
-        if (!await Dialogs.ConfirmAsync($"Merge {count} contact{plural} into {FullName}?",
-                $"The selected contact{plural} will be removed. Empty fields here are filled from {(count == 1 ? "it" : "them")}, and activities move to this contact.", T["Merge"], danger: true))
+        if (_selectedIds.Count > 2)
         {
+            Snackbar.Add(T["Select up to 2 duplicates at a time for side-by-side consolidation."], Severity.Warning);
             return;
         }
 
-        var response = await Http.PostAsJsonAsync($"api/v1/contacts/{Id}/merge", new MergeContactsRequest(_selectedIds.ToList()));
-        if (!response.IsSuccessStatusCode)
+        var parameters = new DialogParameters
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not merge these contacts."]), Severity.Error);
-            return;
-        }
+            ["EntityType"] = "contact",
+            ["MasterId"] = Id,
+            ["DuplicateIds"] = _selectedIds.ToList()
+        };
 
-        Snackbar.Add($"Merged {count} contact{plural}", Severity.Success);
-        _showDuplicates = false;
-        await LoadAsync();
+        var dialog = await Dialogs.ShowAsync<SideBySideMergeDialog>(string.Empty, parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled && result.Data is true)
+        {
+            _showDuplicates = false;
+            _selectedIds.Clear();
+            await LoadAsync();
+        }
     }
 
     private async Task InviteToPortalAsync()

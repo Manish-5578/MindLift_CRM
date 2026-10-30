@@ -1,0 +1,326 @@
+@using MindLift.Shared.Contracts
+@using System.Text.Json
+@inject Translator T
+
+<MudDialog MaxWidth="MaxWidth.Medium" FullWidth="true">
+    <TitleContent>
+        <div class="ml-row" style="align-items:center;gap:10px;">
+            <MudAvatar Color="@GetAvatarColor(Model.Type)" Variant="Variant.Filled" Size="Size.Small">
+                <MudIcon Icon="@GetNodeIcon(Model.Type)" Size="Size.Small" />
+            </MudAvatar>
+            <MudText Typo="Typo.h6">@(IsNew ? T["Add Workflow Node"] : T["Edit Workflow Node"])</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form">
+            <div class="ml-grid ml-grid--2col mb-3">
+                <MudSelect T="string" Label="@T["Node Type"]" @bind-Value="Model.Type" Disabled="!IsNew"
+                           Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true">
+                    <MudSelectItem Value="@("trigger")">@T["Trigger (Workflow Entrypoint)"]</MudSelectItem>
+                    <MudSelectItem Value="@("condition")">@T["Condition (Branching Decision)"]</MudSelectItem>
+                    <MudSelectItem Value="@("action_update_field")">@T["Action: Update Field"]</MudSelectItem>
+                    <MudSelectItem Value="@("action_task")">@T["Action: Create Task"]</MudSelectItem>
+                    <MudSelectItem Value="@("action_notification")">@T["Action: Send In-App Notification"]</MudSelectItem>
+                    <MudSelectItem Value="@("action_email")">@T["Action: Send Email"]</MudSelectItem>
+                    <MudSelectItem Value="@("action_webhook")">@T["Action: Trigger Webhook"]</MudSelectItem>
+                </MudSelect>
+
+                <MudTextField @bind-Value="Model.Label" Label="@T["Node Label"]" Required="true"
+                              Placeholder="@T["e.g. Check Order Volume, Tag Enterprise"]"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </div>
+
+            <!-- Condition Branching Configuration -->
+            @if (Model.Type == "condition")
+            {
+                <MudCard Outlined="true" Class="pa-4 mb-3" Style="background:var(--mud-palette-background-grey);">
+                    <div class="ml-row" style="align-items:center;gap:8px;margin-bottom:12px;">
+                        <MudIcon Icon="@Icons.Material.Filled.AltRoute" Color="Color.Warning" Size="Size.Small" />
+                        <span style="font-weight:600;font-size:0.9rem;">@T["Branching Condition Rule"]</span>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success">@T["Outputs: True / False"]</MudChip>
+                    </div>
+
+                    <div class="ml-grid ml-grid--3col">
+                        <MudTextField @bind-Value="_condField" Label="@T["Field / Fact Key"]" Required="true"
+                                      Placeholder="@T["e.g. score, amount, status"]"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" />
+
+                        <MudSelect T="string" Label="@T["Comparison Operator"]" @bind-Value="_condOp"
+                                   Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true">
+                            <MudSelectItem Value="@("eq")">@T["Equals (=)"]</MudSelectItem>
+                            <MudSelectItem Value="@("neq")">@T["Does Not Equal (!=)"]</MudSelectItem>
+                            <MudSelectItem Value="@("gte")">@T["Greater Than or Equal (>=)"]</MudSelectItem>
+                            <MudSelectItem Value="@("gt")">@T["Greater Than (>)"]</MudSelectItem>
+                            <MudSelectItem Value="@("lte")">@T["Less Than or Equal (<=)"]</MudSelectItem>
+                            <MudSelectItem Value="@("lt")">@T["Less Than (<)"]</MudSelectItem>
+                            <MudSelectItem Value="@("contains")">@T["Contains"]</MudSelectItem>
+                            <MudSelectItem Value="@("notContains")">@T["Does Not Contain"]</MudSelectItem>
+                            <MudSelectItem Value="@("isNotEmpty")">@T["Is Not Empty"]</MudSelectItem>
+                            <MudSelectItem Value="@("isEmpty")">@T["Is Empty"]</MudSelectItem>
+                        </MudSelect>
+
+                        @if (_condOp != "isEmpty" && _condOp != "isNotEmpty")
+                        {
+                            <MudTextField @bind-Value="_condValue" Label="@T["Target Value"]" Required="true"
+                                          Placeholder="@T["e.g. 80, VIP, Closed Won"]"
+                                          Variant="Variant.Outlined" Margin="Margin.Dense" />
+                        }
+                    </div>
+                </MudCard>
+            }
+
+            <!-- Update Field Configuration -->
+            @if (Model.Type == "action_update_field")
+            {
+                <MudCard Outlined="true" Class="pa-4 mb-3" Style="background:var(--mud-palette-background-grey);">
+                    <div class="ml-row" style="align-items:center;gap:8px;margin-bottom:12px;">
+                        <MudIcon Icon="@Icons.Material.Filled.EditNote" Color="Color.Secondary" Size="Size.Small" />
+                        <span style="font-weight:600;font-size:0.9rem;">@T["Field Mutation"]</span>
+                    </div>
+                    <div class="ml-grid ml-grid--2col">
+                        <MudTextField @bind-Value="_updateField" Label="@T["Field Name"]" Required="true"
+                                      Placeholder="@T["e.g. tier, status, lead_rating"]"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" />
+                        <MudTextField @bind-Value="_updateValue" Label="@T["New Value"]" Required="true"
+                                      Placeholder="@T["e.g. Enterprise, Qualified, Urgent"]"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    </div>
+                </MudCard>
+            }
+
+            <!-- Task Creation Configuration -->
+            @if (Model.Type == "action_task")
+            {
+                <MudCard Outlined="true" Class="pa-4 mb-3" Style="background:var(--mud-palette-background-grey);">
+                    <div class="ml-row" style="align-items:center;gap:8px;margin-bottom:12px;">
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircleOutline" Color="Color.Info" Size="Size.Small" />
+                        <span style="font-weight:600;font-size:0.9rem;">@T["Automated Follow-up Task"]</span>
+                    </div>
+                    <div class="ml-grid ml-grid--2col">
+                        <MudTextField @bind-Value="_taskTitle" Label="@T["Task Title"]" Required="true"
+                                      Placeholder="@T["e.g. Call Enterprise Prospect, Expedite Batch Production"]"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" />
+                        <MudTextField @bind-Value="_taskDueDays" Label="@T["Due in (Days)"]"
+                                      Placeholder="@T["e.g. 1, 2, 7"]"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    </div>
+                </MudCard>
+            }
+
+            <!-- Notification Configuration -->
+            @if (Model.Type == "action_notification")
+            {
+                <MudCard Outlined="true" Class="pa-4 mb-3" Style="background:var(--mud-palette-background-grey);">
+                    <div class="ml-row" style="align-items:center;gap:8px;margin-bottom:12px;">
+                        <MudIcon Icon="@Icons.Material.Filled.NotificationsActive" Color="Color.Primary" Size="Size.Small" />
+                        <span style="font-weight:600;font-size:0.9rem;">@T["In-App Alert Message"]</span>
+                    </div>
+                    <MudTextField @bind-Value="_notifMessage" Label="@T["Notification Text"]" Required="true"
+                                  Placeholder="@T["e.g. High-value Printing Order PO-2026 received approval."]"
+                                  Lines="2" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudCard>
+            }
+
+            <!-- Email Configuration -->
+            @if (Model.Type == "action_email")
+            {
+                <MudCard Outlined="true" Class="pa-4 mb-3" Style="background:var(--mud-palette-background-grey);">
+                    <div class="ml-row" style="align-items:center;gap:8px;margin-bottom:12px;">
+                        <MudIcon Icon="@Icons.Material.Filled.Email" Color="Color.Error" Size="Size.Small" />
+                        <span style="font-weight:600;font-size:0.9rem;">@T["Email Notification"]</span>
+                    </div>
+                    <div class="ml-grid ml-grid--2col mb-2">
+                        <MudTextField @bind-Value="_emailTo" Label="@T["Recipient Email"]" Required="true"
+                                      Placeholder="@T["e.g. manager@preethamprints.com or {{contact_email}}"]"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" />
+                        <MudTextField @bind-Value="_emailSubject" Label="@T["Email Subject"]" Required="true"
+                                      Placeholder="@T["e.g. High Priority Order Notification"]"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    </div>
+                    <MudTextField @bind-Value="_emailBody" Label="@T["Email Body Template"]" Lines="3"
+                                  Placeholder="@T["Hello Team, a new order has qualified for expedited handling..."]"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudCard>
+            }
+
+            <!-- Webhook Configuration -->
+            @if (Model.Type == "action_webhook")
+            {
+                <MudCard Outlined="true" Class="pa-4 mb-3" Style="background:var(--mud-palette-background-grey);">
+                    <div class="ml-row" style="align-items:center;gap:8px;margin-bottom:12px;">
+                        <MudIcon Icon="@Icons.Material.Filled.Webhook" Color="Color.Dark" Size="Size.Small" />
+                        <span style="font-weight:600;font-size:0.9rem;">@T["Outbound Webhook"]</span>
+                    </div>
+                    <div class="ml-grid ml-grid--2col">
+                        <MudTextField @bind-Value="_webhookUrl" Label="@T["Target URL"]" Required="true"
+                                      Placeholder="https://api.example.com/webhooks/crm"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" />
+                        <MudSelect T="string" Label="@T["Method"]" @bind-Value="_webhookMethod"
+                                   Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true">
+                            <MudSelectItem Value="@("POST")">POST</MudSelectItem>
+                            <MudSelectItem Value="@("PUT")">PUT</MudSelectItem>
+                            <MudSelectItem Value="@("GET")">GET</MudSelectItem>
+                        </MudSelect>
+                    </div>
+                </MudCard>
+            }
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Cancel">@T["Cancel"]</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save">@T["Save Node"]</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public WorkflowNodeDto Node { get; set; } = default!;
+    [Parameter] public bool IsNew { get; set; }
+
+    private MudForm _form = default!;
+    private NodeEditModel Model = new();
+
+    // Condition state
+    private string _condField = "";
+    private string _condOp = "gte";
+    private string _condValue = "";
+
+    // Action state
+    private string _updateField = "";
+    private string _updateValue = "";
+    private string _taskTitle = "";
+    private string _taskDueDays = "1";
+    private string _notifMessage = "";
+    private string _emailTo = "";
+    private string _emailSubject = "";
+    private string _emailBody = "";
+    private string _webhookUrl = "";
+    private string _webhookMethod = "POST";
+
+    protected override void OnInitialized()
+    {
+        if (Node is not null)
+        {
+            Model = new NodeEditModel
+            {
+                Id = Node.Id,
+                Type = Node.Type,
+                Label = Node.Label,
+                X = Node.X,
+                Y = Node.Y
+            };
+
+            if (Node.Condition is not null)
+            {
+                _condField = Node.Condition.Field ?? "";
+                _condOp = Node.Condition.Operator ?? "gte";
+                _condValue = Node.Condition.Value ?? "";
+            }
+
+            if (Node.Config is not null)
+            {
+                if (Node.Config.TryGetValue("field", out var f)) _updateField = f?.ToString() ?? "";
+                if (Node.Config.TryGetValue("value", out var v)) _updateValue = v?.ToString() ?? "";
+                if (Node.Config.TryGetValue("title", out var t)) _taskTitle = t?.ToString() ?? "";
+                if (Node.Config.TryGetValue("dueDays", out var dd)) _taskDueDays = dd?.ToString() ?? "1";
+                if (Node.Config.TryGetValue("message", out var m)) _notifMessage = m?.ToString() ?? "";
+                if (Node.Config.TryGetValue("to", out var to)) _emailTo = to?.ToString() ?? "";
+                if (Node.Config.TryGetValue("subject", out var s)) _emailSubject = s?.ToString() ?? "";
+                if (Node.Config.TryGetValue("body", out var b)) _emailBody = b?.ToString() ?? "";
+                if (Node.Config.TryGetValue("url", out var u)) _webhookUrl = u?.ToString() ?? "";
+                if (Node.Config.TryGetValue("method", out var meth)) _webhookMethod = meth?.ToString() ?? "POST";
+            }
+        }
+        else
+        {
+            Model = new NodeEditModel
+            {
+                Id = "node_" + Guid.NewGuid().ToString("N")[..8],
+                Type = "action_update_field",
+                Label = "Update Status"
+            };
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Save()
+    {
+        RuleNode? condition = null;
+        if (Model.Type == "condition" && !string.IsNullOrWhiteSpace(_condField))
+        {
+            condition = RuleNode.When(_condField.Trim(), _condOp, _condValue.Trim());
+        }
+
+        var config = new Dictionary<string, object?>();
+        switch (Model.Type)
+        {
+            case "action_update_field":
+                config["field"] = _updateField.Trim();
+                config["value"] = _updateValue.Trim();
+                break;
+            case "action_task":
+                config["title"] = _taskTitle.Trim();
+                config["dueDays"] = _taskDueDays.Trim();
+                break;
+            case "action_notification":
+                config["message"] = _notifMessage.Trim();
+                break;
+            case "action_email":
+                config["to"] = _emailTo.Trim();
+                config["subject"] = _emailSubject.Trim();
+                config["body"] = _emailBody.Trim();
+                break;
+            case "action_webhook":
+                config["url"] = _webhookUrl.Trim();
+                config["method"] = _webhookMethod.Trim();
+                break;
+        }
+
+        var result = new WorkflowNodeDto(
+            Id: Model.Id,
+            Type: Model.Type,
+            Label: string.IsNullOrWhiteSpace(Model.Label) ? Model.Type : Model.Label.Trim(),
+            X: Model.X,
+            Y: Model.Y,
+            Config: config.Count > 0 ? config : null,
+            Condition: condition
+        );
+
+        MudDialog.Close(DialogResult.Ok(result));
+    }
+
+    private sealed class NodeEditModel
+    {
+        public string Id { get; set; } = "";
+        public string Type { get; set; } = "trigger";
+        public string Label { get; set; } = "";
+        public double X { get; set; }
+        public double Y { get; set; }
+    }
+
+    private static Color GetAvatarColor(string type) => type switch
+    {
+        "trigger" => Color.Primary,
+        "condition" => Color.Warning,
+        "action_update_field" => Color.Secondary,
+        "action_task" => Color.Info,
+        "action_notification" => Color.Primary,
+        "action_email" => Color.Error,
+        "action_webhook" => Color.Dark,
+        _ => Color.Default
+    };
+
+    private static string GetNodeIcon(string type) => type switch
+    {
+        "trigger" => Icons.Material.Filled.Bolt,
+        "condition" => Icons.Material.Filled.AltRoute,
+        "action_update_field" => Icons.Material.Filled.EditNote,
+        "action_task" => Icons.Material.Filled.CheckCircleOutline,
+        "action_notification" => Icons.Material.Filled.NotificationsActive,
+        "action_email" => Icons.Material.Filled.Email,
+        "action_webhook" => Icons.Material.Filled.Webhook,
+        _ => Icons.Material.Filled.Widgets
+    };
+}

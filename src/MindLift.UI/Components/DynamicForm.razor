@@ -5,12 +5,20 @@
         @foreach (var field in Fields)
         {
             var current = field;
+            if (HiddenFields?.Contains(current.Key) == true)
+            {
+                continue;
+            }
+
+            var isMandatory = current.Required || MandatoryFields?.Contains(current.Key) == true;
+            var isReadOnly = ReadOnlyFields?.Contains(current.Key) == true;
+
             <MudItem xs="12" sm="@current.Columns">
                 @switch (current.Kind)
                 {
                     case FormFieldKind.Picklist:
                         <MudSelect T="string" Value="Get(current.Key)" ValueChanged="v => SetAsync(current.Key, v)" Label="@LabelOf(current)" Variant="Variant.Outlined" Margin="Margin.Dense"
-                                   Clearable="true" Error="HasError(current.Key)" ErrorText="@ErrorOf(current.Key)" data-testid="@TestIdOf(current)">
+                                   Clearable="true" Disabled="@isReadOnly" Error="HasError(current.Key)" ErrorText="@ErrorOf(current.Key)" data-testid="@TestIdOf(current)">
                             @foreach (var option in (current.Options ?? []).Where(o => o.IsActive))
                             {
                                 <MudSelectItem T="string" Value="@option.Value">@T.Pick(option.Label, option.LabelAr)</MudSelectItem>
@@ -29,11 +37,11 @@
                                       ValueChanged="v => SetAsync(current.Key, v?.ToString())" TestId="@TestIdOf(current)" />
                         break;
                     case FormFieldKind.Checkbox:
-                        <MudCheckBox T="bool" Value="IsChecked(current.Key)" ValueChanged="v => SetAsync(current.Key, FlagText(v))" Label="@LabelOf(current)" Color="Color.Primary" data-testid="@TestIdOf(current)" />
+                        <MudCheckBox T="bool" Value="IsChecked(current.Key)" ValueChanged="v => SetAsync(current.Key, FlagText(v))" Label="@LabelOf(current)" Color="Color.Primary" Disabled="@isReadOnly" data-testid="@TestIdOf(current)" />
                         break;
                     case FormFieldKind.Users:
                         <MudSelect T="string" MultiSelection="true" SelectedValues="SelectedIds(current.Key)" SelectedValuesChanged="values => SetAsync(current.Key, string.Join(',', values))" Label="@LabelOf(current)"
-                                   Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" data-testid="@TestIdOf(current)">
+                                   Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" Disabled="@isReadOnly" data-testid="@TestIdOf(current)">
                             @foreach (var user in Users)
                             {
                                 <MudSelectItem T="string" Value="@user.Id.ToString()">@user.FullName</MudSelectItem>
@@ -42,11 +50,18 @@
                         break;
                     case FormFieldKind.Multiline:
                         <MudTextField T="string" Value="Get(current.Key)" ValueChanged="v => SetAsync(current.Key, v)" Label="@LabelOf(current)" Lines="3" Variant="Variant.Outlined" Margin="Margin.Dense"
-                                      Error="HasError(current.Key)" ErrorText="@ErrorOf(current.Key)" data-testid="@TestIdOf(current)" />
+                                      Disabled="@isReadOnly" Error="HasError(current.Key)" ErrorText="@ErrorOf(current.Key)" data-testid="@TestIdOf(current)" />
                         break;
                     default:
-                        <MudTextField T="string" Value="Get(current.Key)" ValueChanged="v => SetAsync(current.Key, v)" Label="@LabelOf(current)" Variant="Variant.Outlined" Margin="Margin.Dense"
-                                      InputType="@InputTypeOf(current.Kind)" Error="HasError(current.Key)" ErrorText="@ErrorOf(current.Key)" data-testid="@TestIdOf(current)" />
+                        if (current.Key.Equals("country", StringComparison.OrdinalIgnoreCase))
+                        {
+                            <CountryPicker Value="@Get(current.Key)" ValueChanged="v => SetAsync(current.Key, v)" Label="@LabelOf(current)" Required="@isMandatory" Disabled="@isReadOnly" TestId="@TestIdOf(current)" />
+                        }
+                        else
+                        {
+                            <MudTextField T="string" Value="Get(current.Key)" ValueChanged="v => SetAsync(current.Key, v)" Label="@LabelOf(current)" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                          InputType="@InputTypeOf(current.Kind)" Disabled="@isReadOnly" Error="HasError(current.Key)" ErrorText="@ErrorOf(current.Key)" data-testid="@TestIdOf(current)" />
+                        }
                         break;
                 }
             </MudItem>
@@ -56,7 +71,8 @@
     @if (CustomFields.Count > 0)
     {
         <MudText Typo="Typo.overline" Class="ml-muted mt-2">@T["Details"]</MudText>
-        <CustomFieldEditor Fields="CustomFields" Values="CustomValues" ValuesChanged="CustomValuesChanged" />
+        <CustomFieldEditor Fields="CustomFields" Values="CustomValues" ValuesChanged="CustomValuesChanged"
+                           HiddenFields="HiddenFields" MandatoryFields="MandatoryFields" ReadOnlyFields="ReadOnlyFields" />
     }
 </div>
 
@@ -80,6 +96,10 @@
     [Parameter] public Dictionary<string, JsonElement?> CustomValues { get; set; } = new();
     [Parameter] public EventCallback<Dictionary<string, JsonElement?>> CustomValuesChanged { get; set; }
 
+    [Parameter] public IReadOnlySet<string>? HiddenFields { get; set; }
+    [Parameter] public IReadOnlySet<string>? MandatoryFields { get; set; }
+    [Parameter] public IReadOnlySet<string>? ReadOnlyFields { get; set; }
+
     [Parameter] public EventCallback<string> OnFieldChanged { get; set; }
 
     private string? Get(string key) => Values.GetValueOrDefault(key);
@@ -89,7 +109,7 @@
     private static string FlagText(bool value) => value ? "true" : "false";
     private bool HasError(string key) => Errors?.ContainsKey(key) == true;
     private string? ErrorOf(string key) => Errors?.GetValueOrDefault(key);
-    private string LabelOf(FormField field) => field.Required ? T[field.Label] + " *" : T[field.Label];
+    private string LabelOf(FormField field) => (field.Required || MandatoryFields?.Contains(field.Key) == true) ? T[field.Label] + " *" : T[field.Label];
     private static string TestIdOf(FormField field) => field.TestId ?? "field-" + field.Key;
 
     private static InputType InputTypeOf(FormFieldKind kind) => kind switch

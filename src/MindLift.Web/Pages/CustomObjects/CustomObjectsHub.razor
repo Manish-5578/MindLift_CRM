@@ -1,0 +1,236 @@
+@page "/custom-objects"
+@using MindLift.Shared.Contracts
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+@inject NavigationManager Nav
+@inject AppState App
+@inject Translator T
+
+<PageTitle>@T["Custom Objects"] · MindLift</PageTitle>
+
+<div class="ml-page ml-page--records" data-testid="custom-objects-hub-page">
+    <PageHeader Title="Custom Objects" Subtitle="Access, search, and manage records across all your organization's custom business entities.">
+        <Actions>
+            @if (App.IsAdmin)
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Settings"
+                           Href="/settings/custom-objects" Class="mr-2" data-testid="configure-schemas-btn">
+                    @T["Configure Schemas in Settings"]
+                </MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="OpenNewObjectDialog" data-testid="new-custom-object-hub-btn">
+                    @T["New Object"]
+                </MudButton>
+            }
+        </Actions>
+    </PageHeader>
+
+    @if (_loading)
+    {
+        <SkeletonTable Rows="4" Columns="4" />
+    }
+    else if (_definitions.Count == 0)
+    {
+        <MlCard Class="pa-8 text-center">
+            <EmptyState Title="@T["No Custom Objects Available"]"
+                        Message="@T["No custom business objects have been configured for this organization yet."]"
+                        Compact="true" />
+            @if (App.IsAdmin)
+            {
+                <div class="mt-4">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                               OnClick="OpenNewObjectDialog">
+                        @T["Create Your First Custom Object"]
+                    </MudButton>
+                </div>
+            }
+        </MlCard>
+    }
+    else
+    {
+        <!-- Summary Stats & Search -->
+        <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-4">
+            <div class="ml-row" style="align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+                <div style="max-width:360px;flex:1;">
+                    <MudTextField @bind-Value="_searchQuery" Placeholder="@T["Search custom objects..."]"
+                                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Clearable="true" />
+                </div>
+                <div class="ml-row" style="align-items:center;gap:12px;">
+                    <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small">
+                        @T["{0} Custom Objects", _definitions.Count]
+                    </MudChip>
+                    <MudChip T="string" Color="Color.Success" Variant="Variant.Outlined" Size="Size.Small">
+                        @T["{0} Active", _definitions.Count(d => d.IsActive)]
+                    </MudChip>
+                </div>
+            </div>
+        </MudPaper>
+
+        <!-- Custom Object Cards -->
+        <div class="ml-grid ml-grid--2col">
+            @foreach (var def in FilteredDefinitions)
+            {
+                var recordCount = _recordCounts.TryGetValue(def.Slug, out var count) ? count : 0;
+                <MudPaper Elevation="1" Class="pa-5 mb-4" Style="border:1px solid var(--mud-palette-lines-default);border-radius:12px;display:flex;flex-direction:column;justify-content:space-between;">
+                    <div>
+                        <div class="ml-row" style="align-items:flex-start;justify-content:space-between;margin-bottom:12px;">
+                            <div class="ml-row" style="align-items:center;gap:12px;">
+                                <MudAvatar Color="Color.Primary" Variant="Variant.Filled" Size="Size.Large">
+                                    <MudIcon Icon="@GetIcon(def.Icon)" Size="Size.Medium" />
+                                </MudAvatar>
+                                <div>
+                                    <div class="ml-row" style="align-items:center;gap:8px;">
+                                        <MudLink Href="@($"/custom-objects/{def.Slug}")" Underline="Underline.Hover"
+                                                 Style="font-weight:700;font-size:1.25rem;color:var(--mud-palette-text-primary);">
+                                            @def.PluralName
+                                        </MudLink>
+                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Default">
+                                            /@def.Slug
+                                        </MudChip>
+                                    </div>
+                                    <span class="text-caption ml-muted">@def.Name (@T["Singular"])</span>
+                                </div>
+                            </div>
+
+                            @if (App.IsAdmin)
+                            {
+                                <MudIconButton Icon="@Icons.Material.Filled.Settings" Size="Size.Small" Color="Color.Default"
+                                               Title="@T["Configure Schema"]" Href="/settings/custom-objects" />
+                            }
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(def.Description))
+                        {
+                            <MudText Typo="Typo.body2" Class="mb-3 ml-muted">@def.Description</MudText>
+                        }
+
+                        <div class="ml-row" style="gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+                            <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled" Icon="@Icons.Material.Filled.FormatListNumbered">
+                                @T["{0} Records", recordCount]
+                            </MudChip>
+                            <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.ViewColumn">
+                                @T["{0} Fields", def.Fields.Count]
+                            </MudChip>
+                            <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Text">
+                                @T["Title: {0}", def.TitleField]
+                            </MudChip>
+                        </div>
+                    </div>
+
+                    <div class="ml-row" style="justify-content:space-between;align-items:center;border-top:1px solid var(--mud-palette-lines-default);padding-top:14px;margin-top:8px;">
+                        <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                                   OnClick="@(() => OpenCreateRecordDialog(def))">
+                            @T["New {0}", def.Name]
+                        </MudButton>
+
+                        <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Primary" EndIcon="@Icons.Material.Filled.ArrowForward"
+                                   Href="@($"/custom-objects/{def.Slug}")">
+                            @T["Open {0}", def.PluralName]
+                        </MudButton>
+                    </div>
+                </MudPaper>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<CustomObjectDefinitionDto> _definitions = [];
+    private readonly Dictionary<string, int> _recordCounts = new(StringComparer.OrdinalIgnoreCase);
+    private bool _loading = true;
+    private string _searchQuery = "";
+
+    private List<CustomObjectDefinitionDto> FilteredDefinitions => _definitions
+        .Where(d => string.IsNullOrWhiteSpace(_searchQuery)
+            || d.Name.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase)
+            || d.PluralName.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase)
+            || d.Slug.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase))
+        .OrderBy(d => d.Name)
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _loading = true;
+        try
+        {
+            var defs = await Http.GetFromJsonAsync<List<CustomObjectDefinitionDto>>("api/v1/custom-objects/definitions");
+            _definitions = (defs ?? []).Where(d => d.IsActive).ToList();
+            _loading = false;
+            StateHasChanged();
+
+            // Fetch record counts in parallel without blocking page display
+            var tasks = _definitions.Select(async def =>
+            {
+                try
+                {
+                    var paged = await Http.GetFromJsonAsync<CustomObjectRecordPagedResult>(
+                        $"api/v1/custom-objects/{def.Slug}/records?page=1&pageSize=1");
+                    if (paged is not null)
+                    {
+                        _recordCounts[def.Slug] = paged.TotalCount;
+                    }
+                }
+                catch
+                {
+                    _recordCounts[def.Slug] = 0;
+                }
+            });
+            await Task.WhenAll(tasks);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenCreateRecordDialog(CustomObjectDefinitionDto def)
+    {
+        var parameters = new DialogParameters<CustomObjectRecordDialog>
+        {
+            { x => x.Definition, def },
+            { x => x.Record, null }
+        };
+
+        var dialog = await Dialogs.ShowAsync<CustomObjectRecordDialog>(T["New {0}", def.Name], parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
+        {
+            await LoadDataAsync();
+        }
+    }
+
+    private async Task OpenNewObjectDialog()
+    {
+        var dialog = await Dialogs.ShowAsync<CustomObjectDialog>(T["New Custom Object"]);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
+        {
+            await LoadDataAsync();
+        }
+    }
+
+    private static string GetIcon(string? icon) => (icon?.ToLowerInvariant()) switch
+    {
+        "print" => Icons.Material.Filled.Print,
+        "folder" => Icons.Material.Filled.Folder,
+        "directionscar" or "car" => Icons.Material.Filled.DirectionsCar,
+        "build" or "machinery" => Icons.Material.Filled.Build,
+        "inventory2" or "inventory" => Icons.Material.Filled.Inventory2,
+        "shoppingbag" or "order" => Icons.Material.Filled.ShoppingBag,
+        "localshipping" or "shipping" => Icons.Material.Filled.LocalShipping,
+        "devices" => Icons.Material.Filled.Devices,
+        _ => Icons.Material.Filled.Widgets
+    };
+}

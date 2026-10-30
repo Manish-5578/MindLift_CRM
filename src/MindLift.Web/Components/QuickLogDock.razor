@@ -1,0 +1,675 @@
+@using MindLift.Shared.Contracts
+@using MindLift.Shared.Enums
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject AppState App
+@inject Translator T
+@inject NavigationManager Nav
+@inject QuickLogDockState DockState
+@implements IDisposable
+
+@if (_featureAvailable && !IsSettingsRoute)
+{
+    @if (!DockState.IsOpen)
+    {
+        @* Minimized Floating Action Pill *@
+        <div class="ml-quick-dock-fab" @onclick="ToggleOpen" title="@T["1-Click Quick Log"]" data-testid="quick-log-fab">
+            <MudIcon Icon="@Icons.Material.Filled.FlashOn" Size="Size.Medium" />
+            <span class="ml-quick-dock-fab__text">@T["Quick Log"]</span>
+            @if (!string.IsNullOrWhiteSpace(_detectedRecordName))
+            {
+                <span class="ml-quick-dock-fab__badge">@_detectedRecordName</span>
+            }
+        </div>
+    }
+    else
+    {
+        @* Expanded Floating Dock Panel *@
+        <div class="ml-quick-dock-panel" data-testid="quick-log-panel">
+            @* Dock Header *@
+            <div class="ml-quick-dock-panel__header">
+                <div class="d-flex align-center gap-2">
+                    <MudIcon Icon="@Icons.Material.Filled.FlashOn" Color="Color.Primary" />
+                    <MudText Typo="Typo.subtitle1" Style="font-weight: 700;">@T["1-Click Quick Log"]</MudText>
+                </div>
+                <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="DockState.Close" aria-label="@T["Close dock"]" />
+            </div>
+
+            @* Target Record Selector / Badge *@
+            <div class="px-3 pt-2 pb-1" style="background: var(--mud-palette-background-grey); border-bottom: 1px solid var(--mud-palette-divider);">
+                @if (_targetId.HasValue && !string.IsNullOrWhiteSpace(_targetType))
+                {
+                    <div class="d-flex justify-space-between align-center">
+                        <div class="d-flex align-center gap-1">
+                            <span class="text-caption ml-muted">@T["Target:"]</span>
+                            <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled" Style="height: 22px; font-weight: 500;">
+                                @TargetTypeLabel(_targetType): @(_targetName ?? _targetId.Value.ToString()[..8])
+                            </MudChip>
+                        </div>
+                        <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Default" Style="font-size: 11px; padding: 0 4px;" OnClick="ClearTarget">
+                            @T["Change"]
+                        </MudButton>
+                    </div>
+                }
+                else
+                {
+                    <MudAutocomplete T="SearchHitDto" Value="_searchSelected" ValueChanged="OnTargetSelected" SearchFunc="SearchRecordsAsync" ToStringFunc="h => h?.Title"
+                                     Placeholder="@T["Search Deal, Contact, Lead, or Account..."]"
+                                     Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.Search"
+                                     Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Clearable="true"
+                                     MinCharacters="2" DebounceInterval="200" MaxItems="8">
+                        <ItemTemplate Context="hit">
+                            <div class="d-flex align-center gap-2">
+                                <MudIcon Icon="@HitIcon(hit.Kind)" Size="Size.Small" />
+                                <div>
+                                    <div style="font-weight: 500; font-size: 13px;">@hit.Title</div>
+                                    @if (!string.IsNullOrWhiteSpace(hit.Subtitle))
+                                    {
+                                        <div class="text-caption ml-muted">@hit.Subtitle</div>
+                                    }
+                                </div>
+                            </div>
+                        </ItemTemplate>
+                    </MudAutocomplete>
+                }
+            </div>
+
+            @* Tab Navigation *@
+            <MudTabs @bind-ActivePanelIndex="_activeTab" Rounded="false" Centered="false" Color="Color.Transparent" SliderColor="Color.Primary" Class="ml-quick-dock-tabs">
+                <MudTabPanel Text="@T["Call"]" Icon="@Icons.Material.Outlined.Call">
+                    <div class="pa-3 d-flex flex-column gap-2">
+                        @* Call Direction & Outcomes *@
+                        <div class="d-flex justify-space-between align-center">
+                            <MudToggleGroup T="string" @bind-Value="_callDirection" Size="Size.Small" Color="Color.Primary">
+                                <MudToggleItem Value="@("Outbound")" Text="@T["Outbound"]" />
+                                <MudToggleItem Value="@("Inbound")" Text="@T["Inbound"]" />
+                            </MudToggleGroup>
+
+                            <div class="d-flex gap-1 align-center">
+                                <span class="text-caption ml-muted">@T["Duration:"]</span>
+                                @foreach (var d in new[] { 2, 5, 15, 30 })
+                                {
+                                    <MudChip T="int" Size="Size.Small" Variant="@(_callDuration == d ? Variant.Filled : Variant.Outlined)"
+                                             Color="Color.Primary" OnClick="() => _callDuration = d" Style="height: 20px; font-size: 11px; padding: 0 6px;">
+                                        @d @T["m"]
+                                    </MudChip>
+                                }
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="text-caption ml-muted mb-1">@T["Outcome:"]</div>
+                            <div class="d-flex flex-wrap gap-1">
+                                @foreach (var outcome in CallOutcomes)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Variant="@(_callOutcome == outcome ? Variant.Filled : Variant.Outlined)"
+                                             Color="@OutcomeColor(outcome)" OnClick="() => _callOutcome = outcome" Style="height: 22px; font-size: 11px;">
+                                        @outcome
+                                    </MudChip>
+                                }
+                            </div>
+                        </div>
+
+                        <MudTextField @bind-Value="_callSubject" Label="@T["Call Subject *"]" Placeholder="@T["e.g. Discovery call, Product demo"]"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" />
+
+                        <MudTextField @bind-Value="_callNotes" Label="@T["Call Notes / Summary"]" Placeholder="@T["Discussed requirements, agreed on timeline..."]"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />
+
+                        @* 1-Click Follow-Up Task *@
+                        <div class="pa-2 rounded" style="background: var(--mud-palette-background-grey); border: 1px dashed var(--mud-palette-divider);">
+                            <div class="d-flex justify-space-between align-center">
+                                <MudCheckBox @bind-Value="_scheduleFollowUp" Color="Color.Primary" Dense="true" Size="Size.Small" Label="@T["Schedule follow-up task"]" />
+                                @if (_scheduleFollowUp)
+                                {
+                                    <div class="d-flex gap-1">
+                                        <MudChip T="int" Size="Size.Small" Variant="@(_followUpDays == 1 ? Variant.Filled : Variant.Outlined)"
+                                                 Color="Color.Secondary" OnClick="() => _followUpDays = 1" Style="height: 18px; font-size: 10px;">@T["+1 Day"]</MudChip>
+                                        <MudChip T="int" Size="Size.Small" Variant="@(_followUpDays == 2 ? Variant.Filled : Variant.Outlined)"
+                                                 Color="Color.Secondary" OnClick="() => _followUpDays = 2" Style="height: 18px; font-size: 10px;">@T["+2 Days"]</MudChip>
+                                        <MudChip T="int" Size="Size.Small" Variant="@(_followUpDays == 7 ? Variant.Filled : Variant.Outlined)"
+                                                 Color="Color.Secondary" OnClick="() => _followUpDays = 7" Style="height: 18px; font-size: 10px;">@T["+1 Week"]</MudChip>
+                                    </div>
+                                }
+                            </div>
+                            @if (_scheduleFollowUp)
+                            {
+                                <MudTextField @bind-Value="_followUpSubject" Placeholder="@T["Follow-up task subject..."]"
+                                              Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-1" />
+                            }
+                        </div>
+
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LogCallAsync" Disabled="@(_saving || string.IsNullOrWhiteSpace(_callSubject) || !_targetId.HasValue)" data-testid="quick-log-call-btn">
+                            @if (_saving)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="me-2" />
+                                @T["Logging Call..."]
+                            }
+                            else
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Class="me-1" />
+                                @T["Log Call"]
+                            }
+                        </MudButton>
+                    </div>
+                </MudTabPanel>
+
+                <MudTabPanel Text="@T["Note"]" Icon="@Icons.Material.Outlined.StickyNote2">
+                    <div class="pa-3 d-flex flex-column gap-2">
+                        <MudTextField @bind-Value="_noteSubject" Label="@T["Note Title *"]" Placeholder="@T["e.g. Budget update, Internal reminder"]"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" />
+
+                        <MudTextField @bind-Value="_noteContent" Label="@T["Note Content *"]" Placeholder="@T["Write notes here..."]"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" Lines="4" Required="true" />
+
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LogNoteAsync" Disabled="@(_saving || string.IsNullOrWhiteSpace(_noteSubject) || !_targetId.HasValue)" data-testid="quick-log-note-btn">
+                            @if (_saving)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="me-2" />
+                                @T["Saving Note..."]
+                            }
+                            else
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.Save" Size="Size.Small" Class="me-1" />
+                                @T["Save Note"]
+                            }
+                        </MudButton>
+                    </div>
+                </MudTabPanel>
+
+                <MudTabPanel Text="@T["Task"]" Icon="@Icons.Material.Outlined.TaskAlt">
+                    <div class="pa-3 d-flex flex-column gap-2">
+                        <MudTextField @bind-Value="_taskSubject" Label="@T["Task Subject *"]" Placeholder="@T["e.g. Send updated pricing, Review contract"]"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" />
+
+                        <div class="d-flex gap-2 align-center">
+                            <span class="text-caption ml-muted">@T["Due:"]</span>
+                            <MudChip T="int" Size="Size.Small" Variant="@(_taskDueOffset == 0 ? Variant.Filled : Variant.Outlined)" Color="Color.Primary" OnClick="() => _taskDueOffset = 0">@T["Today"]</MudChip>
+                            <MudChip T="int" Size="Size.Small" Variant="@(_taskDueOffset == 1 ? Variant.Filled : Variant.Outlined)" Color="Color.Primary" OnClick="() => _taskDueOffset = 1">@T["Tomorrow"]</MudChip>
+                            <MudChip T="int" Size="Size.Small" Variant="@(_taskDueOffset == 7 ? Variant.Filled : Variant.Outlined)" Color="Color.Primary" OnClick="() => _taskDueOffset = 7">@T["Next Week"]</MudChip>
+                        </div>
+
+                        <MudSelect T="string" @bind-Value="_taskPriority" Label="@T["Priority"]" Variant="Variant.Outlined" Margin="Margin.Dense">
+                            <MudSelectItem Value="@("High")">@T["High"]</MudSelectItem>
+                            <MudSelectItem Value="@("Normal")">@T["Normal"]</MudSelectItem>
+                            <MudSelectItem Value="@("Low")">@T["Low"]</MudSelectItem>
+                        </MudSelect>
+
+                        <MudTextField @bind-Value="_taskNotes" Label="@T["Task Details (Optional)"]" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />
+
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LogTaskAsync" Disabled="@(_saving || string.IsNullOrWhiteSpace(_taskSubject) || !_targetId.HasValue)" data-testid="quick-log-task-btn">
+                            @if (_saving)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="me-2" />
+                                @T["Creating Task..."]
+                            }
+                            else
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Class="me-1" />
+                                @T["Create Task"]
+                            }
+                        </MudButton>
+                    </div>
+                </MudTabPanel>
+
+                <MudTabPanel Text="@T["Meeting"]" Icon="@Icons.Material.Outlined.Event">
+                    <div class="pa-3 d-flex flex-column gap-2">
+                        <MudTextField @bind-Value="_meetingSubject" Label="@T["Meeting Subject *"]" Placeholder="@T["e.g. Solution Demo, Executive Alignment"]"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" />
+
+                        <MudTextField @bind-Value="_meetingLocation" Label="@T["Location or Video Link"]" Placeholder="@T["e.g. Google Meet, Zoom, Client HQ"]"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" />
+
+                        <MudTextField @bind-Value="_meetingNotes" Label="@T["Agenda / Notes"]" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />
+
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LogMeetingAsync" Disabled="@(_saving || string.IsNullOrWhiteSpace(_meetingSubject) || !_targetId.HasValue)" data-testid="quick-log-meeting-btn">
+                            @if (_saving)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="me-2" />
+                                @T["Scheduling Meeting..."]
+                            }
+                            else
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.EventAvailable" Size="Size.Small" Class="me-1" />
+                                @T["Schedule Meeting"]
+                            }
+                        </MudButton>
+                    </div>
+                </MudTabPanel>
+            </MudTabs>
+        </div>
+    }
+}
+
+<style>
+    .ml-quick-dock-fab {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        z-index: 1200;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: linear-gradient(135deg, var(--mud-palette-primary) 0%, var(--mud-palette-primary-darken) 100%);
+        color: #fff;
+        padding: 10px 18px;
+        border-radius: 30px;
+        cursor: pointer;
+        box-shadow: 0 4px 18px rgba(79, 70, 229, 0.4);
+        transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        user-select: none;
+    }
+    .ml-quick-dock-fab:hover {
+        transform: translateY(-2px) scale(1.03);
+        box-shadow: 0 6px 24px rgba(79, 70, 229, 0.55);
+    }
+    .ml-quick-dock-fab__text {
+        font-weight: 600;
+        font-size: 14px;
+    }
+    .ml-quick-dock-fab__badge {
+        background: rgba(255, 255, 255, 0.22);
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 500;
+        max-width: 140px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .ml-quick-dock-panel {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        width: 420px;
+        max-width: calc(100vw - 36px);
+        max-height: calc(100vh - 48px);
+        overflow-y: auto;
+        background: var(--mud-palette-surface);
+        border: 1px solid var(--mud-palette-divider);
+        border-radius: 14px;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.22);
+        z-index: 1250;
+        animation: ml-dock-slide 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .ml-quick-dock-panel__header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--mud-palette-divider);
+    }
+    @@keyframes ml-dock-slide {
+        from {
+            opacity: 0;
+            transform: translateY(16px) scale(0.97);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+</style>
+
+@code {
+    private bool _featureAvailable = false;
+    private bool IsSettingsRoute => Nav.ToBaseRelativePath(Nav.Uri).StartsWith("settings", StringComparison.OrdinalIgnoreCase);
+    private int _activeTab = 0;
+    private bool _saving = false;
+
+    // Target context
+    private string? _targetType;
+    private Guid? _targetId;
+    private string? _targetName;
+    private string? _detectedRecordName;
+    private SearchHitDto? _searchSelected;
+
+    // Call state
+    private string _callDirection = "Outbound";
+    private string _callOutcome = "Connected";
+    private int _callDuration = 5;
+    private string _callSubject = "Discovery Call";
+    private string? _callNotes;
+    private bool _scheduleFollowUp = true;
+    private int _followUpDays = 2;
+    private string _followUpSubject = "Follow up on proposal";
+
+    // Note state
+    private string _noteSubject = "Quick Note";
+    private string _noteContent = "";
+
+    // Task state
+    private string _taskSubject = "Follow up with client";
+    private int _taskDueOffset = 1;
+    private string _taskPriority = "Normal";
+    private string? _taskNotes;
+
+    // Meeting state
+    private string _meetingSubject = "Product Demo";
+    private string? _meetingLocation;
+    private string? _meetingNotes;
+
+    private static readonly string[] CallOutcomes = ["Connected", "Left Voicemail", "Busy", "No Answer", "Wrong Number"];
+
+    protected override async Task OnInitializedAsync()
+    {
+        DockState.OnStateChanged += StateHasChanged;
+        Nav.LocationChanged += OnLocationChanged;
+
+        await CheckFeatureAsync();
+        DetectRouteTarget();
+    }
+
+    private async Task CheckFeatureAsync()
+    {
+        try
+        {
+            // Verify if quick-log-dock feature is enabled
+            var res = await Http.GetAsync("api/v1/features");
+            if (res.IsSuccessStatusCode)
+            {
+                var flags = await res.Content.ReadFromJsonAsync<List<FeatureFlagDto>>();
+                _featureAvailable = flags?.Any(f => f.Key == "quick-log-dock" && f.Enabled) == true;
+            }
+        }
+        catch
+        {
+            _featureAvailable = false;
+        }
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        DetectRouteTarget();
+        StateHasChanged();
+    }
+
+    private void DetectRouteTarget()
+    {
+        // Don't overwrite if dock state already explicitly specified target
+        if (DockState.TargetId.HasValue && !string.IsNullOrWhiteSpace(DockState.TargetType))
+        {
+            _targetType = DockState.TargetType;
+            _targetId = DockState.TargetId;
+            _targetName = DockState.TargetName;
+            _detectedRecordName = DockState.TargetName;
+            return;
+        }
+
+        var relative = Nav.ToBaseRelativePath(Nav.Uri).Split('?')[0].Trim('/');
+        var parts = relative.Split('/');
+        if (parts.Length == 2 && Guid.TryParse(parts[1], out var id))
+        {
+            var type = parts[0].ToLowerInvariant() switch
+            {
+                "leads" => "lead",
+                "contacts" => "contact",
+                "accounts" => "account",
+                "deals" => "deal",
+                _ => null
+            };
+
+            if (type != null)
+            {
+                _targetType = type;
+                _targetId = id;
+                _targetName = $"{char.ToUpper(type[0])}{type[1..]}";
+                _detectedRecordName = _targetName;
+                return;
+            }
+        }
+
+        // On list or generic page
+        if (!_targetId.HasValue)
+        {
+            _detectedRecordName = null;
+        }
+    }
+
+    private void ToggleOpen()
+    {
+        DetectRouteTarget();
+        DockState.Toggle();
+    }
+
+    private void ClearTarget()
+    {
+        _targetType = null;
+        _targetId = null;
+        _targetName = null;
+        _searchSelected = null;
+    }
+
+    private async Task<IEnumerable<SearchHitDto>> SearchRecordsAsync(string text, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(text) || text.Trim().Length < 2) return [];
+        try
+        {
+            return await Http.GetFromJsonAsync<List<SearchHitDto>>("api/v1/search?q=" + Uri.EscapeDataString(text.Trim()), ct) ?? [];
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    private void OnTargetSelected(SearchHitDto? hit)
+    {
+        _searchSelected = hit;
+        if (hit is not null)
+        {
+            _targetType = hit.Kind;
+            _targetId = hit.Id;
+            _targetName = hit.Title;
+        }
+    }
+
+    private async Task LogCallAsync()
+    {
+        if (!_targetId.HasValue || string.IsNullOrWhiteSpace(_targetType))
+        {
+            Snackbar.Add(T["Please select a target record."], Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var req = new QuickLogCallRequest(
+                TargetType: _targetType,
+                TargetId: _targetId.Value,
+                Subject: _callSubject.Trim(),
+                Notes: string.IsNullOrWhiteSpace(_callNotes) ? null : _callNotes.Trim(),
+                Direction: _callDirection,
+                CallOutcome: _callOutcome,
+                DurationMinutes: _callDuration,
+                FollowUpSubject: _scheduleFollowUp && !string.IsNullOrWhiteSpace(_followUpSubject) ? _followUpSubject.Trim() : null,
+                FollowUpDueAt: _scheduleFollowUp ? DateTime.UtcNow.AddDays(_followUpDays) : null
+            );
+
+            var res = await Http.PostAsJsonAsync("api/v1/quick-log/call", req);
+            if (res.IsSuccessStatusCode)
+            {
+                var result = await res.Content.ReadFromJsonAsync<QuickLogResult>();
+                Snackbar.Add(T["Call logged: {0}", _callSubject], Severity.Success);
+                if (result?.FollowUp != null)
+                {
+                    Snackbar.Add(T["Follow-up scheduled: {0}", result.FollowUp.Subject], Severity.Info);
+                }
+
+                _callNotes = null;
+                DockState.Close();
+            }
+            else
+            {
+                Snackbar.Add(await ProblemText.FromAsync(res, T["Could not log call."]), Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task LogNoteAsync()
+    {
+        if (!_targetId.HasValue || string.IsNullOrWhiteSpace(_targetType))
+        {
+            Snackbar.Add(T["Please select a target record."], Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var req = new QuickLogNoteRequest(
+                TargetType: _targetType,
+                TargetId: _targetId.Value,
+                Subject: _noteSubject.Trim(),
+                Notes: _noteContent.Trim()
+            );
+
+            var res = await Http.PostAsJsonAsync("api/v1/quick-log/note", req);
+            if (res.IsSuccessStatusCode)
+            {
+                Snackbar.Add(T["Note saved: {0}", _noteSubject], Severity.Success);
+                _noteContent = "";
+                DockState.Close();
+            }
+            else
+            {
+                Snackbar.Add(await ProblemText.FromAsync(res, T["Could not save note."]), Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task LogTaskAsync()
+    {
+        if (!_targetId.HasValue || string.IsNullOrWhiteSpace(_targetType))
+        {
+            Snackbar.Add(T["Please select a target record."], Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var req = new QuickLogTaskRequest(
+                TargetType: _targetType,
+                TargetId: _targetId.Value,
+                Subject: _taskSubject.Trim(),
+                Notes: string.IsNullOrWhiteSpace(_taskNotes) ? null : _taskNotes.Trim(),
+                DueAt: DateTime.UtcNow.AddDays(_taskDueOffset),
+                Priority: _taskPriority
+            );
+
+            var res = await Http.PostAsJsonAsync("api/v1/quick-log/task", req);
+            if (res.IsSuccessStatusCode)
+            {
+                Snackbar.Add(T["Task created: {0}", _taskSubject], Severity.Success);
+                _taskNotes = null;
+                DockState.Close();
+            }
+            else
+            {
+                Snackbar.Add(await ProblemText.FromAsync(res, T["Could not create task."]), Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task LogMeetingAsync()
+    {
+        if (!_targetId.HasValue || string.IsNullOrWhiteSpace(_targetType))
+        {
+            Snackbar.Add(T["Please select a target record."], Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var req = new QuickLogMeetingRequest(
+                TargetType: _targetType,
+                TargetId: _targetId.Value,
+                Subject: _meetingSubject.Trim(),
+                Notes: string.IsNullOrWhiteSpace(_meetingNotes) ? null : _meetingNotes.Trim(),
+                StartAt: DateTime.UtcNow.AddDays(1),
+                EndAt: DateTime.UtcNow.AddDays(1).AddMinutes(30),
+                Location: _meetingLocation,
+                AttendeeEmails: null
+            );
+
+            var res = await Http.PostAsJsonAsync("api/v1/quick-log/meeting", req);
+            if (res.IsSuccessStatusCode)
+            {
+                Snackbar.Add(T["Meeting scheduled: {0}", _meetingSubject], Severity.Success);
+                _meetingNotes = null;
+                DockState.Close();
+            }
+            else
+            {
+                Snackbar.Add(await ProblemText.FromAsync(res, T["Could not schedule meeting."]), Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private static Color OutcomeColor(string outcome) => outcome switch
+    {
+        "Connected" => Color.Success,
+        "Left Voicemail" => Color.Info,
+        "Busy" => Color.Warning,
+        _ => Color.Default
+    };
+
+    private static string TargetTypeLabel(string type) => type.ToLowerInvariant() switch
+    {
+        "lead" => "Lead",
+        "contact" => "Contact",
+        "account" => "Account",
+        "deal" => "Deal",
+        _ => type
+    };
+
+    private static string HitIcon(string kind) => kind switch
+    {
+        "contact" => Icons.Material.Outlined.Contacts,
+        "account" => Icons.Material.Outlined.Business,
+        "deal" => Icons.Material.Outlined.MonetizationOn,
+        _ => Icons.Material.Outlined.PersonSearch
+    };
+
+    public void Dispose()
+    {
+        DockState.OnStateChanged -= StateHasChanged;
+        Nav.LocationChanged -= OnLocationChanged;
+    }
+}

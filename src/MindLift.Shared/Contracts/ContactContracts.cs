@@ -90,7 +90,7 @@ public sealed record SaveAccountRequest(
     Guid? OwnerId,
     IReadOnlyDictionary<string, JsonElement>? CustomFields);
 
-public sealed record AccountContactDto(Guid Id, string FullName, string? Email, string? Phone, string? JobTitle, string? Role = null, bool IsPrimary = true);
+public sealed record AccountContactDto(Guid Id, string FullName, string? Email, string? Phone, string? JobTitle, string? Role = null, bool IsPrimary = true, Guid? LinkId = null);
 
 public sealed record AccountChildDto(Guid Id, string Name);
 

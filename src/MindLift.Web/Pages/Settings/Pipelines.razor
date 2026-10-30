@@ -4,6 +4,7 @@
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
 @inject Translator T
+@inject IDialogService Dialogs
 
 <PageTitle>@T["Pipelines"] · MindLift</PageTitle>
 
@@ -47,6 +48,11 @@
                                 <MudText Typo="Typo.body1">@stage.Name</MudText>
                                 <MudText Typo="Typo.caption" Class="ml-muted">@stage.StageType · @stage.Probability% @(stage.RottingDays is { } days ? "· stale after " + days + " days" : "")</MudText>
                             </div>
+                            <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Primary" Class="me-2"
+                                       StartIcon="@Icons.Material.Filled.Security" OnClick="() => OpenStageGates(pipeline, stage)"
+                                       data-testid="@($"stage-gates-{stage.Id}")">
+                                @T["Gates"]
+                            </MudButton>
                             <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="() => OpenStage(pipeline, stage)" aria-label="@T["Edit stage"]" />
                             @if (_confirmStageId == stage.Id)
                             {
@@ -313,5 +319,18 @@
 
         Snackbar.Add(T["Stage deleted"], Severity.Success);
         await LoadAsync();
+    }
+
+    private async Task OpenStageGates(PipelineDto pipeline, PipelineStageDto stage)
+    {
+        var parameters = new DialogParameters<StageGatesDialog>
+        {
+            { x => x.PipelineId, pipeline.Id },
+            { x => x.StageId, stage.Id },
+            { x => x.StageName, stage.Name },
+            { x => x.Currency, App.Bootstrap?.Currencies.BaseCurrency ?? "USD" }
+        };
+        await Dialogs.ShowAsync<StageGatesDialog>(T["Stage Gates: {0}", stage.Name], parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true });
     }
 }

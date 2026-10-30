@@ -1,35 +1,51 @@
 @using FieldType = MindLift.Shared.Filtering.FieldType
 @inject Translator T
+
 @foreach (var field in Fields)
 {
-    switch (field.Type)
+    if (HiddenFields?.Contains(field.Key) == true)
     {
-        case FieldType.Boolean:
-            <MudCheckBox T="bool" Value="@GetBool(field.Key)" ValueChanged="v => Set(field.Key, v)" Label="@Label(field)" Color="Color.Primary" Class="mb-2" data-testid="@($"cf-{field.Key}")" />
-            break;
-        case FieldType.Number:
-        case FieldType.Decimal:
-        case FieldType.Currency:
-        case FieldType.Percent:
-            <MudNumericField T="decimal?" Value="@GetDecimal(field.Key)" ValueChanged="v => Set(field.Key, v)" Label="@Label(field)" Variant="Variant.Outlined" Margin="Margin.Dense" Required="field.IsRequired" Class="mb-3" data-testid="@($"cf-{field.Key}")" />
-            break;
-        case FieldType.Date:
-            <MudTextField T="string" Value="@GetText(field.Key)" ValueChanged="v => Set(field.Key, v)" Label="@Label(field)" InputType="InputType.Date" Variant="Variant.Outlined" Margin="Margin.Dense" Required="field.IsRequired" Class="mb-3" data-testid="@($"cf-{field.Key}")" />
-            break;
-        case FieldType.Picklist:
-            <MudSelect T="string" Value="@GetText(field.Key)" ValueChanged="v => Set(field.Key, v)" Label="@Label(field)" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-3" data-testid="@($"cf-{field.Key}")">
-                @foreach (var option in field.Options ?? [])
-                {
-                    <MudSelectItem T="string" Value="@option.Value">@T.Pick(option.Label, option.LabelAr)</MudSelectItem>
-                }
-            </MudSelect>
-            break;
-        case FieldType.TextArea:
-            <MudTextField T="string" Value="@GetText(field.Key)" ValueChanged="v => Set(field.Key, v)" Label="@Label(field)" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="3" Class="mb-3" data-testid="@($"cf-{field.Key}")" />
-            break;
-        default:
-            <MudTextField T="string" Value="@GetText(field.Key)" ValueChanged="v => Set(field.Key, v)" Label="@Label(field)" Variant="Variant.Outlined" Margin="Margin.Dense" Required="field.IsRequired" Class="mb-3" data-testid="@($"cf-{field.Key}")" />
-            break;
+        continue;
+    }
+
+    var isMandatory = field.IsRequired || MandatoryFields?.Contains(field.Key) == true;
+    var isReadOnly = ReadOnlyFields?.Contains(field.Key) == true;
+
+    if (IsCountryField(field))
+    {
+        <CountryPicker Value="@GetText(field.Key)" ValueChanged="v => Set(field.Key, v)" Label="@Label(field, isMandatory)" Required="@isMandatory" Disabled="@isReadOnly" Class="mb-3" TestId="@($"cf-{field.Key}")" />
+    }
+    else
+    {
+        switch (field.Type)
+        {
+            case FieldType.Boolean:
+                <MudCheckBox T="bool" Value="@GetBool(field.Key)" ValueChanged="v => Set(field.Key, v)" Label="@Label(field, isMandatory)" Color="Color.Primary" Disabled="@isReadOnly" Class="mb-2" data-testid="@($"cf-{field.Key}")" />
+                break;
+            case FieldType.Number:
+            case FieldType.Decimal:
+            case FieldType.Currency:
+            case FieldType.Percent:
+                <MudNumericField T="decimal?" Value="@GetDecimal(field.Key)" ValueChanged="v => Set(field.Key, v)" Label="@Label(field, isMandatory)" Variant="Variant.Outlined" Margin="Margin.Dense" Required="@isMandatory" Disabled="@isReadOnly" Class="mb-3" data-testid="@($"cf-{field.Key}")" />
+                break;
+            case FieldType.Date:
+                <MudTextField T="string" Value="@GetText(field.Key)" ValueChanged="v => Set(field.Key, v)" Label="@Label(field, isMandatory)" InputType="InputType.Date" Variant="Variant.Outlined" Margin="Margin.Dense" Required="@isMandatory" Disabled="@isReadOnly" Class="mb-3" data-testid="@($"cf-{field.Key}")" />
+                break;
+            case FieldType.Picklist:
+                <MudSelect T="string" Value="@GetText(field.Key)" ValueChanged="v => Set(field.Key, v)" Label="@Label(field, isMandatory)" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-3" Clearable="true" Disabled="@isReadOnly" data-testid="@($"cf-{field.Key}")">
+                    @foreach (var option in field.Options ?? [])
+                    {
+                        <MudSelectItem T="string" Value="@option.Value">@T.Pick(option.Label, option.LabelAr)</MudSelectItem>
+                    }
+                </MudSelect>
+                break;
+            case FieldType.TextArea:
+                <MudTextField T="string" Value="@GetText(field.Key)" ValueChanged="v => Set(field.Key, v)" Label="@Label(field, isMandatory)" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="3" Disabled="@isReadOnly" Class="mb-3" data-testid="@($"cf-{field.Key}")" />
+                break;
+            default:
+                <MudTextField T="string" Value="@GetText(field.Key)" ValueChanged="v => Set(field.Key, v)" Label="@Label(field, isMandatory)" Variant="Variant.Outlined" Margin="Margin.Dense" Required="@isMandatory" Disabled="@isReadOnly" Class="mb-3" data-testid="@($"cf-{field.Key}")" />
+                break;
+        }
     }
 }
 
@@ -38,7 +54,18 @@
     [Parameter, EditorRequired] public Dictionary<string, JsonElement?> Values { get; set; } = new();
     [Parameter] public EventCallback<Dictionary<string, JsonElement?>> ValuesChanged { get; set; }
 
-    private string Label(FieldDto field) => field.IsRequired ? $"{T.Pick(field.Label, field.LabelAr)} *" : T.Pick(field.Label, field.LabelAr);
+    [Parameter] public IReadOnlySet<string>? HiddenFields { get; set; }
+    [Parameter] public IReadOnlySet<string>? MandatoryFields { get; set; }
+    [Parameter] public IReadOnlySet<string>? ReadOnlyFields { get; set; }
+
+    private static bool IsCountryField(FieldDto field)
+    {
+        return field.Key.Equals("cf_country", StringComparison.OrdinalIgnoreCase) ||
+               field.Key.Equals("country", StringComparison.OrdinalIgnoreCase) ||
+               field.Label.Equals("Country", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string Label(FieldDto field, bool isMandatory) => isMandatory ? $"{T.Pick(field.Label, field.LabelAr)} *" : T.Pick(field.Label, field.LabelAr);
 
     private string? GetText(string key) => Values.TryGetValue(key, out var v) && v is { ValueKind: JsonValueKind.String } s ? s.GetString() : null;
 
@@ -57,6 +84,7 @@
             decimal number => JsonSerializer.SerializeToElement(number),
             _ => JsonSerializer.SerializeToElement(value),
         };
+
         await ValuesChanged.InvokeAsync(Values);
     }
 }

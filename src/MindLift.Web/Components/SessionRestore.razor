@@ -20,27 +20,44 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        if (!Session.IsSignedIn)
+        try
         {
-            try
+            if (!Session.IsSignedIn)
             {
-                var response = await Http.PostAsync("api/v1/auth/refresh", null);
-                if (response.IsSuccessStatusCode)
+                try
                 {
-                    Session.SetTokens((await response.Content.ReadFromJsonAsync<MindLift.Shared.Contracts.TokenResponse>())!);
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                    var response = await Http.PostAsync("api/v1/auth/refresh", null, cts.Token);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var tokens = await response.Content.ReadFromJsonAsync<MindLift.Shared.Contracts.TokenResponse>(cancellationToken: cts.Token);
+                        if (tokens is not null)
+                        {
+                            Session.SetTokens(tokens);
+                        }
+                    }
+                }
+                catch
+                {
+                    // The API is unreachable or timed out. Allow rendering so pages can display appropriate login/error state.
                 }
             }
-            catch (HttpRequestException)
+
+            if (Session.IsSignedIn && App.Bootstrap is null)
             {
-                // The API is unreachable. The pages show their own error states.
+                try
+                {
+                    await App.LoadAsync();
+                }
+                catch
+                {
+                    // Ignore bootstrap load failures so the UI still displays.
+                }
             }
         }
-
-        if (Session.IsSignedIn && App.Bootstrap is null)
+        finally
         {
-            await App.LoadAsync();
+            _ready = true;
         }
-
-        _ready = true;
     }
 }

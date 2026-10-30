@@ -1,0 +1,186 @@
+@using MindLift.Shared.Contracts
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject Translator T
+
+<MudDialog Options="new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true }">
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.AddShoppingCart" Color="Color.Primary" />
+            <MudText Typo="Typo.h6" Style="font-weight:600">@T["Add Product or Line Item"]</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <div class="d-flex flex-column gap-3 py-2">
+            @if (_catalogProducts.Count > 0)
+            {
+                <MudSelect T="Guid?" Label="@T["Select from Product Catalog"]" Value="_selectedProductId" ValueChanged="OnProductSelected"
+                           Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" HelperText="@T["Select an existing product or enter custom item below"]">
+                    <MudSelectItem T="Guid?" Value="@((Guid?)null)">@T["-- Custom / Ad-hoc item --"]</MudSelectItem>
+                    @foreach (var p in _catalogProducts)
+                    {
+                        <MudSelectItem T="Guid?" Value="@((Guid?)p.Id)">
+                            @p.Name (@p.Sku) - @p.UnitPrice.ToString("N2") @p.Currency
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+            }
+
+            <MudTextField @bind-Value="_productName" Label="@T["Item / Product Name *"]" Placeholder="e.g. Cloud Subscription, Consultation"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Required="true"
+                          Error="@(_error != null && string.IsNullOrWhiteSpace(_productName))" />
+
+            <div class="d-flex gap-3">
+                <MudNumericField @bind-Value="_quantity" Label="@T["Quantity *"]" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0.01m" Step="1m" Format="N2" />
+                <MudNumericField @bind-Value="_unitPrice" Label="@T["Unit Price *"]" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0m" Step="10m" Format="N2" Adornment="Adornment.End" AdornmentText="@Currency" />
+            </div>
+
+            <div class="d-flex gap-3">
+                <MudNumericField @bind-Value="_discountPercent" Label="@T["Discount %"]" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0m" Max="100m" Step="1m" Format="N1" Adornment="Adornment.End" AdornmentText="%" />
+                <MudNumericField @bind-Value="_taxRate" Label="@T["Tax Rate %"]" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0m" Max="100m" Step="0.5m" Format="N1" Adornment="Adornment.End" AdornmentText="%" />
+            </div>
+
+            <MudTextField @bind-Value="_description" Label="@T["Description / Notes (Optional)"]" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />
+
+            <div class="pa-3 rounded" style="background: var(--mud-palette-background-grey); border: 1px solid var(--mud-palette-divider);">
+                <div class="d-flex justify-space-between align-center mb-1">
+                    <span class="ml-muted" style="font-size: 13px;">@T["Subtotal:"]</span>
+                    <span style="font-weight: 500;">@CalculatedSubtotal.ToString("N2") @Currency</span>
+                </div>
+                @if (_discountPercent > 0)
+                {
+                    <div class="d-flex justify-space-between align-center mb-1 text-danger">
+                        <span class="ml-muted" style="font-size: 13px;">@T["Discount ({0}%):", _discountPercent]:</span>
+                        <span style="color: var(--mud-palette-error);">-@CalculatedDiscount.ToString("N2") @Currency</span>
+                    </div>
+                }
+                @if (_taxRate > 0)
+                {
+                    <div class="d-flex justify-space-between align-center mb-1">
+                        <span class="ml-muted" style="font-size: 13px;">@T["Tax ({0}%):", _taxRate]:</span>
+                        <span>+@CalculatedTax.ToString("N2") @Currency</span>
+                    </div>
+                }
+                <div class="d-flex justify-space-between align-center pt-2 mt-1" style="border-top: 1px solid var(--mud-palette-divider); font-weight: 600;">
+                    <span>@T["Estimated Total:"]</span>
+                    <span style="color: var(--mud-palette-primary); font-size: 15px;">@CalculatedTotal.ToString("N2") @Currency</span>
+                </div>
+            </div>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="_saving">@T["Cancel"]</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="@(_saving || string.IsNullOrWhiteSpace(_productName) || _quantity <= 0)" data-testid="save-line-item-btn">
+            @if (_saving)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <span class="ms-2">@T["Adding..."]</span>
+            }
+            else
+            {
+                @T["Add Item"]
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public Guid DealId { get; set; }
+    [Parameter] public string Currency { get; set; } = "USD";
+
+    private Guid? _selectedProductId;
+    private string _productName = "";
+    private string? _description;
+    private decimal _quantity = 1m;
+    private decimal _unitPrice = 100m;
+    private decimal _discountPercent = 0m;
+    private decimal _taxRate = 0m;
+
+    private List<ProductDto> _catalogProducts = [];
+    private bool _saving = false;
+    private string? _error;
+
+    private decimal CalculatedSubtotal => Math.Max(0m, _quantity * _unitPrice);
+    private decimal CalculatedDiscount => CalculatedSubtotal * (_discountPercent / 100m);
+    private decimal CalculatedTax => Math.Max(0m, CalculatedSubtotal - CalculatedDiscount) * (_taxRate / 100m);
+    private decimal CalculatedTotal => (CalculatedSubtotal - CalculatedDiscount) + CalculatedTax;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var prods = await Http.GetFromJsonAsync<List<ProductDto>>("api/v1/products?activeOnly=true");
+            _catalogProducts = prods ?? [];
+        }
+        catch
+        {
+            _catalogProducts = [];
+        }
+    }
+
+    private void OnProductSelected(Guid? productId)
+    {
+        _selectedProductId = productId;
+        if (productId.HasValue)
+        {
+            var p = _catalogProducts.FirstOrDefault(x => x.Id == productId.Value);
+            if (p != null)
+            {
+                _productName = p.Name;
+                _unitPrice = p.UnitPrice;
+                _taxRate = p.TaxRate;
+                _description = p.Description;
+            }
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_productName))
+        {
+            _error = T["Product name is required."];
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var req = new SaveDealLineItemRequest(
+                ProductId: _selectedProductId,
+                PriceBookId: null,
+                ProductName: _productName.Trim(),
+                Description: string.IsNullOrWhiteSpace(_description) ? null : _description.Trim(),
+                Quantity: _quantity,
+                UnitPrice: _unitPrice,
+                DiscountPercent: _discountPercent > 0 ? _discountPercent : null,
+                DiscountAmount: null,
+                TaxRate: _taxRate > 0 ? _taxRate : null,
+                SortOrder: 0
+            );
+
+            var response = await Http.PostAsJsonAsync($"api/v1/deals/{DealId}/line-items", req);
+            if (response.IsSuccessStatusCode)
+            {
+                var summary = await response.Content.ReadFromJsonAsync<DealLineItemsSummaryDto>();
+                Snackbar.Add(T["Item added to deal"], Severity.Success);
+                MudDialog.Close(DialogResult.Ok(summary));
+            }
+            else
+            {
+                Snackbar.Add(await ProblemText.FromAsync(response, T["Could not add item to deal."]), Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

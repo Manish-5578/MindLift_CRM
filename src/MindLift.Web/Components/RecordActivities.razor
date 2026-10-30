@@ -3,12 +3,14 @@
 @inject ISnackbar Snackbar
 @inject IDialogService Dialogs
 @inject Translator T
+@inject QuickLogDockState DockState
 
 <MlCard Title="Activities" TestId="record-activities">
     <div class="ml-stack">
         @if (CanCreate)
         {
             <div class="ml-row ml-row--wrap" data-testid="activity-actions">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Filled.FlashOn" OnClick="OpenQuickLog" data-testid="quick-log-btn">@T["Quick Log"]</MudButton>
                 <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Outlined.TaskAlt" OnClick="() => OpenNew(ActivityTypes.Task)" data-testid="add-task">@T["Task"]</MudButton>
                 <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Call" OnClick="() => OpenNew(ActivityTypes.Call)" data-testid="add-call">@T["Call"]</MudButton>
                 <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Event" OnClick="() => OpenNew(ActivityTypes.Meeting)" data-testid="add-meeting">@T["Meeting"]</MudButton>
@@ -140,6 +142,15 @@
         "Note" => Icons.Material.Outlined.StickyNote2,
         _ => Icons.Material.Outlined.TaskAlt,
     };
+
+    private void OpenQuickLog()
+    {
+        if (LeadId.HasValue) DockState.Open("lead", LeadId.Value);
+        else if (ContactId.HasValue) DockState.Open("contact", ContactId.Value);
+        else if (AccountId.HasValue) DockState.Open("account", AccountId.Value);
+        else if (DealId.HasValue) DockState.Open("deal", DealId.Value);
+        else DockState.OpenGeneric();
+    }
 
     private void OpenNew(string type)
     {

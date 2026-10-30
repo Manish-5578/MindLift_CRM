@@ -78,12 +78,26 @@
                                     </div>
                                     <MudText Typo="Typo.caption" Class="ml-muted">@(contact.JobTitle ?? contact.Email ?? contact.Phone ?? "—")</MudText>
                                 </div>
+                                @if (!contact.IsPrimary && contact.LinkId.HasValue && Can(p => p.CanEdit, "Contacts"))
+                                {
+                                    <MudTooltip Text="@T["Unlink Contact"]">
+                                        <MudIconButton Icon="@Icons.Material.Filled.LinkOff" Size="Size.Small" Color="Color.Error"
+                                                       OnClick="() => UnlinkContactAsync(contact.Id, contact.LinkId.Value)"
+                                                       Disabled="_linking" data-testid="unlink-contact-btn" />
+                                    </MudTooltip>
+                                }
                             </div>
                         }
-                        @if (Can(p => p.CanCreate, "Contacts"))
-                        {
-                            <div><MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Outlined.Add" OnClick="AddContact" data-testid="add-contact">@T["Add contact"]</MudButton></div>
-                        }
+                        <div class="d-flex align-center gap-2 mt-2">
+                            @if (Can(p => p.CanCreate, "Contacts"))
+                            {
+                                <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Outlined.Add" OnClick="AddContact" data-testid="add-contact">@T["Add contact"]</MudButton>
+                            }
+                            @if (Can(p => p.CanEdit, "Contacts"))
+                            {
+                                <MudButton Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AddLink" OnClick="OpenLinkContactDialog" data-testid="link-contact">@T["Affiliate existing contact"]</MudButton>
+                            }
+                        </div>
                     </div>
                 </MlCard>
 
@@ -164,6 +178,42 @@
 
 <AccountFormDrawer @ref="_form" @bind-Open="_drawer" OnSaved="OnSaved" />
 <ContactFormDrawer @ref="_contactForm" @bind-Open="_contactDrawer" OnSaved="OnContactSaved" DefaultAccountId="Id" DefaultAccountName="@_summary?.Account.Name" />
+
+<MudDialog @bind-Visible="_linkContactDialogOpen" Options="new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true }">
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.Hub" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">@T["Affiliate Contact with Company"]</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <div class="d-flex flex-column gap-3 py-2">
+            <MudText Typo="Typo.body2" Class="ml-muted">
+                @T["Link an existing contact as an affiliated person for this company (e.g., external consultant, legal counsel, board advisor)."]
+            </MudText>
+            <RecordPicker Search="@((text, ct) => RecordLookups.ContactsAsync(Http, text, ct))"
+                          Label="@T["Select Contact"]"
+                          Value="_selectedContactId"
+                          Text="@_selectedContactName"
+                          ValueChanged="v => _selectedContactId = v" />
+            <MudTextField @bind-Value="_linkRole" Label="@T["Role at Company (Optional)"]" Placeholder="e.g. Legal Counsel, Consultant, Board Member" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _linkContactDialogOpen = false" Disabled="_linking">@T["Cancel"]</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveLinkedContactAsync" Disabled="@(_linking || !_selectedContactId.HasValue)" data-testid="confirm-link-contact">
+            @if (_linking)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <span class="ms-2">@T["Linking..."]</span>
+            }
+            else
+            {
+                @T["Link Contact"]
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
 
 @code {
     private RecordTimeline? _timeline;
@@ -278,5 +328,78 @@
 
         Snackbar.Add(T["Account deleted"], Severity.Success);
         Nav.NavigateTo("/accounts");
+    }
+
+    private bool _linkContactDialogOpen;
+    private Guid? _selectedContactId;
+    private string? _selectedContactName;
+    private string? _linkRole;
+    private bool _linking;
+
+    private void OpenLinkContactDialog()
+    {
+        _selectedContactId = null;
+        _selectedContactName = null;
+        _linkRole = null;
+        _linkContactDialogOpen = true;
+    }
+
+    private async Task SaveLinkedContactAsync()
+    {
+        if (!_selectedContactId.HasValue) return;
+        _linking = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"api/v1/contacts/{_selectedContactId.Value}/accounts", new AddContactAccountRequest(Id, _linkRole));
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add(T["Contact linked to account"], Severity.Success);
+                _linkContactDialogOpen = false;
+                await LoadAsync();
+            }
+            else
+            {
+                Snackbar.Add(await ProblemText.FromAsync(response, T["Could not link contact."]), Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _linking = false;
+        }
+    }
+
+    private async Task UnlinkContactAsync(Guid contactId, Guid linkId)
+    {
+        if (!await Dialogs.ConfirmAsync(T["Unlink contact?"], T["This removes the contact's secondary affiliation with this company. The contact itself will not be deleted."], T["Unlink"], danger: true))
+        {
+            return;
+        }
+
+        _linking = true;
+        try
+        {
+            var response = await Http.DeleteAsync($"api/v1/contacts/{contactId}/accounts/{linkId}");
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add(T["Contact unlinked"], Severity.Success);
+                await LoadAsync();
+            }
+            else
+            {
+                Snackbar.Add(await ProblemText.FromAsync(response, T["Could not unlink contact."]), Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _linking = false;
+        }
     }
 }

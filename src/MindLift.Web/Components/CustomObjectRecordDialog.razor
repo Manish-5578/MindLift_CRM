@@ -1,0 +1,266 @@
+@using MindLift.Shared.Contracts
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject Translator T
+
+<MudDialog MaxWidth="MaxWidth.Small" FullWidth="true">
+    <TitleContent>
+        <div class="ml-row" style="align-items:center;gap:10px;">
+            <MudIcon Icon="@GetIcon(Definition.Icon)" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">
+                @(Record is null ? T["New {0}", Definition.Name] : T["Edit {0}: {1}", Definition.Name, Record.DisplayName])
+            </MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <div class="d-flex flex-column gap-3 py-2">
+            @foreach (var field in Definition.Fields)
+            {
+                var key = field.Key;
+                var isRequired = field.IsRequired;
+                var label = field.Label + (isRequired ? " *" : "");
+
+                @switch (field.Type.ToLowerInvariant())
+                {
+                    case "textarea":
+                        <MudTextField T="string" Label="@label" Value="@GetString(key)"
+                                      ValueChanged="@(v => SetValue(key, v))"
+                                      Required="@isRequired" Lines="3" Margin="Margin.Dense" Variant="Variant.Outlined" />
+                        break;
+
+                    case "number":
+                        <MudNumericField T="double?" Label="@label" Value="@GetNumber(key)"
+                                         ValueChanged="@(v => SetValue(key, v))"
+                                         Required="@isRequired" Margin="Margin.Dense" Variant="Variant.Outlined" />
+                        break;
+
+                    case "boolean":
+                        <div class="ml-row" style="align-items:center;padding:4px 0;">
+                            <MudSwitch T="bool" Value="@GetBool(key)" ValueChanged="@(v => SetValue(key, v))"
+                                       Color="Color.Primary" Label="@field.Label" />
+                        </div>
+                        break;
+
+                    case "date":
+                    case "datetime":
+                        <MudDatePicker Label="@label" Date="@GetDate(key)"
+                                       DateChanged="@(d => SetDate(key, d))"
+                                       Required="@isRequired" Margin="Margin.Dense" Variant="Variant.Outlined" />
+                        break;
+
+                    case "picklist":
+                        <MudSelect T="string" Label="@label" Value="@GetString(key)"
+                                   ValueChanged="@(v => SetValue(key, v))"
+                                   Required="@isRequired" Margin="Margin.Dense" Variant="Variant.Outlined" Clearable="!isRequired">
+                            @if (field.Options is not null)
+                            {
+                                @foreach (var opt in field.Options)
+                                {
+                                    <MudSelectItem Value="@opt">@opt</MudSelectItem>
+                                }
+                            }
+                        </MudSelect>
+                        break;
+
+                    case "email":
+                        <MudTextField T="string" Label="@label" Value="@GetString(key)"
+                                      ValueChanged="@(v => SetValue(key, v))"
+                                      Required="@isRequired" InputType="InputType.Email" Margin="Margin.Dense" Variant="Variant.Outlined" />
+                        break;
+
+                    case "phone":
+                        <MudTextField T="string" Label="@label" Value="@GetString(key)"
+                                      ValueChanged="@(v => SetValue(key, v))"
+                                      Required="@isRequired" InputType="InputType.Telephone" Margin="Margin.Dense" Variant="Variant.Outlined" />
+                        break;
+
+                    case "url":
+                        <MudTextField T="string" Label="@label" Value="@GetString(key)"
+                                      ValueChanged="@(v => SetValue(key, v))"
+                                      Required="@isRequired" InputType="InputType.Url" Margin="Margin.Dense" Variant="Variant.Outlined" />
+                        break;
+
+                    default: // "text"
+                        <MudTextField T="string" Label="@label" Value="@GetString(key)"
+                                      ValueChanged="@(v => SetValue(key, v))"
+                                      Required="@isRequired" Margin="Margin.Dense" Variant="Variant.Outlined" />
+                        break;
+                }
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">@T["Cancel"]</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="_saving">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            @T["Save Record"]
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public required CustomObjectDefinitionDto Definition { get; set; }
+    [Parameter] public CustomObjectRecordDto? Record { get; set; }
+
+    private readonly Dictionary<string, object?> _formData = new(StringComparer.OrdinalIgnoreCase);
+    private bool _saving;
+
+    protected override void OnInitialized()
+    {
+        if (Record is not null && Record.Data is not null)
+        {
+            foreach (var kv in Record.Data)
+            {
+                _formData[kv.Key] = kv.Value;
+            }
+        }
+        else
+        {
+            foreach (var f in Definition.Fields)
+            {
+                if (!string.IsNullOrWhiteSpace(f.DefaultValue))
+                {
+                    _formData[f.Key] = f.DefaultValue;
+                }
+            }
+        }
+    }
+
+    private string? GetString(string key)
+    {
+        if (_formData.TryGetValue(key, out var val) && val is not null)
+        {
+            return val is System.Text.Json.JsonElement je ? je.ToString() : val.ToString();
+        }
+        return null;
+    }
+
+    private double? GetNumber(string key)
+    {
+        if (_formData.TryGetValue(key, out var val) && val is not null)
+        {
+            if (val is System.Text.Json.JsonElement je)
+            {
+                if (je.ValueKind == System.Text.Json.JsonValueKind.Number && je.TryGetDouble(out var d)) return d;
+                if (double.TryParse(je.GetString(), out var parsed)) return parsed;
+            }
+            else if (double.TryParse(val.ToString(), out var d))
+            {
+                return d;
+            }
+        }
+        return null;
+    }
+
+    private bool GetBool(string key)
+    {
+        if (_formData.TryGetValue(key, out var val) && val is not null)
+        {
+            if (val is System.Text.Json.JsonElement je)
+            {
+                if (je.ValueKind == System.Text.Json.JsonValueKind.True) return true;
+                if (je.ValueKind == System.Text.Json.JsonValueKind.False) return false;
+            }
+            else if (bool.TryParse(val.ToString(), out var b))
+            {
+                return b;
+            }
+        }
+        return false;
+    }
+
+    private DateTime? GetDate(string key)
+    {
+        if (_formData.TryGetValue(key, out var val) && val is not null)
+        {
+            if (val is System.Text.Json.JsonElement je)
+            {
+                if (je.TryGetDateTime(out var dt)) return dt;
+                if (DateTime.TryParse(je.GetString(), out var parsed)) return parsed;
+            }
+            else if (DateTime.TryParse(val.ToString(), out var dt))
+            {
+                return dt;
+            }
+        }
+        return null;
+    }
+
+    private void SetValue(string key, object? value)
+    {
+        _formData[key] = value;
+    }
+
+    private void SetDate(string key, DateTime? date)
+    {
+        _formData[key] = date?.ToString("yyyy-MM-dd");
+    }
+
+    private async Task SaveAsync()
+    {
+        // Enforce required fields
+        foreach (var f in Definition.Fields)
+        {
+            if (f.IsRequired)
+            {
+                if (!_formData.TryGetValue(f.Key, out var v) || v is null || string.IsNullOrWhiteSpace(v.ToString()))
+                {
+                    Snackbar.Add(T["Field '{0}' is required.", f.Label], Severity.Warning);
+                    return;
+                }
+            }
+        }
+
+        _saving = true;
+        try
+        {
+            var req = new SaveCustomObjectRecordRequest(_formData);
+            HttpResponseMessage res;
+            if (Record is null)
+            {
+                res = await Http.PostAsJsonAsync($"api/v1/custom-objects/{Definition.Slug}/records", req);
+            }
+            else
+            {
+                res = await Http.PutAsJsonAsync($"api/v1/custom-objects/{Definition.Slug}/records/{Record.Id}", req);
+            }
+
+            if (!res.IsSuccessStatusCode)
+            {
+                Snackbar.Add(await ProblemText.FromAsync(res, T["Failed to save record."]), Severity.Error);
+                return;
+            }
+
+            var saved = await res.Content.ReadFromJsonAsync<CustomObjectRecordDto>();
+            Snackbar.Add(T["{0} record saved successfully.", Definition.Name], Severity.Success);
+            MudDialog.Close(DialogResult.Ok(saved));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private static string GetIcon(string? icon) => (icon?.ToLowerInvariant()) switch
+    {
+        "print" => Icons.Material.Filled.Print,
+        "folder" => Icons.Material.Filled.Folder,
+        "directionscar" or "car" => Icons.Material.Filled.DirectionsCar,
+        "build" or "machinery" => Icons.Material.Filled.Build,
+        "inventory2" or "inventory" => Icons.Material.Filled.Inventory2,
+        "shoppingbag" or "order" => Icons.Material.Filled.ShoppingBag,
+        "localshipping" or "shipping" => Icons.Material.Filled.LocalShipping,
+        "devices" => Icons.Material.Filled.Devices,
+        _ => Icons.Material.Filled.Widgets
+    };
+}

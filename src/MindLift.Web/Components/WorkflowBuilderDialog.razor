@@ -1,0 +1,536 @@
+@using MindLift.Shared.Contracts
+@using System.Text.Json
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+@inject Translator T
+
+<MudDialog MaxWidth="MaxWidth.ExtraLarge" FullWidth="true">
+    <TitleContent>
+        <div class="ml-row" style="align-items:center;justify-content:space-between;width:100%;gap:12px;flex-wrap:wrap;">
+            <div class="ml-row" style="align-items:center;gap:12px;">
+                <MudAvatar Color="Color.Primary" Variant="Variant.Filled">
+                    <MudIcon Icon="@Icons.Material.Filled.AccountTree" />
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.h6">@(_isNew ? T["New Visual Workflow"] : T["Visual Workflow Builder: {0}", _name])</MudText>
+                    <div class="text-caption ml-muted">@T["Design DAG routing with condition branching, automated actions, and live simulation."]</div>
+                </div>
+            </div>
+
+            <div class="ml-row" style="align-items:center;gap:10px;">
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary">
+                    @T["{0} Nodes", _nodes.Count]
+                </MudChip>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Secondary">
+                    @T["{0} Edges", _edges.Count]
+                </MudChip>
+                <MudSwitch T="bool" @bind-Value="_isActive" Color="Color.Success" Label="@(_isActive ? T["Active"] : T["Inactive"])" />
+            </div>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <!-- Workflow Meta Header -->
+        <MudPaper Outlined="true" Class="pa-3 mb-3" Style="background:var(--mud-palette-surface);">
+            <div class="ml-grid ml-grid--4col" style="align-items:center;gap:12px;">
+                <MudTextField @bind-Value="_name" Label="@T["Workflow Name"]" Required="true"
+                              Placeholder="@T["e.g. Lead Qualification Router"]"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" />
+
+                <MudSelect T="string" Label="@T["Entity Type"]" @bind-Value="_entityType"
+                           Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true">
+                    <MudSelectItem Value="@("leads")">@T["Leads"]</MudSelectItem>
+                    <MudSelectItem Value="@("deals")">@T["Deals"]</MudSelectItem>
+                    <MudSelectItem Value="@("contacts")">@T["Contacts"]</MudSelectItem>
+                    <MudSelectItem Value="@("accounts")">@T["Accounts"]</MudSelectItem>
+                    <MudSelectItem Value="@("tickets")">@T["Tickets"]</MudSelectItem>
+                    <MudSelectItem Value="@("custom_objects")">@T["Custom Objects / Orders"]</MudSelectItem>
+                </MudSelect>
+
+                <MudSelect T="string" Label="@T["Trigger Type"]" @bind-Value="_triggerType"
+                           Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true">
+                    <MudSelectItem Value="@("record_created")">@T["Record Created"]</MudSelectItem>
+                    <MudSelectItem Value="@("record_updated")">@T["Record Updated"]</MudSelectItem>
+                    <MudSelectItem Value="@("stage_changed")">@T["Stage Changed"]</MudSelectItem>
+                    <MudSelectItem Value="@("manual")">@T["Manual / API Trigger"]</MudSelectItem>
+                </MudSelect>
+
+                <MudTextField @bind-Value="_description" Label="@T["Description"]"
+                              Placeholder="@T["Optional workflow notes"]"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </div>
+        </MudPaper>
+
+        <!-- Builder Toolbar -->
+        <MudPaper Elevation="0" Outlined="true" Class="pa-2 mb-3" Style="background:var(--mud-palette-background-grey);">
+            <div class="ml-row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                <div class="ml-row" style="align-items:center;gap:6px;flex-wrap:wrap;">
+                    <span style="font-weight:600;font-size:0.8rem;" class="ml-muted mr-1">@T["ADD NODE:"]</span>
+                    <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Bolt"
+                               OnClick="@(() => QuickAddNode("trigger"))">@T["Trigger"]</MudButton>
+                    <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Warning" StartIcon="@Icons.Material.Filled.AltRoute"
+                               OnClick="@(() => QuickAddNode("condition"))">@T["Condition"]</MudButton>
+                    <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.EditNote"
+                               OnClick="@(() => QuickAddNode("action_update_field"))">@T["Update Field"]</MudButton>
+                    <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Info" StartIcon="@Icons.Material.Filled.CheckCircleOutline"
+                               OnClick="@(() => QuickAddNode("action_task"))">@T["Create Task"]</MudButton>
+                    <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Notifications"
+                               OnClick="@(() => QuickAddNode("action_notification"))">@T["Notification"]</MudButton>
+                    <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Error" StartIcon="@Icons.Material.Filled.Email"
+                               OnClick="@(() => QuickAddNode("action_email"))">@T["Email"]</MudButton>
+                </div>
+
+                <div class="ml-row" style="align-items:center;gap:8px;">
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.GridOn"
+                               OnClick="AutoLayoutNodes">
+                        @T["Auto-Layout DAG"]
+                    </MudButton>
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.AddLink"
+                               OnClick="OpenAddEdgeDialog" Disabled="@(_nodes.Count < 2)">
+                        @T["Connect Nodes"]
+                    </MudButton>
+                    @if (!_isNew && Workflow is not null)
+                    {
+                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.PlayArrow"
+                                   OnClick="OpenSimulationDialog">
+                            @T["Simulate Flow"]
+                        </MudButton>
+                    }
+                </div>
+            </div>
+        </MudPaper>
+
+        <!-- DAG Visual Canvas Area -->
+        <div style="position:relative;min-height:460px;max-height:560px;overflow:auto;background:radial-gradient(var(--mud-palette-lines-default) 1px, transparent 1px);background-size:24px 24px;border:1px solid var(--mud-palette-lines-default);border-radius:12px;padding:24px;">
+
+            @if (_nodes.Count == 0)
+            {
+                <div class="pa-12 text-center">
+                    <MudIcon Icon="@Icons.Material.Filled.AccountTree" Size="Size.Large" Color="Color.Default" Class="mb-3" />
+                    <MudText Typo="Typo.h6">@T["Empty Workflow Canvas"]</MudText>
+                    <MudText Typo="Typo.body2" Class="ml-muted mb-4">@T["Click '+ Trigger' or select a preset to begin designing your visual DAG workflow."]</MudText>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                               OnClick="@(() => QuickAddNode("trigger"))">
+                        @T["Add Workflow Trigger"]
+                    </MudButton>
+                </div>
+            }
+            else
+            {
+                <!-- SVG Connectors Layer -->
+                <svg style="position:absolute;top:0;left:0;width:100%;height:100%;min-width:1100px;min-height:520px;pointer-events:none;z-index:1;">
+                    <defs>
+                        <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 1 L 9 5 L 0 9 z" fill="var(--mud-palette-primary)" />
+                        </marker>
+                        <marker id="arrow-true" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 1 L 9 5 L 0 9 z" fill="#10b981" />
+                        </marker>
+                        <marker id="arrow-false" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 1 L 9 5 L 0 9 z" fill="#f59e0b" />
+                        </marker>
+                    </defs>
+
+                    @foreach (var edge in _edges)
+                    {
+                        var source = _nodes.FirstOrDefault(n => n.Id == edge.SourceNodeId);
+                        var target = _nodes.FirstOrDefault(n => n.Id == edge.TargetNodeId);
+                        if (source is not null && target is not null)
+                        {
+                            var isTrue = edge.SourcePort == "true";
+                            var isFalse = edge.SourcePort == "false";
+
+                            var strokeColor = isTrue ? "#10b981" : (isFalse ? "#f59e0b" : "var(--mud-palette-primary)");
+                            var marker = isTrue ? "url(#arrow-true)" : (isFalse ? "url(#arrow-false)" : "url(#arrow)");
+
+                            var sx = source.X + 240;
+                            var sy = source.Y + 65;
+                            var tx = target.X;
+                            var ty = target.Y + 65;
+                            var mx = (sx + tx) / 2;
+
+                            <path d="M @sx @sy C @mx @sy, @mx @ty, @tx @ty"
+                                  fill="none" stroke="@strokeColor" stroke-width="2.5" marker-end="@marker" />
+
+                            @if (!string.IsNullOrWhiteSpace(edge.SourcePort))
+                            {
+                                @((MarkupString)$"<text x='{((sx + mx) / 2)}' y='{((sy + ty) / 2 - 8)}' font-size='11' font-weight='700' fill='{strokeColor}' text-anchor='middle'>{edge.SourcePort.ToUpperInvariant()}</text>")
+                            }
+                        }
+                    }
+                </svg>
+
+                <!-- Interactive Node Elements -->
+                <div style="position:relative;z-index:2;min-width:1100px;min-height:500px;">
+                    @foreach (var node in _nodes)
+                    {
+                        var isCondition = node.Type == "condition";
+                        var isTrigger = node.Type == "trigger";
+                        var isHighlighted = _highlightedNodeIds.Contains(node.Id);
+
+                        <div style="position:absolute;left:@(node.X)px;top:@(node.Y)px;width:240px;background:var(--mud-palette-surface);border:2px solid @(isHighlighted ? "#10b981" : GetNodeBorderColor(node.Type));border-radius:10px;box-shadow:0 4px 12px rgba(0,0,0,0.08);cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;@(isHighlighted ? "box-shadow:0 0 16px rgba(16,185,129,0.5);" : "")">
+                            <!-- Node Header -->
+                            <div class="pa-2 px-3 ml-row" style="align-items:center;justify-content:space-between;background:@GetNodeHeaderBackground(node.Type);border-top-left-radius:8px;border-top-right-radius:8px;color:#fff;">
+                                <div class="ml-row" style="align-items:center;gap:6px;">
+                                    <MudIcon Icon="@GetNodeIcon(node.Type)" Size="Size.Small" />
+                                    <span style="font-weight:700;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.5px;">@GetNodeTypeName(node.Type)</span>
+                                </div>
+                                <div class="ml-row" style="align-items:center;gap:2px;">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Style="color:#fff;"
+                                                   OnClick="@(() => EditNode(node))" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Style="color:#fff;"
+                                                   OnClick="@(() => DeleteNode(node))" />
+                                </div>
+                            </div>
+
+                            <!-- Node Body -->
+                            <div class="pa-3">
+                                <div style="font-weight:700;font-size:0.95rem;margin-bottom:4px;color:var(--mud-palette-text-primary);">
+                                    @node.Label
+                                </div>
+
+                                <!-- Node Preview Info -->
+                                @if (isCondition && node.Condition is not null)
+                                {
+                                    <div class="pa-1 px-2" style="background:var(--mud-palette-background-grey);border-radius:4px;font-size:0.75rem;font-family:monospace;color:var(--mud-palette-text-primary);">
+                                        @node.Condition.Field @node.Condition.Operator @node.Condition.Value
+                                    </div>
+                                    <div class="ml-row mt-2" style="justify-content:space-between;font-size:0.7rem;font-weight:700;">
+                                        <span style="color:#10b981;">● TRUE</span>
+                                        <span style="color:#f59e0b;">● FALSE</span>
+                                    </div>
+                                }
+                                else if (node.Config is not null && node.Config.Count > 0)
+                                {
+                                    <div style="font-size:0.75rem;color:var(--mud-palette-text-secondary);">
+                                        @foreach (var kvp in node.Config.Take(2))
+                                        {
+                                            <div><strong>@kvp.Key:</strong> @kvp.Value</div>
+                                        }
+                                    </div>
+                                }
+                                else if (isTrigger)
+                                {
+                                    <div style="font-size:0.75rem;color:var(--mud-palette-text-secondary);">
+                                        @T["Fires on: {0}", _triggerType]
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <!-- Edges Table (Connections List) -->
+        @if (_edges.Count > 0)
+        {
+            <div class="mt-3">
+                <div class="ml-row" style="align-items:center;gap:6px;margin-bottom:6px;">
+                    <MudIcon Icon="@Icons.Material.Filled.AltRoute" Size="Size.Small" Color="Color.Default" />
+                    <span style="font-weight:600;font-size:0.8rem;" class="ml-muted">@T["ACTIVE CONNECTIONS ({0}):", _edges.Count]</span>
+                </div>
+                <div class="ml-row" style="gap:6px;flex-wrap:wrap;">
+                    @foreach (var edge in _edges)
+                    {
+                        var s = _nodes.FirstOrDefault(n => n.Id == edge.SourceNodeId)?.Label ?? edge.SourceNodeId;
+                        var t = _nodes.FirstOrDefault(n => n.Id == edge.TargetNodeId)?.Label ?? edge.TargetNodeId;
+                        var isBranch = !string.IsNullOrWhiteSpace(edge.SourcePort);
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined"
+                                 Color="@(edge.SourcePort == "true" ? Color.Success : (edge.SourcePort == "false" ? Color.Warning : Color.Primary))"
+                                 OnClose="@(() => _edges.Remove(edge))">
+                            @s ➔ @t @(isBranch ? $"({edge.SourcePort})" : "")
+                        </MudChip>
+                    }
+                </div>
+            </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Cancel">@T["Cancel"]</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save"
+                   OnClick="SaveWorkflowAsync" Disabled="_saving">
+            @T["Save Workflow"]
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public VisualWorkflowDto? Workflow { get; set; }
+
+    private bool _isNew = true;
+    private string _name = "";
+    private string? _description = "";
+    private string _entityType = "leads";
+    private string _triggerType = "record_created";
+    private bool _isActive = true;
+
+    private List<WorkflowNodeDto> _nodes = [];
+    private List<WorkflowEdgeDto> _edges = [];
+    private List<string> _highlightedNodeIds = [];
+    private bool _saving = false;
+
+    protected override void OnInitialized()
+    {
+        if (Workflow is not null)
+        {
+            _isNew = false;
+            _name = Workflow.Name;
+            _description = Workflow.Description;
+            _entityType = Workflow.EntityType;
+            _triggerType = Workflow.TriggerType;
+            _isActive = Workflow.IsActive;
+            _nodes = Workflow.Nodes.ToList();
+            _edges = Workflow.Edges.ToList();
+        }
+        else
+        {
+            // Seed a starter trigger node
+            _nodes =
+            [
+                new WorkflowNodeDto("n_start", "trigger", "Lead Created", 40, 150)
+            ];
+            _edges = [];
+        }
+    }
+
+    private void AutoLayoutNodes()
+    {
+        // Simple horizontal topological layer placement
+        double currentX = 40;
+        double currentY = 150;
+
+        for (int i = 0; i < _nodes.Count; i++)
+        {
+            var node = _nodes[i];
+            double x = currentX;
+            double y = currentY;
+
+            if (node.Type == "condition")
+            {
+                currentY = 80;
+            }
+            else if (i > 1 && _nodes[i - 1].Type == "condition")
+            {
+                currentY = 220;
+            }
+
+            _nodes[i] = node with { X = x, Y = y };
+            currentX += 300;
+        }
+
+        StateHasChanged();
+        Snackbar.Add(T["Nodes repositioned in clean topological layout."], Severity.Info);
+    }
+
+    private void QuickAddNode(string type)
+    {
+        var id = "n_" + Guid.NewGuid().ToString("N")[..6];
+        double nextX = _nodes.Count == 0 ? 40 : _nodes.Max(n => n.X) + 280;
+        double nextY = 150;
+
+        WorkflowNodeDto node;
+        switch (type)
+        {
+            case "trigger":
+                node = new(id, "trigger", "Record Intake", nextX, nextY);
+                break;
+            case "condition":
+                node = new(id, "condition", "Check Qualification", nextX, nextY,
+                    Condition: RuleNode.When("score", RuleOperators.GreaterOrEqual, "80"));
+                break;
+            case "action_update_field":
+                node = new(id, "action_update_field", "Set Enterprise Tier", nextX, nextY,
+                    Config: new Dictionary<string, object?> { ["field"] = "tier", ["value"] = "Enterprise" });
+                break;
+            case "action_task":
+                node = new(id, "action_task", "Priority Follow-up", nextX, nextY,
+                    Config: new Dictionary<string, object?> { ["title"] = "Follow up with VIP", ["dueDays"] = "1" });
+                break;
+            case "action_notification":
+                node = new(id, "action_notification", "Notify Manager", nextX, nextY,
+                    Config: new Dictionary<string, object?> { ["message"] = "High priority record detected" });
+                break;
+            case "action_email":
+                node = new(id, "action_email", "Send Welcome Email", nextX, nextY,
+                    Config: new Dictionary<string, object?> { ["to"] = "contact@client.com", ["subject"] = "Welcome to Preetham Prints" });
+                break;
+            default:
+                node = new(id, type, "Custom Action", nextX, nextY);
+                break;
+        }
+
+        _nodes.Add(node);
+
+        // Auto connect from previous node if default output
+        if (_nodes.Count >= 2 && _nodes[^2].Type != "condition")
+        {
+            _edges.Add(new WorkflowEdgeDto("e_" + Guid.NewGuid().ToString("N")[..6], _nodes[^2].Id, node.Id));
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task EditNode(WorkflowNodeDto node)
+    {
+        var parameters = new DialogParameters<WorkflowNodeDialog>
+        {
+            { x => x.Node, node },
+            { x => x.IsNew, false }
+        };
+
+        var dialog = await Dialogs.ShowAsync<WorkflowNodeDialog>(T["Edit Node"], parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled && result.Data is WorkflowNodeDto updated)
+        {
+            var idx = _nodes.FindIndex(n => n.Id == node.Id);
+            if (idx >= 0)
+            {
+                _nodes[idx] = updated with { X = node.X, Y = node.Y };
+                StateHasChanged();
+            }
+        }
+    }
+
+    private void DeleteNode(WorkflowNodeDto node)
+    {
+        _nodes.Remove(node);
+        _edges.RemoveAll(e => e.SourceNodeId == node.Id || e.TargetNodeId == node.Id);
+        StateHasChanged();
+    }
+
+    private async Task OpenAddEdgeDialog()
+    {
+        // Simple fast edge connection: choose source and target
+        if (_nodes.Count < 2) return;
+
+        var sourceNodes = _nodes.ToList();
+        var selectedSourceId = sourceNodes[0].Id;
+        var selectedTargetId = sourceNodes[1].Id;
+        var port = "";
+
+        // If source is condition, allow selecting True / False
+        var parameters = new DialogParameters();
+        var dialog = await Dialogs.ShowAsync<WorkflowConnectDialog>(T["Connect Nodes"]);
+        var res = await dialog.Result;
+        if (res != null && !res.Canceled && res.Data is WorkflowEdgeDto newEdge)
+        {
+            _edges.Add(newEdge);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenSimulationDialog()
+    {
+        if (Workflow is null) return;
+
+        var parameters = new DialogParameters<WorkflowSimulationDialog>
+        {
+            { x => x.Workflow, Workflow with { Nodes = _nodes, Edges = _edges } }
+        };
+
+        var dialog = await Dialogs.ShowAsync<WorkflowSimulationDialog>(T["Simulate Workflow"], parameters);
+        var result = await dialog.Result;
+    }
+
+    private async Task SaveWorkflowAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_name))
+        {
+            Snackbar.Add(T["Workflow Name is required."], Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var req = new SaveVisualWorkflowRequest(
+                Name: _name.Trim(),
+                Description: string.IsNullOrWhiteSpace(_description) ? null : _description.Trim(),
+                EntityType: _entityType,
+                TriggerType: _triggerType,
+                IsActive: _isActive,
+                Nodes: _nodes,
+                Edges: _edges
+            );
+
+            HttpResponseMessage response;
+            if (_isNew || Workflow is null)
+            {
+                response = await Http.PostAsJsonAsync("api/v1/workflows", req);
+            }
+            else
+            {
+                response = await Http.PutAsJsonAsync($"api/v1/workflows/{Workflow.Id}", req);
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                var saved = await response.Content.ReadFromJsonAsync<VisualWorkflowDto>();
+                Snackbar.Add(T["Workflow '{0}' saved successfully.", _name], Severity.Success);
+                MudDialog.Close(DialogResult.Ok(saved));
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add(T["Failed to save workflow: {0}", error], Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private static string GetNodeBorderColor(string type) => type switch
+    {
+        "trigger" => "var(--mud-palette-primary)",
+        "condition" => "#f59e0b",
+        "action_update_field" => "var(--mud-palette-secondary)",
+        "action_task" => "var(--mud-palette-info)",
+        "action_notification" => "var(--mud-palette-primary)",
+        "action_email" => "var(--mud-palette-error)",
+        _ => "var(--mud-palette-lines-default)"
+    };
+
+    private static string GetNodeHeaderBackground(string type) => type switch
+    {
+        "trigger" => "var(--mud-palette-primary)",
+        "condition" => "#f59e0b",
+        "action_update_field" => "var(--mud-palette-secondary)",
+        "action_task" => "var(--mud-palette-info)",
+        "action_notification" => "var(--mud-palette-primary-darken)",
+        "action_email" => "var(--mud-palette-error)",
+        _ => "var(--mud-palette-dark)"
+    };
+
+    private static string GetNodeIcon(string type) => type switch
+    {
+        "trigger" => Icons.Material.Filled.Bolt,
+        "condition" => Icons.Material.Filled.AltRoute,
+        "action_update_field" => Icons.Material.Filled.EditNote,
+        "action_task" => Icons.Material.Filled.CheckCircleOutline,
+        "action_notification" => Icons.Material.Filled.NotificationsActive,
+        "action_email" => Icons.Material.Filled.Email,
+        _ => Icons.Material.Filled.Widgets
+    };
+
+    private static string GetNodeTypeName(string type) => type switch
+    {
+        "trigger" => "Trigger",
+        "condition" => "Condition",
+        "action_update_field" => "Update Field",
+        "action_task" => "Task",
+        "action_notification" => "Notification",
+        "action_email" => "Email",
+        _ => "Action"
+    };
+}

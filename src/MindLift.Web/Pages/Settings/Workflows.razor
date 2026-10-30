@@ -1,0 +1,546 @@
+@page "/settings/workflows"
+@using MindLift.Shared.Contracts
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+@inject NavigationManager Nav
+@inject AppState App
+@inject Translator T
+
+<PageTitle>@T["Visual Workflows"] · MindLift</PageTitle>
+
+<div class="ml-page ml-page--form" data-testid="visual-workflows-page">
+    <PageHeader Title="Visual Workflows" Subtitle="Design visual DAG workflows with multi-branch condition routing, automated actions, and live record simulation.">
+        <Actions>
+            <MudMenu Label="@T["Load Industry Preset"]" Variant="Variant.Outlined" Color="Color.Default"
+                     StartIcon="@Icons.Material.Filled.AutoFixHigh" EndIcon="@Icons.Material.Filled.ArrowDropDown" Class="mr-2">
+                <MudMenuItem OnClick="SeedPrintingOrderPreset">@T["Printing Orders: Rush Production & Approval"]</MudMenuItem>
+                <MudMenuItem OnClick="SeedLeadQualificationPreset">@T["Leads: High Score Enterprise Router"]</MudMenuItem>
+                <MudMenuItem OnClick="SeedHighValueDealPreset">@T["Deals: High Value VIP Onboarding Flow"]</MudMenuItem>
+            </MudMenu>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="@(() => OpenBuilder(null))" data-testid="new-workflow-btn">
+                @T["New Workflow"]
+            </MudButton>
+        </Actions>
+    </PageHeader>
+
+    <SettingsNav Current="/settings/workflows" />
+
+    @if (!_featureEnabled)
+    {
+        <MudAlert Severity="Severity.Warning" Variant="Variant.Filled" Class="mb-4">
+            <div class="ml-row" style="align-items:center;justify-content:space-between;width:100%;">
+                <div>
+                    <div style="font-weight:600;">@T["Visual Workflow Builder Feature is Disabled"]</div>
+                    <div class="text-caption">@T["Enable the 'workflow-builder' feature flag to unlock DAG visual workflows and simulations."]</div>
+                </div>
+                <MudButton Variant="Variant.Outlined" Color="Color.Inherit" Size="Size.Small" OnClick="EnableFeatureFlagAsync">@T["Enable Feature"]</MudButton>
+            </div>
+        </MudAlert>
+    }
+
+    <!-- Metrics Bar -->
+    <div class="ml-grid ml-grid--4col mb-4">
+        <MlCard Class="pa-4 text-center">
+            <MudText Typo="Typo.h5" Color="Color.Primary" Style="font-weight:700;">@_workflows.Count</MudText>
+            <MudText Typo="Typo.caption" Class="ml-muted">@T["Total Workflows"]</MudText>
+        </MlCard>
+        <MlCard Class="pa-4 text-center">
+            <MudText Typo="Typo.h5" Color="Color.Success" Style="font-weight:700;">@_workflows.Count(w => w.IsActive)</MudText>
+            <MudText Typo="Typo.caption" Class="ml-muted">@T["Active Workflows"]</MudText>
+        </MlCard>
+        <MlCard Class="pa-4 text-center">
+            <MudText Typo="Typo.h5" Color="Color.Warning" Style="font-weight:700;">@_workflows.Sum(w => w.Nodes.Count(n => n.Type == "condition"))</MudText>
+            <MudText Typo="Typo.caption" Class="ml-muted">@T["Condition Decision Nodes"]</MudText>
+        </MlCard>
+        <MlCard Class="pa-4 text-center">
+            <MudText Typo="Typo.h5" Color="Color.Secondary" Style="font-weight:700;">@_workflows.Sum(w => w.Nodes.Count(n => n.Type.StartsWith("action")))</MudText>
+            <MudText Typo="Typo.caption" Class="ml-muted">@T["Automated Action Steps"]</MudText>
+        </MlCard>
+    </div>
+
+    <!-- Filter Bar -->
+    <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-4">
+        <div class="ml-row" style="align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+            <div style="max-width:320px;flex:1;">
+                <MudTextField @bind-Value="_searchQuery" Placeholder="@T["Search workflows by name..."]"
+                              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Clearable="true" />
+            </div>
+
+            <div class="ml-row" style="align-items:center;gap:6px;flex-wrap:wrap;">
+                <span class="text-caption ml-muted mr-1">@T["ENTITY:"]</span>
+                <MudChip T="string" Variant="@(_selectedEntity == null ? Variant.Filled : Variant.Outlined)"
+                         Color="Color.Primary" Size="Size.Small" OnClick="@(() => SetEntityFilter(null))">
+                    @T["All Entities"]
+                </MudChip>
+                <MudChip T="string" Variant="@(_selectedEntity == "leads" ? Variant.Filled : Variant.Outlined)"
+                         Color="Color.Primary" Size="Size.Small" OnClick="@(() => SetEntityFilter("leads"))">
+                    @T["Leads"]
+                </MudChip>
+                <MudChip T="string" Variant="@(_selectedEntity == "deals" ? Variant.Filled : Variant.Outlined)"
+                         Color="Color.Primary" Size="Size.Small" OnClick="@(() => SetEntityFilter("deals"))">
+                    @T["Deals"]
+                </MudChip>
+                <MudChip T="string" Variant="@(_selectedEntity == "custom_objects" ? Variant.Filled : Variant.Outlined)"
+                         Color="Color.Primary" Size="Size.Small" OnClick="@(() => SetEntityFilter("custom_objects"))">
+                    @T["Custom Objects / Orders"]
+                </MudChip>
+            </div>
+        </div>
+    </MudPaper>
+
+    <!-- Workflows Grid -->
+    @if (_loading)
+    {
+        <SkeletonTable Rows="4" Columns="4" />
+    }
+    else if (FilteredWorkflows.Count == 0)
+    {
+        <MlCard Class="pa-8 text-center">
+            <EmptyState Title="@(_workflows.Count == 0 ? T["No Visual Workflows Configured"] : T["No matching workflows found"])"
+                        Message="@(_workflows.Count == 0 ? T["Design automated DAG branching flows or load an industry preset to get started."] : T["Try clearing your search filter."])"
+                        Compact="true" />
+            @if (_workflows.Count == 0)
+            {
+                <div class="mt-4 ml-row" style="justify-content:center;gap:10px;flex-wrap:wrap;">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AutoFixHigh"
+                               OnClick="SeedPrintingOrderPreset">
+                        @T["Load Printing Order Preset"]
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Add"
+                               OnClick="@(() => OpenBuilder(null))">
+                        @T["Create From Scratch"]
+                    </MudButton>
+                </div>
+            }
+        </MlCard>
+    }
+    else
+    {
+        <div class="ml-grid ml-grid--2col">
+            @foreach (var wf in FilteredWorkflows)
+            {
+                var condCount = wf.Nodes.Count(n => n.Type == "condition");
+                var actionCount = wf.Nodes.Count(n => n.Type.StartsWith("action"));
+
+                <MudPaper Elevation="1" Class="pa-4 mb-4" Style="border:1px solid var(--mud-palette-lines-default);border-radius:12px;display:flex;flex-direction:column;justify-content:space-between;">
+                    <div>
+                        <div class="ml-row" style="align-items:flex-start;justify-content:space-between;margin-bottom:8px;">
+                            <div class="ml-row" style="align-items:center;gap:12px;">
+                                <MudAvatar Color="@GetEntityColor(wf.EntityType)" Variant="Variant.Filled">
+                                    <MudIcon Icon="@GetEntityIcon(wf.EntityType)" />
+                                </MudAvatar>
+                                <div>
+                                    <div class="ml-row" style="align-items:center;gap:8px;">
+                                        <span style="font-weight:700;font-size:1.15rem;">@wf.Name</span>
+                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Default">
+                                            @wf.EntityType.ToUpperInvariant()
+                                        </MudChip>
+                                    </div>
+                                    <span class="text-caption ml-muted">@T["Trigger: {0}", wf.TriggerType]</span>
+                                </div>
+                            </div>
+
+                            <div class="ml-row" style="align-items:center;gap:4px;">
+                                <MudSwitch T="bool" Value="@wf.IsActive" ValueChanged="@(async v => await ToggleActiveAsync(wf, v))"
+                                           Color="Color.Success" Size="Size.Small" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                               OnClick="@(() => DeleteWorkflowAsync(wf))" />
+                            </div>
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(wf.Description))
+                        {
+                            <MudText Typo="Typo.body2" Class="mb-3 ml-muted">@wf.Description</MudText>
+                        }
+
+                        <!-- Stats Pills -->
+                        <div class="ml-row mb-3" style="gap:8px;flex-wrap:wrap;">
+                            <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled" Icon="@Icons.Material.Filled.AccountTree">
+                                @T["{0} Nodes", wf.Nodes.Count]
+                            </MudChip>
+                            <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Timeline">
+                                @T["{0} Connections", wf.Edges.Count]
+                            </MudChip>
+                            @if (condCount > 0)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.AltRoute">
+                                    @T["{0} Conditions", condCount]
+                                </MudChip>
+                            }
+                            @if (actionCount > 0)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Bolt">
+                                    @T["{0} Actions", actionCount]
+                                </MudChip>
+                            }
+                        </div>
+
+                        <!-- Step Flow Preview Pills -->
+                        <div class="pa-2 px-3 mb-3" style="background:var(--mud-palette-background-grey);border-radius:6px;font-size:0.8rem;">
+                            <div class="ml-muted mb-1" style="font-size:0.75rem;font-weight:600;">@T["FLOW PATH TRAVERSAL:"]</div>
+                            <div class="ml-row" style="align-items:center;gap:6px;flex-wrap:wrap;">
+                                @for (int i = 0; i < wf.Nodes.Take(5).Count(); i++)
+                                {
+                                    var n = wf.Nodes[i];
+                                    <span class="pa-1 px-2" style="background:var(--mud-palette-surface);border:1px solid var(--mud-palette-lines-default);border-radius:4px;font-size:0.75rem;">
+                                        <strong>@n.Label</strong>
+                                    </span>
+                                    @if (i < Math.Min(wf.Nodes.Count - 1, 4))
+                                    {
+                                        <span class="ml-muted">➔</span>
+                                    }
+                                }
+                                @if (wf.Nodes.Count > 5)
+                                {
+                                    <span class="ml-muted">+@(wf.Nodes.Count - 5) @T["more"]</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Footer Actions -->
+                    <div class="ml-row mt-2" style="justify-content:space-between;align-items:center;border-top:1px solid var(--mud-palette-lines-default);padding-top:12px;">
+                        <span class="text-caption ml-muted">@T["Created {0:MMM dd, yyyy}", wf.CreatedAt]</span>
+                        <div class="ml-row" style="gap:8px;">
+                            <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.PlayArrow"
+                                       OnClick="@(() => OpenSimulation(wf))">
+                                @T["Simulate"]
+                            </MudButton>
+                            <MudIconButton Icon="@Icons.Material.Filled.History" Size="Size.Small" Color="Color.Default"
+                                           Title="@T["Execution History"]" OnClick="@(() => OpenExecutions(wf))" />
+                            <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AccountTree"
+                                       OnClick="@(() => OpenBuilder(wf))">
+                                @T["Open Builder"]
+                            </MudButton>
+                        </div>
+                    </div>
+                </MudPaper>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private bool _loading = true;
+    private bool _featureEnabled = true;
+    private List<VisualWorkflowDto> _workflows = [];
+    private string _searchQuery = "";
+    private string? _selectedEntity;
+
+    private List<VisualWorkflowDto> FilteredWorkflows => _workflows
+        .Where(w => _selectedEntity == null || w.EntityType.Equals(_selectedEntity, StringComparison.OrdinalIgnoreCase))
+        .Where(w => string.IsNullOrWhiteSpace(_searchQuery) ||
+                    w.Name.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase) ||
+                    (w.Description?.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase) ?? false))
+        .OrderByDescending(w => w.CreatedAt)
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckFeatureFlagAsync();
+        await LoadWorkflowsAsync();
+    }
+
+    private async Task CheckFeatureFlagAsync()
+    {
+        try
+        {
+            var flags = await Http.GetFromJsonAsync<List<FeatureFlagDto>>("api/v1/features");
+            var f = flags?.FirstOrDefault(x => x.Key == "workflow-builder");
+            _featureEnabled = f?.Enabled ?? true;
+        }
+        catch
+        {
+            _featureEnabled = true;
+        }
+    }
+
+    private async Task EnableFeatureFlagAsync()
+    {
+        try
+        {
+            var res = await Http.PutAsJsonAsync("api/v1/features/workflow-builder", new SetFeatureRequest(true));
+            if (res.IsSuccessStatusCode)
+            {
+                _featureEnabled = true;
+                Snackbar.Add(T["Visual Workflow Builder feature enabled."], Severity.Success);
+                await LoadWorkflowsAsync();
+            }
+            else
+            {
+                Snackbar.Add(T["Failed to enable feature."], Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task LoadWorkflowsAsync()
+    {
+        _loading = true;
+        try
+        {
+            var url = string.IsNullOrWhiteSpace(_selectedEntity) ? "api/v1/workflows" : $"api/v1/workflows?entityType={_selectedEntity}";
+            var res = await Http.GetFromJsonAsync<List<VisualWorkflowDto>>(url);
+            _workflows = res ?? [];
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void SetEntityFilter(string? entity)
+    {
+        _selectedEntity = entity;
+    }
+
+    private async Task ToggleActiveAsync(VisualWorkflowDto wf, bool active)
+    {
+        try
+        {
+            var req = new SaveVisualWorkflowRequest(
+                Name: wf.Name,
+                Description: wf.Description,
+                EntityType: wf.EntityType,
+                TriggerType: wf.TriggerType,
+                TriggerConfigJson: wf.TriggerConfigJson,
+                IsActive: active,
+                Nodes: wf.Nodes,
+                Edges: wf.Edges
+            );
+
+            var res = await Http.PutAsJsonAsync($"api/v1/workflows/{wf.Id}", req);
+            if (res.IsSuccessStatusCode)
+            {
+                var idx = _workflows.FindIndex(w => w.Id == wf.Id);
+                if (idx >= 0)
+                {
+                    _workflows[idx] = wf with { IsActive = active };
+                }
+                Snackbar.Add(active ? T["Workflow activated."] : T["Workflow deactivated."], Severity.Info);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task DeleteWorkflowAsync(VisualWorkflowDto wf)
+    {
+        var confirm = await Dialogs.ShowMessageBoxAsync(
+            T["Delete Workflow"],
+            T["Are you sure you want to permanently delete the workflow '{0}'?", wf.Name],
+            yesText: T["Delete"],
+            cancelText: T["Cancel"]
+        );
+
+        if (confirm == true)
+        {
+            try
+            {
+                var res = await Http.DeleteAsync($"api/v1/workflows/{wf.Id}");
+                if (res.IsSuccessStatusCode)
+                {
+                    _workflows.Remove(wf);
+                    Snackbar.Add(T["Workflow deleted."], Severity.Success);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add(ex.Message, Severity.Error);
+            }
+        }
+    }
+
+    private async Task OpenBuilder(VisualWorkflowDto? wf)
+    {
+        var parameters = new DialogParameters<WorkflowBuilderDialog>
+        {
+            { x => x.Workflow, wf }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.ExtraLarge, FullWidth = true, CloseButton = true };
+        var dialog = await Dialogs.ShowAsync<WorkflowBuilderDialog>(
+            wf is null ? T["New Visual Workflow"] : T["Edit Workflow: {0}", wf.Name],
+            parameters,
+            options
+        );
+
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
+        {
+            await LoadWorkflowsAsync();
+        }
+    }
+
+    private async Task OpenSimulation(VisualWorkflowDto wf)
+    {
+        var parameters = new DialogParameters<WorkflowSimulationDialog>
+        {
+            { x => x.Workflow, wf }
+        };
+
+        var dialog = await Dialogs.ShowAsync<WorkflowSimulationDialog>(T["Simulate Workflow"], parameters);
+        await dialog.Result;
+    }
+
+    private async Task OpenExecutions(VisualWorkflowDto wf)
+    {
+        var parameters = new DialogParameters<WorkflowExecutionsDialog>
+        {
+            { x => x.Workflow, wf }
+        };
+
+        var dialog = await Dialogs.ShowAsync<WorkflowExecutionsDialog>(T["Execution History"], parameters);
+        await dialog.Result;
+    }
+
+    #region Presets
+    private async Task SeedPrintingOrderPreset()
+    {
+        var nodes = new List<WorkflowNodeDto>
+        {
+            new("n_start", "trigger", "Printing Order Created", 40, 150),
+            new("n_cond", "condition", "High Volume Check (> 5,000)", 340, 150,
+                Condition: RuleNode.When("quantity", RuleOperators.GreaterThan, "5000")),
+            new("n_tag_rush", "action_update_field", "Tag Rush Production", 660, 60,
+                Config: new Dictionary<string, object?> { ["field"] = "priority", ["value"] = "Urgent / Rush" }),
+            new("n_task_prod", "action_task", "Expedite Press Scheduling", 960, 60,
+                Config: new Dictionary<string, object?> { ["title"] = "Reserve Heidelberg Press 4", ["dueDays"] = "1" }),
+            new("n_tag_std", "action_update_field", "Standard Queue Routing", 660, 240,
+                Config: new Dictionary<string, object?> { ["field"] = "priority", ["value"] = "Normal" }),
+            new("n_notif", "action_notification", "Notify Production Floor", 960, 240,
+                Config: new Dictionary<string, object?> { ["message"] = "New batch added to printing queue" })
+        };
+
+        var edges = new List<WorkflowEdgeDto>
+        {
+            new("e_1", "n_start", "n_cond"),
+            new("e_true", "n_cond", "n_tag_rush", SourcePort: "true"),
+            new("e_rush_next", "n_tag_rush", "n_task_prod"),
+            new("e_false", "n_cond", "n_tag_std", SourcePort: "false"),
+            new("e_std_next", "n_tag_std", "n_notif")
+        };
+
+        await CreatePresetWorkflowAsync("Printing Order Volume Router", "Automatically flags printing orders with quantity > 5,000 for rush press scheduling.", "custom_objects", "record_created", nodes, edges);
+    }
+
+    private async Task SeedLeadQualificationPreset()
+    {
+        var nodes = new List<WorkflowNodeDto>
+        {
+            new("n_start", "trigger", "New Lead Registered", 40, 150),
+            new("n_cond", "condition", "Score >= 80 (VIP)", 340, 150,
+                Condition: RuleNode.When("score", RuleOperators.GreaterOrEqual, "80")),
+            new("n_ent_tier", "action_update_field", "Set Tier = Enterprise", 660, 60,
+                Config: new Dictionary<string, object?> { ["field"] = "tier", ["value"] = "Enterprise" }),
+            new("n_task_call", "action_task", "Priority Call in 24h", 960, 60,
+                Config: new Dictionary<string, object?> { ["title"] = "VIP Sales Discovery Call", ["dueDays"] = "1" }),
+            new("n_std_tier", "action_update_field", "Set Tier = Standard", 660, 240,
+                Config: new Dictionary<string, object?> { ["field"] = "tier", ["value"] = "Standard" }),
+            new("n_email_nurture", "action_email", "Send Product Catalog", 960, 240,
+                Config: new Dictionary<string, object?> { ["to"] = "{{contact_email}}", ["subject"] = "Welcome to Preetham Prints Catalog" })
+        };
+
+        var edges = new List<WorkflowEdgeDto>
+        {
+            new("e_1", "n_start", "n_cond"),
+            new("e_true", "n_cond", "n_ent_tier", SourcePort: "true"),
+            new("e_ent_next", "n_ent_tier", "n_task_call"),
+            new("e_false", "n_cond", "n_std_tier", SourcePort: "false"),
+            new("e_std_next", "n_std_tier", "n_email_nurture")
+        };
+
+        await CreatePresetWorkflowAsync("Lead Score Qualification Router", "Routes inbound leads to Enterprise priority or Standard nurture track based on qualification score.", "leads", "record_created", nodes, edges);
+    }
+
+    private async Task SeedHighValueDealPreset()
+    {
+        var nodes = new List<WorkflowNodeDto>
+        {
+            new("n_start", "trigger", "Deal Stage Changed", 40, 150),
+            new("n_cond", "condition", "Deal Amount > 50,000 AED", 340, 150,
+                Condition: RuleNode.When("amount", RuleOperators.GreaterThan, "50000")),
+            new("n_notif_exec", "action_notification", "Notify Executive Leadership", 660, 60,
+                Config: new Dictionary<string, object?> { ["message"] = "High value deal reached closing stage" }),
+            new("n_task_contract", "action_task", "Prepare Legal Packaging Contract", 960, 60,
+                Config: new Dictionary<string, object?> { ["title"] = "Draft Commercial Print Agreement", ["dueDays"] = "2" }),
+            new("n_task_std", "action_task", "Standard Account Follow-up", 660, 240,
+                Config: new Dictionary<string, object?> { ["title"] = "Standard pipeline check-in", ["dueDays"] = "5" })
+        };
+
+        var edges = new List<WorkflowEdgeDto>
+        {
+            new("e_1", "n_start", "n_cond"),
+            new("e_true", "n_cond", "n_notif_exec", SourcePort: "true"),
+            new("e_exec_next", "n_notif_exec", "n_task_contract"),
+            new("e_false", "n_cond", "n_task_std", SourcePort: "false")
+        };
+
+        await CreatePresetWorkflowAsync("High-Value Deal Closing Guard", "Triggers executive notifications and legal contract tasks when deals exceed 50,000 AED.", "deals", "stage_changed", nodes, edges);
+    }
+
+    private async Task CreatePresetWorkflowAsync(string name, string description, string entity, string trigger, List<WorkflowNodeDto> nodes, List<WorkflowEdgeDto> edges)
+    {
+        try
+        {
+            var req = new SaveVisualWorkflowRequest(
+                Name: name,
+                Description: description,
+                EntityType: entity,
+                TriggerType: trigger,
+                IsActive: true,
+                Nodes: nodes,
+                Edges: edges
+            );
+
+            var res = await Http.PostAsJsonAsync("api/v1/workflows", req);
+            if (res.IsSuccessStatusCode)
+            {
+                Snackbar.Add(T["Industry preset '{0}' loaded successfully.", name], Severity.Success);
+                await LoadWorkflowsAsync();
+            }
+            else
+            {
+                var err = await res.Content.ReadAsStringAsync();
+                Snackbar.Add(T["Failed to load preset: {0}", err], Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+    #endregion
+
+    private static Color GetEntityColor(string entity) => entity.ToLowerInvariant() switch
+    {
+        "leads" => Color.Primary,
+        "deals" => Color.Success,
+        "contacts" => Color.Info,
+        "accounts" => Color.Warning,
+        "custom_objects" => Color.Secondary,
+        _ => Color.Default
+    };
+
+    private static string GetEntityIcon(string entity) => entity.ToLowerInvariant() switch
+    {
+        "leads" => Icons.Material.Filled.PersonAdd,
+        "deals" => Icons.Material.Filled.AttachMoney,
+        "contacts" => Icons.Material.Filled.PermContactCalendar,
+        "accounts" => Icons.Material.Filled.Business,
+        "custom_objects" => Icons.Material.Filled.Print,
+        _ => Icons.Material.Filled.Widgets
+    };
+}

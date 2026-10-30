@@ -127,6 +127,18 @@
         }
 
 
+        @if (_proactiveDuplicates.Count > 0 && !_converted && !_showDuplicates)
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-4" Icon="@Icons.Material.Filled.WarningAmber">
+                <div class="d-flex align-center justify-space-between flex-wrap gap-2">
+                    <span style="font-weight: 500;">@T["{0} potential duplicate record(s) detected for this lead.", _proactiveDuplicates.Count]</span>
+                    <MudButton Variant="Variant.Filled" Color="Color.Warning" Size="Size.Small" StartIcon="@Icons.Material.Filled.CompareArrows" OnClick="OpenProactiveMergeAsync" data-testid="proactive-merge-btn">
+                        @T["Compare & Merge"]
+                    </MudButton>
+                </div>
+            </MudAlert>
+        }
+
         <MudGrid Spacing="4">
             <MudItem xs="12" md="6">
                 <MlCard Title="Details">
@@ -227,6 +239,36 @@
         _candidates = (await response.Content.ReadFromJsonAsync<List<DuplicateCandidateDto>>() ?? []).Where(c => c.Id != Id).ToList();
     }
 
+    private List<DuplicateCandidateDto> _proactiveDuplicates = [];
+
+    private async Task OpenProactiveMergeAsync()
+    {
+        if (_proactiveDuplicates.Count == 0) return;
+        var candidateIds = _proactiveDuplicates.Where(c => c.Kind == LeadKind).Select(c => c.Id).Take(2).ToList();
+        if (candidateIds.Count == 0)
+        {
+            _showDuplicates = true;
+            _candidates = _proactiveDuplicates;
+            return;
+        }
+
+        var parameters = new DialogParameters
+        {
+            ["EntityType"] = "lead",
+            ["MasterId"] = Id,
+            ["DuplicateIds"] = candidateIds
+        };
+
+        var dialog = await Dialogs.ShowAsync<SideBySideMergeDialog>(string.Empty, parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled && result.Data is true)
+        {
+            _showDuplicates = false;
+            _selectedIds.Clear();
+            await LoadAsync();
+        }
+    }
+
     private async Task MergeAsync()
     {
         if (_lead is null)
@@ -240,29 +282,27 @@
             return;
         }
 
-        var count = _selectedIds.Count;
-        var plural = count == 1 ? string.Empty : "s";
-        var confirmed = await Dialogs.ConfirmAsync(
-            $"Merge {count} lead{plural} into {_lead.FirstName} {_lead.LastName}?".Replace("  ", " "),
-            $"The selected lead{plural} will be removed. Empty fields on this lead are filled from {(count == 1 ? "it" : "them")}, and {(count == 1 ? "its" : "their")} tags are added.",
-            T["Merge"],
-            danger: true);
-        if (!confirmed)
+        if (_selectedIds.Count > 2)
         {
+            Snackbar.Add(T["Select up to 2 duplicates at a time for side-by-side consolidation."], Severity.Warning);
             return;
         }
 
-        var response = await Http.PostAsJsonAsync($"api/v1/leads/{Id}/merge", new MergeLeadsRequest(_selectedIds.ToList()));
-        if (!response.IsSuccessStatusCode)
+        var parameters = new DialogParameters
         {
-            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not merge these leads."]), Severity.Error);
-            return;
-        }
+            ["EntityType"] = "lead",
+            ["MasterId"] = Id,
+            ["DuplicateIds"] = _selectedIds.ToList()
+        };
 
-        Snackbar.Add($"Merged {count} lead{plural}", Severity.Success);
-        _showDuplicates = false;
-        _selectedIds.Clear();
-        await LoadAsync();
+        var dialog = await Dialogs.ShowAsync<SideBySideMergeDialog>(string.Empty, parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled && result.Data is true)
+        {
+            _showDuplicates = false;
+            _selectedIds.Clear();
+            await LoadAsync();
+        }
     }
 
     private bool _showConvert;
@@ -302,6 +342,23 @@
             {
                 _lead = await response.Content.ReadFromJsonAsync<LeadDto>();
                 _accountName ??= _lead?.CompanyName;
+
+                try
+                {
+                    var dupsRes = await Http.GetAsync($"api/v1/leads/{Id}/duplicates");
+                    if (dupsRes.IsSuccessStatusCode)
+                    {
+                        _proactiveDuplicates = (await dupsRes.Content.ReadFromJsonAsync<List<DuplicateCandidateDto>>() ?? []).Where(c => c.Id != Id).ToList();
+                    }
+                    else
+                    {
+                        _proactiveDuplicates = [];
+                    }
+                }
+                catch
+                {
+                    _proactiveDuplicates = [];
+                }
             }
             else
             {
