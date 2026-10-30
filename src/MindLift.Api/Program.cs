@@ -95,8 +95,7 @@ static string ToNpgsqlKeyValue(string cs)
         Database = uri.AbsolutePath.TrimStart('/'),
         Username = userInfo.Length > 0 ? Uri.UnescapeDataString(userInfo[0]) : string.Empty,
         Password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : string.Empty,
-        SslMode  = Enum.TryParse<Npgsql.SslMode>(sslMode, true, out var sm) ? sm : Npgsql.SslMode.Require,
-        TrustServerCertificate = false
+        SslMode  = Enum.TryParse<Npgsql.SslMode>(sslMode, true, out var sm) ? sm : Npgsql.SslMode.Require
     };
     return sb.ConnectionString;
 }
