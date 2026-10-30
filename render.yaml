@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: mindlift-staging
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    healthCheckPath: /health/ready
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ASPNETCORE_HTTP_PORTS
+        value: 8080
+      - key: Database__MigrateOnStartup
+        value: "true"
+      - key: Jwt__Issuer
+        value: "mindlift-staging"
+      - key: Jwt__Audience
+        value: "mindlift-api"
+      - key: Jwt__SigningKey
+        generateValue: true
+      - key: Security__SecretKey
+        generateValue: true
+      - key: ConnectionStrings__Default
+        sync: false
