@@ -71,35 +71,17 @@ if (builder.Configuration["Sentry:Dsn"] is { Length: > 0 } sentryDsn)
     });
 }
 
-var connectionString = builder.Configuration.GetConnectionString("Default") ?? string.Empty;
+var rawConnectionString = builder.Configuration.GetConnectionString("Default") ?? string.Empty;
+var connectionString = MindLift.Infrastructure.DependencyInjection.NormalizeConnectionString(rawConnectionString);
 
-// Neon (and many PaaS providers) return a URI-format connection string (postgresql://user:pass@host/db?sslmode=require).
-// EF Core / Npgsql can parse URIs, but Hangfire.PostgreSql passes the raw string directly to
-// NpgsqlConnectionStringBuilder which only accepts Key=Value format → crash at startup.
-// Convert once here so both paths are satisfied.
-static string ToNpgsqlKeyValue(string cs)
+// Override ConnectionStrings:Default with normalized Key=Value format so EF Core, Npgsql, health checks,
+// and migrations all receive standard Key=Value parameters instead of raw postgresql:// URIs.
+if (!string.IsNullOrEmpty(connectionString) && connectionString != rawConnectionString)
 {
-    if (string.IsNullOrWhiteSpace(cs)) return cs;
-    if (!cs.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase) &&
-        !cs.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase))
-        return cs; // already Key=Value, nothing to do
-
-    var uri = new Uri(cs);
-    var userInfo = uri.UserInfo.Split(':', 2);
-    var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
-    var sslMode = query["sslmode"] ?? "Require";
-    var sb = new Npgsql.NpgsqlConnectionStringBuilder
-    {
-        Host     = uri.Host,
-        Port     = uri.Port > 0 ? uri.Port : 5432,
-        Database = uri.AbsolutePath.TrimStart('/'),
-        Username = userInfo.Length > 0 ? Uri.UnescapeDataString(userInfo[0]) : string.Empty,
-        Password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : string.Empty,
-        SslMode  = Enum.TryParse<Npgsql.SslMode>(sslMode, true, out var sm) ? sm : Npgsql.SslMode.Require
-    };
-    return sb.ConnectionString;
+    builder.Configuration["ConnectionStrings:Default"] = connectionString;
 }
-var hangfireConnectionString = ToNpgsqlKeyValue(connectionString);
+
+var hangfireConnectionString = connectionString;
 var jwt = builder.Configuration.GetSection("Jwt").Get<MindLift.Infrastructure.JwtOptions>() ?? new();
 
 builder.Services.AddMindLiftInfrastructure(builder.Configuration);

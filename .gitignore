@@ -497,3 +497,4 @@ App_Data/
 
 # local experiments and test builds
 .scratch/
+.neon

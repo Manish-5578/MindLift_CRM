@@ -23,11 +23,40 @@ namespace MindLift.Infrastructure;
 
 public static class DependencyInjection
 {
+    /// <summary>
+    /// Converts a postgresql:// or postgres:// URI connection string (used by Neon, Supabase, Render, Heroku)
+    /// to standard Npgsql Key=Value format (Host=...;Port=...;Database=...;Username=...;Password=...;SSL Mode=...).
+    /// Npgsql v9+ and Hangfire require Key=Value format.
+    /// </summary>
+    public static string NormalizeConnectionString(string cs)
+    {
+        if (string.IsNullOrWhiteSpace(cs)) return cs;
+        if (!cs.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase) &&
+            !cs.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase))
+            return cs;
+
+        var uri = new Uri(cs);
+        var userInfo = uri.UserInfo.Split(':', 2);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        var sslMode = query["sslmode"] ?? "Require";
+        var sb = new Npgsql.NpgsqlConnectionStringBuilder
+        {
+            Host     = uri.Host,
+            Port     = uri.Port > 0 ? uri.Port : 5432,
+            Database = uri.AbsolutePath.TrimStart('/'),
+            Username = userInfo.Length > 0 ? Uri.UnescapeDataString(userInfo[0]) : string.Empty,
+            Password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : string.Empty,
+            SslMode  = Enum.TryParse<Npgsql.SslMode>(sslMode, true, out var sm) ? sm : Npgsql.SslMode.Require
+        };
+        return sb.ConnectionString;
+    }
+
     /// <summary>Registers the database, identity, security, tenancy, administration services, mail, file storage and cache.</summary>
     public static IServiceCollection AddMindLiftInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        var connectionString = configuration.GetConnectionString("Default")
+        var rawConnectionString = configuration.GetConnectionString("Default")
             ?? throw new InvalidOperationException("ConnectionStrings:Default is not configured.");
+        var connectionString = NormalizeConnectionString(rawConnectionString);
 
         services.Configure<JwtOptions>(configuration.GetSection("Jwt"));
         services.Configure<SmtpOptions>(configuration.GetSection("Smtp"));
