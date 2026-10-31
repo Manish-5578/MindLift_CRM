@@ -30,7 +30,8 @@ public static class SystemFields
     [
         new("leads", "Lead", typeof(Lead),
         [
-            F("first_name", "First name", FieldType.Text, nameof(Lead.FirstName), required: true),
+            F("id", "ID", FieldType.Lookup, nameof(Lead.Id)),
+            F("first_name", "First name", FieldType.Text, nameof(Lead.FirstName), required: false),
             F("last_name", "Last name", FieldType.Text, nameof(Lead.LastName)),
             F("email", "Email", FieldType.Email, nameof(Lead.Email)),
             F("phone", "Phone", FieldType.Phone, nameof(Lead.Phone)),

@@ -54,6 +54,7 @@
                 @if (CanEditRecords)
                 {
                     <MudMenuItem OnClick="() => EditRowAsync(row.Id)" Icon="@Icons.Material.Outlined.Edit" data-testid="row-edit">@T["Edit"]</MudMenuItem>
+                    <MudMenuItem OnClick="() => OpenMoveToViewDialog(row)" Icon="@Icons.Material.Outlined.DriveFileMove" data-testid="row-move-view">@T["Change view"]</MudMenuItem>
                 }
                 @if (CanDeleteRecords)
                 {
@@ -65,6 +66,27 @@
 </div>
 
 <LeadFormDrawer @ref="_form" @bind-Open="_drawer" OnSaved="OnSaved" />
+
+<MudDialog @bind-Visible="_moveDialogOpen" Options="new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true }" data-testid="move-view-dialog">
+    <TitleContent>
+        <MudText Typo="Typo.h6">@T["Change view"]</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="ml-muted mb-3">
+            @T["Move {0} to another view:", _movingLead is not null ? LeadTitle(_movingLead) : ""]
+        </MudText>
+        <MudSelect T="string" Label="@T["Target view"]" @bind-Value="_targetViewKey" Variant="Variant.Outlined" Dense="true" data-testid="select-target-view">
+            @foreach (var v in AvailableViewsForMove)
+            {
+                <MudSelectItem Value="@v.Key">@(v.SavedId is null ? T[v.Label] : v.Label)</MudSelectItem>
+            }
+        </MudSelect>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _moveDialogOpen = false">@T["Cancel"]</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(string.IsNullOrEmpty(_targetViewKey) || _targetViewKey == CurrentViewKey)" OnClick="ConfirmMoveLeadAsync" data-testid="confirm-move-view">@T["Move"]</MudButton>
+    </DialogActions>
+</MudDialog>
 
 @code {
     private const string MineView = "mine";
@@ -122,10 +144,10 @@
         _columns = BuildColumns();
         _card = lead =>
             @<div class="ml-cell-primary">
-                <UserAvatar Name="@lead.FullName" Id="@lead.Id" Size="40" />
+                <UserAvatar Name="@LeadTitle(lead)" Id="@lead.Id" Size="40" />
                 <div class="ml-cell-primary__text ml-grow">
-                    <MudText Typo="Typo.subtitle1" Class="ml-truncate">@lead.FullName</MudText>
-                    <MudText Typo="Typo.body2" Class="ml-muted ml-truncate">@Secondary(lead)</MudText>
+                    <MudText Typo="Typo.subtitle1" Class="ml-truncate">@LeadTitle(lead)</MudText>
+                    <MudText Typo="Typo.body2" Class="ml-muted ml-truncate">@LeadSubtitle(lead)</MudText>
                     <MudText Typo="Typo.caption" Class="ml-muted">@(lead.Source is null ? T["No source"] : SourceLabel(lead.Source)) · <DateText Value="@lead.CreatedAtUtc" /></MudText>
                 </div>
                 <StatusChip Text="@StatusLabel(lead.Status)" Color="@StatusColors.For(StatusCategory(lead.Status))" />
@@ -150,7 +172,13 @@
 
     private static string? LeadHref(LeadListItemDto lead) => "/leads/" + lead.Id;
 
-    private static string Secondary(LeadListItemDto lead) => lead.Email ?? lead.Phone ?? lead.CompanyName ?? "—";
+    private static string LeadTitle(LeadListItemDto lead) =>
+        !string.IsNullOrWhiteSpace(lead.CompanyName) ? lead.CompanyName : (!string.IsNullOrWhiteSpace(lead.FullName) ? lead.FullName : "—");
+
+    private static string LeadSubtitle(LeadListItemDto lead) =>
+        !string.IsNullOrWhiteSpace(lead.FullName) ? lead.FullName : (lead.Email ?? lead.Phone ?? "—");
+
+    private static string Secondary(LeadListItemDto lead) => LeadSubtitle(lead);
 
     private void OpenNewLead()
     {
@@ -182,13 +210,13 @@
     [
         new()
         {
-            Header = "Name", SortField = "first_name",
+            Header = "Company", SortField = "company_name",
             Cell = lead =>
                 @<div class="ml-cell-primary">
-                    <UserAvatar Name="@lead.FullName" Id="@lead.Id" Size="32" />
+                    <UserAvatar Name="@LeadTitle(lead)" Id="@lead.Id" Size="32" />
                     <div class="ml-cell-primary__text">
-                        <MudText Typo="Typo.subtitle2" Class="ml-truncate">@lead.FullName</MudText>
-                        <MudText Typo="Typo.caption" Class="ml-muted ml-truncate">@Secondary(lead)</MudText>
+                        <MudText Typo="Typo.subtitle2" Class="ml-truncate">@LeadTitle(lead)</MudText>
+                        <MudText Typo="Typo.caption" Class="ml-muted ml-truncate">@LeadSubtitle(lead)</MudText>
                     </div>
                 </div>,
         },
@@ -327,6 +355,47 @@
         }
 
         Snackbar.Add(T["Deleted"], Severity.Success);
+        if (_list is not null)
+        {
+            await _list.ReloadAsync();
+        }
+    }
+
+    private bool _moveDialogOpen;
+    private LeadListItemDto? _movingLead;
+    private string? _targetViewKey;
+
+    private string CurrentViewKey => _list?.CurrentViewKey ?? string.Empty;
+
+    private IReadOnlyList<ListView> AvailableViewsForMove => _list?.AllViewsList ?? [.. _views, .. _savedViews];
+
+    private void OpenMoveToViewDialog(LeadListItemDto lead)
+    {
+        _movingLead = lead;
+        _targetViewKey = null;
+        _moveDialogOpen = true;
+    }
+
+    private async Task ConfirmMoveLeadAsync()
+    {
+        if (_movingLead is null || string.IsNullOrWhiteSpace(_targetViewKey))
+        {
+            return;
+        }
+
+        var lead = _movingLead;
+        _moveDialogOpen = false;
+        var sourceViewKey = _list?.CurrentViewKey;
+        var problem = await SavedViews.MoveRecordAsync(Http, "leads", lead.Id, _targetViewKey, sourceViewKey, T["We could not move this lead."]);
+        if (problem is not null)
+        {
+            Snackbar.Add(problem, Severity.Error);
+            return;
+        }
+
+        var targetName = AvailableViewsForMove.FirstOrDefault(v => v.Key == _targetViewKey)?.Label ?? _targetViewKey;
+        Snackbar.Add(T["Moved lead to {0}", targetName], Severity.Success);
+        await LoadSavedViewsAsync();
         if (_list is not null)
         {
             await _list.ReloadAsync();

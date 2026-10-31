@@ -29,6 +29,14 @@ public static class SavedViews
         return response.IsSuccessStatusCode ? null : await ProblemText.FromAsync(response, failure);
     }
 
+    /// <summary>Moves a record into a target view (and removes from previous view if applicable).</summary>
+    public static async Task<string?> MoveRecordAsync(HttpClient http, string entity, Guid recordId, string targetViewKey, string? sourceViewKey, string failure)
+    {
+        var response = await http.PostAsJsonAsync("api/v1/views/move-record",
+            new MoveRecordToViewRequest(entity, recordId, targetViewKey, sourceViewKey));
+        return response.IsSuccessStatusCode ? null : await ProblemText.FromAsync(response, failure);
+    }
+
     /// <summary>Deletes a view. Returns null on success, or the reason it could not be deleted.</summary>
     public static async Task<string?> DeleteAsync(HttpClient http, Guid id, string failure)
     {

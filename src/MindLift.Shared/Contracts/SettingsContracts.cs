@@ -155,6 +155,8 @@ public sealed record SavedViewDto(Guid Id, string EntityType, string Name, bool 
 
 public sealed record SaveSavedViewRequest(string EntityType, string Name, bool IsShared, bool IsDefault, FilterGroup? Filter, IReadOnlyList<string> Columns, string? SortField, string? SortDir);
 
+public sealed record MoveRecordToViewRequest(string EntityType, Guid RecordId, string TargetViewKey, string? SourceViewKey);
+
 // ---------- Bootstrap ----------
 
 /// <summary>What the current user may do in one module. Scope is Own, Team or All.</summary>

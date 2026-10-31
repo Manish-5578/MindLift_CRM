@@ -32,6 +32,17 @@ public sealed class ViewsController(SavedViewService views) : ControllerBase
     public async Task<ActionResult<SavedViewDto>> Create([FromBody] SaveSavedViewRequest request, CancellationToken cancellationToken)
         => Ok(await views.CreateAsync(request, cancellationToken));
 
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<SavedViewDto>> Update(Guid id, [FromBody] SaveSavedViewRequest request, CancellationToken cancellationToken)
+        => Ok(await views.UpdateAsync(id, request, cancellationToken));
+
+    [HttpPost("move-record")]
+    public async Task<IActionResult> MoveRecord([FromBody] MoveRecordToViewRequest request, CancellationToken cancellationToken)
+    {
+        await views.MoveRecordAsync(request, cancellationToken);
+        return NoContent();
+    }
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {

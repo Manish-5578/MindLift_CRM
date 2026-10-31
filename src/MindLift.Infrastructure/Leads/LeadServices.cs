@@ -898,9 +898,9 @@ public sealed class LeadService(
 
     private async Task ApplyAsync(Lead lead, SaveLeadRequest request, bool isNew, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(request.FirstName))
+        if (string.IsNullOrWhiteSpace(request.FirstName) && string.IsNullOrWhiteSpace(request.LastName) && string.IsNullOrWhiteSpace(request.CompanyName))
         {
-            throw new ValidationException(new Dictionary<string, string[]> { ["firstName"] = ["First name is required."] });
+            throw new ValidationException(new Dictionary<string, string[]> { ["companyName"] = ["Enter a company name or contact name."] });
         }
 
         var status = request.Status ?? (isNew ? "new" : lead.Status);
@@ -924,8 +924,8 @@ public sealed class LeadService(
             throw new ValidationException(customErrors);
         }
 
-        lead.FirstName = request.FirstName.Trim();
-        lead.LastName = request.LastName.Trim();
+        lead.FirstName = (request.FirstName ?? string.Empty).Trim();
+        lead.LastName = (request.LastName ?? string.Empty).Trim();
         lead.Email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim();
         lead.NormalizedEmail = LeadNormalizer.Email(request.Email);
         lead.Phone = string.IsNullOrWhiteSpace(request.Phone) ? null : request.Phone.Trim();

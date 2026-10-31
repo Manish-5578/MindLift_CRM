@@ -261,7 +261,7 @@ public sealed class SavedViewService(AppDbContext db, ITenantContext tenant, Set
         await EnsurePermissionAsync(entityKey, PermissionAction.View, cancellationToken);
         var me = tenant.UserId;
         var rows = await db.SavedViews.AsNoTracking()
-            .Where(v => v.EntityType == entityKey && (v.IsShared || v.OwnerUserId == me))
+            .Where(v => v.EntityType == entityKey && (v.IsShared || (me != null && v.OwnerUserId == me) || (me == null && v.OwnerUserId == null)))
             .OrderBy(v => v.Name)
             .ToListAsync(cancellationToken);
         return rows.Select(Map).ToList();
@@ -294,6 +294,135 @@ public sealed class SavedViewService(AppDbContext db, ITenantContext tenant, Set
         await db.SaveChangesAsync(cancellationToken);
         await version.BumpAsync(cancellationToken);
         return Map(view);
+    }
+
+    public async Task<SavedViewDto> UpdateAsync(Guid id, SaveSavedViewRequest request, CancellationToken cancellationToken = default)
+    {
+        var view = await db.SavedViews.FirstOrDefaultAsync(v => v.Id == id, cancellationToken) ?? throw new NotFoundException("View", id);
+        await EnsurePermissionAsync(view.EntityType, PermissionAction.View, cancellationToken);
+        if (request.IsShared && !view.IsShared)
+        {
+            await EnsurePermissionAsync(request.EntityType, PermissionAction.Edit, cancellationToken);
+        }
+
+        view.Name = request.Name.Trim();
+        view.IsShared = request.IsShared;
+        view.IsDefault = request.IsDefault;
+        view.Filter = request.Filter is null ? null : JsonDocument.Parse(JsonSerializer.Serialize(request.Filter));
+        view.Columns = JsonSerializer.Serialize(request.Columns);
+        view.SortField = request.SortField;
+        view.SortDir = request.SortDir;
+
+        await db.SaveChangesAsync(cancellationToken);
+        await version.BumpAsync(cancellationToken);
+        return Map(view);
+    }
+
+    public async Task MoveRecordAsync(MoveRecordToViewRequest request, CancellationToken cancellationToken = default)
+    {
+        await EnsurePermissionAsync(request.EntityType, PermissionAction.Edit, cancellationToken);
+
+        static Guid? ParseViewId(string? key)
+        {
+            if (string.IsNullOrWhiteSpace(key)) return null;
+            var clean = key.StartsWith("saved_") ? key[6..] : key;
+            return Guid.TryParse(clean, out var id) ? id : null;
+        }
+
+        var targetId = ParseViewId(request.TargetViewKey);
+        var sourceId = ParseViewId(request.SourceViewKey);
+
+        // 1. Add record to target saved view if target is a saved view
+        if (targetId is { } tId)
+        {
+            var targetView = await db.SavedViews.FirstOrDefaultAsync(v => v.Id == tId, cancellationToken);
+            if (targetView is not null)
+            {
+                var filterGroup = targetView.Filter is null
+                    ? new FilterGroup()
+                    : JsonSerializer.Deserialize<FilterGroup>(targetView.Filter.RootElement.GetRawText()) ?? new FilterGroup();
+
+                var idCondition = filterGroup.Conditions.FirstOrDefault(c => c.Field == "id" && c.Op == FilterOperator.In);
+                var currentIds = new HashSet<Guid>();
+                if (idCondition?.Value is { ValueKind: JsonValueKind.Array } arr)
+                {
+                    foreach (var item in arr.EnumerateArray())
+                    {
+                        if (item.TryGetGuid(out var g) && g != Guid.Empty) currentIds.Add(g);
+                    }
+                }
+
+                currentIds.Add(request.RecordId);
+
+                if (idCondition is null)
+                {
+                    filterGroup.Conditions.Clear();
+                    filterGroup.Groups.Clear();
+                    filterGroup.Conditions.Add(new FilterCondition
+                    {
+                        Field = "id",
+                        Op = FilterOperator.In,
+                        Value = JsonSerializer.SerializeToElement(currentIds.ToArray())
+                    });
+                }
+                else
+                {
+                    idCondition.Value = JsonSerializer.SerializeToElement(currentIds.ToArray());
+                }
+
+                targetView.Filter = JsonDocument.Parse(JsonSerializer.Serialize(filterGroup));
+            }
+        }
+
+        // 2. Remove record from source saved view if source was a saved view
+        if (sourceId is { } sId && sId != targetId)
+        {
+            var sourceView = await db.SavedViews.FirstOrDefaultAsync(v => v.Id == sId, cancellationToken);
+            if (sourceView?.Filter is not null)
+            {
+                var filterGroup = JsonSerializer.Deserialize<FilterGroup>(sourceView.Filter.RootElement.GetRawText()) ?? new FilterGroup();
+                var idCondition = filterGroup.Conditions.FirstOrDefault(c => c.Field == "id" && c.Op == FilterOperator.In);
+                if (idCondition?.Value is { ValueKind: JsonValueKind.Array } arr)
+                {
+                    var currentIds = new List<Guid>();
+                    foreach (var item in arr.EnumerateArray())
+                    {
+                        if (item.TryGetGuid(out var g) && g != request.RecordId && g != Guid.Empty)
+                        {
+                            currentIds.Add(g);
+                        }
+                    }
+
+                    if (currentIds.Count == 0)
+                    {
+                        currentIds.Add(Guid.Empty);
+                    }
+
+                    idCondition.Value = JsonSerializer.SerializeToElement(currentIds.ToArray());
+                    sourceView.Filter = JsonDocument.Parse(JsonSerializer.Serialize(filterGroup));
+                }
+            }
+        }
+
+        // 3. Handle standard views for Leads
+        if (request.EntityType == "leads")
+        {
+            var lead = await db.Leads.FirstOrDefaultAsync(l => l.Id == request.RecordId, cancellationToken);
+            if (lead is not null)
+            {
+                if (request.TargetViewKey == "new")
+                {
+                    lead.Status = "new";
+                }
+                else if (request.TargetViewKey == "mine" && tenant.UserId is { } me)
+                {
+                    lead.OwnerId = me;
+                }
+            }
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        await version.BumpAsync(cancellationToken);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)

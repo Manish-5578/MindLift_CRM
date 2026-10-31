@@ -89,9 +89,9 @@
         _card = lead =>
             @<div class="ml-stack-sm">
                 <a href="@("/leads/" + lead.Id)" draggable="false" class="ml-link" style="text-decoration:none">
-                    <MudText Typo="Typo.subtitle1" Class="ml-truncate">@lead.FullName</MudText>
+                    <MudText Typo="Typo.subtitle1" Class="ml-truncate">@LeadTitle(lead)</MudText>
                 </a>
-                <MudText Typo="Typo.body2" Class="ml-muted ml-truncate">@(lead.CompanyName ?? lead.Email ?? lead.Phone ?? "—")</MudText>
+                <MudText Typo="Typo.body2" Class="ml-muted ml-truncate">@LeadSubtitle(lead)</MudText>
                 <div class="ml-row ml-row--between">
                     <MudText Typo="Typo.caption" Class="ml-muted">@SourceLabel(lead.Source) · <DateText Value="@lead.CreatedAtUtc" /></MudText>
                     <UserAvatar Name="@(lead.OwnerName ?? "?")" Id="@lead.OwnerId" Size="24" />
@@ -267,6 +267,12 @@
         // Counts and order come from the server, so both columns are loaded again whether or not the move worked.
         await LoadAllAsync();
     }
+
+    private static string LeadTitle(LeadListItemDto lead) =>
+        !string.IsNullOrWhiteSpace(lead.CompanyName) ? lead.CompanyName : (!string.IsNullOrWhiteSpace(lead.FullName) ? lead.FullName : "—");
+
+    private static string LeadSubtitle(LeadListItemDto lead) =>
+        !string.IsNullOrWhiteSpace(lead.FullName) ? lead.FullName : (lead.Email ?? lead.Phone ?? "—");
 
     private void OpenNewLead()
     {

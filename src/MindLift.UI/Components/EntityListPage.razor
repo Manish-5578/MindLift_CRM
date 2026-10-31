@@ -232,7 +232,7 @@
     <DialogContent>
         <MudText Typo="Typo.body2" Class="ml-muted mb-3">@T["Saves the current filters, sort and columns as a tab above the list."]</MudText>
         <MudTextField @bind-Value="_viewName" Label="@T["Name"]" Variant="Variant.Outlined" MaxLength="80" Required="true" data-testid="save-view-name" />
-        <MudCheckBox @bind-Value="_viewShared" Label="@T["Share with everyone in the workspace"]" data-testid="save-view-shared" />
+        <MudCheckBox @bind-Value="_viewShared" Label="@T["Share with everyone in the workspace (optional)"]" data-testid="save-view-shared" />
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="() => _saveViewOpen = false">@T["Cancel"]</MudButton>
@@ -316,9 +316,13 @@
     private string _viewName = string.Empty;
     private bool _viewShared;
 
-    private IReadOnlyList<ListView> AllViews => SavedViews.Count == 0 ? Views : [.. Views, .. SavedViews];
+    public IReadOnlyList<ListView> AllViewsList => AllViews;
 
-    private ListView? CurrentView => AllViews.FirstOrDefault(v => v.Key == _state.View);
+    public ListView? CurrentView => AllViews.FirstOrDefault(v => v.Key == _state.View);
+
+    public string CurrentViewKey => _state.View;
+
+    private IReadOnlyList<ListView> AllViews => SavedViews.Count == 0 ? Views : [.. Views, .. SavedViews];
 
     private bool Selectable => ItemId is not null && BulkActions is not null;
 
@@ -448,8 +452,30 @@
     private async Task SaveViewAsync()
     {
         _saveViewOpen = false;
+        FilterGroup? filter;
+        if (!_allMatching && _selected.Count > 0)
+        {
+            var selectedIds = _selected.ToArray();
+            filter = new FilterGroup
+            {
+                Conditions =
+                [
+                    new FilterCondition
+                    {
+                        Field = "id",
+                        Op = MindLift.Shared.Filtering.FilterOperator.In,
+                        Value = JsonSerializer.SerializeToElement(selectedIds)
+                    }
+                ]
+            };
+        }
+        else
+        {
+            filter = EffectiveFilter();
+        }
+
         await OnSaveView.InvokeAsync(new SaveViewRequest(
-            _viewName.Trim(), _viewShared, EffectiveFilter(), _state.SortField ?? DefaultSortField, _state.SortField is null ? DefaultSortDir : _state.SortDir,
+            _viewName.Trim(), _viewShared, filter, _state.SortField ?? DefaultSortField, _state.SortField is null ? DefaultSortDir : _state.SortDir,
             VisibleColumns.Select(c => c.Header).ToList()));
     }
 
