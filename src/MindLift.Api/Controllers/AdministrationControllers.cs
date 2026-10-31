@@ -46,6 +46,14 @@ public sealed class UsersController(UserAdministrationService users) : Controlle
         await users.ReactivateAsync(id, cancellationToken);
         return NoContent();
     }
+
+    [HasPermission(AppModule.Users, PermissionAction.Delete)]
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        await users.DeleteAsync(id, cancellationToken);
+        return NoContent();
+    }
 }
 
 [ApiController]

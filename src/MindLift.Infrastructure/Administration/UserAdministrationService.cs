@@ -250,6 +250,36 @@ public sealed class UserAdministrationService(
         await users.UpdateAsync(user);
     }
 
+    public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        await EnsureInScopeAsync(id, cancellationToken);
+        var user = await LoadAsync(id, cancellationToken);
+
+        if (user.IsTenantOwner)
+        {
+            throw new ConflictException("owner_cannot_be_deleted", "The workspace owner cannot be deleted.");
+        }
+
+        if (user.Id == tenant.UserId)
+        {
+            throw new ConflictException("cannot_delete_self", "You cannot delete your own account.");
+        }
+
+        var isCallerAdmin = await IsCallerAdminAsync(cancellationToken);
+        var targetRole = user.RoleId is null ? null : await db.Roles.AsNoTracking().FirstOrDefaultAsync(r => r.Id == user.RoleId, cancellationToken);
+        if (targetRole?.IsAdmin == true && !isCallerAdmin)
+        {
+            throw new ForbiddenException("Only administrators can delete administrator accounts.", "admin_required");
+        }
+
+        await refreshTokens.RevokeAllForUserAsync(user.Id, cancellationToken);
+        var result = await users.DeleteAsync(user);
+        if (!result.Succeeded)
+        {
+            throw new ConflictException("user_delete_failed", string.Join(" ", result.Errors.Select(e => e.Description)));
+        }
+    }
+
     public async Task<UserDetail> UpdateProfileAsync(Guid userId, UpdateProfileRequest request, CancellationToken cancellationToken = default)
     {
         var user = await LoadAsync(userId, cancellationToken);

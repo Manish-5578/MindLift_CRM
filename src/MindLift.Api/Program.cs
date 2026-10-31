@@ -490,6 +490,14 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
                 }
             }
         }
+
+        // Remove maha@mindlift.tech from MindLift_CRM account if present:
+        var mahaUser = await db.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.NormalizedEmail == "MAHA@MINDLIFT.TECH");
+        if (mahaUser != null)
+        {
+            var userMgr = scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<MindLift.Infrastructure.Identity.AppUser>>();
+            await userMgr.DeleteAsync(mahaUser);
+        }
     });
 
     // Webhook secrets saved before they were encrypted are converted once.

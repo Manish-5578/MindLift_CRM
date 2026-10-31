@@ -36,6 +36,16 @@
                 </div>
             </MudAlert>
         }
+        @if (_pendingDelete is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-3" data-testid="delete-confirm">
+                @T["Permanently remove {0} from the workspace? This cannot be undone.", _pendingDelete.FullName]
+                <div class="ml-row" style="justify-content:flex-end;margin-top:8px">
+                    <MudButton Size="Size.Small" OnClick="() => _pendingDelete = null">@T["Cancel"]</MudButton>
+                    <MudButton Size="Size.Small" Color="Color.Error" Variant="Variant.Filled" OnClick="ConfirmDeleteAsync">@T["Delete user"]</MudButton>
+                </div>
+            </MudAlert>
+        }
         <MlCard Flush="true">
             @foreach (var user in _users.Items)
             {
@@ -51,6 +61,13 @@
                     @if (user.IsActive && !user.IsTenantOwner && user.Id != App.Bootstrap!.User.UserId)
                     {
                         <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => _pending = user">@T["Deactivate"]</MudButton>
+                    }
+                    @if (!user.IsActive && !user.IsTenantOwner && user.Id != App.Bootstrap!.User.UserId)
+                    {
+                        <div class="ml-row" style="gap:4px">
+                            <MudButton Size="Size.Small" Color="Color.Primary" OnClick="() => ReactivateAsync(user.Id)">@T["Reactivate"]</MudButton>
+                            <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => _pendingDelete = user">@T["Delete"]</MudButton>
+                        </div>
                     }
                 </div>
             }
@@ -208,6 +225,7 @@
     }
 
     private UserListItem? _pending;
+    private UserListItem? _pendingDelete;
 
     private async Task ConfirmDeactivateAsync()
     {
@@ -221,6 +239,34 @@
         }
 
         Snackbar.Add(T["User deactivated"], Severity.Success);
+        await LoadAsync();
+    }
+
+    private async Task ReactivateAsync(Guid id)
+    {
+        var response = await Http.PostAsync($"api/v1/users/{id}/reactivate", null);
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, T["Could not reactivate this user."]), Severity.Error);
+            return;
+        }
+
+        Snackbar.Add(T["User reactivated"], Severity.Success);
+        await LoadAsync();
+    }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        var user = _pendingDelete!;
+        _pendingDelete = null;
+        var response = await Http.DeleteAsync($"api/v1/users/{user.Id}");
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, T["Could not delete this user."]), Severity.Error);
+            return;
+        }
+
+        Snackbar.Add(T["User removed from workspace"], Severity.Success);
         await LoadAsync();
     }
 }
