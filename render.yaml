@@ -23,3 +23,7 @@ services:
         generateValue: true
       - key: ConnectionStrings__Default
         sync: false
+      - key: ForwardedHeaders__Enabled
+        value: "true"
+      - key: ForwardedHeaders__TrustAllProxies
+        value: "true"

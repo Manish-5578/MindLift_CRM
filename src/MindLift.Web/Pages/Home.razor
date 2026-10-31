@@ -223,7 +223,7 @@
     {
         if (!Session.IsSignedIn)
         {
-            Nav.NavigateTo("/login", forceLoad: true);
+            Nav.NavigateTo("/login", replace: true);
             return;
         }
 

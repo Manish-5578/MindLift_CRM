@@ -18,6 +18,13 @@ public static class ForwardedHeadersSetup
         options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
         options.ForwardLimit = configuration.GetValue<int?>("ForwardedHeaders:ForwardLimit") ?? 1;
 
+        if (configuration.GetValue<bool>("ForwardedHeaders:TrustAllProxies"))
+        {
+            options.KnownProxies.Clear();
+            options.KnownIPNetworks.Clear();
+            return;
+        }
+
         var proxies = configuration.GetSection("ForwardedHeaders:KnownProxies").Get<string[]>() ?? [];
         var networks = configuration.GetSection("ForwardedHeaders:KnownNetworks").Get<string[]>() ?? [];
         if (proxies.Length == 0 && networks.Length == 0)

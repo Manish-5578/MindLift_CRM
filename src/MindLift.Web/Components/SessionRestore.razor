@@ -14,6 +14,7 @@ else
     [Inject] private AuthSession Session { get; set; } = default!;
     [Inject] private AppState App { get; set; } = default!;
     [Inject] private HttpClient Http { get; set; } = default!;
+    [Inject] private NavigationManager Nav { get; set; } = default!;
     [Parameter] public RenderFragment? ChildContent { get; set; }
 
     private bool _ready;
@@ -22,11 +23,19 @@ else
     {
         try
         {
-            if (!Session.IsSignedIn)
+            var uri = Nav.Uri;
+            var isPublicAuthPage = uri.Contains("/login", StringComparison.OrdinalIgnoreCase) ||
+                                   uri.Contains("/signup", StringComparison.OrdinalIgnoreCase) ||
+                                   uri.Contains("/forgot-password", StringComparison.OrdinalIgnoreCase) ||
+                                   uri.Contains("/reset-password", StringComparison.OrdinalIgnoreCase) ||
+                                   uri.Contains("/verify-email", StringComparison.OrdinalIgnoreCase) ||
+                                   uri.Contains("/accept-invite", StringComparison.OrdinalIgnoreCase);
+
+            if (!Session.IsSignedIn && !isPublicAuthPage)
             {
                 try
                 {
-                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
                     var response = await Http.PostAsync("api/v1/auth/refresh", null, cts.Token);
                     if (response.IsSuccessStatusCode)
                     {
@@ -58,6 +67,7 @@ else
         finally
         {
             _ready = true;
+            StateHasChanged();
         }
     }
 }

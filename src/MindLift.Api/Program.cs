@@ -420,7 +420,8 @@ if (!app.Environment.IsDevelopment())
 app.Use(async (context, next) =>
 {
     var forwardedProto = context.Request.Headers["X-Forwarded-Proto"].ToString();
-    var isPlaintextHttp = !context.Request.IsHttps || string.Equals(forwardedProto, "http", StringComparison.OrdinalIgnoreCase);
+    var isHttps = context.Request.IsHttps || string.Equals(forwardedProto, "https", StringComparison.OrdinalIgnoreCase);
+    var isPlaintextHttp = !isHttps;
 
     if (!app.Environment.IsDevelopment() && isPlaintextHttp)
     {
