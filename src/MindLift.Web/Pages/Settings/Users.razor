@@ -75,6 +75,10 @@
                 <MudSelectItem T="Guid?" Value="@role.Id">@role.Name</MudSelectItem>
             }
         </MudSelect>
+        @if (_roles.Count == 0)
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true">@T["No roles found in this workspace. Please create roles in Settings > Roles."]</MudAlert>
+        }
 
         <div>
             <div class="ml-row" style="gap:8px;align-items:flex-start">
@@ -85,7 +89,7 @@
                                    data-testid="invite-password" />
                 </div>
                 <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Size="Size.Small" OnClick="GeneratePassword"
-                           StartIcon="@Icons.Material.Outlined.AutoFixHigh" Style="margin-top:4px">
+                            StartIcon="@Icons.Material.Outlined.AutoFixHigh" Style="margin-top:4px">
                     @T["Generate"]
                 </MudButton>
             </div>
@@ -111,6 +115,7 @@
     private void OpenAddUser()
     {
         _error = null;
+        _roleId ??= _roles.FirstOrDefault(r => r.Name == "Staff")?.Id ?? _roles.FirstOrDefault(r => r.Name == "Admin")?.Id ?? _roles.FirstOrDefault()?.Id;
         _invite = true;
         if (string.IsNullOrWhiteSpace(_password))
         {
@@ -158,7 +163,7 @@
         {
             _users = await Http.GetFromJsonAsync<PagedResult<UserListItem>>("api/v1/users?pageSize=200");
             _roles = await Http.GetFromJsonAsync<List<RoleDto>>("api/v1/roles") ?? [];
-            _roleId ??= _roles.FirstOrDefault(r => r.Name == "Staff")?.Id;
+            _roleId ??= _roles.FirstOrDefault(r => r.Name == "Staff")?.Id ?? _roles.FirstOrDefault(r => r.Name == "Admin")?.Id ?? _roles.FirstOrDefault()?.Id;
         }
         catch (HttpRequestException)
         {

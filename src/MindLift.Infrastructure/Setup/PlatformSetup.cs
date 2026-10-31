@@ -36,7 +36,7 @@ public static class PlanCatalog
 /// Creates the internal platform tenant and a platform admin (plan 6.10).
 /// Run from the command line: <c>dotnet run --project src/MindLift.Api -- seed-platform-admin --email ... --password ...</c>.
 /// </summary>
-public sealed class PlatformAdminSeeder(AppDbContext db, UserManager<AppUser> users, ITenantContext tenant, IClock clock)
+public sealed class PlatformAdminSeeder(AppDbContext db, UserManager<AppUser> users, ITenantContext tenant, IClock clock, SystemSeedService seed)
 {
     public const string PlatformSlug = "mindlift-platform";
 
@@ -58,13 +58,48 @@ public sealed class PlatformAdminSeeder(AppDbContext db, UserManager<AppUser> us
             await db.SaveChangesAsync(cancellationToken);
         }
 
-        var normalized = users.NormalizeEmail(email);
-        if (await db.Users.IgnoreQueryFilters().AnyAsync(u => u.NormalizedEmail == normalized, cancellationToken))
+        using var scope = tenant.Use(platform.Id);
+
+        var hasSettings = await db.TenantSettings.IgnoreQueryFilters().AnyAsync(s => s.TenantId == platform.Id, cancellationToken);
+        if (!hasSettings)
         {
-            return "A user with this email already exists. No changes were made.";
+            db.TenantSettings.Add(new TenantSettings
+            {
+                TenantId = platform.Id,
+                CompanyName = platform.Name,
+                Email = email,
+                BaseCurrency = "USD",
+                DefaultLanguage = "en",
+                TimeZoneId = "UTC",
+                WeekStartDay = 1,
+            });
+            await db.SaveChangesAsync(cancellationToken);
         }
 
-        using var scope = tenant.Use(platform.Id);
+        var hasRoles = await db.Roles.IgnoreQueryFilters().AnyAsync(r => r.TenantId == platform.Id, cancellationToken);
+        if (!hasRoles)
+        {
+            await seed.SeedTenantAsync(platform.Id, cancellationToken);
+        }
+
+        var adminRole = await db.Roles.IgnoreQueryFilters().FirstOrDefaultAsync(r => r.TenantId == platform.Id && r.IsAdmin, cancellationToken);
+        var adminRoleId = adminRole?.Id;
+
+        var normalized = users.NormalizeEmail(email);
+        var existing = await db.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.NormalizedEmail == normalized, cancellationToken);
+        if (existing != null)
+        {
+            existing.TenantId = platform.Id;
+            existing.IsPlatformAdmin = true;
+            existing.IsTenantOwner = true;
+            if (adminRoleId != null)
+            {
+                existing.RoleId = adminRoleId;
+            }
+            await db.SaveChangesAsync(cancellationToken);
+            return $"Platform admin {email} updated with platform tenant and admin role.";
+        }
+
         var user = new AppUser
         {
             Id = Guid.CreateVersion7(),
@@ -78,6 +113,7 @@ public sealed class PlatformAdminSeeder(AppDbContext db, UserManager<AppUser> us
             IsActive = true,
             EmailConfirmed = true,
             LockoutEnabled = true,
+            RoleId = adminRoleId,
             CreatedAt = clock.UtcNow,
         };
 

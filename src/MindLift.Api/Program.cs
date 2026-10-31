@@ -11,6 +11,7 @@ using MindLift.Api.Auth;
 using MindLift.Api.Filters;
 using MindLift.Api.Hubs;
 using MindLift.Api.Middleware;
+using MindLift.Application.Abstractions;
 using MindLift.Infrastructure;
 using MindLift.Infrastructure.Persistence;
 using MindLift.Infrastructure.Setup;
@@ -400,6 +401,10 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
     {
         await db.Database.MigrateAsync();
         await PlanCatalog.EnsureAsync(db);
+        
+        var tenantContext = scope.ServiceProvider.GetRequiredService<ITenantContext>();
+        var seedService = scope.ServiceProvider.GetRequiredService<MindLift.Infrastructure.Setup.SystemSeedService>();
+
         // Ensure Platform Admin (Super Admin) tenant and user exist:
         var platformTenant = await db.Tenants.FirstOrDefaultAsync(t => t.Slug == PlatformAdminSeeder.PlatformSlug);
         if (platformTenant is null)
@@ -420,22 +425,69 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
             }
         }
 
+        // Heal all existing tenants: Ensure TenantSettings and default Roles exist
+        var allTenants = await db.Tenants.ToListAsync();
+        foreach (var t in allTenants)
+        {
+            using (tenantContext.Use(t.Id))
+            {
+                var hasSettings = await db.TenantSettings.IgnoreQueryFilters().AnyAsync(s => s.TenantId == t.Id);
+                if (!hasSettings)
+                {
+                    db.TenantSettings.Add(new MindLift.Domain.Entities.TenantSettings
+                    {
+                        TenantId = t.Id,
+                        CompanyName = t.Name,
+                        Email = "admin@mindlift.local",
+                        BaseCurrency = "USD",
+                        DefaultLanguage = "en",
+                        TimeZoneId = "UTC",
+                        WeekStartDay = 1,
+                    });
+                    await db.SaveChangesAsync();
+                }
+
+                var hasRoles = await db.Roles.IgnoreQueryFilters().AnyAsync(r => r.TenantId == t.Id);
+                if (!hasRoles)
+                {
+                    await seedService.SeedTenantAsync(t.Id);
+                }
+            }
+        }
+
         if (platformTenant != null)
         {
-            var superAdminEmail = app.Configuration["PlatformAdmin:Email"] ?? "manishuday2004@gmail.com";
-            var normEmail = superAdminEmail.Trim().ToUpperInvariant();
-            var adminUser = await db.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.NormalizedEmail == normEmail);
-            if (adminUser != null)
+            using (tenantContext.Use(platformTenant.Id))
             {
-                adminUser.IsPlatformAdmin = true;
-                adminUser.TenantId = platformTenant.Id;
-                await db.SaveChangesAsync();
-            }
-            else
-            {
-                var seeder = scope.ServiceProvider.GetRequiredService<PlatformAdminSeeder>();
-                var defaultPass = app.Configuration["PlatformAdmin:Password"] ?? "Manish@245578";
-                await seeder.SeedAsync(superAdminEmail, defaultPass, "Manish", "Admin");
+                var adminRole = await db.Roles.IgnoreQueryFilters().FirstOrDefaultAsync(r => r.TenantId == platformTenant.Id && r.IsAdmin);
+                var adminRoleId = adminRole?.Id;
+
+                var superAdminEmail = app.Configuration["PlatformAdmin:Email"] ?? "manishuday2004@gmail.com";
+                var normEmail = superAdminEmail.Trim().ToUpperInvariant();
+                var adminUser = await db.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.NormalizedEmail == normEmail);
+                if (adminUser != null)
+                {
+                    adminUser.IsPlatformAdmin = true;
+                    adminUser.IsTenantOwner = true;
+                    adminUser.TenantId = platformTenant.Id;
+                    if (adminRoleId != null)
+                    {
+                        adminUser.RoleId = adminRoleId;
+                    }
+                    await db.SaveChangesAsync();
+                }
+                else
+                {
+                    var seeder = scope.ServiceProvider.GetRequiredService<PlatformAdminSeeder>();
+                    var defaultPass = app.Configuration["PlatformAdmin:Password"] ?? "Manish@245578";
+                    await seeder.SeedAsync(superAdminEmail, defaultPass, "Manish", "Admin");
+                    adminUser = await db.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.NormalizedEmail == normEmail);
+                    if (adminUser != null && adminRoleId != null)
+                    {
+                        adminUser.RoleId = adminRoleId;
+                        await db.SaveChangesAsync();
+                    }
+                }
             }
         }
     });

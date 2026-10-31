@@ -10,7 +10,10 @@ public static class ProblemText
     {
         try
         {
-            using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+            var content = await response.Content.ReadAsStringAsync();
+            if (string.IsNullOrWhiteSpace(content)) return fallback;
+
+            using var document = JsonDocument.Parse(content);
             if (document.RootElement.TryGetProperty("errors", out var errors) && errors.ValueKind == JsonValueKind.Object)
             {
                 var messages = new List<string>();
@@ -30,9 +33,14 @@ public static class ProblemText
                 }
             }
 
-            if (document.RootElement.TryGetProperty("detail", out var detail) && detail.ValueKind == JsonValueKind.String)
+            if (document.RootElement.TryGetProperty("detail", out var detail) && detail.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(detail.GetString()))
             {
-                return detail.GetString() ?? fallback;
+                return detail.GetString()!;
+            }
+
+            if (document.RootElement.TryGetProperty("title", out var title) && title.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(title.GetString()))
+            {
+                return title.GetString()!;
             }
         }
         catch (JsonException)
@@ -49,7 +57,10 @@ public static class ProblemText
         var result = new Dictionary<string, string>();
         try
         {
-            using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+            var content = await response.Content.ReadAsStringAsync();
+            if (string.IsNullOrWhiteSpace(content)) return result;
+
+            using var document = JsonDocument.Parse(content);
             if (document.RootElement.TryGetProperty("errors", out var errors) && errors.ValueKind == JsonValueKind.Object)
             {
                 foreach (var field in errors.EnumerateObject())
