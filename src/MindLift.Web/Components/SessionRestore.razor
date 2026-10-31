@@ -1,14 +1,5 @@
-@* Restores the signed-in session on page load (refresh cookie) before any page renders. *@
-@if (_ready)
-{
-    @ChildContent
-}
-else
-{
-    <div class="ml-state" style="min-height:100vh;justify-content:center">
-        <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
-    </div>
-}
+@* Restores the signed-in session on page load (refresh cookie) in background without blocking rendering. *@
+@ChildContent
 
 @code {
     [Inject] private AuthSession Session { get; set; } = default!;
@@ -17,57 +8,51 @@ else
     [Inject] private NavigationManager Nav { get; set; } = default!;
     [Parameter] public RenderFragment? ChildContent { get; set; }
 
-    private bool _ready;
-
     protected override async Task OnInitializedAsync()
     {
-        try
-        {
-            var uri = Nav.Uri;
-            var isPublicAuthPage = uri.Contains("/login", StringComparison.OrdinalIgnoreCase) ||
-                                   uri.Contains("/signup", StringComparison.OrdinalIgnoreCase) ||
-                                   uri.Contains("/forgot-password", StringComparison.OrdinalIgnoreCase) ||
-                                   uri.Contains("/reset-password", StringComparison.OrdinalIgnoreCase) ||
-                                   uri.Contains("/verify-email", StringComparison.OrdinalIgnoreCase) ||
-                                   uri.Contains("/accept-invite", StringComparison.OrdinalIgnoreCase);
+        var uri = Nav.Uri;
+        var isPublicAuthPage = uri.Contains("/login", StringComparison.OrdinalIgnoreCase) ||
+                               uri.Contains("/signup", StringComparison.OrdinalIgnoreCase) ||
+                               uri.Contains("/forgot-password", StringComparison.OrdinalIgnoreCase) ||
+                               uri.Contains("/reset-password", StringComparison.OrdinalIgnoreCase) ||
+                               uri.Contains("/verify-email", StringComparison.OrdinalIgnoreCase) ||
+                               uri.Contains("/accept-invite", StringComparison.OrdinalIgnoreCase);
 
-            if (!Session.IsSignedIn && !isPublicAuthPage)
+        if (!Session.IsSignedIn && !isPublicAuthPage)
+        {
+            try
             {
-                try
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                var response = await Http.PostAsync("api/v1/auth/refresh", null, cts.Token);
+                if (response.IsSuccessStatusCode)
                 {
-                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-                    var response = await Http.PostAsync("api/v1/auth/refresh", null, cts.Token);
-                    if (response.IsSuccessStatusCode)
+                    var tokens = await response.Content.ReadFromJsonAsync<MindLift.Shared.Contracts.TokenResponse>(cancellationToken: cts.Token);
+                    if (tokens is not null)
                     {
-                        var tokens = await response.Content.ReadFromJsonAsync<MindLift.Shared.Contracts.TokenResponse>(cancellationToken: cts.Token);
-                        if (tokens is not null)
+                        Session.SetTokens(tokens);
+                        if (App.Bootstrap is null)
                         {
-                            Session.SetTokens(tokens);
+                            await App.LoadAsync();
                         }
+                        StateHasChanged();
                     }
                 }
-                catch
-                {
-                    // The API is unreachable or timed out. Allow rendering so pages can display appropriate login/error state.
-                }
             }
-
-            if (Session.IsSignedIn && App.Bootstrap is null)
+            catch
             {
-                try
-                {
-                    await App.LoadAsync();
-                }
-                catch
-                {
-                    // Ignore bootstrap load failures so the UI still displays.
-                }
+                // The API is unreachable or timed out.
             }
         }
-        finally
+        else if (Session.IsSignedIn && App.Bootstrap is null)
         {
-            _ready = true;
-            StateHasChanged();
+            try
+            {
+                await App.LoadAsync();
+                StateHasChanged();
+            }
+            catch
+            {
+            }
         }
     }
 }

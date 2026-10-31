@@ -535,6 +535,7 @@ app.UseMiddleware<SubscriptionGuardMiddleware>();
 app.UseAuthorization();
 app.UseMiddleware<MindLift.Api.Middleware.MustChangePasswordMiddleware>();
 
+app.MapStaticAssets();
 app.MapControllers();
 app.MapHub<NotificationHub>("/hubs/notifications");
 app.MapHealthChecks("/health");

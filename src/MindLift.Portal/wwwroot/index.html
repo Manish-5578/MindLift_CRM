@@ -17,11 +17,26 @@
 
 <body>
     <div id="app">
-        <svg class="loading-progress">
-            <circle r="40%" cx="50%" cy="50%" />
-            <circle r="40%" cx="50%" cy="50%" />
-        </svg>
-        <div class="loading-progress-text"></div>
+        <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;background:#f8fafc;font-family:'Inter',system-ui,sans-serif;padding:32px 16px;">
+            <div style="margin-top:24px;margin-bottom:28px;display:flex;align-items:center;gap:8px;">
+                <span style="font-size:1.6rem;font-weight:800;color:#2563eb;letter-spacing:-0.5px;">MindLift Portal</span>
+            </div>
+            <div style="width:100%;max-width:420px;background:#ffffff;border-radius:12px;border:1px solid #e2e8f0;padding:32px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.05);">
+                <h1 style="font-size:1.5rem;font-weight:700;color:#0f172a;margin:0 0 6px 0;">Customer Portal</h1>
+                <p style="font-size:0.875rem;color:#64748b;margin:0 0 24px 0;">Access your invoices, quotes, tickets, and documents.</p>
+                <div style="display:flex;flex-direction:column;gap:16px;">
+                    <div>
+                        <label style="display:block;font-size:0.8rem;font-weight:600;color:#475569;margin-bottom:6px;">Email</label>
+                        <input type="email" placeholder="name@company.com" style="width:100%;padding:10px 14px;border:1px solid #cbd5e1;border-radius:8px;font-size:0.9rem;box-sizing:border-box;outline:none;" />
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:0.8rem;font-weight:600;color:#475569;margin-bottom:6px;">Password</label>
+                        <input type="password" placeholder="••••••••" style="width:100%;padding:10px 14px;border:1px solid #cbd5e1;border-radius:8px;font-size:0.9rem;box-sizing:border-box;outline:none;" />
+                    </div>
+                    <button style="margin-top:8px;width:100%;padding:12px;background:#2563eb;color:#ffffff;border:none;border-radius:8px;font-weight:600;font-size:0.95rem;cursor:pointer;">Sign in</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div id="blazor-error-ui">
