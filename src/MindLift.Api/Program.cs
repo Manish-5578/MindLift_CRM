@@ -400,6 +400,44 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
     {
         await db.Database.MigrateAsync();
         await PlanCatalog.EnsureAsync(db);
+        // Ensure Platform Admin (Super Admin) tenant and user exist:
+        var platformTenant = await db.Tenants.FirstOrDefaultAsync(t => t.Slug == PlatformAdminSeeder.PlatformSlug);
+        if (platformTenant is null)
+        {
+            var enterprisePlan = await db.Plans.FirstOrDefaultAsync(p => p.Key == "enterprise");
+            if (enterprisePlan != null)
+            {
+                platformTenant = new MindLift.Domain.Entities.Tenant
+                {
+                    Name = "MindLift Platform",
+                    Slug = PlatformAdminSeeder.PlatformSlug,
+                    Status = "Active",
+                    PlanId = enterprisePlan.Id,
+                    CreatedAt = DateTime.UtcNow,
+                };
+                db.Tenants.Add(platformTenant);
+                await db.SaveChangesAsync();
+            }
+        }
+
+        if (platformTenant != null)
+        {
+            var superAdminEmail = app.Configuration["PlatformAdmin:Email"] ?? "manishuday2004@gmail.com";
+            var normEmail = superAdminEmail.Trim().ToUpperInvariant();
+            var adminUser = await db.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.NormalizedEmail == normEmail);
+            if (adminUser != null)
+            {
+                adminUser.IsPlatformAdmin = true;
+                adminUser.TenantId = platformTenant.Id;
+                await db.SaveChangesAsync();
+            }
+            else
+            {
+                var seeder = scope.ServiceProvider.GetRequiredService<PlatformAdminSeeder>();
+                var defaultPass = app.Configuration["PlatformAdmin:Password"] ?? "Manish@245578";
+                await seeder.SeedAsync(superAdminEmail, defaultPass, "Manish", "Admin");
+            }
+        }
     });
 
     // Webhook secrets saved before they were encrypted are converted once.
