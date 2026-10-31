@@ -521,10 +521,45 @@ else if (allowedOrigins.Length > 0)
     app.UseCors("prod");
 }
 
-// Staff web app (Blazor WebAssembly) served at "/", customer portal at "/portal".
-app.UseBlazorFrameworkFiles();
-app.UseBlazorFrameworkFiles("/portal");
+// Static files & modern .NET 10 static assets (replaces UseBlazorFrameworkFiles)
 app.UseStaticFiles();
+
+// Direct fallback handler for un-fingerprinted blazor.webassembly.js requests
+app.MapGet("/_framework/blazor.webassembly.js", (IWebHostEnvironment env) =>
+{
+    var webRoot = env.WebRootPath ?? Path.Combine(AppContext.BaseDirectory, "wwwroot");
+    var frameworkDir = Path.Combine(webRoot, "_framework");
+    if (Directory.Exists(frameworkDir))
+    {
+        var file = Directory.GetFiles(frameworkDir, "blazor.webassembly.*.js")
+            .FirstOrDefault(f => !f.EndsWith(".gz") && !f.EndsWith(".br"));
+        if (file != null)
+        {
+            return Results.File(file, "text/javascript");
+        }
+    }
+    return Results.NotFound();
+}).AllowAnonymous();
+
+app.MapGet("/portal/_framework/blazor.webassembly.js", (IWebHostEnvironment env) =>
+{
+    var webRoot = env.WebRootPath ?? Path.Combine(AppContext.BaseDirectory, "wwwroot");
+    var frameworkDir = Path.Combine(webRoot, "portal", "_framework");
+    if (!Directory.Exists(frameworkDir))
+    {
+        frameworkDir = Path.Combine(webRoot, "_framework");
+    }
+    if (Directory.Exists(frameworkDir))
+    {
+        var file = Directory.GetFiles(frameworkDir, "blazor.webassembly.*.js")
+            .FirstOrDefault(f => !f.EndsWith(".gz") && !f.EndsWith(".br"));
+        if (file != null)
+        {
+            return Results.File(file, "text/javascript");
+        }
+    }
+    return Results.NotFound();
+}).AllowAnonymous();
 
 app.UseRateLimiter();
 app.UseAuthentication();

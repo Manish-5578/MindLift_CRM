@@ -35,9 +35,14 @@
                         <label style="display:block;font-size:0.8rem;font-weight:600;color:#475569;margin-bottom:6px;">Password</label>
                         <input type="password" placeholder="••••••••" style="width:100%;padding:10px 14px;border:1px solid #cbd5e1;border-radius:8px;font-size:0.9rem;box-sizing:border-box;outline:none;" />
                     </div>
-                    <button style="margin-top:8px;width:100%;padding:12px;background:#2563eb;color:#ffffff;border:none;border-radius:8px;font-weight:600;font-size:0.95rem;cursor:pointer;">Sign in</button>
+                    <button id="initial-signin-btn" onclick="this.textContent='Starting MindLift...';this.disabled=true;this.style.opacity='0.75';" style="margin-top:8px;width:100%;padding:12px;background:#2563eb;color:#ffffff;border:none;border-radius:8px;font-weight:600;font-size:0.95rem;cursor:pointer;transition:all 0.2s;">Sign in</button>
+                    <div style="display:flex;align-items:center;justify-content:center;gap:8px;font-size:0.75rem;color:#94a3b8;margin-top:4px;">
+                        <span style="display:inline-block;width:10px;height:10px;border:2px solid #cbd5e1;border-top-color:#2563eb;border-radius:50%;animation:mlspin 0.8s linear infinite;"></span>
+                        Loading workspace runtime...
+                    </div>
                 </div>
             </div>
+            <style>@keyframes mlspin{to{transform:rotate(360deg)}}</style>
         </div>
     </div>
 
@@ -93,7 +98,7 @@
             }
         });
     </script>
-    <script src="_framework/blazor.webassembly.js"></script>
+    <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
 </body>
 
