@@ -40,6 +40,7 @@ RUN apt-get update && \
 
 # Environment defaults for production container
 ENV ASPNETCORE_HTTP_PORTS=8080
+ENV PORT=8080
 ENV Ocr__TesseractPath=/usr/bin/tesseract
 ENV Ocr__Languages=eng+ara
 

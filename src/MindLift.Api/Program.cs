@@ -21,6 +21,12 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Cloud hosting port binding: if PORT is set (e.g. on Render), bind Kestrel to it on all interfaces.
+if (Environment.GetEnvironmentVariable("PORT") is { Length: > 0 } port)
+{
+    builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+}
+
 // Logs: always to the console; also to daily files (Logging:FilePath) and to a Seq server (Seq:ServerUrl) when set. Every line of a request
 // carries its correlation id, company and user (see RequestLogContextMiddleware), so one customer's problem can be found among all the others.
 builder.Host.UseSerilog((context, services, configuration) =>
