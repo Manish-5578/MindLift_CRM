@@ -36,6 +36,7 @@ public static class SystemFields
             F("email", "Email", FieldType.Email, nameof(Lead.Email)),
             F("phone", "Phone", FieldType.Phone, nameof(Lead.Phone)),
             F("company_name", "Company", FieldType.Text, nameof(Lead.CompanyName)),
+            F("address", "Address", FieldType.Text, nameof(Lead.Address), required: true),
             F("status", "Status", FieldType.Picklist, nameof(Lead.Status), picklist: "lead_status"),
             F("source", "Source", FieldType.Picklist, nameof(Lead.Source), picklist: "lead_source"),
             F("rating", "Rating", FieldType.Picklist, nameof(Lead.Rating), picklist: "lead_rating"),

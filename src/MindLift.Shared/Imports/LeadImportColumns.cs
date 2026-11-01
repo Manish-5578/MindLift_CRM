@@ -18,6 +18,7 @@ public static class LeadImportColumns
         ("email", "Email", ["email"]),
         ("phone", "Phone", ["phone"]),
         ("company_name", "Company", ["company", "companyname", "organization", "organisation"]),
+        ("address", "Address", ["address", "street", "streetaddress", "location"]),
         ("status", "Status", ["status", "leadstatus"]),
         ("source", "Source", ["source", "leadsource"]),
         ("rating", "Rating", ["rating", "leadrating"]),

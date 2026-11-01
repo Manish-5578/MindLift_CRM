@@ -27,9 +27,6 @@
                     <MudButton Href="/leads/board">@T["Board"]</MudButton>
                     <MudButton Color="Color.Primary" Href="/leads">@T["List"]</MudButton>
                 </MudButtonGroup>
-                <MudTooltip Text="@T["Upload history"]">
-                    <MudIconButton Icon="@Icons.Material.Outlined.History" OnClick="OpenHistoryDialog" data-testid="leads-upload-history" Title="@T["Upload history"]" />
-                </MudTooltip>
                 <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Custom.FileFormats.FileExcel" OnClick="DownloadTemplateAsync" data-testid="download-template">@T["Template"]</MudButton>
                 @if (CanImport)
                 {
@@ -46,6 +43,9 @@
                 {
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" OnClick="OpenNewLead" data-testid="primary-action">@T["New lead"]</MudButton>
                 }
+                <MudTooltip Text="@T["Upload history"]">
+                    <MudIconButton Icon="@Icons.Material.Outlined.History" OnClick="OpenHistoryDialog" data-testid="leads-upload-history" Title="@T["Upload history"]" />
+                </MudTooltip>
             </HeaderActions>
             <EmptyActions>
                 @if (CanCreate)

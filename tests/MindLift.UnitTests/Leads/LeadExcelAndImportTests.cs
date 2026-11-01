@@ -12,30 +12,11 @@ namespace MindLift.UnitTests.Leads;
 public sealed class LeadExcelAndImportTests
 {
     [Fact]
-    public void GenerateLeadTemplateExcel_ContainsLeadsAndHelpSheets_WithPreFilledHeadings()
+    public void GenerateLeadTemplateExcel_ContainsLeadsAndHelpSheets_WithPreFilledHeadings_AndNoPrefilledDataRows()
     {
-        // Act: Generate template Excel workbook
-        using var workbook = new XLWorkbook();
-        
-        // Sheet 1: Leads
-        var sheetLeads = workbook.Worksheets.Add("Leads");
-        var leadHeaders = new[] { "Company", "First Name", "Last Name", "Email", "Phone", "Status", "Source", "Rating", "Notes" };
-        for (var col = 0; col < leadHeaders.Length; col++)
-        {
-            sheetLeads.Cell(1, col + 1).Value = leadHeaders[col];
-        }
-
-        // Sheet 2: Help
-        var sheetHelp = workbook.Worksheets.Add("Help");
-        var helpHeaders = new[] { "Field Name", "Requirement", "Description", "Allowed / Example Values" };
-        for (var col = 0; col < helpHeaders.Length; col++)
-        {
-            sheetHelp.Cell(1, col + 1).Value = helpHeaders[col];
-        }
-
-        using var ms = new MemoryStream();
-        workbook.SaveAs(ms);
-        ms.Position = 0;
+        // Act: Generate actual template Excel workbook via LeadService
+        var bytes = LeadService.GenerateTemplateExcel();
+        using var ms = new MemoryStream(bytes);
 
         // Verify loaded workbook
         using var readWb = new XLWorkbook(ms);
@@ -46,12 +27,17 @@ public sealed class LeadExcelAndImportTests
         leadsWorksheet.Cell(1, 1).GetString().ShouldBe("Company");
         leadsWorksheet.Cell(1, 2).GetString().ShouldBe("First Name");
         leadsWorksheet.Cell(1, 3).GetString().ShouldBe("Last Name");
-        leadsWorksheet.Cell(1, 4).GetString().ShouldBe("Email");
-        leadsWorksheet.Cell(1, 5).GetString().ShouldBe("Phone");
-        leadsWorksheet.Cell(1, 6).GetString().ShouldBe("Status");
-        leadsWorksheet.Cell(1, 7).GetString().ShouldBe("Source");
-        leadsWorksheet.Cell(1, 8).GetString().ShouldBe("Rating");
-        leadsWorksheet.Cell(1, 9).GetString().ShouldBe("Notes");
+        leadsWorksheet.Cell(1, 4).GetString().ShouldBe("Address");
+        leadsWorksheet.Cell(1, 5).GetString().ShouldBe("Email");
+        leadsWorksheet.Cell(1, 6).GetString().ShouldBe("Phone");
+        leadsWorksheet.Cell(1, 7).GetString().ShouldBe("Status");
+        leadsWorksheet.Cell(1, 8).GetString().ShouldBe("Source");
+        leadsWorksheet.Cell(1, 9).GetString().ShouldBe("Rating");
+        leadsWorksheet.Cell(1, 10).GetString().ShouldBe("Notes");
+
+        // Requirement 4: No prefilled leads inside the template (only the header row)
+        leadsWorksheet.LastRowUsed()!.RowNumber().ShouldBe(1);
+        leadsWorksheet.Cell(2, 1).GetString().ShouldBe(string.Empty);
 
         var helpWorksheet = readWb.Worksheet("Help");
         helpWorksheet.ShouldNotBeNull();
@@ -59,6 +45,20 @@ public sealed class LeadExcelAndImportTests
         helpWorksheet.Cell(1, 2).GetString().ShouldBe("Requirement");
         helpWorksheet.Cell(1, 3).GetString().ShouldBe("Description");
         helpWorksheet.Cell(1, 4).GetString().ShouldBe("Allowed / Example Values");
+
+        // Requirement 2: Address must be marked Mandatory in template
+        var foundAddressRow = false;
+        var lastHelpRow = helpWorksheet.LastRowUsed()!.RowNumber();
+        for (var r = 2; r <= lastHelpRow; r++)
+        {
+            if (helpWorksheet.Cell(r, 1).GetString() == "Address")
+            {
+                helpWorksheet.Cell(r, 2).GetString().ShouldBe("Mandatory");
+                foundAddressRow = true;
+                break;
+            }
+        }
+        foundAddressRow.ShouldBeTrue("Address row should exist in Help sheet and be marked Mandatory.");
     }
 
     [Fact]
@@ -68,15 +68,18 @@ public sealed class LeadExcelAndImportTests
         var sheet = workbook.Worksheets.Add("Leads");
         sheet.Cell(1, 1).Value = "Company";
         sheet.Cell(1, 2).Value = "First Name";
-        sheet.Cell(1, 3).Value = "Email";
+        sheet.Cell(1, 3).Value = "Address";
+        sheet.Cell(1, 4).Value = "Email";
 
         sheet.Cell(2, 1).Value = "Nova Corp";
         sheet.Cell(2, 2).Value = "Alice";
-        sheet.Cell(2, 3).Value = "alice@nova.com";
+        sheet.Cell(2, 3).Value = "123 Main St";
+        sheet.Cell(2, 4).Value = "alice@nova.com";
 
         sheet.Cell(3, 1).Value = "Starlight Ltd";
         sheet.Cell(3, 2).Value = "Bob";
-        sheet.Cell(3, 3).Value = "bob@starlight.com";
+        sheet.Cell(3, 3).Value = "456 Elm Ave";
+        sheet.Cell(3, 4).Value = "bob@starlight.com";
 
         using var ms = new MemoryStream();
         workbook.SaveAs(ms);
@@ -85,40 +88,41 @@ public sealed class LeadExcelAndImportTests
         var rows = LeadService.ParseRowsFromStream(ms, "leads.xlsx");
 
         rows.Count.ShouldBe(3);
-        rows[0].ShouldBe(["Company", "First Name", "Email"]);
-        rows[1].ShouldBe(["Nova Corp", "Alice", "alice@nova.com"]);
-        rows[2].ShouldBe(["Starlight Ltd", "Bob", "bob@starlight.com"]);
+        rows[0].ShouldBe(["Company", "First Name", "Address", "Email"]);
+        rows[1].ShouldBe(["Nova Corp", "Alice", "123 Main St", "alice@nova.com"]);
+        rows[2].ShouldBe(["Starlight Ltd", "Bob", "456 Elm Ave", "bob@starlight.com"]);
     }
 
     [Fact]
     public void ParseRowsFromStream_ParsesCsvStream_Correctly()
     {
-        var csv = "Company,First Name,Email\nNova Corp,Alice,alice@nova.com\nStarlight Ltd,Bob,bob@starlight.com\n";
+        var csv = "Company,First Name,Address,Email\nNova Corp,Alice,123 Main St,alice@nova.com\nStarlight Ltd,Bob,456 Elm Ave,bob@starlight.com\n";
         using var ms = new MemoryStream(Encoding.UTF8.GetBytes(csv));
 
         var rows = LeadService.ParseRowsFromStream(ms, "leads.csv");
 
         rows.Count.ShouldBe(3);
-        rows[0].ShouldBe(["Company", "First Name", "Email"]);
-        rows[1].ShouldBe(["Nova Corp", "Alice", "alice@nova.com"]);
-        rows[2].ShouldBe(["Starlight Ltd", "Bob", "bob@starlight.com"]);
+        rows[0].ShouldBe(["Company", "First Name", "Address", "Email"]);
+        rows[1].ShouldBe(["Nova Corp", "Alice", "123 Main St", "alice@nova.com"]);
+        rows[2].ShouldBe(["Starlight Ltd", "Bob", "456 Elm Ave", "bob@starlight.com"]);
     }
 
     [Fact]
-    public void LeadImportColumns_MapsExcelHeadings_WithStatusAndRating()
+    public void LeadImportColumns_MapsExcelHeadings_WithAddressStatusAndRating()
     {
-        var headers = new[] { "Company", "First Name", "Last Name", "Email", "Phone", "Status", "Source", "Rating", "Notes" };
+        var headers = new[] { "Company", "First Name", "Last Name", "Address", "Email", "Phone", "Status", "Source", "Rating", "Notes" };
         var map = LeadImportColumns.Map(headers);
 
         map["company_name"].ShouldBe(0);
         map["first_name"].ShouldBe(1);
         map["last_name"].ShouldBe(2);
-        map["email"].ShouldBe(3);
-        map["phone"].ShouldBe(4);
-        map["status"].ShouldBe(5);
-        map["source"].ShouldBe(6);
-        map["rating"].ShouldBe(7);
-        map["description"].ShouldBe(8);
+        map["address"].ShouldBe(3);
+        map["email"].ShouldBe(4);
+        map["phone"].ShouldBe(5);
+        map["status"].ShouldBe(6);
+        map["source"].ShouldBe(7);
+        map["rating"].ShouldBe(8);
+        map["description"].ShouldBe(9);
     }
 
     [Fact]
@@ -185,4 +189,3 @@ public sealed class LeadExcelAndImportTests
         history.ImportedByName.ShouldBe("Sarah Connor");
     }
 }
-

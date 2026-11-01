@@ -50,6 +50,7 @@
         new("companyName", "Company"),
         new("firstName", "First name", TestId: "lead-first", Columns: 6),
         new("lastName", "Last name", Columns: 6),
+        new("address", "Address", Required: true, TestId: "lead-address"),
         new("email", "Email", FormFieldKind.Email, TestId: "lead-email"),
         new("phone", "Phone"),
         new("status", "Status", FormFieldKind.Picklist, Options: Options("lead_status"), Columns: 6),
@@ -77,7 +78,7 @@
         _leadId = lead.Id;
         _values = new Dictionary<string, string?>
         {
-            ["firstName"] = lead.FirstName, ["lastName"] = lead.LastName, ["email"] = lead.Email, ["phone"] = lead.Phone,
+            ["firstName"] = lead.FirstName, ["lastName"] = lead.LastName, ["address"] = lead.Address, ["email"] = lead.Email, ["phone"] = lead.Phone,
             ["companyName"] = lead.CompanyName, ["status"] = lead.Status, ["source"] = lead.Source, ["rating"] = lead.Rating, ["description"] = lead.Description,
         };
         Reset(lead.CustomFields.ToDictionary(kv => kv.Key, kv => (JsonElement?)kv.Value));
@@ -107,6 +108,12 @@
             return;
         }
 
+        if (Value("address") is null)
+        {
+            _fieldErrors = new Dictionary<string, string> { ["address"] = "Address is required." };
+            return;
+        }
+
         _busy = true;
         try
         {
@@ -126,7 +133,8 @@
             var request = new SaveLeadRequest(
                 Value("firstName") ?? string.Empty, Value("lastName") ?? string.Empty, Value("email"), Value("phone"), Value("companyName"),
                 Value("status"), Value("source"), Value("rating"), Value("description"), null, null,
-                _custom.Where(kv => kv.Value is not null).ToDictionary(kv => kv.Key, kv => kv.Value!.Value));
+                _custom.Where(kv => kv.Value is not null).ToDictionary(kv => kv.Key, kv => kv.Value!.Value),
+                Address: Value("address"));
 
             var response = _leadId is null
                 ? await Http.PostAsJsonAsync("api/v1/leads", request)

@@ -30,7 +30,8 @@ public sealed record LeadListItemDto(
     bool IsConverted,
     bool IsDisqualified,
     string FirstName,
-    string LastName);
+    string LastName,
+    string? Address = null);
 
 public sealed record LeadDto(
     Guid Id,
@@ -52,7 +53,8 @@ public sealed record LeadDto(
     Guid? ConvertedContactId,
     Guid? ConvertedAccountId,
     Guid? ConvertedDealId,
-    IReadOnlyDictionary<string, JsonElement> CustomFields);
+    IReadOnlyDictionary<string, JsonElement> CustomFields,
+    string? Address = null);
 
 public sealed record SaveLeadRequest(
     string FirstName,
@@ -66,7 +68,8 @@ public sealed record SaveLeadRequest(
     string? Description,
     IReadOnlyList<string>? Tags,
     Guid? OwnerId,
-    IReadOnlyDictionary<string, JsonElement>? CustomFields);
+    IReadOnlyDictionary<string, JsonElement>? CustomFields,
+    string? Address = null);
 
 public sealed record DisqualifyLeadRequest(string Reason, string? Notes);
 
