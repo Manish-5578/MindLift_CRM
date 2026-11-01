@@ -30,11 +30,42 @@
                     <MudButton Variant="Variant.Outlined" OnClick="() => _showDisqualify = !_showDisqualify">@T["Disqualify"]</MudButton>
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenEdit" data-testid="primary-action">@T["Edit"]</MudButton>
                 }
+                else if (_disqualified)
+                {
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick='() => SetStatusAsync("new")' data-testid="reopen-lead-btn">@T["Reopen lead"]</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenEdit" data-testid="primary-action">@T["Edit"]</MudButton>
+                }
             </Actions>
         </PageHeader>
 
-        <div class="ml-row ml-row--wrap" style="margin-bottom:24px">
-            <StatusChip Text="@StatusLabel(_lead.Status)" Color="@StatusColors.For(_converted ? "Won" : _disqualified ? "Lost" : _lead.Status == "qualified" ? "Qualified" : "Working")" />
+        <div class="ml-row ml-row--wrap align-center gap-3" style="margin-bottom:24px" data-testid="lead-status-bar">
+            <div class="d-flex align-center gap-2">
+                <MudText Typo="Typo.subtitle2" Class="ml-muted">@T["Status:"]</MudText>
+                @if (!_converted)
+                {
+                    <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small" data-testid="status-button-group">
+                        @foreach (var s in AvailableStatuses)
+                        {
+                            var isCurrent = s.Value == _lead.Status;
+                            <MudButton Variant="@(isCurrent ? Variant.Filled : Variant.Outlined)"
+                                       Color="@(isCurrent ? StatusButtonColor(s.Value) : Color.Default)"
+                                       Disabled="@(isCurrent || _statusBusy)"
+                                       OnClick="() => SetStatusAsync(s.Value)"
+                                       data-testid="@("status-btn-" + s.Value)">
+                                @T.Pick(s.Label, s.LabelAr)
+                            </MudButton>
+                        }
+                    </MudButtonGroup>
+                }
+                else
+                {
+                    <StatusChip Text="@T["Converted"]" Color="@StatusColors.For("Won")" />
+                }
+            </div>
+            @if (_disqualified)
+            {
+                <StatusChip Text="@T["Disqualified"]" Color="@StatusColors.For("Lost")" />
+            }
             @if (_lead.Rating is not null) { <StatusChip Text="@RatingLabel(_lead.Rating)" Dot="false" /> }
             @if (_lead.Source is not null) { <StatusChip Text="@SourceLabel(_lead.Source)" Dot="false" /> }
             <MudText Typo="Typo.body2" Class="ml-muted">@T["Created"] <DateText Value="@_lead.CreatedAtUtc" /></MudText>
@@ -478,4 +509,65 @@
 
     private string PicklistLabel(string key, string code)
         => App.PicklistLabel(key, code);
+
+    private bool _statusBusy;
+
+    private IReadOnlyList<PicklistValueDto> AvailableStatuses
+    {
+        get
+        {
+            var list = App.Bootstrap?.Picklists.FirstOrDefault(p => p.Key == "lead_status")?.Values
+                .Where(v => v.IsActive && v.Value != "converted" && v.Value != "disqualified").OrderBy(v => v.SortOrder).ToList() ?? [];
+            if (list.Count == 0)
+            {
+                return
+                [
+                    new(Guid.Empty, "new", "New", "جديد", "New", null, 0, true, true, true),
+                    new(Guid.Empty, "working", "Contacted", "تم التواصل", "Working", null, 1, false, true, true),
+                    new(Guid.Empty, "qualified", "Qualified", "مؤهل", "Qualified", null, 2, false, true, true),
+                ];
+            }
+            return list;
+        }
+    }
+
+    private static Color StatusButtonColor(string status) => status switch
+    {
+        "new" => Color.Primary,
+        "working" => Color.Warning,
+        "qualified" => Color.Success,
+        _ => Color.Primary
+    };
+
+    private async Task SetStatusAsync(string status)
+    {
+        if (_lead is null || _statusBusy) return;
+        _statusBusy = true;
+        try
+        {
+            var res = await Http.PostAsJsonAsync($"api/v1/leads/{Id}/status", new ChangeLeadStatusRequest(status));
+            if (res.IsSuccessStatusCode)
+            {
+                var updated = await res.Content.ReadFromJsonAsync<LeadDto>();
+                if (updated is not null)
+                {
+                    _lead = updated;
+                }
+                Snackbar.Add(T["Status updated to {0}", StatusLabel(status)], Severity.Success);
+                await LoadAsync();
+            }
+            else
+            {
+                Snackbar.Add(await ProblemText.FromAsync(res, T["We could not update the status."]), Severity.Error);
+            }
+        }
+        catch (HttpRequestException)
+        {
+            Snackbar.Add(T["Network error. Please try again."], Severity.Error);
+        }
+        finally
+        {
+            _statusBusy = false;
+        }
+    }
 }

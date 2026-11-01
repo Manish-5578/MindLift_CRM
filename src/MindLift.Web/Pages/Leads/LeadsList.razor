@@ -61,6 +61,7 @@
                 @if (CanEditRecords)
                 {
                     <MudMenuItem OnClick="() => EditRowAsync(row.Id)" Icon="@Icons.Material.Outlined.Edit" data-testid="row-edit">@T["Edit"]</MudMenuItem>
+                    <MudMenuItem OnClick="() => OpenChangeStatusDialog(row)" Icon="@Icons.Material.Outlined.CheckCircleOutline" data-testid="row-change-status">@T["Change status"]</MudMenuItem>
                     <MudMenuItem OnClick="() => OpenMoveToViewDialog(row)" Icon="@Icons.Material.Outlined.DriveFileMove" data-testid="row-move-view">@T["Change view"]</MudMenuItem>
                 }
                 @if (CanDeleteRecords)
@@ -92,6 +93,31 @@
     <DialogActions>
         <MudButton OnClick="() => _moveDialogOpen = false">@T["Cancel"]</MudButton>
         <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(string.IsNullOrEmpty(_targetViewKey) || _targetViewKey == CurrentViewKey)" OnClick="ConfirmMoveLeadAsync" data-testid="confirm-move-view">@T["Move"]</MudButton>
+    </DialogActions>
+</MudDialog>
+
+<MudDialog @bind-Visible="_statusDialogOpen" Options="new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true }" data-testid="change-status-dialog">
+    <TitleContent>
+        <MudText Typo="Typo.h6">@T["Change status"]</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="ml-muted mb-3">
+            @T["Change status for {0}:", _statusLead is not null ? LeadTitle(_statusLead) : ""]
+        </MudText>
+        <MudSelect T="string" Label="@T["Status"]" @bind-Value="_targetStatusKey" Variant="Variant.Outlined" Dense="true" data-testid="select-target-status">
+            @foreach (var s in SettableStatuses)
+            {
+                <MudSelectItem Value="@s.Value">@T.Pick(s.Label, s.LabelAr)</MudSelectItem>
+            }
+        </MudSelect>
+        @if (_targetStatusKey == "disqualified")
+        {
+            <MudTextField @bind-Value="_disqualifyReason" Label="@T["Reason *"]" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-3" data-testid="status-disqualify-reason" />
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _statusDialogOpen = false">@T["Cancel"]</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(string.IsNullOrEmpty(_targetStatusKey) || _targetStatusKey == _statusLead?.Status || (_targetStatusKey == "disqualified" && string.IsNullOrWhiteSpace(_disqualifyReason)))" OnClick="ConfirmChangeStatusAsync" data-testid="confirm-change-status">@T["Update"]</MudButton>
     </DialogActions>
 </MudDialog>
 
@@ -139,6 +165,68 @@
     private async Task OpenHistoryDialog()
     {
         await Dialogs.ShowAsync<ImportHistoryDialog>(T["Lead Upload & Import History"], new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true });
+    }
+
+    private bool _statusDialogOpen;
+    private LeadListItemDto? _statusLead;
+    private string? _targetStatusKey;
+    private string? _disqualifyReason;
+
+    private IReadOnlyList<PicklistValueDto> SettableStatuses
+    {
+        get
+        {
+            var list = App.Bootstrap?.Picklists.FirstOrDefault(p => p.Key == "lead_status")?.Values
+                .Where(v => v.IsActive && v.Value != "converted").OrderBy(v => v.SortOrder).ToList() ?? [];
+            if (list.Count == 0)
+            {
+                return
+                [
+                    new(Guid.Empty, "new", "New", "جديد", "New", null, 0, true, true, true),
+                    new(Guid.Empty, "working", "Contacted", "تم التواصل", "Working", null, 1, false, true, true),
+                    new(Guid.Empty, "qualified", "Qualified", "مؤهل", "Qualified", null, 2, false, true, true),
+                    new(Guid.Empty, "disqualified", "Not interested", "غير مهتم", "Disqualified", null, 3, false, true, true),
+                ];
+            }
+            return list;
+        }
+    }
+
+    private void OpenChangeStatusDialog(LeadListItemDto lead)
+    {
+        _statusLead = lead;
+        _targetStatusKey = lead.Status;
+        _disqualifyReason = null;
+        _statusDialogOpen = true;
+    }
+
+    private async Task ConfirmChangeStatusAsync()
+    {
+        if (_statusLead is null || string.IsNullOrWhiteSpace(_targetStatusKey)) return;
+
+        HttpResponseMessage res;
+        if (_targetStatusKey == "disqualified")
+        {
+            res = await Http.PostAsJsonAsync($"api/v1/leads/{_statusLead.Id}/disqualify", new DisqualifyLeadRequest(_disqualifyReason?.Trim() ?? "Not interested", null));
+        }
+        else
+        {
+            res = await Http.PostAsJsonAsync($"api/v1/leads/{_statusLead.Id}/status", new ChangeLeadStatusRequest(_targetStatusKey));
+        }
+
+        if (res.IsSuccessStatusCode)
+        {
+            Snackbar.Add(T["Status updated successfully."], Severity.Success);
+            _statusDialogOpen = false;
+            if (_list is not null)
+            {
+                await _list.ReloadAsync();
+            }
+        }
+        else
+        {
+            Snackbar.Add(await ProblemText.FromAsync(res, T["We could not change the status."]), Severity.Error);
+        }
     }
 
     /// <summary>Downloads the leads the list is showing now: the same view, search, filters and sort in Excel (.xlsx) or CSV (.csv).</summary>

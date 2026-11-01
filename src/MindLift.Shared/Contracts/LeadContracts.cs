@@ -71,6 +71,8 @@ public sealed record SaveLeadRequest(
     IReadOnlyDictionary<string, JsonElement>? CustomFields,
     string? Address = null);
 
+public sealed record ChangeLeadStatusRequest(string Status);
+
 public sealed record DisqualifyLeadRequest(string Reason, string? Notes);
 
 /// <summary>How the converted records are created or linked (plan 7.3, Convert).</summary>

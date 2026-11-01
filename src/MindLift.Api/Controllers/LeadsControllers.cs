@@ -53,6 +53,11 @@ public sealed class LeadsController(LeadService leads, ImportNotifier imports) :
         => Ok(await leads.BulkDeleteAsync(request, cancellationToken));
 
     [HasPermission(AppModule.Leads, PermissionAction.Edit)]
+    [HttpPost("{id:guid}/status")]
+    public async Task<ActionResult<LeadDto>> ChangeStatus(Guid id, [FromBody] ChangeLeadStatusRequest request, CancellationToken cancellationToken)
+        => Ok(await leads.ChangeStatusAsync(id, request.Status, cancellationToken));
+
+    [HasPermission(AppModule.Leads, PermissionAction.Edit)]
     [HttpPost("{id:guid}/disqualify")]
     public async Task<ActionResult<LeadDto>> Disqualify(Guid id, [FromBody] DisqualifyLeadRequest request, CancellationToken cancellationToken)
         => Ok(await leads.DisqualifyAsync(id, request, cancellationToken));

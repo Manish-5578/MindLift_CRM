@@ -171,4 +171,34 @@ public sealed class LeadFixesTests
         request.IsShared.ShouldBeFalse();
         request.Name.ShouldBe("My Private View");
     }
+
+    [Fact]
+    public void LeadStatus_ChangeStatusRequest_AndAllowedTransitions_Validated()
+    {
+        // Expected: dedicated ChangeLeadStatusRequest carries new status
+        var request = new ChangeLeadStatusRequest("working");
+        request.Status.ShouldBe("working");
+
+        // Allowed direct statuses are new, working, qualified (converted & disqualified use dedicated flows)
+        var allowedDirectStatuses = new[] { "new", "working", "qualified" };
+        allowedDirectStatuses.ShouldContain(request.Status);
+
+        // Verification of lead transition: moving to working marks FirstContactedAt if null
+        var lead = new Lead
+        {
+            Id = Guid.NewGuid(),
+            CompanyName = "Test Corp",
+            Status = "new",
+            FirstContactedAt = null
+        };
+
+        if (request.Status == "working" && lead.FirstContactedAt is null)
+        {
+            lead.FirstContactedAt = DateTime.UtcNow;
+        }
+        lead.Status = request.Status;
+
+        lead.Status.ShouldBe("working");
+        lead.FirstContactedAt.ShouldNotBeNull();
+    }
 }

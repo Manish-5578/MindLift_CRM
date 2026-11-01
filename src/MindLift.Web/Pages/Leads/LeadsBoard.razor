@@ -242,16 +242,7 @@
         }
         else
         {
-            var full = await Http.GetFromJsonAsync<LeadDto>($"api/v1/leads/{lead.Id}");
-            if (full is null)
-            {
-                Snackbar.Add(T["We could not open this lead."], Severity.Error);
-                return;
-            }
-
-            response = await Http.PutAsJsonAsync($"api/v1/leads/{lead.Id}", new SaveLeadRequest(
-                full.FirstName, full.LastName, full.Email, full.Phone, full.CompanyName, move.ToKey, full.Source, full.Rating,
-                full.Description, full.Tags, full.OwnerId, full.CustomFields));
+            response = await Http.PostAsJsonAsync($"api/v1/leads/{lead.Id}/status", new ChangeLeadStatusRequest(move.ToKey));
         }
 
         if (!response.IsSuccessStatusCode)

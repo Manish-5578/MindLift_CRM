@@ -249,6 +249,75 @@ public sealed class LeadService(
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<LeadDto> ChangeStatusAsync(Guid id, string status, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(status))
+        {
+            throw new ValidationException(new Dictionary<string, string[]> { ["status"] = ["Choose a status."] });
+        }
+
+        var lead = await LoadScopedAsync(id, cancellationToken);
+        if (lead.ConvertedAt is not null)
+        {
+            throw new ForbiddenException("Converted leads cannot change status. Edit the contact or deal instead.", "lead_converted");
+        }
+
+        var normalized = status.Trim().ToLowerInvariant();
+        if (normalized == "converted")
+        {
+            throw new ValidationException(new Dictionary<string, string[]> { ["status"] = ["Use Convert to change a lead to converted."] });
+        }
+
+        if (normalized == "disqualified")
+        {
+            throw new ValidationException(new Dictionary<string, string[]> { ["status"] = ["Use Disqualify to specify a reason."] });
+        }
+
+        var validStatuses = await db.PicklistValues.AsNoTracking()
+            .Where(p => p.PicklistKey == "lead_status" && p.IsActive)
+            .Select(p => p.Value.ToLowerInvariant())
+            .ToListAsync(cancellationToken);
+
+        if (validStatuses.Count > 0)
+        {
+            if (!validStatuses.Contains(normalized))
+            {
+                throw new ValidationException(new Dictionary<string, string[]> { ["status"] = ["Choose a valid status."] });
+            }
+        }
+        else if (normalized != "new" && normalized != "working" && normalized != "qualified")
+        {
+            throw new ValidationException(new Dictionary<string, string[]> { ["status"] = ["Choose a valid status."] });
+        }
+
+        var oldStatus = lead.Status;
+        lead.Status = normalized;
+        if (normalized != "disqualified")
+        {
+            lead.DisqualifyReason = null;
+        }
+
+        if (normalized == "working" && lead.FirstContactedAt is null)
+        {
+            lead.FirstContactedAt = clock.UtcNow;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        await timeline.PublishAsync(new TimelineEventInput(
+            EntityType: "lead",
+            EntityId: lead.Id,
+            Kind: "lead_status_changed",
+            Summary: $"Changed status from {oldStatus} to {normalized}",
+            Source: "crm",
+            DetailJson: JsonSerializer.Serialize(new { OldStatus = oldStatus, NewStatus = normalized }),
+            ActorUserId: tenant.UserId,
+            OccurredAt: clock.UtcNow
+        ), cancellationToken);
+
+        return Map(lead);
+    }
+
     public async Task<LeadDto> DisqualifyAsync(Guid id, DisqualifyLeadRequest request, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(request.Reason))

@@ -60,7 +60,23 @@
     ];
 
     private IReadOnlyList<PicklistValueDto> Options(string key)
-        => App.Bootstrap?.Picklists.FirstOrDefault(p => p.Key == key)?.Values ?? [];
+    {
+        var list = App.Bootstrap?.Picklists.FirstOrDefault(p => p.Key == key)?.Values ?? [];
+        if (key == "lead_status")
+        {
+            if (list.Count == 0)
+            {
+                return
+                [
+                    new(Guid.Empty, "new", "New", "جديد", "New", null, 0, true, true, true),
+                    new(Guid.Empty, "working", "Contacted", "تم التواصل", "Working", null, 1, false, true, true),
+                    new(Guid.Empty, "qualified", "Qualified", "مؤهل", "Qualified", null, 2, false, true, true),
+                ];
+            }
+            return list.Where(v => v.IsActive && v.Value != "converted" && v.Value != "disqualified").ToList();
+        }
+        return list;
+    }
 
     protected override async Task OnInitializedAsync() => _users = await RecordLookups.UsersAsync(Http);
 
