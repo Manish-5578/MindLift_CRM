@@ -25,6 +25,8 @@
             <Actions>
                 @if (!_converted && !_disqualified)
                 {
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.PersonAdd" OnClick="QuickMoveToContactAsync">@T["Add to contact"]</MudButton>
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Handshake" OnClick="QuickMoveToEngagementAsync">@T["Move to engagement"]</MudButton>
                     <MudButton Variant="Variant.Outlined" OnClick="FindDuplicatesAsync" data-testid="find-duplicates">@T["Find duplicates"]</MudButton>
                     <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Transform" OnClick="OpenConvertDialogAsync" data-testid="convert-lead-btn">@T["Convert"]</MudButton>
                     <MudButton Variant="Variant.Outlined" OnClick="() => _showDisqualify = !_showDisqualify">@T["Disqualify"]</MudButton>
@@ -169,6 +171,8 @@
                 </div>
             </MudAlert>
         }
+
+        <LeadStickyNote LeadId="Id" InitialNote="_lead.Description" OnSaved="note => _lead = _lead with { Description = note }" />
 
         <MudGrid Spacing="4">
             <MudItem xs="12" md="6">
@@ -434,6 +438,93 @@
         _reason = string.Empty;
         Snackbar.Add(T["Lead disqualified"], Severity.Success);
         await LoadAsync();
+    }
+
+    private async Task QuickMoveToContactAsync()
+    {
+        if (_lead is null) return;
+        bool hasSufficient = !string.IsNullOrWhiteSpace(_lead.FirstName) || !string.IsNullOrWhiteSpace(_lead.LastName);
+
+        if (hasSufficient)
+        {
+            try
+            {
+                var res = await Http.PostAsJsonAsync($"api/v1/leads/{Id}/quick-convert-contact", new QuickConvertContactRequest());
+                if (res.IsSuccessStatusCode)
+                {
+                    var result = await res.Content.ReadFromJsonAsync<ConvertLeadResult>();
+                    Snackbar.Add(T["Lead successfully converted to Contact!"], Severity.Success, config =>
+                    {
+                        if (result?.ContactId != null)
+                        {
+                            config.Action = T["View Contact"];
+                            config.ActionColor = Color.Primary;
+                            config.OnClick = _ => { Nav.NavigateTo($"/contacts/{result.ContactId}"); return Task.CompletedTask; };
+                        }
+                    });
+                    await LoadAsync();
+                    return;
+                }
+            }
+            catch { /* fallback to dialog */ }
+        }
+
+        var parameters = new DialogParameters<LeadConvertDialog>
+        {
+            { x => x.LeadId, Id },
+            { x => x.TargetMode, "contact" }
+        };
+        var dialog = await Dialogs.ShowAsync<LeadConvertDialog>(T["Move Lead to Contact"], parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true });
+        var diagResult = await dialog.Result;
+        if (!diagResult.Canceled)
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task QuickMoveToEngagementAsync()
+    {
+        if (_lead is null) return;
+        bool hasSufficient = (!string.IsNullOrWhiteSpace(_lead.FirstName) || !string.IsNullOrWhiteSpace(_lead.LastName))
+            && !string.IsNullOrWhiteSpace(_lead.CompanyName);
+
+        if (hasSufficient)
+        {
+            try
+            {
+                var res = await Http.PostAsJsonAsync($"api/v1/leads/{Id}/quick-convert-engagement", new QuickConvertEngagementRequest());
+                if (res.IsSuccessStatusCode)
+                {
+                    var result = await res.Content.ReadFromJsonAsync<ConvertLeadResult>();
+                    Snackbar.Add(T["Lead successfully moved to Engagement!"], Severity.Success, config =>
+                    {
+                        if (result?.DealId != null)
+                        {
+                            config.Action = T["View Engagement"];
+                            config.ActionColor = Color.Primary;
+                            config.OnClick = _ => { Nav.NavigateTo($"/deals/{result.DealId}"); return Task.CompletedTask; };
+                        }
+                    });
+                    await LoadAsync();
+                    return;
+                }
+            }
+            catch { /* fallback to dialog */ }
+        }
+
+        var parameters = new DialogParameters<LeadConvertDialog>
+        {
+            { x => x.LeadId, Id },
+            { x => x.TargetMode, "engagement" }
+        };
+        var dialog = await Dialogs.ShowAsync<LeadConvertDialog>(T["Move Lead to Engagement"], parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true });
+        var diagResult = await dialog.Result;
+        if (!diagResult.Canceled)
+        {
+            await LoadAsync();
+        }
     }
 
     private async Task OpenConvertDialogAsync()

@@ -95,7 +95,7 @@ public sealed record ListState(string View, string? Search = null, int Page = 1,
         }
     }
 
-    private static Dictionary<string, string> ParseQuery(string? queryString)
+    public static Dictionary<string, string> ParseQuery(string? queryString)
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         if (string.IsNullOrWhiteSpace(queryString))

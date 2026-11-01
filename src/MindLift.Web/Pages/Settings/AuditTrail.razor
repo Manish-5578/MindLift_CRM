@@ -1,0 +1,566 @@
+@page "/settings/audit-trail"
+@using System.Globalization
+@using System.Text.Json
+@using MindLift.Shared.Contracts
+@using MindLift.Shared.Enums
+@using MindLift.Web.Components.Platform
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+@inject Translator T
+@inject NavigationManager Nav
+@inject AppState App
+
+<PageTitle>@T["Audit trail"] · MindLift</PageTitle>
+
+<div class="ml-page ml-page--wide">
+    <div class="d-flex align-center justify-space-between flex-wrap gap-4 mb-3">
+        <div>
+            <h1 class="mud-typography mud-typography-h5" style="font-weight:700;">@T["Audit trail"]</h1>
+            <div class="mud-text-secondary" style="font-size:14px;">
+                @T["Every record change, creation, update, and deletion across your workspace on record with who made it and full before/after field changes."]
+            </div>
+        </div>
+        <div class="d-flex align-center gap-2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Download" OnClick="ExportCsvAsync"
+                       Disabled="_exporting" data-testid="audit-export-btn">
+                @(_exporting ? T["Exporting..."] : T["Export CSV"])
+            </MudButton>
+        </div>
+    </div>
+
+    <SettingsNav Current="/settings/audit-trail" />
+
+    @* KPI Summary Bar *@
+    <MudGrid Spacing="2" Class="mb-4">
+        <MudItem xs="6" sm="3">
+            <MudPaper Class="pa-3 d-flex align-center gap-3" Elevation="0" Style="border:1px solid var(--mud-palette-divider); border-radius:8px;">
+                <MudAvatar Color="Color.Primary" Variant="Variant.Filled" Size="Size.Medium">
+                    <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small" />
+                </MudAvatar>
+                <div>
+                    <div class="text-caption mud-text-secondary">@T["Total changes"]</div>
+                    <div class="text-h6" style="font-weight:700;">@(_page?.Total ?? 0)</div>
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <MudPaper Class="pa-3 d-flex align-center gap-3" Elevation="0" Style="border:1px solid var(--mud-palette-divider); border-radius:8px;">
+                <MudAvatar Color="Color.Success" Variant="Variant.Filled" Size="Size.Medium">
+                    <MudIcon Icon="@Icons.Material.Filled.AddCircle" Size="Size.Small" />
+                </MudAvatar>
+                <div>
+                    <div class="text-caption mud-text-secondary">@T["Creations"]</div>
+                    <div class="text-h6" style="font-weight:700; color:var(--mud-palette-success);">@_createsCount</div>
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <MudPaper Class="pa-3 d-flex align-center gap-3" Elevation="0" Style="border:1px solid var(--mud-palette-divider); border-radius:8px;">
+                <MudAvatar Color="Color.Info" Variant="Variant.Filled" Size="Size.Medium">
+                    <MudIcon Icon="@Icons.Material.Filled.Edit" Size="Size.Small" />
+                </MudAvatar>
+                <div>
+                    <div class="text-caption mud-text-secondary">@T["Modifications"]</div>
+                    <div class="text-h6" style="font-weight:700; color:var(--mud-palette-info);">@_updatesCount</div>
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <MudPaper Class="pa-3 d-flex align-center gap-3" Elevation="0" Style="border:1px solid var(--mud-palette-divider); border-radius:8px;">
+                <MudAvatar Color="Color.Error" Variant="Variant.Filled" Size="Size.Medium">
+                    <MudIcon Icon="@Icons.Material.Filled.Delete" Size="Size.Small" />
+                </MudAvatar>
+                <div>
+                    <div class="text-caption mud-text-secondary">@T["Deletions"]</div>
+                    <div class="text-h6" style="font-weight:700; color:var(--mud-palette-error);">@_deletesCount</div>
+                </div>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    @* Filters Section *@
+    <MudPaper Class="pa-4 mb-4" Elevation="0" Style="border:1px solid var(--mud-palette-divider); border-radius:10px;">
+        <div class="d-flex align-center justify-space-between flex-wrap gap-3 mb-3">
+            @* Action Filter Chips *@
+            <div class="d-flex align-center gap-1 flex-wrap">
+                <MudChip T="string" Variant="@(string.IsNullOrEmpty(_action) ? Variant.Filled : Variant.Outlined)"
+                         Color="Color.Primary" OnClick="@(() => SetActionAsync(""))" data-testid="audit-action-all">
+                    @T["All Actions"]
+                </MudChip>
+                <MudChip T="string" Variant="@(_action == "Create" ? Variant.Filled : Variant.Outlined)"
+                         Color="Color.Success" OnClick="@(() => SetActionAsync("Create"))" data-testid="audit-action-create">
+                    @T["Create"]
+                </MudChip>
+                <MudChip T="string" Variant="@(_action == "Update" ? Variant.Filled : Variant.Outlined)"
+                         Color="Color.Info" OnClick="@(() => SetActionAsync("Update"))" data-testid="audit-action-update">
+                    @T["Update"]
+                </MudChip>
+                <MudChip T="string" Variant="@(_action == "Delete" ? Variant.Filled : Variant.Outlined)"
+                         Color="Color.Error" OnClick="@(() => SetActionAsync("Delete"))" data-testid="audit-action-delete">
+                    @T["Delete"]
+                </MudChip>
+            </div>
+
+            @if (HasActiveFilters)
+            {
+                <MudButton Variant="Variant.Text" Color="Color.Default" StartIcon="@Icons.Material.Filled.FilterAltOff"
+                           Size="Size.Small" OnClick="ClearFiltersAsync" data-testid="audit-clear-btn">
+                    @T["Clear filters"]
+                </MudButton>
+            }
+        </div>
+
+        <MudGrid Spacing="2">
+            <MudItem xs="12" sm="6" md="3">
+                <MudSelect T="string" Value="@_entityType" ValueChanged="OnEntityTypeChanged" Label="@T["Module / Entity"]"
+                           Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Clearable="true" data-testid="audit-module-select">
+                    <MudSelectItem Value="@("")">@T["All modules"]</MudSelectItem>
+                    <MudSelectItem Value="@("Lead")">@T["Leads"]</MudSelectItem>
+                    <MudSelectItem Value="@("Contact")">@T["Contacts"]</MudSelectItem>
+                    <MudSelectItem Value="@("Account")">@T["Accounts"]</MudSelectItem>
+                    <MudSelectItem Value="@("Deal")">@T["Deals"]</MudSelectItem>
+                    <MudSelectItem Value="@("Activity")">@T["Activities"]</MudSelectItem>
+                    <MudSelectItem Value="@("User")">@T["Users"]</MudSelectItem>
+                    <MudSelectItem Value="@("Role")">@T["Roles"]</MudSelectItem>
+                    <MudSelectItem Value="@("Pipeline")">@T["Pipelines"]</MudSelectItem>
+                    <MudSelectItem Value="@("AutomationRule")">@T["Automation rules"]</MudSelectItem>
+                    <MudSelectItem Value="@("VisualWorkflow")">@T["Visual workflows"]</MudSelectItem>
+                    <MudSelectItem Value="@("Cadence")">@T["Cadences"]</MudSelectItem>
+                    <MudSelectItem Value="@("DocumentType")">@T["Document types"]</MudSelectItem>
+                    <MudSelectItem Value="@("StoredFile")">@T["Files & documents"]</MudSelectItem>
+                    <MudSelectItem Value="@("ModuleSetting")">@T["Module settings"]</MudSelectItem>
+                    <MudSelectItem Value="@("PicklistValue")">@T["Picklists"]</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudSelect T="string" Value="@_userId" ValueChanged="OnUserChanged" Label="@T["Who (Actor)"]"
+                           Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Clearable="true" data-testid="audit-user-select">
+                    <MudSelectItem Value="@("")">@T["All users & system"]</MudSelectItem>
+                    @foreach (var user in _users)
+                    {
+                        <MudSelectItem Value="@user.Id.ToString()">@user.FullName</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="6" sm="3" md="2">
+                <MudDatePicker Label="@T["From date"]" Date="@_from" DateChanged="OnFromDateChanged"
+                               Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" data-testid="audit-from-date" />
+            </MudItem>
+
+            <MudItem xs="6" sm="3" md="2">
+                <MudDatePicker Label="@T["To date"]" Date="@_to" DateChanged="OnToDateChanged"
+                               Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" data-testid="audit-to-date" />
+            </MudItem>
+
+            <MudItem xs="12" md="2">
+                <MudTextField T="string" Value="@_search" ValueChanged="OnSearchChanged" Placeholder="@T["Search changes..."]"
+                              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Clearable="true" data-testid="audit-search-input" />
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    @* Table Section *@
+    <MudPaper Class="elevation-0" Style="border:1px solid var(--mud-palette-divider); border-radius:10px; overflow:hidden;" data-testid="audit-table-card">
+        @if (_loading)
+        {
+            <div class="pa-8 d-flex justify-center align-center">
+                <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+            </div>
+        }
+        else if (_page is null || _page.Items.Count == 0)
+        {
+            <div class="pa-12 text-center">
+                <MudAvatar Color="Color.Default" Variant="Variant.Outlined" Size="Size.Large" Class="mb-3 mx-auto">
+                    <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Medium" />
+                </MudAvatar>
+                <MudText Typo="Typo.h6" Style="font-weight:600;">
+                    @(HasActiveFilters ? T["No audit records match your filters"] : T["No audit records yet"])
+                </MudText>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary mt-1">
+                    @T["When records are created, updated, or deleted in your workspace, the complete history will appear here."]
+                </MudText>
+            </div>
+        }
+        else
+        {
+            <div style="overflow-x:auto;">
+                <table class="mud-table-root" style="width:100%; border-collapse:collapse;" data-testid="audit-table">
+                    <thead>
+                        <tr style="border-bottom:1px solid var(--mud-palette-divider); background:var(--mud-palette-background-grey); text-align:left;">
+                            <th style="padding:12px 16px; font-weight:600; font-size:13px; width:160px;">@T["When"]</th>
+                            <th style="padding:12px 16px; font-weight:600; font-size:13px; width:180px;">@T["Who"]</th>
+                            <th style="padding:12px 16px; font-weight:600; font-size:13px; width:110px;">@T["Action"]</th>
+                            <th style="padding:12px 16px; font-weight:600; font-size:13px; width:130px;">@T["Module"]</th>
+                            <th style="padding:12px 16px; font-weight:600; font-size:13px;">@T["What Changed"]</th>
+                            <th style="padding:12px 16px; width:50px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var log in _page.Items)
+                        {
+                            var entry = log;
+                            var isOpen = _openLogId == entry.Id;
+                            <tr style="border-bottom:1px solid var(--mud-palette-divider); cursor:pointer; transition:background-color 0.15s ease;"
+                                class="@(isOpen ? "mud-theme-primary-light" : "")"
+                                @onclick="() => ToggleRow(entry.Id)" data-testid="audit-row">
+                                <td style="padding:12px 16px;">
+                                    <div style="font-weight:600; font-size:13px;">@Pc.Ago(entry.OccurredAtUtc)</div>
+                                    <div class="mud-text-secondary" style="font-size:11px;">@entry.OccurredAtUtc.ToString("dd MMM yyyy HH:mm:ss") UTC</div>
+                                </td>
+                                <td style="padding:12px 16px;">
+                                    <div class="d-flex align-center gap-2">
+                                        <MudAvatar Size="Size.Small" Color="@GetUserColor(entry.UserName)">
+                                            @(Pc.Initials(entry.UserName ?? "S"))
+                                        </MudAvatar>
+                                        <div style="line-height:1.2;">
+                                            <div style="font-weight:600; font-size:13px;">@(entry.UserName ?? "System")</div>
+                                            @if (!string.IsNullOrEmpty(entry.UserEmail))
+                                            {
+                                                <div class="mud-text-secondary" style="font-size:11px;">@entry.UserEmail</div>
+                                            }
+                                        </div>
+                                    </div>
+                                </td>
+                                <td style="padding:12px 16px;">
+                                    <MudChip T="string" Size="Size.Small" Color="@GetActionColor(entry.Action)" Variant="Variant.Filled"
+                                             Style="font-size:11px; height:22px; font-weight:600;">
+                                        @entry.Action
+                                    </MudChip>
+                                </td>
+                                <td style="padding:12px 16px;">
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Default"
+                                             Style="font-size:11px; height:22px;">
+                                        @FormatEntityType(entry.EntityType)
+                                    </MudChip>
+                                </td>
+                                <td style="padding:12px 16px; font-size:13px; max-width:380px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                                    @(entry.Summary ?? $"{entry.Action} {entry.EntityType}")
+                                </td>
+                                <td style="padding:12px 16px; text-align:center;">
+                                    <MudIconButton Icon="@(isOpen ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
+                                                   Size="Size.Small" OnClick="@(() => ToggleRow(entry.Id))" />
+                                </td>
+                            </tr>
+                            @if (isOpen)
+                            {
+                                <tr style="background:var(--mud-palette-background-grey); border-bottom:1px solid var(--mud-palette-divider);" data-testid="audit-row-detail">
+                                    <td colspan="6" style="padding:16px 20px;">
+                                        <MudPaper Class="pa-4" Elevation="0" Style="border:1px solid var(--mud-palette-divider); border-radius:8px; background:var(--mud-palette-surface);">
+                                            <div class="d-flex align-center justify-space-between flex-wrap gap-2 mb-3 pb-2" style="border-bottom:1px solid var(--mud-palette-divider);">
+                                                <div class="d-flex align-center gap-3">
+                                                    <MudText Typo="Typo.subtitle2" Style="font-weight:700;">@T["Record details & Field changes"]</MudText>
+                                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Primary">
+                                                        @T["ID: {0}", entry.EntityId]
+                                                    </MudChip>
+                                                </div>
+                                                <div class="text-caption mud-text-secondary">
+                                                    @T["Exact time: {0} UTC", entry.OccurredAtUtc.ToString("yyyy-MM-dd HH:mm:ss")]
+                                                </div>
+                                            </div>
+
+                                            @* Field Changes Table *@
+                                            @if (entry.Diff is { Count: > 0 } diffList)
+                                            {
+                                                <div class="mt-2 mb-3">
+                                                    <MudText Typo="Typo.caption" Class="mud-text-secondary" Style="font-weight:600; text-transform:uppercase;">
+                                                        @T["Field Differences ({0} changed)", diffList.Count]
+                                                    </MudText>
+                                                    <table style="width:100%; border-collapse:collapse; margin-top:6px; font-size:12px;">
+                                                        <thead>
+                                                            <tr style="border-bottom:1px solid var(--mud-palette-divider); text-align:left; background:var(--mud-palette-background-grey);">
+                                                                <th style="padding:6px 12px; font-weight:600; width:25%;">@T["Field"]</th>
+                                                                <th style="padding:6px 12px; font-weight:600; width:37%;">@T["Previous value"]</th>
+                                                                <th style="padding:6px 12px; font-weight:600; width:38%;">@T["New value"]</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            @foreach (var diff in diffList)
+                                                            {
+                                                                <tr style="border-bottom:1px solid var(--mud-palette-divider);">
+                                                                    <td style="padding:6px 12px; font-weight:600; font-family:monospace;">@diff.Field</td>
+                                                                    <td style="padding:6px 12px; color:var(--mud-palette-error); background:rgba(var(--mud-palette-error-rgb), 0.05); font-family:monospace;">
+                                                                        @(diff.OldValue ?? "— (empty)")
+                                                                    </td>
+                                                                    <td style="padding:6px 12px; color:var(--mud-palette-success); background:rgba(var(--mud-palette-success-rgb), 0.05); font-weight:600; font-family:monospace;">
+                                                                        @(diff.NewValue ?? "— (empty)")
+                                                                    </td>
+                                                                </tr>
+                                                            }
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            }
+                                            else if (!string.IsNullOrWhiteSpace(entry.Changes))
+                                            {
+                                                <div class="mt-2">
+                                                    <MudText Typo="Typo.caption" Class="mud-text-secondary" Style="font-weight:600;">@T["Raw changes:"]</MudText>
+                                                    <pre style="background:var(--mud-palette-background-grey); padding:8px; border-radius:4px; font-size:11px; overflow-x:auto; margin-top:4px;">@entry.Changes</pre>
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <div class="mt-2 text-caption mud-text-secondary">
+                                                    @T["Initial creation or full deletion of this {0} record.", entry.EntityType]
+                                                </div>
+                                            }
+                                        </MudPaper>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @* Pagination *@
+            <div class="d-flex align-center justify-space-between pa-4 flex-wrap gap-3" style="border-top:1px solid var(--mud-palette-divider);">
+                <div class="mud-text-secondary" style="font-size:13px;" data-testid="audit-pagination-info">
+                    @T["Showing {0}–{1} of {2} entries", (_pageNo - 1) * PageSize + 1, Math.Min(_pageNo * PageSize, _page.Total), _page.Total]
+                </div>
+                <div class="d-flex align-center gap-2">
+                    <MudButton Variant="Variant.Outlined" Size="Size.Small" Disabled="@(_pageNo <= 1)"
+                               OnClick="@(() => GoPageAsync(_pageNo - 1))" StartIcon="@Icons.Material.Filled.NavigateBefore" data-testid="audit-prev-page">
+                        @T["Newer"]
+                    </MudButton>
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@T["Page {0}", _pageNo]</MudChip>
+                    <MudButton Variant="Variant.Outlined" Size="Size.Small" Disabled="@(_pageNo * PageSize >= _page.Total)"
+                               OnClick="@(() => GoPageAsync(_pageNo + 1))" EndIcon="@Icons.Material.Filled.NavigateNext" data-testid="audit-next-page">
+                        @T["Older"]
+                    </MudButton>
+                </div>
+            </div>
+        }
+    </MudPaper>
+</div>
+
+@code {
+    private const int PageSize = 25;
+
+    private PagedResult<AuditLogDto>? _page;
+    private List<UserListItem> _users = [];
+    private bool _loading = true;
+    private bool _exporting = false;
+    private int _pageNo = 1;
+
+    // Filters
+    private string _action = "";
+    private string _entityType = "";
+    private string _userId = "";
+    private DateTime? _from;
+    private DateTime? _to;
+    private string _search = "";
+
+    // KPI Counters
+    private int _createsCount = 0;
+    private int _updatesCount = 0;
+    private int _deletesCount = 0;
+
+    private Guid? _openLogId;
+    private CancellationTokenSource? _searchDebounce;
+
+    private bool HasActiveFilters => !string.IsNullOrEmpty(_action)
+        || !string.IsNullOrEmpty(_entityType)
+        || !string.IsNullOrEmpty(_userId)
+        || _from.HasValue
+        || _to.HasValue
+        || !string.IsNullOrWhiteSpace(_search);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsersAsync();
+        await LoadLogsAsync();
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        try
+        {
+            var res = await Http.GetFromJsonAsync<PagedResult<UserListItem>>("api/v1/users?pageSize=200");
+            _users = res?.Items?.ToList() ?? [];
+        }
+        catch
+        {
+            _users = [];
+        }
+    }
+
+    private string BuildQueryString(bool paged)
+    {
+        var q = new List<string>();
+        if (paged)
+        {
+            q.Add($"page={_pageNo}");
+            q.Add($"pageSize={PageSize}");
+        }
+        if (!string.IsNullOrEmpty(_action)) q.Add($"action={Uri.EscapeDataString(_action)}");
+        if (!string.IsNullOrEmpty(_entityType)) q.Add($"entityType={Uri.EscapeDataString(_entityType)}");
+        if (!string.IsNullOrEmpty(_userId) && Guid.TryParse(_userId, out var uid)) q.Add($"userId={uid}");
+        if (_from.HasValue) q.Add($"from={_from.Value:yyyy-MM-dd}");
+        if (_to.HasValue) q.Add($"to={_to.Value:yyyy-MM-dd}");
+        if (!string.IsNullOrWhiteSpace(_search)) q.Add($"search={Uri.EscapeDataString(_search.Trim())}");
+
+        return string.Join("&", q);
+    }
+
+    private async Task LoadLogsAsync()
+    {
+        _loading = true;
+        try
+        {
+            var url = "api/v1/audit-logs?" + BuildQueryString(true);
+            _page = await Http.GetFromJsonAsync<PagedResult<AuditLogDto>>(url);
+
+            // Compute KPI counts from current loaded set or total
+            if (_page?.Items is not null)
+            {
+                _createsCount = _page.Items.Count(i => i.Action.Equals("Create", StringComparison.OrdinalIgnoreCase));
+                _updatesCount = _page.Items.Count(i => i.Action.Equals("Update", StringComparison.OrdinalIgnoreCase));
+                _deletesCount = _page.Items.Count(i => i.Action.Equals("Delete", StringComparison.OrdinalIgnoreCase));
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(T["Failed to load audit logs: {0}", ex.Message], Severity.Error);
+            _page = new PagedResult<AuditLogDto>([], 0, 1, PageSize);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ReloadAsync()
+    {
+        _pageNo = 1;
+        _openLogId = null;
+        await LoadLogsAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task SetActionAsync(string act)
+    {
+        _action = act;
+        await ReloadAsync();
+    }
+
+    private async Task OnEntityTypeChanged(string entityType)
+    {
+        _entityType = entityType;
+        await ReloadAsync();
+    }
+
+    private async Task OnUserChanged(string userId)
+    {
+        _userId = userId;
+        await ReloadAsync();
+    }
+
+    private async Task OnFromDateChanged(DateTime? date)
+    {
+        _from = date;
+        await ReloadAsync();
+    }
+
+    private async Task OnToDateChanged(DateTime? date)
+    {
+        _to = date;
+        await ReloadAsync();
+    }
+
+    private async Task OnSearchChanged(string search)
+    {
+        _search = search ?? "";
+        _searchDebounce?.Cancel();
+        _searchDebounce = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(300, _searchDebounce.Token);
+            await ReloadAsync();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async Task ClearFiltersAsync()
+    {
+        _action = "";
+        _entityType = "";
+        _userId = "";
+        _from = null;
+        _to = null;
+        _search = "";
+        await ReloadAsync();
+    }
+
+    private async Task GoPageAsync(int page)
+    {
+        _pageNo = Math.Max(1, page);
+        _openLogId = null;
+        await LoadLogsAsync();
+    }
+
+    private void ToggleRow(Guid id)
+    {
+        _openLogId = _openLogId == id ? null : id;
+    }
+
+    private async Task ExportCsvAsync()
+    {
+        _exporting = true;
+        try
+        {
+            var url = "api/v1/audit-logs/export?" + BuildQueryString(false);
+            var bytes = await Http.GetByteArrayAsync(url);
+            var fileName = $"workspace-audit-trail-{DateTime.UtcNow:yyyyMMddHHmmss}.csv";
+            await JS.InvokeVoidAsync("mindlift.downloadFile", fileName, "text/csv", Convert.ToBase64String(bytes));
+            Snackbar.Add(T["Audit trail exported successfully."], Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(T["Export failed: {0}", ex.Message], Severity.Error);
+        }
+        finally
+        {
+            _exporting = false;
+        }
+    }
+
+    private static Color GetActionColor(string action) => action switch
+    {
+        "Create" => Color.Success,
+        "Update" => Color.Info,
+        "Delete" => Color.Error,
+        _ => Color.Default
+    };
+
+    private static Color GetUserColor(string? name)
+    {
+        if (string.IsNullOrEmpty(name)) return Color.Default;
+        var hash = Math.Abs(name.GetHashCode());
+        return (hash % 4) switch
+        {
+            0 => Color.Primary,
+            1 => Color.Secondary,
+            2 => Color.Info,
+            _ => Color.Dark
+        };
+    }
+
+    private static string FormatEntityType(string entityType) => entityType switch
+    {
+        "AutomationRule" => "Automation Rule",
+        "VisualWorkflow" => "Workflow",
+        "DocumentType" => "Doc Type",
+        "StoredFile" => "File",
+        "ModuleSetting" => "Module Setting",
+        "PicklistValue" => "Picklist",
+        _ => entityType
+    };
+}
+

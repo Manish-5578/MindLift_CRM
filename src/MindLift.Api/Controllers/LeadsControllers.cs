@@ -73,6 +73,21 @@ public sealed class LeadsController(LeadService leads, ImportNotifier imports) :
     public async Task<ActionResult<LeadConvertOptionsDto>> GetConvertOptions(Guid id, CancellationToken cancellationToken)
         => Ok(await leads.GetConvertOptionsAsync(id, cancellationToken));
 
+    [HasPermission(AppModule.Leads, PermissionAction.Edit)]
+    [HttpPatch("{id:guid}/sticky-note")]
+    public async Task<ActionResult<LeadDto>> UpdateStickyNote(Guid id, [FromBody] UpdateStickyNoteRequest request, CancellationToken cancellationToken)
+        => Ok(await leads.UpdateStickyNoteAsync(id, request.Note, cancellationToken));
+
+    [HasPermission(AppModule.Leads, PermissionAction.Edit)]
+    [HttpPost("{id:guid}/quick-convert-contact")]
+    public async Task<ActionResult<ConvertLeadResult>> QuickConvertContact(Guid id, [FromBody] QuickConvertContactRequest? request, CancellationToken cancellationToken)
+        => Ok(await leads.QuickConvertToContactAsync(id, request, cancellationToken));
+
+    [HasPermission(AppModule.Leads, PermissionAction.Edit)]
+    [HttpPost("{id:guid}/quick-convert-engagement")]
+    public async Task<ActionResult<ConvertLeadResult>> QuickConvertEngagement(Guid id, [FromBody] QuickConvertEngagementRequest? request, CancellationToken cancellationToken)
+        => Ok(await leads.QuickConvertToEngagementAsync(id, request, cancellationToken));
+
     [HasPermission(AppModule.Leads, PermissionAction.Create)]
     [HttpPost("check-duplicates")]
     public async Task<ActionResult<IReadOnlyList<DuplicateCandidateDto>>> CheckDuplicates([FromBody] CheckDuplicatesRequest request, CancellationToken cancellationToken)

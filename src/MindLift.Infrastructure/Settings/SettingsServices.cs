@@ -429,7 +429,8 @@ public sealed class SavedViewService(AppDbContext db, ITenantContext tenant, Set
     {
         var view = await db.SavedViews.FirstOrDefaultAsync(v => v.Id == id, cancellationToken) ?? throw new NotFoundException("View", id);
         await EnsurePermissionAsync(view.EntityType, PermissionAction.View, cancellationToken);
-        if (view.OwnerUserId != tenant.UserId)
+        var isAdmin = tenant.IsPlatformAdmin || await permissions.HasAsync(AppModule.Settings, PermissionAction.Edit, cancellationToken);
+        if (view.OwnerUserId != tenant.UserId && !isAdmin)
         {
             throw new ForbiddenException("You can only delete views you created.");
         }

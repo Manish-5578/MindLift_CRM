@@ -102,6 +102,8 @@ public sealed record AcceptInvitationRequest(string Token, string Password);
 
 public sealed record InvitationPreview(string Email, string FirstName, string LastName, string CompanyName, DateTime ExpiresAtUtc);
 
+public sealed record AuditFieldDiff(string Field, string? OldValue, string? NewValue);
+
 public sealed record AuditLogDto(
     Guid Id,
     Guid? UserId,
@@ -109,7 +111,11 @@ public sealed record AuditLogDto(
     Guid EntityId,
     string Action,
     string? Changes,
-    DateTime OccurredAtUtc);
+    DateTime OccurredAtUtc,
+    string? UserName = null,
+    string? UserEmail = null,
+    string? Summary = null,
+    IReadOnlyList<AuditFieldDiff>? Diff = null);
 
 public sealed record PlatformTenantDto(
     Guid Id,

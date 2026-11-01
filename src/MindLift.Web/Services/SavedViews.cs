@@ -8,12 +8,12 @@ namespace MindLift.Web.Services;
 public static class SavedViews
 {
     /// <summary>The saved views of a record type as list tabs. A list still works without them, so a failure gives none.</summary>
-    public static async Task<IReadOnlyList<ListView>> LoadAsync(HttpClient http, string entity, Guid? currentUserId)
+    public static async Task<IReadOnlyList<ListView>> LoadAsync(HttpClient http, string entity, Guid? currentUserId, bool isAdmin = false)
     {
         try
         {
             var views = await http.GetFromJsonAsync<List<SavedViewDto>>($"api/v1/views/{entity}");
-            return views?.Select(v => ListView.FromSaved(v, currentUserId)).ToList() ?? [];
+            return views?.Select(v => ListView.FromSaved(v, currentUserId, isAdmin)).ToList() ?? [];
         }
         catch (HttpRequestException)
         {

@@ -11,8 +11,8 @@
                 <MudIcon Icon="@Icons.Material.Filled.Transform" />
             </MudAvatar>
             <div>
-                <MudText Typo="Typo.h6" Style="font-weight:700">@T["Convert Lead to Customer"]</MudText>
-                <MudText Typo="Typo.caption" Class="mud-text-secondary">@T["Transform this lead into an active contact, organization account, and deal pipeline opportunity."]</MudText>
+                <MudText Typo="Typo.h6" Style="font-weight:700">@(TargetMode == "contact" ? T["Move Lead to Contact"] : TargetMode == "engagement" ? T["Move Lead to Engagement"] : T["Convert Lead to Customer"])</MudText>
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">@(TargetMode == "contact" ? T["Complete any missing details to create an active contact from this lead."] : TargetMode == "engagement" ? T["Set up the engagement details, pipeline stage, and converted customer."] : T["Transform this lead into an active contact, organization account, and deal pipeline opportunity."])</MudText>
             </div>
         </div>
     </TitleContent>
@@ -150,8 +150,15 @@
                             </MudRadioGroup>
                         }
 
-                        <div class="d-flex align-center gap-3">
-                            <MudChip T="string" Icon="@Icons.Material.Filled.Badge" Variant="Variant.Text">@_options.LeadName</MudChip>
+                        @if (_contactMode == "create")
+                        {
+                            <div class="ml-row ml-row--wrap gap-2 mb-3">
+                                <MudTextField @bind-Value="_contactFirstName" Label="@T["First Name *"]" Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" Class="ml-grow" />
+                                <MudTextField @bind-Value="_contactLastName" Label="@T["Last Name *"]" Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" Class="ml-grow" />
+                            </div>
+                        }
+
+                        <div class="d-flex align-center gap-3 flex-wrap">
                             @if (!string.IsNullOrWhiteSpace(_options.Email))
                             {
                                 <MudChip T="string" Icon="@Icons.Material.Filled.Email" Variant="Variant.Text">@_options.Email</MudChip>
@@ -159,6 +166,10 @@
                             @if (!string.IsNullOrWhiteSpace(_options.Phone))
                             {
                                 <MudChip T="string" Icon="@Icons.Material.Filled.Phone" Variant="Variant.Text">@_options.Phone</MudChip>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(_options.CompanyName))
+                            {
+                                <MudChip T="string" Icon="@Icons.Material.Filled.Business" Variant="Variant.Text">@_options.CompanyName</MudChip>
                             }
                         </div>
                     </div>
@@ -235,8 +246,11 @@
 @code {
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
     [Parameter] public Guid LeadId { get; set; }
+    [Parameter] public string TargetMode { get; set; } = "all"; // all, contact, engagement
 
     private bool _loading = true;
+    private string _contactFirstName = "";
+    private string _contactLastName = "";
     private bool _converting = false;
     private LeadConvertOptionsDto? _options;
     private ConvertLeadResult? _result;
@@ -294,6 +308,19 @@
                     _selectedContactId = _options.MatchingContacts[0].Id;
                 }
 
+                var parts = _options.LeadName?.Trim().Split(' ', 2, StringSplitOptions.RemoveEmptyEntries) ?? [];
+                _contactFirstName = parts.Length > 0 ? parts[0] : "";
+                _contactLastName = parts.Length > 1 ? parts[1] : "";
+
+                if (TargetMode == "contact")
+                {
+                    _createDeal = false;
+                }
+                else if (TargetMode == "engagement")
+                {
+                    _createDeal = true;
+                }
+
                 _dealName = $"{_accountName} - Initial Deal";
 
                 if (_options.AvailablePipelines.Count > 0)
@@ -341,6 +368,12 @@
         _converting = true;
         try
         {
+            if (_contactMode == "create" && string.IsNullOrWhiteSpace(_contactFirstName) && string.IsNullOrWhiteSpace(_contactLastName))
+            {
+                Snackbar.Add("Contact first name or last name is required.", Severity.Warning);
+                return;
+            }
+
             var request = new ConvertLeadRequest(
                 AccountMode: _accountMode,
                 ExistingAccountId: _accountMode == "existing" ? _selectedAccountId : null,
@@ -353,7 +386,9 @@
                 StageId: _createDeal ? _selectedStageId : null,
                 Amount: _createDeal ? _dealAmount : null,
                 Currency: _createDeal ? _options?.BaseCurrency : null,
-                ExpectedCloseDate: _createDeal ? _expectedCloseDate : null);
+                ExpectedCloseDate: _createDeal ? _expectedCloseDate : null,
+                ContactFirstName: _contactFirstName?.Trim(),
+                ContactLastName: _contactLastName?.Trim());
 
             var res = await Http.PostAsJsonAsync($"api/v1/leads/{LeadId}/convert", request);
             if (res.IsSuccessStatusCode)

@@ -31,7 +31,8 @@ public sealed record LeadListItemDto(
     bool IsDisqualified,
     string FirstName,
     string LastName,
-    string? Address = null);
+    string? Address = null,
+    string? Description = null);
 
 public sealed record LeadDto(
     Guid Id,
@@ -73,6 +74,12 @@ public sealed record SaveLeadRequest(
 
 public sealed record ChangeLeadStatusRequest(string Status);
 
+public sealed record UpdateStickyNoteRequest(string? Note);
+
+public sealed record QuickConvertContactRequest(string? FirstName = null, string? LastName = null, string? CompanyName = null);
+
+public sealed record QuickConvertEngagementRequest(string? DealName = null, Guid? PipelineId = null, Guid? StageId = null, decimal? Amount = null);
+
 public sealed record DisqualifyLeadRequest(string Reason, string? Notes);
 
 /// <summary>How the converted records are created or linked (plan 7.3, Convert).</summary>
@@ -88,7 +95,9 @@ public sealed record ConvertLeadRequest(
     Guid? StageId,
     decimal? Amount,
     string? Currency,
-    DateTime? ExpectedCloseDate);
+    DateTime? ExpectedCloseDate,
+    string? ContactFirstName = null,
+    string? ContactLastName = null);
 
 public sealed record ConvertLeadResult(Guid ContactId, Guid? AccountId, Guid? DealId);
 

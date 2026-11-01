@@ -1,0 +1,130 @@
+@using MindLift.Shared.Contracts
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+@inject Translator T
+
+<div class="ml-sticky-note pa-4 mb-4" style="background: linear-gradient(135deg, #FEF9C3 0%, #FEF08A 100%); border: 1px solid #FACC15; border-radius: 12px; box-shadow: 0 4px 12px rgba(234, 179, 8, 0.15); color: #713F12; position: relative;">
+    <div class="d-flex align-center justify-space-between mb-2">
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.PushPin" Style="color: #CA8A04; transform: rotate(-25deg);" />
+            <MudText Typo="Typo.subtitle2" Style="font-weight: 700; color: #854D0E;">@T["Sticky Note"]</MudText>
+        </div>
+        <div class="d-flex align-center gap-1">
+            @if (!string.IsNullOrWhiteSpace(_note))
+            {
+                <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small" Style="color: #854D0E;" OnClick="CopyNoteAsync" Title="@T["Copy note"]" />
+            }
+            @if (_saving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Style="color: #CA8A04; width:16px; height:16px;" />
+            }
+            else if (_dirty)
+            {
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Style="color: #A16207; font-size:11px;">@T["Unsaved changes"]</MudChip>
+            }
+        </div>
+    </div>
+
+    <MudTextField T="string"
+                  Value="@_note"
+                  ValueChanged="OnNoteChanged"
+                  Lines="4"
+                  Placeholder="@T["Write a quick note, reminder, or important context about this lead..."]"
+                  Variant="Variant.Outlined"
+                  Style="background: rgba(255, 255, 255, 0.65); border-radius: 8px; color: #422006; font-size: 13.5px;"
+                  Class="mb-2" />
+
+    <div class="d-flex align-center justify-space-between">
+        <MudText Typo="Typo.caption" Style="color: #A16207;">
+            @(_note?.Length ?? 0) @T["characters"]
+        </MudText>
+        <div class="d-flex gap-2">
+            @if (_dirty)
+            {
+                <MudButton Size="Size.Small" Variant="Variant.Text" Style="color: #854D0E;" OnClick="RevertNote">
+                    @T["Cancel"]
+                </MudButton>
+            }
+            <MudButton Size="Size.Small"
+                       Variant="Variant.Filled"
+                       Style="background-color: #CA8A04; color: #FFFFFF; font-weight: 600;"
+                       StartIcon="@Icons.Material.Filled.Save"
+                       OnClick="SaveNoteAsync"
+                       Disabled="_saving || !_dirty">
+                @(_saving ? T["Saving..."] : T["Save Note"])
+            </MudButton>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public Guid LeadId { get; set; }
+    [Parameter] public string? InitialNote { get; set; }
+    [Parameter] public EventCallback<string?> OnSaved { get; set; }
+
+    private string? _note;
+    private string? _savedNote;
+    private bool _dirty;
+    private bool _saving;
+
+    protected override void OnParametersSet()
+    {
+        if (!_dirty)
+        {
+            _note = InitialNote;
+            _savedNote = InitialNote;
+        }
+    }
+
+    private void OnNoteChanged(string? value)
+    {
+        _note = value;
+        _dirty = _note != _savedNote;
+    }
+
+    private void RevertNote()
+    {
+        _note = _savedNote;
+        _dirty = false;
+    }
+
+    private async Task SaveNoteAsync()
+    {
+        _saving = true;
+        try
+        {
+            var res = await Http.PatchAsJsonAsync($"api/v1/leads/{LeadId}/sticky-note", new UpdateStickyNoteRequest(_note));
+            if (res.IsSuccessStatusCode)
+            {
+                _savedNote = _note;
+                _dirty = false;
+                Snackbar.Add(T["Sticky note saved"], Severity.Success);
+                await OnSaved.InvokeAsync(_note);
+            }
+            else
+            {
+                var err = await res.Content.ReadAsStringAsync();
+                Snackbar.Add(T["Could not save note: {0}", err], Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(T["Error saving note: {0}", ex.Message], Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task CopyNoteAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(_note))
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", _note);
+            Snackbar.Add(T["Note copied to clipboard"], Severity.Info);
+        }
+    }
+}
+

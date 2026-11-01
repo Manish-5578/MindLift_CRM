@@ -189,8 +189,33 @@ public sealed class AuditLogsController(AuditLogQuery audit) : ControllerBase
 {
     [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet]
-    public async Task<ActionResult<PagedResult<AuditLogDto>>> List([FromQuery] string? entityType, [FromQuery] Guid? entityId, [FromQuery] int page = 1, [FromQuery] int pageSize = 50, CancellationToken cancellationToken = default)
-        => Ok(await audit.ListAsync(entityType, entityId, page, pageSize, cancellationToken));
+    public async Task<ActionResult<PagedResult<AuditLogDto>>> List(
+        [FromQuery] string? entityType = null,
+        [FromQuery] Guid? entityId = null,
+        [FromQuery] string? action = null,
+        [FromQuery] Guid? userId = null,
+        [FromQuery] string? search = null,
+        [FromQuery] DateTime? from = null,
+        [FromQuery] DateTime? to = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        CancellationToken cancellationToken = default)
+        => Ok(await audit.ListAsync(entityType, entityId, page, pageSize, cancellationToken, action, userId, search, from, to));
+
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
+    [HttpGet("export")]
+    public async Task<IActionResult> Export(
+        [FromQuery] string? entityType = null,
+        [FromQuery] string? action = null,
+        [FromQuery] Guid? userId = null,
+        [FromQuery] string? search = null,
+        [FromQuery] DateTime? from = null,
+        [FromQuery] DateTime? to = null,
+        CancellationToken cancellationToken = default)
+    {
+        var csv = await audit.ExportAsync(entityType, action, userId, search, from, to, cancellationToken);
+        return File(System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(csv)).ToArray(), "text/csv", "audit-trail.csv");
+    }
 }
 
 /// <summary>

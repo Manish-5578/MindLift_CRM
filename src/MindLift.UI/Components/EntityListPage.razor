@@ -26,7 +26,22 @@
             </div>
             @if (CurrentView is { SavedId: { } savedId, CanDelete: true } && OnDeleteView.HasDelegate)
             {
-                <MudIconButton Icon="@Icons.Material.Outlined.DeleteOutline" Size="Size.Small" OnClick="() => DeleteViewAsync(savedId)" aria-label="@T["Delete this view"]" data-testid="delete-view" />
+                <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small" StartIcon="@Icons.Material.Outlined.DeleteOutline" OnClick="() => DeleteViewAsync(savedId)" aria-label="@T["Delete view"]" data-testid="delete-view">
+                    @T["Delete view"]
+                </MudButton>
+            }
+            @if (SavedViews.Any(v => v.CanDelete && v.SavedId.HasValue) && OnDeleteView.HasDelegate)
+            {
+                <MudMenu Icon="@Icons.Material.Outlined.MoreHoriz" Size="Size.Small" Dense="true" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+                    <MudMenuItem Disabled="true"><b>@T["Delete Saved Views"]</b></MudMenuItem>
+                    @foreach (var sv in SavedViews.Where(v => v.CanDelete && v.SavedId.HasValue))
+                    {
+                        var svId = sv.SavedId!.Value;
+                        <MudMenuItem Icon="@Icons.Material.Outlined.DeleteOutline" IconColor="Color.Error" OnClick="() => DeleteViewAsync(svId)">
+                            @T["Delete '{0}'", sv.Label]
+                        </MudMenuItem>
+                    }
+                </MudMenu>
             }
             @if (OnSaveView.HasDelegate)
             {
@@ -510,6 +525,17 @@
 
         Nav.LocationChanged += OnLocationChanged;
         await LoadAsync();
+    }
+
+    protected override void OnParametersSet()
+    {
+        var uri = new Uri(Nav.Uri);
+        var parsed = ListState.ParseQuery(uri.Query);
+        if (parsed.TryGetValue(ListState.ViewKey, out var qv) && !string.IsNullOrEmpty(qv) && qv != _state.View && AllViews.Any(v => v.Key == qv))
+        {
+            _state = _state.Reset(view: qv);
+            _ = InvokeAsync(LoadAsync);
+        }
     }
 
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)

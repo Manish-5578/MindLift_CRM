@@ -186,7 +186,7 @@
 
     private bool CanExportRecords => HasPermission(p => p.CanExport);
 
-    private async Task LoadSavedViewsAsync() => _savedViews = await SavedViews.LoadAsync(Http, "accounts", App.Bootstrap?.User.UserId);
+    private async Task LoadSavedViewsAsync() => _savedViews = await SavedViews.LoadAsync(Http, "accounts", App.Bootstrap?.User.UserId, App.IsAdmin);
 
     private async Task SaveViewAsync(SaveViewRequest view)
     {

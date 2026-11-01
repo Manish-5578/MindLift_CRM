@@ -1,0 +1,40 @@
+@using MindLift.Shared.Contracts
+@inject Translator T
+
+<MudDialog MaxWidth="MaxWidth.Small" FullWidth="true">
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.PushPin" Style="color: #CA8A04; transform: rotate(-25deg);" />
+            <div>
+                <MudText Typo="Typo.h6" Style="font-weight: 700; color: #854D0E;">@T["Sticky Note: {0}", LeadTitle]</MudText>
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">@T["Quick reference note attached to this lead."]</MudText>
+            </div>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <LeadStickyNote LeadId="LeadId" InitialNote="InitialNote" OnSaved="OnNoteSaved" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Close">@T["Close"]</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public Guid LeadId { get; set; }
+    [Parameter] public string LeadTitle { get; set; } = string.Empty;
+    [Parameter] public string? InitialNote { get; set; }
+
+    private string? _updatedNote;
+
+    private void OnNoteSaved(string? note)
+    {
+        _updatedNote = note;
+    }
+
+    private void Close()
+    {
+        MudDialog.Close(DialogResult.Ok(_updatedNote ?? InitialNote));
+    }
+}
+

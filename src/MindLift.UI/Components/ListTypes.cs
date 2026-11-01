@@ -43,13 +43,13 @@ public sealed record ListView(string Key, string Label, FilterGroup? Filter = nu
 
     public const string SavedPrefix = "saved-";
 
-    public static ListView FromSaved(SavedViewDto view, Guid? currentUserId) => new(SavedPrefix + view.Id.ToString("N"), view.Name, view.Filter)
+    public static ListView FromSaved(SavedViewDto view, Guid? currentUserId, bool isAdmin = false) => new(SavedPrefix + view.Id.ToString("N"), view.Name, view.Filter)
     {
         SavedId = view.Id,
         SortField = view.SortField,
         SortDir = view.SortDir,
         Columns = view.Columns,
-        CanDelete = view.OwnerUserId is null || view.OwnerUserId == currentUserId,
+        CanDelete = isAdmin || view.OwnerUserId is null || view.OwnerUserId == currentUserId,
     };
 }
 

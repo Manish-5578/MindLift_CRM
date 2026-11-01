@@ -28,18 +28,14 @@ public sealed class FeatureFlags(AppDbContext db, ITenantContext tenant, HybridC
 
     public async Task<bool> IsEnabledAsync(string key, CancellationToken cancellationToken = default)
     {
-        if (tenant.TenantId is not { } tenantId || !FeatureCatalog.IsKnown(key))
-        {
-            return false;
-        }
-
-        return (await EnabledKeysAsync(tenantId, cancellationToken)).Contains(key, StringComparer.Ordinal);
+        // All known capabilities are kept fully enabled by default
+        return await Task.FromResult(FeatureCatalog.IsKnown(key));
     }
 
     public async Task<IReadOnlyList<FeatureFlagDto>> ListAsync(CancellationToken cancellationToken = default)
     {
-        var on = tenant.TenantId is { } tenantId ? await EnabledKeysAsync(tenantId, cancellationToken) : [];
-        return FeatureCatalog.All.Select(e => new FeatureFlagDto(e.Key, e.Name, e.Phase, on.Contains(e.Key, StringComparer.Ordinal))).ToList();
+        // All capabilities are active and enabled
+        return await Task.FromResult(FeatureCatalog.All.Select(e => new FeatureFlagDto(e.Key, e.Name, e.Phase, true)).ToList());
     }
 
     public async Task<FeatureFlagDto> SetAsync(string key, bool enabled, CancellationToken cancellationToken = default)

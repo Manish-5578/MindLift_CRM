@@ -58,6 +58,9 @@
             </BulkActions>
             <RowMenu Context="row">
                 <MudMenuItem Href="@("/leads/" + row.Id)" Icon="@Icons.Material.Outlined.OpenInNew" data-testid="row-open">@T["Open"]</MudMenuItem>
+                <MudMenuItem OnClick="() => AddToContactAsync(row)" Icon="@Icons.Material.Outlined.PersonAdd" data-testid="row-add-contact">@T["Add to contact"]</MudMenuItem>
+                <MudMenuItem OnClick="() => MoveToEngagementAsync(row)" Icon="@Icons.Material.Outlined.Handshake" data-testid="row-move-engagement">@T["Move to engagement"]</MudMenuItem>
+                <MudMenuItem OnClick="() => OpenStickyNoteAsync(row)" Icon="@Icons.Material.Outlined.StickyNote2" data-testid="row-sticky-note">@T["Sticky note"]</MudMenuItem>
                 @if (CanEditRecords)
                 {
                     <MudMenuItem OnClick="() => EditRowAsync(row.Id)" Icon="@Icons.Material.Outlined.Edit" data-testid="row-edit">@T["Edit"]</MudMenuItem>
@@ -303,6 +306,109 @@
 
     private static string Secondary(LeadListItemDto lead) => LeadSubtitle(lead);
 
+    private async Task AddToContactAsync(LeadListItemDto lead)
+    {
+        bool hasSufficient = (!string.IsNullOrWhiteSpace(lead.FirstName) || !string.IsNullOrWhiteSpace(lead.LastName) || !string.IsNullOrWhiteSpace(lead.FullName))
+            && lead.FullName != "—";
+
+        if (hasSufficient)
+        {
+            try
+            {
+                var res = await Http.PostAsJsonAsync($"api/v1/leads/{lead.Id}/quick-convert-contact", new QuickConvertContactRequest());
+                if (res.IsSuccessStatusCode)
+                {
+                    var result = await res.Content.ReadFromJsonAsync<ConvertLeadResult>();
+                    Snackbar.Add(T["Lead successfully added to Contacts!"], Severity.Success, config =>
+                    {
+                        if (result?.ContactId != null)
+                        {
+                            config.Action = T["View Contact"];
+                            config.ActionColor = Color.Primary;
+                            config.OnClick = _ => { Nav.NavigateTo($"/contacts/{result.ContactId}"); return Task.CompletedTask; };
+                        }
+                    });
+                    if (_list is not null) await _list.ReloadAsync();
+                    return;
+                }
+            }
+            catch { /* fallback to dialog */ }
+        }
+
+        var parameters = new DialogParameters<LeadConvertDialog>
+        {
+            { x => x.LeadId, lead.Id },
+            { x => x.TargetMode, "contact" }
+        };
+        var dialog = await Dialogs.ShowAsync<LeadConvertDialog>(T["Move Lead to Contact"], parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true });
+        var diagResult = await dialog.Result;
+        if (!diagResult.Canceled && _list is not null)
+        {
+            await _list.ReloadAsync();
+        }
+    }
+
+    private async Task MoveToEngagementAsync(LeadListItemDto lead)
+    {
+        bool hasSufficient = (!string.IsNullOrWhiteSpace(lead.FirstName) || !string.IsNullOrWhiteSpace(lead.LastName) || !string.IsNullOrWhiteSpace(lead.FullName))
+            && (!string.IsNullOrWhiteSpace(lead.CompanyName) || lead.FullName != "—");
+
+        if (hasSufficient)
+        {
+            try
+            {
+                var res = await Http.PostAsJsonAsync($"api/v1/leads/{lead.Id}/quick-convert-engagement", new QuickConvertEngagementRequest());
+                if (res.IsSuccessStatusCode)
+                {
+                    var result = await res.Content.ReadFromJsonAsync<ConvertLeadResult>();
+                    Snackbar.Add(T["Lead successfully moved to Engagement!"], Severity.Success, config =>
+                    {
+                        if (result?.DealId != null)
+                        {
+                            config.Action = T["View Engagement"];
+                            config.ActionColor = Color.Primary;
+                            config.OnClick = _ => { Nav.NavigateTo($"/deals/{result.DealId}"); return Task.CompletedTask; };
+                        }
+                    });
+                    if (_list is not null) await _list.ReloadAsync();
+                    return;
+                }
+            }
+            catch { /* fallback to dialog */ }
+        }
+
+        var parameters = new DialogParameters<LeadConvertDialog>
+        {
+            { x => x.LeadId, lead.Id },
+            { x => x.TargetMode, "engagement" }
+        };
+        var dialog = await Dialogs.ShowAsync<LeadConvertDialog>(T["Move Lead to Engagement"], parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true });
+        var diagResult = await dialog.Result;
+        if (!diagResult.Canceled && _list is not null)
+        {
+            await _list.ReloadAsync();
+        }
+    }
+
+    private async Task OpenStickyNoteAsync(LeadListItemDto lead)
+    {
+        var parameters = new DialogParameters<StickyNoteDialog>
+        {
+            { x => x.LeadId, lead.Id },
+            { x => x.LeadTitle, LeadTitle(lead) },
+            { x => x.InitialNote, lead.Description }
+        };
+        var dialog = await Dialogs.ShowAsync<StickyNoteDialog>(string.Empty, parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true });
+        var result = await dialog.Result;
+        if (!result.Canceled && _list is not null)
+        {
+            await _list.ReloadAsync();
+        }
+    }
+
     private void OpenNewLead()
     {
         _form?.OpenNew();
@@ -338,7 +444,17 @@
                 @<div class="ml-cell-primary">
                     <UserAvatar Name="@LeadTitle(lead)" Id="@lead.Id" Size="32" />
                     <div class="ml-cell-primary__text">
-                        <MudText Typo="Typo.subtitle2" Class="ml-truncate">@LeadTitle(lead)</MudText>
+                        <div class="d-flex align-center gap-1">
+                            <MudText Typo="Typo.subtitle2" Class="ml-truncate">@LeadTitle(lead)</MudText>
+                            @if (!string.IsNullOrWhiteSpace(lead.Description))
+                            {
+                                <MudTooltip Text="@lead.Description">
+                                    <span @onclick:stopPropagation="true" @onclick="() => OpenStickyNoteAsync(lead)">
+                                        <MudIcon Icon="@Icons.Material.Filled.PushPin" Size="Size.Small" Style="color: #CA8A04; font-size:14px; cursor:pointer;" />
+                                    </span>
+                                </MudTooltip>
+                            }
+                        </div>
                         <MudText Typo="Typo.caption" Class="ml-muted ml-truncate">@LeadSubtitle(lead)</MudText>
                     </div>
                 </div>,
@@ -418,7 +534,7 @@
     private IReadOnlyList<PicklistValueDto> BulkStatuses => App.Bootstrap?.Picklists.FirstOrDefault(p => p.Key == "lead_status")?.Values
         .Where(v => v.IsActive && v.Value is not ("disqualified" or "converted")).ToList() ?? [];
 
-    private async Task LoadSavedViewsAsync() => _savedViews = await SavedViews.LoadAsync(Http, "leads", App.Bootstrap?.User.UserId);
+    private async Task LoadSavedViewsAsync() => _savedViews = await SavedViews.LoadAsync(Http, "leads", App.Bootstrap?.User.UserId, App.IsAdmin);
 
     private async Task SaveViewAsync(SaveViewRequest view)
     {

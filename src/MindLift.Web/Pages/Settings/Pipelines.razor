@@ -9,12 +9,30 @@
 <PageTitle>@T["Pipelines"] · MindLift</PageTitle>
 
 <div class="ml-page ml-page--form">
-    <PageHeader Title="Pipelines" Subtitle="The stages a deal moves through. Every pipeline needs open stages, then exactly one Won and one Lost stage at the end.">
+    <PageHeader Title="@T["Pipelines"]" Subtitle="@(_activeTab == 0 ? T["The stages a deal moves through. Every pipeline needs open stages, then exactly one Won and one Lost stage at the end."] : T["The pipeline stages a lead moves through from discovery to qualification, conversion, or disqualification."])">
         <Actions>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => OpenPipeline(null)" data-testid="primary-action">@T["New pipeline"]</MudButton>
+            @if (_activeTab == 0)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => OpenPipeline(null)" data-testid="primary-action">@T["New pipeline"]</MudButton>
+            }
+            else
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Add" OnClick="() => OpenLeadStage(null)" data-testid="primary-lead-stage-action">@T["New lead stage"]</MudButton>
+            }
         </Actions>
     </PageHeader>
     <SettingsNav Current="/settings/pipelines" />
+
+    <div class="mb-4">
+        <MudButtonGroup Variant="Variant.Outlined" Size="Size.Medium">
+            <MudButton Color="@(_activeTab == 0 ? Color.Primary : Color.Default)" Variant="@(_activeTab == 0 ? Variant.Filled : Variant.Outlined)" StartIcon="@Icons.Material.Outlined.Handshake" OnClick="() => _activeTab = 0">
+                @T["Engagements Pipeline"]
+            </MudButton>
+            <MudButton Color="@(_activeTab == 1 ? Color.Primary : Color.Default)" Variant="@(_activeTab == 1 ? Variant.Filled : Variant.Outlined)" StartIcon="@Icons.Material.Outlined.PersonSearch" OnClick="() => _activeTab = 1">
+                @T["Leads Pipeline"]
+            </MudButton>
+        </MudButtonGroup>
+    </div>
 
     @if (_loading)
     {
@@ -24,69 +42,153 @@
     {
         <ErrorState OnRetry="LoadAsync" />
     }
-    else if (_pipelines.Count == 0)
+    else if (_activeTab == 0)
     {
-        <EmptyState Title="No pipelines yet" Message="Create a pipeline to start tracking deals." />
-    }
-    else
-    {
-        @foreach (var pipeline in _pipelines)
+        @* Deals / Engagements Pipeline *@
+        @if (_pipelines.Count == 0)
         {
-            <MlCard Title="@pipeline.Name" Subtitle="@PipelineSubtitle(pipeline)" Class="mb-4" TestId="@($"pipeline-{pipeline.Name}")">
-                <div class="ml-row ml-row--wrap" style="margin-bottom:12px">
-                    @foreach (var stage in pipeline.Stages)
-                    {
-                        <StatusChip Text="@StageLabel(stage)" Color="@StageColor(stage)" Dot="false" />
-                    }
-                </div>
+            <EmptyState Title="No pipelines yet" Message="Create a pipeline to start tracking deals." />
+        }
+        else
+        {
+            @foreach (var pipeline in _pipelines)
+            {
+                <MlCard Title="@pipeline.Name" Subtitle="@PipelineSubtitle(pipeline)" Class="mb-4" TestId="@($"pipeline-{pipeline.Name}")">
+                    <div class="ml-row ml-row--wrap" style="margin-bottom:12px">
+                        @foreach (var stage in pipeline.Stages)
+                        {
+                            <StatusChip Text="@StageLabel(stage)" Color="@StageColor(stage)" Dot="false" />
+                        }
+                    </div>
 
-                <div data-testid="stage-list">
-                    @foreach (var stage in pipeline.Stages)
-                    {
-                        <div class="ml-row" style="padding:8px 0;border-bottom:1px solid var(--ml-border)" data-testid="stage-row">
-                            <div class="ml-grow">
-                                <MudText Typo="Typo.body1">@stage.Name</MudText>
-                                <MudText Typo="Typo.caption" Class="ml-muted">@stage.StageType · @stage.Probability% @(stage.RottingDays is { } days ? "· stale after " + days + " days" : "")</MudText>
+                    <div data-testid="stage-list">
+                        @foreach (var stage in pipeline.Stages)
+                        {
+                            <div class="ml-row" style="padding:8px 0;border-bottom:1px solid var(--ml-border)" data-testid="stage-row">
+                                <div class="ml-grow">
+                                    <MudText Typo="Typo.body1">@stage.Name</MudText>
+                                    <MudText Typo="Typo.caption" Class="ml-muted">@stage.StageType · @stage.Probability% @(stage.RottingDays is { } days ? "· stale after " + days + " days" : "")</MudText>
+                                </div>
+                                <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Primary" Class="me-2"
+                                           StartIcon="@Icons.Material.Filled.Security" OnClick="() => OpenStageGates(pipeline, stage)"
+                                           data-testid="@($"stage-gates-{stage.Id}")">
+                                    @T["Gates"]
+                                </MudButton>
+                                <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="() => OpenStage(pipeline, stage)" aria-label="@T["Edit stage"]" />
+                                @if (_confirmStageId == stage.Id)
+                                {
+                                    <MudButton Size="Size.Small" OnClick="() => _confirmStageId = null">@T["Keep"]</MudButton>
+                                    <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeleteStageAsync(pipeline, stage)">@T["Delete"]</MudButton>
+                                }
+                                else
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" OnClick="() => _confirmStageId = stage.Id" aria-label="@T["Delete stage"]" />
+                                }
                             </div>
-                            <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Primary" Class="me-2"
-                                       StartIcon="@Icons.Material.Filled.Security" OnClick="() => OpenStageGates(pipeline, stage)"
-                                       data-testid="@($"stage-gates-{stage.Id}")">
-                                @T["Gates"]
-                            </MudButton>
-                            <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="() => OpenStage(pipeline, stage)" aria-label="@T["Edit stage"]" />
-                            @if (_confirmStageId == stage.Id)
+                        }
+                    </div>
+
+                    <div class="ml-row ml-row--wrap" style="justify-content:space-between;margin-top:12px">
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="() => OpenStage(pipeline, null)">@T["Add stage"]</MudButton>
+                        <div class="ml-row">
+                            <MudButton Size="Size.Small" OnClick="() => OpenPipeline(pipeline)">@T["Edit pipeline"]</MudButton>
+                            @if (_confirmPipelineId == pipeline.Id)
                             {
-                                <MudButton Size="Size.Small" OnClick="() => _confirmStageId = null">@T["Keep"]</MudButton>
-                                <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeleteStageAsync(pipeline, stage)">@T["Delete"]</MudButton>
+                                <MudButton Size="Size.Small" OnClick="() => _confirmPipelineId = null">@T["Keep"]</MudButton>
+                                <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeletePipelineAsync(pipeline)">@T["Delete pipeline"]</MudButton>
                             }
                             else
                             {
-                                <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" OnClick="() => _confirmStageId = stage.Id" aria-label="@T["Delete stage"]" />
+                                <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => _confirmPipelineId = pipeline.Id">@T["Delete"]</MudButton>
                             }
                         </div>
-                    }
-                </div>
-
-                <div class="ml-row ml-row--wrap" style="justify-content:space-between;margin-top:12px">
-                    <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="() => OpenStage(pipeline, null)">@T["Add stage"]</MudButton>
-                    <div class="ml-row">
-                        <MudButton Size="Size.Small" OnClick="() => OpenPipeline(pipeline)">@T["Edit pipeline"]</MudButton>
-                        @if (_confirmPipelineId == pipeline.Id)
+                    </div>
+                </MlCard>
+            }
+        }
+    }
+    else
+    {
+        @* Leads Status Pipeline *@
+        <MlCard Title="@T["Lead Status Pipeline"]" Subtitle="@T["{0} stages configured for lead tracking and qualification", _leadStages.Count]" Class="mb-4" TestId="pipeline-leads">
+            <div class="ml-row ml-row--wrap align-center gap-2" style="margin-bottom:16px; padding: 12px; background: var(--mud-palette-background-grey); border-radius: 8px;">
+                @foreach (var stage in _leadStages.OrderBy(s => s.SortOrder))
+                {
+                    <div class="d-flex align-center gap-1">
+                        <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background-color:@GetLeadStageColor(stage);"></span>
+                        <MudText Typo="Typo.body2" Style="@(stage.IsActive ? "font-weight:600" : "text-decoration:line-through; opacity:0.6")">
+                            @T.Pick(stage.Label, stage.LabelAr)
+                        </MudText>
+                        @if (stage.IsDefault)
                         {
-                            <MudButton Size="Size.Small" OnClick="() => _confirmPipelineId = null">@T["Keep"]</MudButton>
-                            <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeletePipelineAsync(pipeline)">@T["Delete pipeline"]</MudButton>
-                        }
-                        else
-                        {
-                            <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => _confirmPipelineId = pipeline.Id">@T["Delete"]</MudButton>
+                            <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined" Class="pa-1" Style="font-size:10px; height:18px;">@T["Default"]</MudChip>
                         }
                     </div>
-                </div>
-            </MlCard>
-        }
+                    @if (stage != _leadStages.OrderBy(s => s.SortOrder).LastOrDefault())
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Small" Class="ml-muted" />
+                    }
+                }
+            </div>
+
+            <div data-testid="lead-stage-list">
+                @foreach (var stage in _leadStages.OrderBy(s => s.SortOrder))
+                {
+                    <div class="ml-row align-center" style="padding:10px 0; border-bottom:1px solid var(--ml-border)">
+                        <div class="d-flex align-center gap-3 ml-grow">
+                            <span style="display:inline-block; width:14px; height:14px; border-radius:50%; background-color:@GetLeadStageColor(stage);"></span>
+                            <div>
+                                <div class="d-flex align-center gap-2">
+                                    <MudText Typo="Typo.body1" Style="@(stage.IsActive ? "font-weight:600" : "opacity:0.6; text-decoration:line-through")">
+                                        @stage.Label
+                                    </MudText>
+                                    @if (!string.IsNullOrWhiteSpace(stage.LabelAr))
+                                    {
+                                        <MudText Typo="Typo.caption" Class="ml-muted">(@stage.LabelAr)</MudText>
+                                    }
+                                    @if (stage.IsDefault)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled" Style="font-size:10px; height:18px;">@T["Default"]</MudChip>
+                                    }
+                                    @if (stage.IsSystem)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined" Style="font-size:10px; height:18px;">@T["System"]</MudChip>
+                                    }
+                                </div>
+                                <MudText Typo="Typo.caption" Class="ml-muted">
+                                    @T["Code"]: <code>@stage.Value</code> · @T["Category"]: @(stage.Category ?? "Open") · @T["Order"]: @stage.SortOrder
+                                </MudText>
+                            </div>
+                        </div>
+
+                        <MudSwitch T="bool" Value="stage.IsActive" ValueChanged="v => ToggleLeadStageActiveAsync(stage, v)" Color="Color.Primary" aria-label="@T["Active"]" />
+                        <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="() => OpenLeadStage(stage)" aria-label="@T["Edit stage"]" Class="ms-2" />
+                        @if (!stage.IsSystem)
+                        {
+                            @if (_confirmLeadStageId == stage.Id)
+                            {
+                                <MudButton Size="Size.Small" OnClick="() => _confirmLeadStageId = null">@T["Keep"]</MudButton>
+                                <MudButton Size="Size.Small" Color="Color.Error" OnClick="() => DeleteLeadStageAsync(stage)">@T["Delete"]</MudButton>
+                            }
+                            else
+                            {
+                                <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" OnClick="() => _confirmLeadStageId = stage.Id" aria-label="@T["Delete stage"]" />
+                            }
+                        }
+                    </div>
+                }
+            </div>
+
+            <div class="ml-row" style="margin-top:16px">
+                <MudButton Size="Size.Small" Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Add" OnClick="() => OpenLeadStage(null)">
+                    @T["Add lead stage"]
+                </MudButton>
+            </div>
+        </MlCard>
     }
 </div>
 
+@* Deal Pipeline Drawer *@
 <FormDrawer Open="_pipelineOpen" OpenChanged="v => _pipelineOpen = v" Title="@_pipelineTitle" SubmitText="Save pipeline" Busy="_busy" OnSubmit="SavePipelineAsync">
     <div class="ml-stack">
         <MudTextField @bind-Value="_pipelineName" Label="@T["Name *"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="pipeline-name" />
@@ -97,6 +199,7 @@
     </div>
 </FormDrawer>
 
+@* Deal Stage Drawer *@
 <FormDrawer Open="_stageOpen" OpenChanged="v => _stageOpen = v" Title="@_stageTitle" SubmitText="Save stage" Busy="_busy" OnSubmit="SaveStageAsync">
     <div class="ml-stack">
         <MudTextField @bind-Value="_stageName" Label="@T["Name *"]" Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="stage-name" />
@@ -113,12 +216,56 @@
     </div>
 </FormDrawer>
 
+@* Lead Pipeline Stage Drawer *@
+<FormDrawer Open="_leadStageOpen" OpenChanged="v => _leadStageOpen = v" Title="@_leadStageTitle" SubmitText="Save lead stage" Busy="_busy" OnSubmit="SaveLeadStageAsync">
+    <div class="ml-stack">
+        <MudTextField @bind-Value="_leadStageLabel" Label="@T["Stage Name *"]" Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" />
+        <MudTextField @bind-Value="_leadStageLabelAr" Label="@T["Stage Name (Arabic)"]" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        @if (_leadStageEditItem is null)
+        {
+            <MudTextField @bind-Value="_leadStageValue" Label="@T["Code * (e.g. demo_scheduled)"]" Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" HelperText="@T["Lowercase letters, digits and underscores only. Cannot be changed later."]" />
+        }
+        else
+        {
+            <MudTextField Value="@_leadStageValue" Label="@T["Code (Permanent)"]" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="true" />
+        }
+        <MudSelect T="string" @bind-Value="_leadStageCategory" Label="@T["Category *"]" Variant="Variant.Outlined" Margin="Margin.Dense">
+            <MudSelectItem T="string" Value="@("New")">@T["New / Open"]</MudSelectItem>
+            <MudSelectItem T="string" Value="@("Working")">@T["Working / In Progress"]</MudSelectItem>
+            <MudSelectItem T="string" Value="@("Qualified")">@T["Qualified"]</MudSelectItem>
+            <MudSelectItem T="string" Value="@("Converted")">@T["Converted"]</MudSelectItem>
+            <MudSelectItem T="string" Value="@("Disqualified")">@T["Disqualified"]</MudSelectItem>
+        </MudSelect>
+        <div class="d-flex align-center gap-2">
+            <MudTextField @bind-Value="_leadStageColor" Label="@T["Color (Hex)"]" Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="@T["e.g. #4F46E5, #16A34A, #F59E0B"]" Class="ml-grow" />
+            @if (!string.IsNullOrWhiteSpace(_leadStageColor))
+            {
+                <span style="display:inline-block; width:32px; height:32px; border-radius:6px; background-color:@_leadStageColor; border:1px solid var(--mud-palette-divider);"></span>
+            }
+        </div>
+        <div class="d-flex gap-1 flex-wrap mb-2">
+            @foreach (var c in _presetColors)
+            {
+                <span style="display:inline-block; width:22px; height:22px; border-radius:4px; background-color:@c; cursor:pointer; border:2px solid @(_leadStageColor == c ? "#000" : "transparent");"
+                      @onclick="() => _leadStageColor = c"></span>
+            }
+        </div>
+        <MudNumericField @bind-Value="_leadStageSortOrder" Label="@T["Position / Sort Order"]" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" />
+        <MudCheckBox @bind-Value="_leadStageDefault" Label="@T["Default stage for new leads"]" Color="Color.Primary" />
+        <MudCheckBox @bind-Value="_leadStageActive" Label="@T["Active"]" Color="Color.Primary" />
+        @if (_leadStageError is not null) { <MudAlert Severity="Severity.Error" Dense="true">@_leadStageError</MudAlert> }
+    </div>
+</FormDrawer>
+
 @code {
     private const string StageOpen = "Open";
     private const string StageWon = "Won";
     private const string StageLost = "Lost";
 
+    private int _activeTab = 0; // 0 = Deals Pipeline, 1 = Leads Pipeline
+
     private List<PipelineDto> _pipelines = [];
+    private List<PicklistValueDto> _leadStages = [];
     private bool _loading = true;
     private bool _loadFailed;
     private bool _busy;
@@ -145,6 +292,23 @@
     private int? _stageRotting;
     private int? _stageSortOrder = 1;
 
+    // Lead Stage State
+    private bool _leadStageOpen;
+    private PicklistValueDto? _leadStageEditItem;
+    private string _leadStageTitle = "New lead stage";
+    private string _leadStageLabel = string.Empty;
+    private string? _leadStageLabelAr;
+    private string _leadStageValue = string.Empty;
+    private string _leadStageCategory = "Working";
+    private string? _leadStageColor = "#4F46E5";
+    private int _leadStageSortOrder = 1;
+    private bool _leadStageDefault;
+    private bool _leadStageActive = true;
+    private string? _leadStageError;
+    private Guid? _confirmLeadStageId;
+
+    private readonly string[] _presetColors = ["#4F46E5", "#0284C7", "#0D9488", "#16A34A", "#EAB308", "#F59E0B", "#EA580C", "#DC2626", "#8B5CF6", "#64748B"];
+
     protected override async Task OnInitializedAsync()
     {
         if (!App.IsAdmin)
@@ -163,6 +327,10 @@
         try
         {
             _pipelines = await Http.GetFromJsonAsync<List<PipelineDto>>("api/v1/settings/pipelines") ?? [];
+
+            var picklists = await Http.GetFromJsonAsync<List<PicklistDto>>("api/v1/settings/picklists");
+            var leadPicklist = picklists?.FirstOrDefault(p => p.Key == "lead_status");
+            _leadStages = leadPicklist?.Values.ToList() ?? [];
         }
         catch (HttpRequestException)
         {
@@ -177,16 +345,8 @@
     private static string PipelineSubtitle(PipelineDto pipeline)
     {
         var parts = new List<string> { pipeline.Stages.Count + (pipeline.Stages.Count == 1 ? " stage" : " stages") };
-        if (pipeline.IsDefault)
-        {
-            parts.Add("Default");
-        }
-
-        if (!pipeline.IsActive)
-        {
-            parts.Add("Inactive");
-        }
-
+        if (pipeline.IsDefault) parts.Add("Default");
+        if (!pipeline.IsActive) parts.Add("Inactive");
         return string.Join(" · ", parts);
     }
 
@@ -197,6 +357,16 @@
         StageWon => StatusColors.For("Won"),
         StageLost => StatusColors.For("Lost"),
         _ => StatusColors.For("Open"),
+    };
+
+    private string GetLeadStageColor(PicklistValueDto stage) => stage.Color ?? stage.Value switch
+    {
+        "new" => "#4F46E5",
+        "working" => "#F59E0B",
+        "qualified" => "#16A34A",
+        "converted" => "#0D9488",
+        "disqualified" => "#94A3B8",
+        _ => "#64748B",
     };
 
     private void OpenPipeline(PipelineDto? pipeline)
@@ -221,10 +391,25 @@
         _stageType = stage?.StageType ?? StageOpen;
         _stageProbability = stage?.Probability ?? 10;
         _stageRotting = stage?.RottingDays;
-        // A new stage goes after the last open stage and before Won and Lost, which have to stay at the end.
         _stageSortOrder = stage?.SortOrder ?? (pipeline.Stages.Count(s => s.StageType == StageOpen) + 1);
         _stageTitle = stage is null ? "New stage" : "Edit stage";
         _stageOpen = true;
+    }
+
+    private void OpenLeadStage(PicklistValueDto? stage)
+    {
+        _leadStageError = null;
+        _leadStageEditItem = stage;
+        _leadStageLabel = stage?.Label ?? string.Empty;
+        _leadStageLabelAr = stage?.LabelAr;
+        _leadStageValue = stage?.Value ?? string.Empty;
+        _leadStageCategory = stage?.Category ?? "Working";
+        _leadStageColor = stage?.Color ?? "#4F46E5";
+        _leadStageSortOrder = stage?.SortOrder ?? (_leadStages.Count + 1);
+        _leadStageDefault = stage?.IsDefault ?? false;
+        _leadStageActive = stage?.IsActive ?? true;
+        _leadStageTitle = stage is null ? "New lead stage" : "Edit lead stage";
+        _leadStageOpen = true;
     }
 
     private async Task SavePipelineAsync()
@@ -291,6 +476,92 @@
         {
             _busy = false;
         }
+    }
+
+    private async Task SaveLeadStageAsync()
+    {
+        _leadStageError = null;
+        if (string.IsNullOrWhiteSpace(_leadStageLabel))
+        {
+            _leadStageError = T["Enter a stage name."];
+            return;
+        }
+
+        var code = _leadStageValue.Trim().ToLowerInvariant().Replace(' ', '_');
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            _leadStageError = T["Enter a stage code."];
+            return;
+        }
+
+        var body = new SavePicklistValueRequest(
+            code,
+            _leadStageLabel.Trim(),
+            string.IsNullOrWhiteSpace(_leadStageLabelAr) ? null : _leadStageLabelAr.Trim(),
+            _leadStageCategory,
+            _leadStageColor,
+            _leadStageSortOrder,
+            _leadStageDefault,
+            _leadStageActive);
+
+        _busy = true;
+        try
+        {
+            var response = _leadStageEditItem is null
+                ? await Http.PostAsJsonAsync("api/v1/settings/picklists/lead_status/values", body)
+                : await Http.PutAsJsonAsync($"api/v1/settings/picklists/lead_status/values/{_leadStageEditItem.Id}", body);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _leadStageError = await ProblemText.FromAsync(response, T["We could not save this lead stage."]);
+                return;
+            }
+
+            _leadStageOpen = false;
+            Snackbar.Add(T["Lead stage saved"], Severity.Success);
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task ToggleLeadStageActiveAsync(PicklistValueDto stage, bool active)
+    {
+        var body = new SavePicklistValueRequest(
+            stage.Value,
+            stage.Label,
+            stage.LabelAr,
+            stage.Category,
+            stage.Color,
+            stage.SortOrder,
+            stage.IsDefault,
+            active);
+
+        var response = await Http.PutAsJsonAsync($"api/v1/settings/picklists/lead_status/values/{stage.Id}", body);
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not update this lead stage."]), Severity.Error);
+            return;
+        }
+
+        Snackbar.Add(T["Lead stage updated"], Severity.Success);
+        await LoadAsync();
+    }
+
+    private async Task DeleteLeadStageAsync(PicklistValueDto stage)
+    {
+        var response = await Http.DeleteAsync($"api/v1/settings/picklists/lead_status/values/{stage.Id}");
+        _confirmLeadStageId = null;
+        if (!response.IsSuccessStatusCode)
+        {
+            Snackbar.Add(await ProblemText.FromAsync(response, T["We could not delete this lead stage."]), Severity.Error);
+            return;
+        }
+
+        Snackbar.Add(T["Lead stage deleted"], Severity.Success);
+        await LoadAsync();
     }
 
     private async Task DeletePipelineAsync(PipelineDto pipeline)

@@ -75,7 +75,7 @@ public sealed class LeadService(
         var items = rows.Select(l => new LeadListItemDto(
             l.Id, $"{l.FirstName} {l.LastName}".Trim(), l.Email, l.Phone, l.CompanyName, l.Status, l.Source, l.Rating,
             l.OwnerId, owners.GetValueOrDefault(l.OwnerId), l.CreatedAt, l.FirstContactedAt,
-            l.ConvertedAt is not null, l.Status == "disqualified", l.FirstName, l.LastName, l.Address)).ToList();
+            l.ConvertedAt is not null, l.Status == "disqualified", l.FirstName, l.LastName, l.Address, l.Description)).ToList();
 
         return new PagedResult<LeadListItemDto>(items, total, page, pageSize);
     }
@@ -409,10 +409,17 @@ public sealed class LeadService(
         }
         else
         {
+            var cFn = !string.IsNullOrWhiteSpace(request.ContactFirstName) ? request.ContactFirstName.Trim() : lead.FirstName;
+            var cLn = !string.IsNullOrWhiteSpace(request.ContactLastName) ? request.ContactLastName.Trim() : lead.LastName;
+            if (string.IsNullOrWhiteSpace(cFn)) cFn = cLn ?? "Contact";
+            if (string.IsNullOrWhiteSpace(cLn)) cLn = cFn;
+            lead.FirstName = cFn;
+            lead.LastName = cLn;
+
             contact = new Contact
             {
-                FirstName = lead.FirstName,
-                LastName = lead.LastName,
+                FirstName = cFn,
+                LastName = cLn,
                 Email = lead.Email,
                 Phone = lead.Phone,
                 NormalizedEmail = lead.NormalizedEmail,
@@ -587,6 +594,143 @@ public sealed class LeadService(
         await tx.CommitAsync(cancellationToken);
 
         return new ConvertLeadResult(contact.Id, account?.Id, deal?.Id);
+    }
+
+    public async Task<LeadDto> UpdateStickyNoteAsync(Guid id, string? note, CancellationToken cancellationToken = default)
+    {
+        await RequireAsync(AppModule.Leads, PermissionAction.Edit, true, cancellationToken);
+        var lead = await LoadScopedAsync(id, cancellationToken);
+        lead.Description = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
+        await db.SaveChangesAsync(cancellationToken);
+        return Map(lead);
+    }
+
+    public async Task<ConvertLeadResult> QuickConvertToContactAsync(Guid id, QuickConvertContactRequest? request = null, CancellationToken cancellationToken = default)
+    {
+        var lead = await LoadScopedAsync(id, cancellationToken);
+        if (lead.ConvertedAt is not null)
+        {
+            throw new ConflictException("already_converted", "This lead has already been converted.");
+        }
+        if (lead.Status == "disqualified")
+        {
+            throw new BusinessRuleException("lead_disqualified", "A disqualified lead cannot be converted. Reopen it first.");
+        }
+
+        var firstName = (!string.IsNullOrWhiteSpace(request?.FirstName) ? request.FirstName : lead.FirstName)?.Trim();
+        var lastName = (!string.IsNullOrWhiteSpace(request?.LastName) ? request.LastName : lead.LastName)?.Trim();
+
+        if (string.IsNullOrWhiteSpace(firstName) && string.IsNullOrWhiteSpace(lastName))
+        {
+            throw new ValidationException(new Dictionary<string, string[]> { ["name"] = ["First name or last name is required to create a contact."] });
+        }
+
+        if (string.IsNullOrWhiteSpace(firstName)) firstName = lastName!;
+        if (string.IsNullOrWhiteSpace(lastName)) lastName = firstName;
+        lead.FirstName = firstName;
+        lead.LastName = lastName;
+
+        var company = (!string.IsNullOrWhiteSpace(request?.CompanyName) ? request.CompanyName : lead.CompanyName)?.Trim();
+        string accountMode = "none";
+        Guid? existingAccountId = null;
+        if (!string.IsNullOrWhiteSpace(company))
+        {
+            var match = await db.Accounts.AsNoTracking().FirstOrDefaultAsync(a => a.Name.ToLower() == company.ToLower(), cancellationToken);
+            if (match != null)
+            {
+                accountMode = "existing";
+                existingAccountId = match.Id;
+            }
+            else
+            {
+                accountMode = "create";
+            }
+        }
+
+        var convertReq = new ConvertLeadRequest(
+            AccountMode: accountMode,
+            ExistingAccountId: existingAccountId,
+            AccountName: accountMode == "create" ? company : null,
+            ContactMode: "create",
+            ExistingContactId: null,
+            CreateDeal: false,
+            DealName: null,
+            PipelineId: null,
+            StageId: null,
+            Amount: null,
+            Currency: null,
+            ExpectedCloseDate: null);
+
+        return await ConvertAsync(id, convertReq, cancellationToken);
+    }
+
+    public async Task<ConvertLeadResult> QuickConvertToEngagementAsync(Guid id, QuickConvertEngagementRequest? request = null, CancellationToken cancellationToken = default)
+    {
+        var lead = await LoadScopedAsync(id, cancellationToken);
+        if (lead.ConvertedAt is not null)
+        {
+            throw new ConflictException("already_converted", "This lead has already been converted.");
+        }
+        if (lead.Status == "disqualified")
+        {
+            throw new BusinessRuleException("lead_disqualified", "A disqualified lead cannot be converted. Reopen it first.");
+        }
+
+        var firstName = lead.FirstName?.Trim();
+        var lastName = lead.LastName?.Trim();
+        var company = lead.CompanyName?.Trim();
+
+        if (string.IsNullOrWhiteSpace(firstName) && string.IsNullOrWhiteSpace(lastName) && string.IsNullOrWhiteSpace(company))
+        {
+            throw new ValidationException(new Dictionary<string, string[]> { ["deal"] = ["Lead requires a name or company to create an engagement."] });
+        }
+
+        if (string.IsNullOrWhiteSpace(firstName)) firstName = lastName ?? company ?? "Lead";
+        if (string.IsNullOrWhiteSpace(lastName)) lastName = firstName;
+        lead.FirstName = firstName;
+        lead.LastName = lastName;
+
+        string accountMode = "none";
+        Guid? existingAccountId = null;
+        if (!string.IsNullOrWhiteSpace(company))
+        {
+            var match = await db.Accounts.AsNoTracking().FirstOrDefaultAsync(a => a.Name.ToLower() == company.ToLower(), cancellationToken);
+            if (match != null)
+            {
+                accountMode = "existing";
+                existingAccountId = match.Id;
+            }
+            else
+            {
+                accountMode = "create";
+            }
+        }
+
+        var defaultPipe = await db.Pipelines.AsNoTracking().Where(p => p.IsActive).OrderByDescending(p => p.IsDefault).FirstOrDefaultAsync(cancellationToken)
+            ?? throw new BusinessRuleException("no_pipeline", "No active pipeline available.");
+        var stages = await db.PipelineStages.AsNoTracking().Where(s => s.PipelineId == defaultPipe.Id).OrderBy(s => s.SortOrder).ToListAsync(cancellationToken);
+        var openStage = stages.FirstOrDefault(s => s.StageType == "Open") ?? stages.FirstOrDefault()
+            ?? throw new BusinessRuleException("no_stage", "No pipeline stage available.");
+
+        var dealName = request?.DealName?.Trim() is { Length: > 0 } dn ? dn
+            : !string.IsNullOrWhiteSpace(company) ? $"{company} – Engagement"
+            : $"{firstName} {lastName} – Engagement";
+
+        var convertReq = new ConvertLeadRequest(
+            AccountMode: accountMode,
+            ExistingAccountId: existingAccountId,
+            AccountName: accountMode == "create" ? company : null,
+            ContactMode: "create",
+            ExistingContactId: null,
+            CreateDeal: true,
+            DealName: dealName,
+            PipelineId: request?.PipelineId ?? defaultPipe.Id,
+            StageId: request?.StageId ?? openStage.Id,
+            Amount: request?.Amount ?? 0,
+            Currency: null,
+            ExpectedCloseDate: DateTime.UtcNow.AddDays(30));
+
+        return await ConvertAsync(id, convertReq, cancellationToken);
     }
 
     /// <summary>Returns recommended existing accounts, contacts, and pipelines for the conversion dialog.</summary>
