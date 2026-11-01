@@ -126,3 +126,4 @@ public sealed class LeadActionsAndStickyNoteTests
         req.Note.ShouldBe("Follow up next Tuesday after quarterly review");
     }
 }
+
