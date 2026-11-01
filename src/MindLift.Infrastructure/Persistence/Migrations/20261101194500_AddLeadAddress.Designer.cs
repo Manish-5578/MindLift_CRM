@@ -13,7 +13,6 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MindLift.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [DbContext(typeof(AppDbContext))]
     [Migration("20261101194500_AddLeadAddress")]
     partial class AddLeadAddress
     {
