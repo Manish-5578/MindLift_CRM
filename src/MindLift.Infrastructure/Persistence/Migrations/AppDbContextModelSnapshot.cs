@@ -8433,6 +8433,101 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.ToTable("number_sequences", (string)null);
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.ImportHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("entity_type");
+
+                    b.Property<string[]>("Errors")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("errors");
+
+                    b.Property<int>("FailedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("failed_count");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("file_name");
+
+                    b.Property<Guid?>("ImportedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("imported_by_id");
+
+                    b.Property<string>("ImportedByName")
+                        .HasColumnType("text")
+                        .HasColumnName("imported_by_name");
+
+                    b.Property<int>("ImportedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("imported_count");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<int>("SkippedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("skipped_count");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<int>("TotalRows")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_rows");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_import_histories");
+
+                    b.HasIndex("EntityType")
+                        .HasDatabaseName("ix_import_histories_entity_type");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_import_histories_tenant_id");
+
+                    b.ToTable("import_histories", (string)null);
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.OfflineSyncBatchLog", b =>
                 {
                     b.Property<Guid>("Id")

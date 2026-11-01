@@ -167,6 +167,12 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     /// <summary>Tenant used by query filters. Guid.Empty when no tenant is set, so no rows match.</summary>
     protected Guid CurrentTenantId => tenant.TenantId ?? Guid.Empty;
 
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        base.OnConfiguring(optionsBuilder);
+        optionsBuilder.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+    }
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);

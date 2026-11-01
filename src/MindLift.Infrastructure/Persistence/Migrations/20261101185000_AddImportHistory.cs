@@ -59,3 +59,4 @@ namespace MindLift.Infrastructure.Persistence.Migrations
         }
     }
 }
+

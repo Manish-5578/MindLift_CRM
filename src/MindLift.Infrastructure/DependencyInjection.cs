@@ -72,6 +72,7 @@ public static class DependencyInjection
         services.AddDbContext<AppDbContext>((sp, options) => options
             .UseNpgsql(connectionString)
             .UseSnakeCaseNamingConvention()
+            .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning))
             .AddInterceptors(sp.GetRequiredService<AuditableEntityInterceptor>(), sp.GetRequiredService<MindLift.Infrastructure.Caching.CacheInvalidationInterceptor>()));
         services.AddScoped<MindLift.Infrastructure.Caching.RequestStateCache>();
         services.AddScoped<AuditRetentionJob>();
