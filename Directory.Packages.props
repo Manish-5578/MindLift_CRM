@@ -55,5 +55,6 @@
     <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.23.0" />
     <PackageVersion Include="Bogus" Version="35.6.5" />
     <PackageVersion Include="Dapper" Version="2.1.35" />
+    <PackageVersion Include="ClosedXML" Version="0.104.2" />
   </ItemGroup>
 </Project>

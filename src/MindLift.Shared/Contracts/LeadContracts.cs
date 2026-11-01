@@ -104,6 +104,37 @@ public sealed record CheckDuplicatesRequest(string FirstName, string LastName, s
 
 public sealed record ImportResultDto(int Total, int Created, int Skipped, int Failed, IReadOnlyList<string> Errors);
 
+public sealed record ImportHistoryItemDto(
+    Guid Id,
+    string EntityType,
+    string FileName,
+    int TotalRows,
+    int ImportedCount,
+    int SkippedCount,
+    int FailedCount,
+    string Status,
+    IReadOnlyList<string> Errors,
+    Guid? ImportedById,
+    string? ImportedByName,
+    DateTime CreatedAtUtc);
+
+public sealed record ImportHistorySummaryDto(
+    int TotalImports,
+    int TotalRows,
+    int TotalImported,
+    int TotalSkipped,
+    int TotalFailed,
+    IReadOnlyList<ImportHistoryItemDto> Items);
+
+public sealed record ImportPreviewDto(
+    string FileName,
+    IReadOnlyList<string> Headers,
+    IReadOnlyList<IReadOnlyList<string>> Rows,
+    int TotalRows,
+    IReadOnlyList<MindLift.Shared.Imports.ColumnMatch> Matches,
+    bool HasRequired,
+    string? Error);
+
 public sealed record AssignmentRuleDto(Guid Id, string Name, bool IsActive, int Priority, string Method, IReadOnlyList<Guid> UserIds, FilterGroup? Conditions);
 
 public sealed record SaveAssignmentRuleRequest(string Name, bool IsActive, int Priority, string Method, IReadOnlyList<Guid> UserIds, FilterGroup? Conditions);

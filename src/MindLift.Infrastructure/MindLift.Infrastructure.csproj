@@ -26,6 +26,7 @@
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" />
     <PackageReference Include="UglyToad.PdfPig" />
     <PackageReference Include="RapidOcrNet" GeneratePathProperty="true" />
+    <PackageReference Include="ClosedXML" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="MailKit" />

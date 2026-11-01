@@ -23,9 +23,9 @@
 
     @if (_step == 1)
     {
-        <MlCard Title="Choose a file" Subtitle="@("A CSV file with one " + Singular + " per row and the column names in the first row.")" TestId="import-step-file">
+        <MlCard Title="Choose a file" Subtitle="@("A CSV or Excel (.xlsx) file with one " + Singular + " per row and the column names in the first row.")" TestId="import-step-file">
             <div class="ml-stack">
-                <FileDropZone @ref="_drop" Accept=".csv,text/csv" MaxSizeMb="5" Multiple="false" HintText="CSV · up to 5,000 rows" FilesChanged="OnFileChosen" />
+                <FileDropZone @ref="_drop" Accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" MaxSizeMb="5" Multiple="false" HintText="CSV or Excel (.xlsx) · up to 5,000 rows" FilesChanged="OnFileChosen" />
                 @if (_fileError is not null)
                 {
                     <MudAlert Severity="Severity.Error" Dense="true" data-testid="import-file-error">@_fileError</MudAlert>
@@ -165,6 +165,7 @@
     private string? _fileError;
     private string _fileName = string.Empty;
     private string _csv = string.Empty;
+    private byte[]? _fileBytes;
     private List<List<string>> _rows = [];
     private IReadOnlyList<ColumnMatch> _matches = [];
     private ImportResultDto? _result;
@@ -175,9 +176,9 @@
 
     private bool TooManyRows => _rows.Count - 1 > MaxRows;
 
-    private string TemplateFileName => ItemLabel + "-template.csv";
+    private string TemplateFileName => Module == AppModule.Leads ? ItemLabel + "-template.xlsx" : ItemLabel + "-template.csv";
 
-    private string TemplateHref => "data:text/csv;charset=utf-8," + Uri.EscapeDataString(ImportColumns.TemplateCsv(Fields));
+    private string TemplateHref => Module == AppModule.Leads ? "api/v1/leads/template?format=xlsx" : "data:text/csv;charset=utf-8," + Uri.EscapeDataString(ImportColumns.TemplateCsv(Fields));
 
     private string StepColor(int number) => StatusColors.For(number == _step ? "Working" : number < _step ? "Won" : "Open");
 
@@ -211,23 +212,53 @@
             using var stream = file.OpenReadStream(MaxFileBytes);
             using var buffer = new MemoryStream();
             await stream.CopyToAsync(buffer);
-            var text = CsvText.Decode(buffer.ToArray());
-            var rows = CsvText.Parse(text);
-            if (rows.Count < 2)
-            {
-                _fileError = "The file needs a header row and at least one row of " + ItemLabel + ".";
-                return;
-            }
-
+            _fileBytes = buffer.ToArray();
             _fileName = file.Name;
-            _csv = text;
-            _rows = rows;
-            _matches = ImportColumns.Recognize(rows[0], Fields);
-            _step = 2;
+
+            if (file.Name.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+            {
+                using var form = new MultipartFormDataContent();
+                var fileContent = new ByteArrayContent(_fileBytes);
+                fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+                form.Add(fileContent, "file", file.Name);
+
+                var previewRes = await Http.PostAsync(Endpoint + "/preview", form);
+                if (!previewRes.IsSuccessStatusCode)
+                {
+                    _fileError = await ProblemText.FromAsync(previewRes, T["We could not read this Excel file."]);
+                    return;
+                }
+
+                var preview = await previewRes.Content.ReadFromJsonAsync<ImportPreviewDto>();
+                if (preview is null || preview.Error is not null)
+                {
+                    _fileError = preview?.Error ?? T["Could not read Excel file."];
+                    return;
+                }
+
+                _rows = preview.Headers.Count > 0 ? [preview.Headers.ToList(), ..preview.Rows.Select(r => r.ToList())] : [];
+                _matches = preview.Matches;
+                _step = 2;
+            }
+            else
+            {
+                var text = CsvText.Decode(_fileBytes);
+                var rows = CsvText.Parse(text);
+                if (rows.Count < 2)
+                {
+                    _fileError = "The file needs a header row and at least one row of " + ItemLabel + ".";
+                    return;
+                }
+
+                _csv = text;
+                _rows = rows;
+                _matches = ImportColumns.Recognize(rows[0], Fields);
+                _step = 2;
+            }
         }
-        catch (IOException)
+        catch (Exception ex)
         {
-            _fileError = T["We could not read this file. Try saving it as CSV again."];
+            _fileError = T["We could not read this file: {0}", ex.Message];
         }
     }
 
@@ -236,6 +267,7 @@
         _step = 1;
         _rows = [];
         _csv = string.Empty;
+        _fileBytes = null;
     }
 
     private async Task ImportAsync()
@@ -255,7 +287,20 @@
         _busy = true;
         try
         {
-            var response = await Http.PostAsync(Endpoint, new StringContent(_csv, Encoding.UTF8, "text/csv"));
+            HttpResponseMessage response;
+            if (_fileBytes is not null && _fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+            {
+                using var form = new MultipartFormDataContent();
+                var fileContent = new ByteArrayContent(_fileBytes);
+                fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+                form.Add(fileContent, "file", _fileName);
+                response = await Http.PostAsync(Endpoint, form);
+            }
+            else
+            {
+                response = await Http.PostAsync(Endpoint, new StringContent(_csv, Encoding.UTF8, "text/csv"));
+            }
+
             if (!response.IsSuccessStatusCode)
             {
                 Snackbar.Add(await ProblemText.FromAsync(response, T["We could not import this file."]), Severity.Error);
@@ -282,6 +327,7 @@
         _rows = [];
         _csv = string.Empty;
         _fileName = string.Empty;
+        _fileBytes = null;
         if (_drop is not null)
         {
             await _drop.ClearAsync();

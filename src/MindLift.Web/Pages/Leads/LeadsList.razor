@@ -27,13 +27,20 @@
                     <MudButton Href="/leads/board">@T["Board"]</MudButton>
                     <MudButton Color="Color.Primary" Href="/leads">@T["List"]</MudButton>
                 </MudButtonGroup>
+                <MudTooltip Text="@T["Upload history"]">
+                    <MudIconButton Icon="@Icons.Material.Outlined.History" OnClick="OpenHistoryDialog" data-testid="leads-upload-history" Title="@T["Upload history"]" />
+                </MudTooltip>
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Custom.FileFormats.FileExcel" OnClick="DownloadTemplateAsync" data-testid="download-template">@T["Template"]</MudButton>
                 @if (CanImport)
                 {
                     <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Upload" Href="/leads/import" data-testid="import-leads">@T["Import"]</MudButton>
                 }
                 @if (CanExport)
                 {
-                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Download" OnClick="ExportAsync" data-testid="export-leads">@T["Export"]</MudButton>
+                    <MudMenu Label="@T["Export"]" StartIcon="@Icons.Material.Outlined.Download" Variant="Variant.Outlined" EndIcon="@Icons.Material.Filled.KeyboardArrowDown" data-testid="export-leads">
+                        <MudMenuItem Icon="@Icons.Custom.FileFormats.FileExcel" OnClick='() => ExportAsync("xlsx")'>@T["Export as Excel (.xlsx)"]</MudMenuItem>
+                        <MudMenuItem Icon="@Icons.Material.Outlined.TableChart" OnClick='() => ExportAsync("csv")'>@T["Export as CSV (.csv)"]</MudMenuItem>
+                    </MudMenu>
                 }
                 @if (CanCreate)
                 {
@@ -108,15 +115,41 @@
 
     private bool CanExport => App.Bootstrap?.Permissions.Any(p => p.Module == "Leads" && p.CanExport) == true;
 
-    /// <summary>Downloads the leads the list is showing now: the same view, search, filters and sort.</summary>
-    private async Task ExportAsync()
+    private async Task DownloadTemplateAsync()
+    {
+        try
+        {
+            var response = await Http.GetAsync("api/v1/leads/template?format=xlsx");
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add(T["We could not download the template."], Severity.Error);
+                return;
+            }
+
+            var bytes = await response.Content.ReadAsByteArrayAsync();
+            await JS.InvokeVoidAsync("mindlift.downloadFile", "leads-template.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Convert.ToBase64String(bytes));
+            Snackbar.Add(T["Template downloaded successfully"], Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(T["Failed to download template: {0}", ex.Message], Severity.Error);
+        }
+    }
+
+    private async Task OpenHistoryDialog()
+    {
+        await Dialogs.ShowAsync<ImportHistoryDialog>(T["Lead Upload & Import History"], new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true });
+    }
+
+    /// <summary>Downloads the leads the list is showing now: the same view, search, filters and sort in Excel (.xlsx) or CSV (.csv).</summary>
+    private async Task ExportAsync(string format = "xlsx")
     {
         if (_list is null)
         {
             return;
         }
 
-        var response = await Http.PostAsJsonAsync("api/v1/leads/export", _list.CurrentQuery with { Page = 1, PageSize = 200 });
+        var response = await Http.PostAsJsonAsync($"api/v1/leads/export?format={format}", _list.CurrentQuery with { Page = 1, PageSize = 200 });
         if (!response.IsSuccessStatusCode)
         {
             Snackbar.Add(await ProblemText.FromAsync(response, T["We could not export your leads."]), Severity.Error);
@@ -124,7 +157,9 @@
         }
 
         var bytes = await response.Content.ReadAsByteArrayAsync();
-        await JS.InvokeVoidAsync("mindlift.downloadFile", "leads.csv", "text/csv", Convert.ToBase64String(bytes));
+        var fileName = format == "xlsx" ? "leads.xlsx" : "leads.csv";
+        var mime = format == "xlsx" ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" : "text/csv";
+        await JS.InvokeVoidAsync("mindlift.downloadFile", fileName, mime, Convert.ToBase64String(bytes));
         Snackbar.Add(T["Export ready"], Severity.Success);
     }
 

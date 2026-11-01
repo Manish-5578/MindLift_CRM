@@ -84,25 +84,112 @@ public sealed class LeadsController(LeadService leads, ImportNotifier imports) :
     public async Task<ActionResult<LeadDto>> Merge(Guid id, [FromBody] MergeLeadsRequest request, CancellationToken cancellationToken)
         => Ok(await leads.MergeAsync(id, request.DuplicateIds, request.FieldOverrides, cancellationToken));
 
-    /// <summary>CSV body (text/csv). Max 5,000 rows.</summary>
+    [HttpGet("template")]
+    public IActionResult DownloadTemplate([FromQuery] string? format = "xlsx")
+    {
+        if (string.Equals(format, "csv", StringComparison.OrdinalIgnoreCase))
+        {
+            var csv = MindLift.Shared.Imports.LeadImportColumns.TemplateCsv;
+            return File(System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(csv)).ToArray(), "text/csv", "leads-template.csv");
+        }
+
+        var bytes = leads.GenerateLeadTemplateExcel();
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "leads-template.xlsx");
+    }
+
+    /// <summary>CSV or Excel bulk import. Accepts raw body or multipart/form-data. Max 5,000 rows.</summary>
     [HasPermission(AppModule.Leads, PermissionAction.Import)]
     [HttpPost("import")]
     public async Task<ActionResult<ImportResultDto>> Import(CancellationToken cancellationToken)
     {
-        using var reader = new StreamReader(Request.Body);
-        var csv = await reader.ReadToEndAsync(cancellationToken);
-        var result = await leads.ImportCsvAsync(csv, cancellationToken);
-        await imports.NotifyAsync("leads", "/leads", result, cancellationToken);
-        return Ok(result);
+        Stream stream;
+        string fileName = "leads.csv";
+
+        if (Request.HasFormContentType && Request.Form.Files.Count > 0)
+        {
+            var formFile = Request.Form.Files[0];
+            fileName = formFile.FileName;
+            stream = formFile.OpenReadStream();
+        }
+        else
+        {
+            var ms = new MemoryStream();
+            await Request.Body.CopyToAsync(ms, cancellationToken);
+            ms.Position = 0;
+            stream = ms;
+            if (Request.Headers.TryGetValue("X-File-Name", out var hName) && !string.IsNullOrWhiteSpace(hName))
+            {
+                fileName = hName.ToString();
+            }
+            else if (Request.ContentType?.Contains("spreadsheetml") == true || Request.ContentType?.Contains("excel") == true)
+            {
+                fileName = "leads.xlsx";
+            }
+        }
+
+        using (stream)
+        {
+            var result = await leads.ImportStreamAsync(stream, fileName, cancellationToken);
+            await imports.NotifyAsync("leads", "/leads", result, cancellationToken);
+            return Ok(result);
+        }
+    }
+
+    [HasPermission(AppModule.Leads, PermissionAction.Import)]
+    [HttpPost("import/preview")]
+    public async Task<ActionResult<ImportPreviewDto>> PreviewImport(CancellationToken cancellationToken)
+    {
+        Stream stream;
+        string fileName = "leads.csv";
+
+        if (Request.HasFormContentType && Request.Form.Files.Count > 0)
+        {
+            var formFile = Request.Form.Files[0];
+            fileName = formFile.FileName;
+            stream = formFile.OpenReadStream();
+        }
+        else
+        {
+            var ms = new MemoryStream();
+            await Request.Body.CopyToAsync(ms, cancellationToken);
+            ms.Position = 0;
+            stream = ms;
+            if (Request.Headers.TryGetValue("X-File-Name", out var hName) && !string.IsNullOrWhiteSpace(hName))
+            {
+                fileName = hName.ToString();
+            }
+            else if (Request.ContentType?.Contains("spreadsheetml") == true || Request.ContentType?.Contains("excel") == true)
+            {
+                fileName = "leads.xlsx";
+            }
+        }
+
+        using (stream)
+        {
+            return Ok(leads.PreviewImport(stream, fileName));
+        }
     }
 
     [HasPermission(AppModule.Leads, PermissionAction.Export)]
     [HttpPost("export")]
-    public async Task<IActionResult> Export([FromBody] ListQuery query, CancellationToken cancellationToken)
+    public async Task<IActionResult> Export([FromBody] ListQuery query, [FromQuery] string? format = "csv", CancellationToken cancellationToken = default)
     {
+        if (string.Equals(format, "xlsx", StringComparison.OrdinalIgnoreCase))
+        {
+            var bytes = await leads.ExportExcelAsync(query, cancellationToken);
+            return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "leads.xlsx");
+        }
+
         var csv = await leads.ExportCsvAsync(query, cancellationToken);
         return File(System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(csv)).ToArray(), "text/csv", "leads.csv");
     }
+
+    [HasPermission(AppModule.Leads, PermissionAction.View)]
+    [HttpGet("import-history")]
+    public async Task<ActionResult<ImportHistorySummaryDto>> GetImportHistory(CancellationToken cancellationToken)
+        => Ok(await leads.GetImportHistoryAsync(cancellationToken));
+
+
 }
 
 /// <summary>Assignment rules and web forms (settings, Admin by default).</summary>

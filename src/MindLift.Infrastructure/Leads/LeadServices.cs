@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Linq.Expressions;
 using System.Text;
 using System.Text.Json;
+using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
 using MindLift.Application.Abstractions;
 using MindLift.Application.Common.Exceptions;
@@ -793,9 +794,232 @@ public sealed class LeadService(
     /// CSV import (plan 4.10). The header row is matched to field keys or labels, ignoring case, spaces and underscores.
     /// Rows whose email or phone already exists are skipped. Returns counts and the first errors.
     /// </summary>
+    /// <summary>Generates an Excel (.xlsx) template for bulk lead upload with a 'Leads' data entry sheet and a 'Help' reference sheet.</summary>
+    public byte[] GenerateLeadTemplateExcel()
+    {
+        using var workbook = new XLWorkbook();
+
+        // Sheet 1: Leads
+        var sheetLeads = workbook.Worksheets.Add("Leads");
+        var leadHeaders = new[] { "Company", "First Name", "Last Name", "Email", "Phone", "Status", "Source", "Rating", "Notes" };
+        for (var col = 0; col < leadHeaders.Length; col++)
+        {
+            var cell = sheetLeads.Cell(1, col + 1);
+            cell.Value = leadHeaders[col];
+            cell.Style.Font.Bold = true;
+            cell.Style.Font.FontColor = XLColor.White;
+            cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#1E3A8A");
+            cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            cell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+        }
+        sheetLeads.Row(1).Height = 26;
+
+        // Sample entry row
+        var sampleValues = new[] { "Acme Corp", "Jane", "Doe", "jane.doe@acme.com", "+1 555-0199", "new", "web", "hot", "Interested in enterprise plan" };
+        for (var col = 0; col < sampleValues.Length; col++)
+        {
+            var cell = sheetLeads.Cell(2, col + 1);
+            cell.Value = sampleValues[col];
+            cell.Style.Font.FontColor = XLColor.FromHtml("#475569");
+        }
+        sheetLeads.Row(2).Height = 20;
+        sheetLeads.Columns().AdjustToContents(15.0, 45.0);
+
+        // Sheet 2: Help
+        var sheetHelp = workbook.Worksheets.Add("Help");
+        var helpHeaders = new[] { "Field Name", "Requirement", "Description", "Allowed / Example Values" };
+        for (var col = 0; col < helpHeaders.Length; col++)
+        {
+            var cell = sheetHelp.Cell(1, col + 1);
+            cell.Value = helpHeaders[col];
+            cell.Style.Font.Bold = true;
+            cell.Style.Font.FontColor = XLColor.White;
+            cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#0F766E");
+            cell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+        }
+        sheetHelp.Row(1).Height = 26;
+
+        var helpRows = new (string Field, string Req, string Desc, string Values)[]
+        {
+            ("Company", "Optional (Required if contact name blank)", "The company, organization or business name.", "Free text. E.g. Acme Corp"),
+            ("First Name", "Optional (Required if company blank)", "Contact person's first / given name.", "Free text. E.g. Jane"),
+            ("Last Name", "Optional", "Contact person's last / family name.", "Free text. E.g. Doe"),
+            ("Email", "Optional", "Contact's email address. Used for duplicate checking.", "Valid email format. E.g. jane.doe@acme.com"),
+            ("Phone", "Optional", "Phone number with country code. Used for duplicate checking.", "E.164 or digits. E.g. +1 555-0199"),
+            ("Status", "Optional", "Lifecycle status of the lead. Defaults to 'new' if omitted.", "new, working, qualified, disqualified"),
+            ("Source", "Optional", "Where the lead came from. Defaults to 'import' if omitted.", "web, referral, phone, campaign, partner, other"),
+            ("Rating", "Optional", "Lead warmth or priority level.", "hot, warm, cold"),
+            ("Notes", "Optional", "Background description, notes, or specific requirements.", "Free text.")
+        };
+
+        for (var r = 0; r < helpRows.Length; r++)
+        {
+            var rowIdx = r + 2;
+            var item = helpRows[r];
+            sheetHelp.Cell(rowIdx, 1).Value = item.Field;
+            sheetHelp.Cell(rowIdx, 1).Style.Font.Bold = true;
+            sheetHelp.Cell(rowIdx, 2).Value = item.Req;
+            sheetHelp.Cell(rowIdx, 3).Value = item.Desc;
+            sheetHelp.Cell(rowIdx, 4).Value = item.Values;
+
+            if (r % 2 == 1)
+            {
+                sheetHelp.Row(rowIdx).Style.Fill.BackgroundColor = XLColor.FromHtml("#F8FAFC");
+            }
+            sheetHelp.Row(rowIdx).Height = 22;
+        }
+
+        sheetHelp.Columns().AdjustToContents(18.0, 60.0);
+
+        using var memoryStream = new MemoryStream();
+        workbook.SaveAs(memoryStream);
+        return memoryStream.ToArray();
+    }
+
+    /// <summary>Excel export of the current list. Respects scope and filters; capped at 10,000 rows.</summary>
+    public async Task<byte[]> ExportExcelAsync(ListQuery query, CancellationToken cancellationToken = default)
+    {
+        const int pageSize = 200;
+        var items = new List<LeadListItemDto>();
+        for (var pageNumber = 1; items.Count < MaxExportRows; pageNumber++)
+        {
+            var page = await QueryAsync(query with { Page = pageNumber, PageSize = pageSize }, cancellationToken);
+            items.AddRange(page.Items);
+            if (page.Items.Count < pageSize || items.Count >= page.Total)
+            {
+                break;
+            }
+        }
+
+        using var workbook = new XLWorkbook();
+        var sheet = workbook.Worksheets.Add("Leads");
+
+        var headers = new[] { "Id", "Company", "First Name", "Last Name", "Email", "Phone", "Status", "Source", "Rating", "Owner", "Created At" };
+        for (var c = 0; c < headers.Length; c++)
+        {
+            var cell = sheet.Cell(1, c + 1);
+            cell.Value = headers[c];
+            cell.Style.Font.Bold = true;
+            cell.Style.Font.FontColor = XLColor.White;
+            cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#1E3A8A");
+            cell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+        }
+        sheet.Row(1).Height = 25;
+
+        var rowIdx = 2;
+        foreach (var item in items.Take(MaxExportRows))
+        {
+            sheet.Cell(rowIdx, 1).Value = item.Id.ToString();
+            sheet.Cell(rowIdx, 2).Value = item.CompanyName ?? string.Empty;
+            sheet.Cell(rowIdx, 3).Value = item.FirstName;
+            sheet.Cell(rowIdx, 4).Value = item.LastName;
+            sheet.Cell(rowIdx, 5).Value = item.Email ?? string.Empty;
+            sheet.Cell(rowIdx, 6).Value = item.Phone ?? string.Empty;
+            sheet.Cell(rowIdx, 7).Value = item.Status;
+            sheet.Cell(rowIdx, 8).Value = item.Source ?? string.Empty;
+            sheet.Cell(rowIdx, 9).Value = item.Rating ?? string.Empty;
+            sheet.Cell(rowIdx, 10).Value = item.OwnerName ?? string.Empty;
+            sheet.Cell(rowIdx, 11).Value = item.CreatedAtUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+
+            if (rowIdx % 2 == 1)
+            {
+                sheet.Row(rowIdx).Style.Fill.BackgroundColor = XLColor.FromHtml("#F8FAFC");
+            }
+            rowIdx++;
+        }
+
+        sheet.Columns().AdjustToContents(12.0, 45.0);
+
+        using var ms = new MemoryStream();
+        workbook.SaveAs(ms);
+        return ms.ToArray();
+    }
+
+    /// <summary>Parses row data from either an Excel (.xlsx) or CSV stream.</summary>
+    public static List<List<string>> ParseRowsFromStream(Stream stream, string? fileName = null)
+    {
+        var isXlsx = fileName?.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) == true;
+        if (!isXlsx && stream.CanSeek)
+        {
+            var headerBytes = new byte[4];
+            var read = stream.Read(headerBytes, 0, 4);
+            stream.Position = 0;
+            if (read == 4 && headerBytes[0] == 0x50 && headerBytes[1] == 0x4B && headerBytes[2] == 0x03 && headerBytes[3] == 0x04)
+            {
+                isXlsx = true;
+            }
+        }
+
+        if (isXlsx)
+        {
+            using var workbook = new XLWorkbook(stream);
+            var sheet = workbook.Worksheets.FirstOrDefault(w => w.Name.Equals("Leads", StringComparison.OrdinalIgnoreCase))
+                        ?? workbook.Worksheets.FirstOrDefault();
+            if (sheet is null)
+            {
+                return [];
+            }
+
+            var rows = new List<List<string>>();
+            var lastRow = sheet.LastRowUsed()?.RowNumber() ?? 0;
+            var lastCol = sheet.LastColumnUsed()?.ColumnNumber() ?? 0;
+
+            for (var r = 1; r <= lastRow; r++)
+            {
+                var rowCells = new List<string>();
+                var row = sheet.Row(r);
+                var hasContent = false;
+                for (var c = 1; c <= lastCol; c++)
+                {
+                    var text = row.Cell(c).GetString().Trim();
+                    rowCells.Add(text);
+                    if (!string.IsNullOrWhiteSpace(text)) hasContent = true;
+                }
+                if (hasContent || r == 1)
+                {
+                    rows.Add(rowCells);
+                }
+            }
+            return rows;
+        }
+        else
+        {
+            using var reader = new StreamReader(stream, Encoding.UTF8, leaveOpen: true);
+            var text = reader.ReadToEnd();
+            return CsvText.Parse(text);
+        }
+    }
+
+    public ImportPreviewDto PreviewImport(Stream stream, string fileName)
+    {
+        var rows = ParseRowsFromStream(stream, fileName);
+        if (rows.Count < 2)
+        {
+            return new ImportPreviewDto(fileName, [], [], 0, [], false, "The file needs a header row and at least one row of leads.");
+        }
+
+        var headers = rows[0];
+        var matches = LeadImportColumns.Recognize(headers);
+        var map = LeadImportColumns.Map(headers);
+        var hasReq = (map.TryGetValue("first_name", out var f) && f >= 0) || (map.TryGetValue("company_name", out var c) && c >= 0);
+
+        var previewRows = rows.Skip(1).Take(10).Select(r => (IReadOnlyList<string>)r).ToList();
+        return new ImportPreviewDto(fileName, headers, previewRows, rows.Count - 1, matches, hasReq, null);
+    }
+
     public async Task<ImportResultDto> ImportCsvAsync(string csv, CancellationToken cancellationToken = default)
     {
-        var rows = CsvText.Parse(csv);
+        using var ms = new MemoryStream(Encoding.UTF8.GetBytes(csv));
+        return await ImportStreamAsync(ms, "leads.csv", cancellationToken);
+    }
+
+    /// <summary>
+    /// Imports leads from an Excel (.xlsx) or CSV stream. Automatically maps columns, checks duplicates by email/phone,
+    /// logs results into ImportHistory, and reports detailed outcomes.
+    /// </summary>
+    public async Task<ImportResultDto> ImportStreamAsync(Stream stream, string fileName, CancellationToken cancellationToken = default)
+    {
+        var rows = ParseRowsFromStream(stream, fileName);
         if (rows.Count < 2)
         {
             throw new ValidationException(new Dictionary<string, string[]> { ["file"] = ["The file needs a header row and at least one row."] });
@@ -806,12 +1030,12 @@ public sealed class LeadService(
             throw new BusinessRuleException("import_too_large", $"Import at most {MaxImportRows} rows at a time.");
         }
 
-        // The same rules the import wizard uses to show people how their columns will be read.
         var columns = LeadImportColumns.Map(rows[0]);
-
-        if (columns[LeadImportColumns.RequiredField] < 0)
+        var hasFirst = columns.TryGetValue("first_name", out var fnIdx) && fnIdx >= 0;
+        var hasCompany = columns.TryGetValue("company_name", out var compIdx) && compIdx >= 0;
+        if (!hasFirst && !hasCompany)
         {
-            throw new ValidationException(new Dictionary<string, string[]> { ["file"] = ["The file needs a 'First name' column."] });
+            throw new ValidationException(new Dictionary<string, string[]> { ["file"] = ["The file needs a 'Company' or 'First name' column."] });
         }
 
         var created = 0;
@@ -822,13 +1046,16 @@ public sealed class LeadService(
         for (var i = 1; i < rows.Count; i++)
         {
             var row = rows[i];
-            string? Cell(string key) => columns[key] >= 0 && columns[key] < row.Count ? row[columns[key]].Trim() : null;
+            string? Cell(string key) => columns.TryGetValue(key, out var idx) && idx >= 0 && idx < row.Count ? row[idx].Trim() : null;
 
-            var first = Cell("first_name");
-            if (string.IsNullOrWhiteSpace(first))
+            var first = Cell("first_name") ?? string.Empty;
+            var last = Cell("last_name") ?? string.Empty;
+            var company = Cell("company_name");
+
+            if (string.IsNullOrWhiteSpace(first) && string.IsNullOrWhiteSpace(last) && string.IsNullOrWhiteSpace(company))
             {
                 failed++;
-                if (errors.Count < 20) errors.Add($"Row {i + 1}: first name is missing.");
+                if (errors.Count < 20) errors.Add($"Row {i + 1}: company name or contact name is required.");
                 continue;
             }
 
@@ -841,11 +1068,35 @@ public sealed class LeadService(
                 continue;
             }
 
+            var status = Cell("status");
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                status = status.Trim().ToLowerInvariant();
+                if (status != "new" && status != "working" && status != "qualified" && status != "disqualified")
+                {
+                    status = "new";
+                }
+            }
+            else
+            {
+                status = "new";
+            }
+
+            var rating = Cell("rating");
+            if (!string.IsNullOrWhiteSpace(rating))
+            {
+                rating = rating.Trim().ToLowerInvariant();
+                if (rating != "hot" && rating != "warm" && rating != "cold")
+                {
+                    rating = null;
+                }
+            }
+
             var source = Cell("source");
             var request = new SaveLeadRequest(
-                first, Cell("last_name") ?? string.Empty, Cell("email"), Cell("phone"), Cell("company_name"),
-                "new", string.IsNullOrWhiteSpace(source) ? "import" : source.ToLowerInvariant().Replace(' ', '_'),
-                null, Cell("description"), null, null, null);
+                first, last, Cell("email"), Cell("phone"), company,
+                status, string.IsNullOrWhiteSpace(source) ? "import" : source.ToLowerInvariant().Replace(' ', '_'),
+                rating, Cell("description"), null, null, null);
 
             try
             {
@@ -859,11 +1110,54 @@ public sealed class LeadService(
             }
         }
 
+        var statusStr = failed == 0 ? "completed" : (created > 0 ? "completed_with_errors" : "failed");
+        var actor = tenant.UserId is { } uid ? await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == uid, cancellationToken) : null;
+        var actorName = actor is not null ? $"{actor.FirstName} {actor.LastName}".Trim() : "System";
+
+        var history = new ImportHistory
+        {
+            EntityType = "leads",
+            FileName = string.IsNullOrWhiteSpace(fileName) ? "leads.csv" : fileName,
+            TotalRows = rows.Count - 1,
+            ImportedCount = created,
+            SkippedCount = skipped,
+            FailedCount = failed,
+            Status = statusStr,
+            Errors = errors.ToArray(),
+            ImportedById = tenant.UserId,
+            ImportedByName = actorName,
+            CreatedAt = clock.UtcNow
+        };
+        db.ImportHistories.Add(history);
+        await db.SaveChangesAsync(cancellationToken);
+
         return new ImportResultDto(rows.Count - 1, created, skipped, failed, errors);
     }
 
-    /// <summary>CSV export of the current list (plan 4.10). Respects scope and filters; capped at 10,000 rows.</summary>
-    public async Task<string> ExportCsvAsync(ListQuery query, CancellationToken cancellationToken = default)
+    /// <summary>Returns the recent import history and aggregate metrics for leads.</summary>
+    public async Task<ImportHistorySummaryDto> GetImportHistoryAsync(CancellationToken cancellationToken = default)
+    {
+        var records = await db.ImportHistories.AsNoTracking()
+            .Where(h => h.EntityType == "leads")
+            .OrderByDescending(h => h.CreatedAt)
+            .Take(50)
+            .ToListAsync(cancellationToken);
+
+        var items = records.Select(r => new ImportHistoryItemDto(
+            r.Id, r.EntityType, r.FileName, r.TotalRows, r.ImportedCount, r.SkippedCount, r.FailedCount,
+            r.Status, r.Errors, r.ImportedById, r.ImportedByName, r.CreatedAt)).ToList();
+
+        var totalImports = items.Count;
+        var totalRows = items.Sum(i => i.TotalRows);
+        var totalImported = items.Sum(i => i.ImportedCount);
+        var totalSkipped = items.Sum(i => i.SkippedCount);
+        var totalFailed = items.Sum(i => i.FailedCount);
+
+        return new ImportHistorySummaryDto(totalImports, totalRows, totalImported, totalSkipped, totalFailed, items);
+    }
+
+
+        public async Task<string> ExportCsvAsync(ListQuery query, CancellationToken cancellationToken = default)
     {
         // QueryAsync never returns more than 200 rows a page, so walk the pages until everything (up to the export limit) is read.
         const int pageSize = 200;

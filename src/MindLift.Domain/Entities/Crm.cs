@@ -394,3 +394,19 @@ public sealed class ActivityMention : TenantEntity
     public Guid ActivityId { get; set; }
     public Guid UserId { get; set; }
 }
+
+/// <summary>Tracks historical file imports with execution metrics and error logs.</summary>
+[Audited]
+public sealed class ImportHistory : TenantEntity
+{
+    public string EntityType { get; set; } = "leads";
+    public string FileName { get; set; } = string.Empty;
+    public int TotalRows { get; set; }
+    public int ImportedCount { get; set; }
+    public int SkippedCount { get; set; }
+    public int FailedCount { get; set; }
+    public string Status { get; set; } = "completed";
+    public string[] Errors { get; set; } = [];
+    public Guid? ImportedById { get; set; }
+    public string? ImportedByName { get; set; }
+}

@@ -1,0 +1,168 @@
+@using MindLift.Shared.Contracts
+@inject HttpClient Http
+@inject Translator T
+@inject ISnackbar Snackbar
+
+<MudDialog MaxWidth="MaxWidth.Medium" FullWidth="true">
+    <TitleContent>
+        <div class="ml-row" style="align-items:center;gap:8px;">
+            <MudIcon Icon="@Icons.Material.Outlined.History" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">@T["Lead Upload & Import History"]</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (_loading)
+        {
+            <div class="d-flex justify-center my-6">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else if (_summary is null || _summary.Items.Count == 0)
+        {
+            <div class="pa-8 text-center">
+                <MudIcon Icon="@Icons.Material.Outlined.CloudUpload" Size="Size.Large" Class="ml-muted mb-2" />
+                <MudText Typo="Typo.body1" Class="ml-muted">@T["No import history found yet. Upload leads using CSV or Excel to see metrics here."]</MudText>
+            </div>
+        }
+        else
+        {
+            <div class="ml-stack mb-4">
+                <!-- Summary Metrics Cards -->
+                <div class="ml-row ml-row--wrap" style="gap:12px;">
+                    <MudPaper Elevation="0" Outlined="true" Class="pa-3 flex-grow-1" Style="min-width:140px;border-radius:8px;">
+                        <MudText Typo="Typo.caption" Class="ml-muted">@T["Total Imports"]</MudText>
+                        <MudText Typo="Typo.h5" Style="font-weight:700;">@_summary.TotalImports</MudText>
+                    </MudPaper>
+                    <MudPaper Elevation="0" Outlined="true" Class="pa-3 flex-grow-1" Style="min-width:140px;border-radius:8px;">
+                        <MudText Typo="Typo.caption" Class="ml-muted">@T["Total Processed"]</MudText>
+                        <MudText Typo="Typo.h5" Style="font-weight:700;">@_summary.TotalRows.ToString("N0")</MudText>
+                    </MudPaper>
+                    <MudPaper Elevation="0" Outlined="true" Class="pa-3 flex-grow-1" Style="min-width:140px;border-radius:8px;border-left:4px solid var(--mud-palette-success);">
+                        <MudText Typo="Typo.caption" Color="Color.Success">@T["Imported"]</MudText>
+                        <MudText Typo="Typo.h5" Color="Color.Success" Style="font-weight:700;">@_summary.TotalImported.ToString("N0")</MudText>
+                    </MudPaper>
+                    <MudPaper Elevation="0" Outlined="true" Class="pa-3 flex-grow-1" Style="min-width:140px;border-radius:8px;border-left:4px solid var(--mud-palette-warning);">
+                        <MudText Typo="Typo.caption" Color="Color.Warning">@T["Duplicates / Skipped"]</MudText>
+                        <MudText Typo="Typo.h5" Color="Color.Warning" Style="font-weight:700;">@_summary.TotalSkipped.ToString("N0")</MudText>
+                    </MudPaper>
+                    <MudPaper Elevation="0" Outlined="true" Class="pa-3 flex-grow-1" Style="min-width:140px;border-radius:8px;border-left:4px solid var(--mud-palette-error);">
+                        <MudText Typo="Typo.caption" Color="Color.Error">@T["Failed"]</MudText>
+                        <MudText Typo="Typo.h5" Color="Color.Error" Style="font-weight:700;">@_summary.TotalFailed.ToString("N0")</MudText>
+                    </MudPaper>
+                </div>
+
+                <!-- History Table -->
+                <MudTable Items="@_summary.Items" Hover="true" Dense="true" Elevation="0" Outlined="true" Style="border-radius:8px;">
+                    <HeaderContent>
+                        <MudTh>@T["Date & Time"]</MudTh>
+                        <MudTh>@T["File"]</MudTh>
+                        <MudTh>@T["Uploaded By"]</MudTh>
+                        <MudTh>@T["Status"]</MudTh>
+                        <MudTh Style="text-align:right">@T["Rows"]</MudTh>
+                        <MudTh Style="text-align:right">@T["Imported"]</MudTh>
+                        <MudTh Style="text-align:right">@T["Skipped"]</MudTh>
+                        <MudTh Style="text-align:right">@T["Failed"]</MudTh>
+                        <MudTh Style="text-align:center">@T["Details"]</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Date">@context.CreatedAtUtc.ToLocalTime().ToString("MMM dd, yyyy HH:mm")</MudTd>
+                        <MudTd DataLabel="File">
+                            <div class="d-flex align-center gap-1">
+                                <MudIcon Icon="@(context.FileName.EndsWith(".xlsx") ? Icons.Custom.FileFormats.FileExcel : Icons.Material.Outlined.TableChart)"
+                                         Size="Size.Small"
+                                         Color="@(context.FileName.EndsWith(".xlsx") ? Color.Success : Color.Default)" />
+                                <span style="font-weight:500;">@context.FileName</span>
+                            </div>
+                        </MudTd>
+                        <MudTd DataLabel="Uploaded By">@(string.IsNullOrWhiteSpace(context.ImportedByName) ? "System" : context.ImportedByName)</MudTd>
+                        <MudTd DataLabel="Status">
+                            @if (context.Status == "completed")
+                            {
+                                <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Outlined">@T["Completed"]</MudChip>
+                            }
+                            else if (context.Status == "completed_with_errors")
+                            {
+                                <MudChip T="string" Color="Color.Warning" Size="Size.Small" Variant="Variant.Outlined">@T["With errors"]</MudChip>
+                            }
+                            else
+                            {
+                                <MudChip T="string" Color="Color.Error" Size="Size.Small" Variant="Variant.Outlined">@T["Failed"]</MudChip>
+                            }
+                        </MudTd>
+                        <MudTd DataLabel="Rows" Style="text-align:right">@context.TotalRows</MudTd>
+                        <MudTd DataLabel="Imported" Style="text-align:right;color:var(--mud-palette-success);font-weight:600;">@context.ImportedCount</MudTd>
+                        <MudTd DataLabel="Skipped" Style="text-align:right;color:var(--mud-palette-warning);">@context.SkippedCount</MudTd>
+                        <MudTd DataLabel="Failed" Style="text-align:right;color:var(--mud-palette-error);">@context.FailedCount</MudTd>
+                        <MudTd DataLabel="Details" Style="text-align:center">
+                            @if (context.Errors.Count > 0)
+                            {
+                                <MudIconButton Icon="@Icons.Material.Outlined.Info" Size="Size.Small" Color="Color.Error"
+                                               OnClick="() => ToggleErrors(context.Id)" />
+                            }
+                            else
+                            {
+                                <MudIcon Icon="@Icons.Material.Outlined.CheckCircle" Size="Size.Small" Color="Color.Success" />
+                            }
+                        </MudTd>
+                    </RowTemplate>
+                    <ChildRowContent>
+                        @if (_expandedId == context.Id && context.Errors.Count > 0)
+                        {
+                            <MudTr>
+                                <td colspan="9" class="pa-3" style="background-color:var(--mud-palette-background-grey);">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Error" Class="mb-1">@T["Errors logged during import:"]</MudText>
+                                    <ul style="margin:0;padding-left:20px;font-size:0.85rem;">
+                                        @foreach (var err in context.Errors)
+                                        {
+                                            <li>@err</li>
+                                        }
+                                    </ul>
+                                </td>
+                            </MudTr>
+                        }
+                    </ChildRowContent>
+                </MudTable>
+            </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Close">@T["Close"]</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private bool _loading = true;
+    private ImportHistorySummaryDto? _summary;
+    private Guid? _expandedId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadHistoryAsync();
+    }
+
+    private async Task LoadHistoryAsync()
+    {
+        _loading = true;
+        try
+        {
+            _summary = await Http.GetFromJsonAsync<ImportHistorySummaryDto>("api/v1/leads/import-history");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(T["Failed to load import history: {0}", ex.Message], Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void ToggleErrors(Guid id)
+    {
+        _expandedId = _expandedId == id ? null : id;
+    }
+
+    private void Close() => MudDialog.Close();
+}
