@@ -22,7 +22,7 @@
         {
             try
             {
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
                 var response = await Http.PostAsync("api/v1/auth/refresh", null, cts.Token);
                 if (response.IsSuccessStatusCode)
                 {

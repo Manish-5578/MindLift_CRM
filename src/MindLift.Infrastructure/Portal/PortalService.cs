@@ -291,7 +291,17 @@ public sealed class PortalService(
 
         if (token.UsedAt.HasValue)
         {
-            // A rotated token came back: someone else may hold a copy. End every session for this customer.
+            if (DateTime.UtcNow - token.UsedAt.Value <= TimeSpan.FromSeconds(60))
+            {
+                var concurrentUser = await db.PortalUsers.IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(u => u.Id == token.PortalUserId && u.TenantId == t.Id && !u.IsDeleted, ct);
+                if (concurrentUser is not null && concurrentUser.IsActive)
+                {
+                    return await IssueAsync(t.Id, concurrentUser, ct);
+                }
+            }
+
+            // A rotated token came back outside grace period: someone else may hold a copy. End every session for this customer.
             await RevokeRefreshTokensAsync(t.Id, token.PortalUserId, ct);
             throw new UnauthorizedException("refresh_token_reused", "Your session has ended. Please sign in again.");
         }
@@ -310,7 +320,10 @@ public sealed class PortalService(
 
         if (!await TryConsumeAsync(token, ct))
         {
-            // Another request used this token between the check above and now, which is the same as a reused token.
+            if (user.IsActive)
+            {
+                return await IssueAsync(t.Id, user, ct);
+            }
             await RevokeRefreshTokensAsync(t.Id, token.PortalUserId, ct);
             throw new UnauthorizedException("refresh_token_reused", "Your session has ended. Please sign in again.");
         }

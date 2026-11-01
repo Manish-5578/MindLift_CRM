@@ -40,6 +40,16 @@ public sealed class RefreshTokenService(AppDbContext db, IClock clock, TokenServ
 
         if (row.RevokedAt is not null)
         {
+            // OAuth 2.0 Security BCP Grace Period:
+            // If the token was rotated recently within the grace window (60s) and was replaced by a normal rotation,
+            // this is a concurrent request or race condition (e.g. multi-tab or network retry).
+            // Do NOT revoke the family. Issue a new token for this concurrent request so legitimate sessions stay active.
+            if (row.ReplacedByHash is not null && (now - row.RevokedAt.Value) <= TimeSpan.FromSeconds(60))
+            {
+                var nextConcurrent = await IssueAsync(row.UserId, row.TenantId, row.FamilyId, cancellationToken);
+                return (row.UserId, row.TenantId, nextConcurrent);
+            }
+
             await RevokeFamilyAsync(row.FamilyId, cancellationToken);
             throw new UnauthorizedException("refresh_token_reused", "Your session has ended. Please sign in again.");
         }

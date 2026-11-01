@@ -145,7 +145,7 @@ public sealed class AuthController(
     {
         HttpOnly = true,
         Secure = true,
-        SameSite = SameSiteMode.Strict,
+        SameSite = SameSiteMode.Lax,
         Path = "/api/v1/auth",
         Expires = expires,
     };

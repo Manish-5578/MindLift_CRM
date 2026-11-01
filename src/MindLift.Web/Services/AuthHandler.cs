@@ -46,9 +46,16 @@ public sealed class AuthHandler(AuthSession session, Uri baseAddress) : Delegati
 
     private async Task<bool> RefreshAsync(CancellationToken cancellationToken)
     {
+        var tokenBeforeWait = session.AccessToken;
         await RefreshGate.WaitAsync(cancellationToken);
         try
         {
+            // If another request already refreshed the token while we were waiting on the gate, don't refresh again!
+            if (session.AccessToken != null && session.AccessToken != tokenBeforeWait)
+            {
+                return true;
+            }
+
             var req = new HttpRequestMessage(HttpMethod.Post, "api/v1/auth/refresh")
             {
                 Content = JsonContent.Create(new RefreshRequest(null))
@@ -56,9 +63,15 @@ public sealed class AuthHandler(AuthSession session, Uri baseAddress) : Delegati
             req.SetBrowserRequestCredentials(BrowserRequestCredentials.Include);
             using var client = new HttpClient(new HttpClientHandler()) { BaseAddress = baseAddress };
             var response = await client.SendAsync(req, cancellationToken);
-            if (!response.IsSuccessStatusCode)
+            if (response.StatusCode == HttpStatusCode.Unauthorized || response.StatusCode == HttpStatusCode.Forbidden)
             {
                 session.Clear();
+                return false;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                // Transient server error (e.g. 502/503 during restart/cold start) - do not clear credentials on network blip
                 return false;
             }
 
