@@ -600,7 +600,25 @@ public sealed class LeadService(
     {
         await RequireAsync(AppModule.Leads, PermissionAction.Edit, true, cancellationToken);
         var lead = await LoadScopedAsync(id, cancellationToken);
-        lead.Description = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
+        var trimmed = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
+        var oldNote = lead.Description;
+        lead.Description = trimmed;
+
+        if (!string.IsNullOrWhiteSpace(trimmed) && trimmed != oldNote)
+        {
+            var activity = new Activity
+            {
+                Type = "Note",
+                Subject = trimmed.Length > 50 ? trimmed[..47] + "..." : trimmed,
+                Description = trimmed,
+                Status = "Completed",
+                CompletedAt = clock.UtcNow,
+                LeadId = lead.Id,
+                OwnerId = tenant.UserId ?? lead.OwnerId
+            };
+            db.Activities.Add(activity);
+        }
+
         await db.SaveChangesAsync(cancellationToken);
         return Map(lead);
     }

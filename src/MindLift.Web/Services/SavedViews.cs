@@ -30,10 +30,14 @@ public static class SavedViews
     }
 
     /// <summary>Moves a record into a target view (and removes from previous view if applicable).</summary>
-    public static async Task<string?> MoveRecordAsync(HttpClient http, string entity, Guid recordId, string targetViewKey, string? sourceViewKey, string failure)
+    public static Task<string?> MoveRecordAsync(HttpClient http, string entity, Guid recordId, string targetViewKey, string? sourceViewKey, string failure)
+        => MoveRecordsAsync(http, entity, [recordId], targetViewKey, sourceViewKey, failure);
+
+    /// <summary>Moves multiple records into a target view (and removes from previous view if applicable).</summary>
+    public static async Task<string?> MoveRecordsAsync(HttpClient http, string entity, IReadOnlyList<Guid> recordIds, string targetViewKey, string? sourceViewKey, string failure)
     {
         var response = await http.PostAsJsonAsync("api/v1/views/move-record",
-            new MoveRecordToViewRequest(entity, recordId, targetViewKey, sourceViewKey));
+            new MoveRecordToViewRequest(entity, recordIds.FirstOrDefault(), targetViewKey, sourceViewKey, recordIds));
         return response.IsSuccessStatusCode ? null : await ProblemText.FromAsync(response, failure);
     }
 

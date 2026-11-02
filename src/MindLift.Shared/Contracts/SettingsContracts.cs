@@ -155,7 +155,7 @@ public sealed record SavedViewDto(Guid Id, string EntityType, string Name, bool 
 
 public sealed record SaveSavedViewRequest(string EntityType, string Name, bool IsShared, bool IsDefault, FilterGroup? Filter, IReadOnlyList<string> Columns, string? SortField, string? SortDir);
 
-public sealed record MoveRecordToViewRequest(string EntityType, Guid RecordId, string TargetViewKey, string? SourceViewKey);
+public sealed record MoveRecordToViewRequest(string EntityType, Guid RecordId, string TargetViewKey, string? SourceViewKey, IReadOnlyList<Guid>? RecordIds = null);
 
 // ---------- Bootstrap ----------
 

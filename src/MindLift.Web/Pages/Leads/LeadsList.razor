@@ -54,13 +54,19 @@
                 }
             </EmptyActions>
             <BulkActions Context="selection">
-                <ListBulkBar Selection="selection" Entity="leads" ItemLabel="@ItemLabel" Users="_users" Statuses="BulkStatuses" AllowTags="true" CanEdit="CanEditRecords" CanDelete="CanDeleteRecords" CanExport="CanExportRecords" />
+                <div class="d-flex align-center gap-2 flex-wrap">
+                    <ListBulkBar Selection="selection" Entity="leads" ItemLabel="@ItemLabel" Users="_users" Statuses="BulkStatuses" AllowTags="true" CanEdit="CanEditRecords" CanDelete="CanDeleteRecords" CanExport="CanExportRecords" />
+                    @if (CanEditRecords)
+                    {
+                        <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Outlined.DriveFileMove" OnClick="() => OpenBulkMoveToViewDialog(selection)" data-testid="bulk-change-view">@T["Change view"]</MudButton>
+                    }
+                </div>
             </BulkActions>
             <RowMenu Context="row">
                 <MudMenuItem Href="@("/leads/" + row.Id)" Icon="@Icons.Material.Outlined.OpenInNew" data-testid="row-open">@T["Open"]</MudMenuItem>
                 <MudMenuItem OnClick="() => AddToContactAsync(row)" Icon="@Icons.Material.Outlined.PersonAdd" data-testid="row-add-contact">@T["Add to contact"]</MudMenuItem>
                 <MudMenuItem OnClick="() => MoveToEngagementAsync(row)" Icon="@Icons.Material.Outlined.Handshake" data-testid="row-move-engagement">@T["Move to engagement"]</MudMenuItem>
-                <MudMenuItem OnClick="() => OpenStickyNoteAsync(row)" Icon="@Icons.Material.Outlined.StickyNote2" data-testid="row-sticky-note">@T["Sticky note"]</MudMenuItem>
+                <MudMenuItem OnClick="() => OpenStickyNoteAsync(row)" Icon="@Icons.Material.Outlined.EditNote" data-testid="row-notes">@T["Notes"]</MudMenuItem>
                 @if (CanEditRecords)
                 {
                     <MudMenuItem OnClick="() => EditRowAsync(row.Id)" Icon="@Icons.Material.Outlined.Edit" data-testid="row-edit">@T["Edit"]</MudMenuItem>
@@ -84,7 +90,14 @@
     </TitleContent>
     <DialogContent>
         <MudText Typo="Typo.body2" Class="ml-muted mb-3">
-            @T["Move {0} to another view:", _movingLead is not null ? LeadTitle(_movingLead) : ""]
+            @if (_movingLead is not null)
+            {
+                @T["Move {0} to another view:", LeadTitle(_movingLead)]
+            }
+            else if (_bulkMovingSelection is not null)
+            {
+                @T["Move {0} selected lead(s) to another view:", _bulkMovingSelection.Count]
+            }
         </MudText>
         <MudSelect T="string" Label="@T["Target view"]" @bind-Value="_targetViewKey" Variant="Variant.Outlined" Dense="true" data-testid="select-target-view">
             @foreach (var v in AvailableViewsForMove)
@@ -450,7 +463,7 @@
                             {
                                 <MudTooltip Text="@lead.Description">
                                     <span @onclick:stopPropagation="true" @onclick="() => OpenStickyNoteAsync(lead)">
-                                        <MudIcon Icon="@Icons.Material.Filled.PushPin" Size="Size.Small" Style="color: #CA8A04; font-size:14px; cursor:pointer;" />
+                                        <MudIcon Icon="@Icons.Material.Outlined.EditNote" Size="Size.Small" Color="Color.Primary" Style="font-size:16px; cursor:pointer;" />
                                     </span>
                                 </MudTooltip>
                             }
@@ -602,6 +615,7 @@
 
     private bool _moveDialogOpen;
     private LeadListItemDto? _movingLead;
+    private BulkSelection? _bulkMovingSelection;
     private string? _targetViewKey;
 
     private string CurrentViewKey => _list?.CurrentViewKey ?? string.Empty;
@@ -611,29 +625,56 @@
     private void OpenMoveToViewDialog(LeadListItemDto lead)
     {
         _movingLead = lead;
+        _bulkMovingSelection = null;
+        _targetViewKey = null;
+        _moveDialogOpen = true;
+    }
+
+    private void OpenBulkMoveToViewDialog(BulkSelection selection)
+    {
+        _movingLead = null;
+        _bulkMovingSelection = selection;
         _targetViewKey = null;
         _moveDialogOpen = true;
     }
 
     private async Task ConfirmMoveLeadAsync()
     {
-        if (_movingLead is null || string.IsNullOrWhiteSpace(_targetViewKey))
+        if (string.IsNullOrWhiteSpace(_targetViewKey))
         {
             return;
         }
 
-        var lead = _movingLead;
         _moveDialogOpen = false;
         var sourceViewKey = _list?.CurrentViewKey;
-        var problem = await SavedViews.MoveRecordAsync(Http, "leads", lead.Id, _targetViewKey, sourceViewKey, T["We could not move this lead."]);
-        if (problem is not null)
+        var targetName = AvailableViewsForMove.FirstOrDefault(v => v.Key == _targetViewKey)?.Label ?? _targetViewKey;
+
+        if (_movingLead is not null)
         {
-            Snackbar.Add(problem, Severity.Error);
-            return;
+            var lead = _movingLead;
+            var problem = await SavedViews.MoveRecordAsync(Http, "leads", lead.Id, _targetViewKey, sourceViewKey, T["We could not move this lead."]);
+            if (problem is not null)
+            {
+                Snackbar.Add(problem, Severity.Error);
+                return;
+            }
+
+            Snackbar.Add(T["Moved lead to {0}", targetName], Severity.Success);
+        }
+        else if (_bulkMovingSelection is not null && _bulkMovingSelection.Ids.Count > 0)
+        {
+            var ids = _bulkMovingSelection.Ids;
+            var problem = await SavedViews.MoveRecordsAsync(Http, "leads", ids, _targetViewKey, sourceViewKey, T["We could not move the selected leads."]);
+            if (problem is not null)
+            {
+                Snackbar.Add(problem, Severity.Error);
+                return;
+            }
+
+            Snackbar.Add(T["Moved {0} leads to {1}", ids.Count, targetName], Severity.Success);
+            await _bulkMovingSelection.Done();
         }
 
-        var targetName = AvailableViewsForMove.FirstOrDefault(v => v.Key == _targetViewKey)?.Label ?? _targetViewKey;
-        Snackbar.Add(T["Moved lead to {0}", targetName], Severity.Success);
         await LoadSavedViewsAsync();
         if (_list is not null)
         {

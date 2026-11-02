@@ -4,24 +4,24 @@
 @inject IJSRuntime JS
 @inject Translator T
 
-<div class="ml-sticky-note pa-4 mb-4" style="background: linear-gradient(135deg, #FEF9C3 0%, #FEF08A 100%); border: 1px solid #FACC15; border-radius: 12px; box-shadow: 0 4px 12px rgba(234, 179, 8, 0.15); color: #713F12; position: relative;">
+<div class="ml-sticky-note pa-4 mb-4 mud-paper" style="border: 1px solid var(--mud-palette-divider); border-radius: 12px; background: var(--mud-palette-surface); box-shadow: var(--mud-elevation-1);">
     <div class="d-flex align-center justify-space-between mb-2">
         <div class="d-flex align-center gap-2">
-            <MudIcon Icon="@Icons.Material.Filled.PushPin" Style="color: #CA8A04; transform: rotate(-25deg);" />
-            <MudText Typo="Typo.subtitle2" Style="font-weight: 700; color: #854D0E;">@T["Sticky Note"]</MudText>
+            <MudIcon Icon="@Icons.Material.Outlined.EditNote" Color="Color.Primary" />
+            <MudText Typo="Typo.subtitle2" Style="font-weight: 700;">@T["Notes"]</MudText>
         </div>
         <div class="d-flex align-center gap-1">
             @if (!string.IsNullOrWhiteSpace(_note))
             {
-                <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small" Style="color: #854D0E;" OnClick="CopyNoteAsync" Title="@T["Copy note"]" />
+                <MudIconButton Icon="@Icons.Material.Outlined.ContentCopy" Size="Size.Small" OnClick="CopyNoteAsync" Title="@T["Copy note"]" />
             }
             @if (_saving)
             {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Style="color: #CA8A04; width:16px; height:16px;" />
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Primary" Style="width:16px; height:16px;" />
             }
             else if (_dirty)
             {
-                <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Style="color: #A16207; font-size:11px;">@T["Unsaved changes"]</MudChip>
+                <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Text" Style="font-size:11px;">@T["Unsaved changes"]</MudChip>
             }
         </div>
     </div>
@@ -30,29 +30,28 @@
                   Value="@_note"
                   ValueChanged="OnNoteChanged"
                   Lines="4"
-                  Placeholder="@T["Write a quick note, reminder, or important context about this lead..."]"
+                  Placeholder="@T["Write notes, reminders, or important context about this lead..."]"
                   Variant="Variant.Outlined"
-                  Style="background: rgba(255, 255, 255, 0.65); border-radius: 8px; color: #422006; font-size: 13.5px;"
                   Class="mb-2" />
 
     <div class="d-flex align-center justify-space-between">
-        <MudText Typo="Typo.caption" Style="color: #A16207;">
+        <MudText Typo="Typo.caption" Class="mud-text-secondary">
             @(_note?.Length ?? 0) @T["characters"]
         </MudText>
         <div class="d-flex gap-2">
             @if (_dirty)
             {
-                <MudButton Size="Size.Small" Variant="Variant.Text" Style="color: #854D0E;" OnClick="RevertNote">
+                <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="RevertNote">
                     @T["Cancel"]
                 </MudButton>
             }
             <MudButton Size="Size.Small"
                        Variant="Variant.Filled"
-                       Style="background-color: #CA8A04; color: #FFFFFF; font-weight: 600;"
+                       Color="Color.Primary"
                        StartIcon="@Icons.Material.Filled.Save"
                        OnClick="SaveNoteAsync"
                        Disabled="_saving || !_dirty">
-                @(_saving ? T["Saving..."] : T["Save Note"])
+                @(_saving ? T["Saving..."] : T["Save note"])
             </MudButton>
         </div>
     </div>
@@ -99,7 +98,7 @@
             {
                 _savedNote = _note;
                 _dirty = false;
-                Snackbar.Add(T["Sticky note saved"], Severity.Success);
+                Snackbar.Add(T["Note saved successfully."], Severity.Success);
                 await OnSaved.InvokeAsync(_note);
             }
             else
@@ -127,4 +126,3 @@
         }
     }
 }
-

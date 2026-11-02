@@ -125,5 +125,32 @@ public sealed class LeadActionsAndStickyNoteTests
         var req = new UpdateStickyNoteRequest("Follow up next Tuesday after quarterly review");
         req.Note.ShouldBe("Follow up next Tuesday after quarterly review");
     }
+
+    [Fact]
+    public void MoveRecordToViewRequest_Supports_Single_And_Bulk_Records()
+    {
+        var id1 = Guid.NewGuid();
+        var id2 = Guid.NewGuid();
+        var id3 = Guid.NewGuid();
+
+        // Single record move
+        var singleReq = new MoveRecordToViewRequest("leads", id1, "view-mine", "view-all");
+        singleReq.EntityType.ShouldBe("leads");
+        singleReq.RecordId.ShouldBe(id1);
+        singleReq.TargetViewKey.ShouldBe("view-mine");
+        singleReq.SourceViewKey.ShouldBe("view-all");
+        singleReq.RecordIds.ShouldBeNull();
+
+        // Bulk records move
+        var bulkReq = new MoveRecordToViewRequest("leads", id1, "view-hot-leads", "view-new", new[] { id1, id2, id3 });
+        bulkReq.EntityType.ShouldBe("leads");
+        bulkReq.RecordId.ShouldBe(id1);
+        bulkReq.RecordIds.ShouldNotBeNull();
+        bulkReq.RecordIds.Count.ShouldBe(3);
+        bulkReq.RecordIds.ShouldContain(id2);
+        bulkReq.RecordIds.ShouldContain(id3);
+        bulkReq.TargetViewKey.ShouldBe("view-hot-leads");
+        bulkReq.SourceViewKey.ShouldBe("view-new");
+    }
 }
 

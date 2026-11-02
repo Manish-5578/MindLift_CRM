@@ -172,7 +172,7 @@
             </MudAlert>
         }
 
-        <LeadStickyNote LeadId="Id" InitialNote="_lead.Description" OnSaved="note => _lead = _lead with { Description = note }" />
+        <LeadStickyNote LeadId="Id" InitialNote="_lead.Description" OnSaved="OnNoteSavedAsync" />
 
         <MudGrid Spacing="4">
             <MudItem xs="12" md="6">
@@ -194,7 +194,7 @@
             </MudItem>
         </MudGrid>
 
-        <div class="mt-4"><RecordActivities LeadId="Id" OnChanged="ReloadTimelineAsync" /></div>
+        <div class="mt-4"><RecordActivities @ref="_activities" LeadId="Id" OnChanged="ReloadTimelineAsync" /></div>
         <div class="mt-4"><RecordTimeline @ref="_timeline" EntityType="leads" EntityId="Id" /></div>
         <div class="mt-4"><RecordFiles EntityType="leads" EntityId="Id" /></div>
     }
@@ -204,6 +204,7 @@
 
 @code {
     private RecordTimeline? _timeline;
+    private RecordActivities? _activities;
 
     private async Task ReloadTimelineAsync()
     {
@@ -211,6 +212,19 @@
         {
             await _timeline.ReloadAsync();
         }
+    }
+
+    private async Task OnNoteSavedAsync(string? note)
+    {
+        if (_lead is not null)
+        {
+            _lead = _lead with { Description = note };
+        }
+        if (_activities is not null)
+        {
+            await _activities.LoadAsync();
+        }
+        await ReloadTimelineAsync();
     }
     [Parameter] public Guid Id { get; set; }
 

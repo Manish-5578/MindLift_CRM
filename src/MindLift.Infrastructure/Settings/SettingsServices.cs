@@ -322,6 +322,10 @@ public sealed class SavedViewService(AppDbContext db, ITenantContext tenant, Set
     {
         await EnsurePermissionAsync(request.EntityType, PermissionAction.Edit, cancellationToken);
 
+        var ids = (request.RecordIds is { Count: > 0 } ? request.RecordIds : (request.RecordId != Guid.Empty ? [request.RecordId] : Array.Empty<Guid>()))
+            .Distinct().ToList();
+        if (ids.Count == 0) return;
+
         static Guid? ParseViewId(string? key)
         {
             if (string.IsNullOrWhiteSpace(key)) return null;
@@ -342,39 +346,61 @@ public sealed class SavedViewService(AppDbContext db, ITenantContext tenant, Set
                     ? new FilterGroup()
                     : JsonSerializer.Deserialize<FilterGroup>(targetView.Filter.RootElement.GetRawText()) ?? new FilterGroup();
 
-                var idCondition = filterGroup.Conditions.FirstOrDefault(c => c.Field == "id" && c.Op == FilterOperator.In);
-                var currentIds = new HashSet<Guid>();
-                if (idCondition?.Value is { ValueKind: JsonValueKind.Array } arr)
+                string? targetStatus = null;
+                Guid? targetOwnerId = null;
+
+                foreach (var cond in filterGroup.Conditions)
                 {
-                    foreach (var item in arr.EnumerateArray())
+                    if (cond.Field.Equals("status", StringComparison.OrdinalIgnoreCase) && cond.Op == FilterOperator.Eq && cond.Value is { ValueKind: JsonValueKind.String } sVal)
                     {
-                        if (item.TryGetGuid(out var g) && g != Guid.Empty) currentIds.Add(g);
+                        targetStatus = sVal.GetString();
+                    }
+                    else if (cond.Field.Equals("owner_id", StringComparison.OrdinalIgnoreCase) && cond.Op == FilterOperator.Eq && cond.Value is { ValueKind: JsonValueKind.String } oVal && Guid.TryParse(oVal.GetString(), out var oId))
+                    {
+                        targetOwnerId = oId;
                     }
                 }
 
-                currentIds.Add(request.RecordId);
-
-                if (idCondition is null)
+                var idCondition = filterGroup.Conditions.FirstOrDefault(c => c.Field == "id" && c.Op == FilterOperator.In);
+                if (idCondition != null)
                 {
-                    filterGroup.Conditions.Clear();
-                    filterGroup.Groups.Clear();
+                    var currentIds = new HashSet<Guid>();
+                    if (idCondition.Value is { ValueKind: JsonValueKind.Array } arr)
+                    {
+                        foreach (var item in arr.EnumerateArray())
+                        {
+                            if (item.TryGetGuid(out var g) && g != Guid.Empty) currentIds.Add(g);
+                        }
+                    }
+                    foreach (var id in ids) currentIds.Add(id);
+                    idCondition.Value = JsonSerializer.SerializeToElement(currentIds.ToArray());
+                    targetView.Filter = JsonDocument.Parse(JsonSerializer.Serialize(filterGroup));
+                }
+                else if (targetStatus == null && targetOwnerId == null)
+                {
+                    var currentIds = new HashSet<Guid>(ids);
                     filterGroup.Conditions.Add(new FilterCondition
                     {
                         Field = "id",
                         Op = FilterOperator.In,
                         Value = JsonSerializer.SerializeToElement(currentIds.ToArray())
                     });
-                }
-                else
-                {
-                    idCondition.Value = JsonSerializer.SerializeToElement(currentIds.ToArray());
+                    targetView.Filter = JsonDocument.Parse(JsonSerializer.Serialize(filterGroup));
                 }
 
-                targetView.Filter = JsonDocument.Parse(JsonSerializer.Serialize(filterGroup));
+                if (request.EntityType == "leads")
+                {
+                    var leads = await db.Leads.Where(l => ids.Contains(l.Id)).ToListAsync(cancellationToken);
+                    foreach (var lead in leads)
+                    {
+                        if (!string.IsNullOrEmpty(targetStatus)) lead.Status = targetStatus;
+                        if (targetOwnerId.HasValue) lead.OwnerId = targetOwnerId.Value;
+                    }
+                }
             }
         }
 
-        // 2. Remove record from source saved view if source was a saved view
+        // 2. Remove record from source saved view if source was an ID-scoped saved view
         if (sourceId is { } sId && sId != targetId)
         {
             var sourceView = await db.SavedViews.FirstOrDefaultAsync(v => v.Id == sId, cancellationToken);
@@ -387,7 +413,7 @@ public sealed class SavedViewService(AppDbContext db, ITenantContext tenant, Set
                     var currentIds = new List<Guid>();
                     foreach (var item in arr.EnumerateArray())
                     {
-                        if (item.TryGetGuid(out var g) && g != request.RecordId && g != Guid.Empty)
+                        if (item.TryGetGuid(out var g) && !ids.Contains(g) && g != Guid.Empty)
                         {
                             currentIds.Add(g);
                         }
@@ -407,8 +433,8 @@ public sealed class SavedViewService(AppDbContext db, ITenantContext tenant, Set
         // 3. Handle standard views for Leads
         if (request.EntityType == "leads")
         {
-            var lead = await db.Leads.FirstOrDefaultAsync(l => l.Id == request.RecordId, cancellationToken);
-            if (lead is not null)
+            var leads = await db.Leads.Where(l => ids.Contains(l.Id)).ToListAsync(cancellationToken);
+            foreach (var lead in leads)
             {
                 if (request.TargetViewKey == "new")
                 {
@@ -417,6 +443,13 @@ public sealed class SavedViewService(AppDbContext db, ITenantContext tenant, Set
                 else if (request.TargetViewKey == "mine" && tenant.UserId is { } me)
                 {
                     lead.OwnerId = me;
+                }
+                else if (request.TargetViewKey == "all")
+                {
+                    if (lead.Status == "disqualified")
+                    {
+                        lead.Status = "working";
+                    }
                 }
             }
         }

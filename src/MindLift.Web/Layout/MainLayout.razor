@@ -64,6 +64,10 @@
                     @if (App.CanView(AppModule.Settings))
                     {
                         <MudNavLink Href="/settings/company" Icon="@Icons.Material.Outlined.Settings">@T["Settings"]</MudNavLink>
+                        @if (App.IsAdmin)
+                        {
+                            <MudNavLink Href="/settings/audit-trail" Icon="@Icons.Material.Outlined.History">@T["Audit Trail"]</MudNavLink>
+                        }
                     }
                 </MudNavMenu>
             </MudDrawer>
