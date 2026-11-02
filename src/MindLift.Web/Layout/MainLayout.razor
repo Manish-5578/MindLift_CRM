@@ -61,13 +61,13 @@
                         <MudNavLink Href="/custom-objects" Icon="@Icons.Material.Outlined.Widgets">@T["Custom Objects"]</MudNavLink>
                     }
                     <MudDivider Class="my-2" />
+                    @if (App.IsAdmin || App.CanView(AppModule.Settings))
+                    {
+                        <MudNavLink Href="/audit-trail" Icon="@Icons.Material.Outlined.History">@T["Audit Trail"]</MudNavLink>
+                    }
                     @if (App.CanView(AppModule.Settings))
                     {
                         <MudNavLink Href="/settings/company" Icon="@Icons.Material.Outlined.Settings">@T["Settings"]</MudNavLink>
-                        @if (App.IsAdmin)
-                        {
-                            <MudNavLink Href="/settings/audit-trail" Icon="@Icons.Material.Outlined.History">@T["Audit Trail"]</MudNavLink>
-                        }
                     }
                 </MudNavMenu>
             </MudDrawer>
