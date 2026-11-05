@@ -244,3 +244,11 @@ h1[tabindex="-1"]:focus, h1[tabindex="-1"]:focus-visible, [tabindex="-1"]:focus:
     pointer-events: none !important;
     display: none !important;
 }
+
+.text-truncate {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  display: inline-block;
+  max-width: 100%;
+}

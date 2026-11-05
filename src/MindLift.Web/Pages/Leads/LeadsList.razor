@@ -515,7 +515,11 @@
     private IReadOnlyList<PicklistValueDto> BulkStatuses => App.Bootstrap?.Picklists.FirstOrDefault(p => p.Key == "lead_status")?.Values
         .Where(v => v.IsActive && v.Value is not ("disqualified" or "converted")).ToList() ?? [];
 
-    private async Task LoadSavedViewsAsync() => _savedViews = await SavedViews.LoadAsync(Http, "leads", App.Bootstrap?.User.UserId, App.IsAdmin);
+    private async Task LoadSavedViewsAsync()
+    {
+        _savedViews = await SavedViews.LoadAsync(Http, "leads", App.Bootstrap?.User.UserId, App.IsAdmin);
+        _views = BuildViews();
+    }
 
     private async Task SaveViewAsync(SaveViewRequest view)
     {

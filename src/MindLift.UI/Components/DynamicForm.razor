@@ -57,6 +57,13 @@
                         {
                             <CountryPicker Value="@Get(current.Key)" ValueChanged="v => SetAsync(current.Key, v)" Label="@LabelOf(current)" Required="@isMandatory" Disabled="@isReadOnly" TestId="@TestIdOf(current)" />
                         }
+                        else if (current.Kind == FormFieldKind.Number)
+                        {
+                            <MudTextField T="string" Value="@Get(current.Key)" ValueChanged="@(v => SetAsync(current.Key, SanitizeNumber(v)))" Label="@LabelOf(current)" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                          InputType="InputType.Number" Immediate="true"
+                                          UserAttributes="@NumberAttributes"
+                                          Disabled="@isReadOnly" Error="HasError(current.Key)" ErrorText="@ErrorOf(current.Key)" data-testid="@TestIdOf(current)" />
+                        }
                         else
                         {
                             <MudTextField T="string" Value="Get(current.Key)" ValueChanged="v => SetAsync(current.Key, v)" Label="@LabelOf(current)" Variant="Variant.Outlined" Margin="Margin.Dense"
@@ -123,15 +130,30 @@
         _ => InputType.Text,
     };
 
+    private static readonly Dictionary<string, object> NumberAttributes = new()
+    {
+        ["min"] = "0",
+        ["onkeydown"] = "if(event.key==='-'||event.key==='e'||event.key==='E'||event.keyCode===189||event.keyCode===109){event.preventDefault();}",
+        ["oninput"] = "if(this.value && this.value.includes('-')){this.value=this.value.replace(/-/g,'');}"
+    };
+
+    private static string? SanitizeNumber(string? v)
+    {
+        if (string.IsNullOrWhiteSpace(v)) return v;
+        var clean = v.Replace("-", "").Trim();
+        if (int.TryParse(clean, out var n))
+        {
+            return Math.Max(0, n).ToString();
+        }
+        return clean;
+    }
+
     private async Task SetAsync(string key, string? value)
     {
         var field = Fields.FirstOrDefault(f => f.Key == key);
         if (field?.Kind == FormFieldKind.Number && value is not null)
         {
-            if (value.StartsWith('-') || (int.TryParse(value, out var n) && n < 0))
-            {
-                value = "0";
-            }
+            value = SanitizeNumber(value);
         }
         Values[key] = value;
         await OnFieldChanged.InvokeAsync(key);

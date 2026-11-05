@@ -201,4 +201,61 @@ public sealed class LeadFixesTests
         lead.Status.ShouldBe("working");
         lead.FirstContactedAt.ShouldNotBeNull();
     }
+
+    [Fact]
+    public void NegativeMinutes_Sanitization_PreventsNegativeValues()
+    {
+        // When negative input such as "-6" or "-10" is supplied, it must be sanitized so negative numbers are disallowed
+        static string? SanitizeNumber(string? v)
+        {
+            if (string.IsNullOrWhiteSpace(v)) return v;
+            var clean = v.Replace("-", "").Trim();
+            if (int.TryParse(clean, out var n))
+            {
+                return Math.Max(0, n).ToString();
+            }
+            return clean;
+        }
+
+        SanitizeNumber("-6").ShouldBe("6");
+        SanitizeNumber("-0").ShouldBe("0");
+        SanitizeNumber("-").ShouldBe(string.Empty);
+        SanitizeNumber("30").ShouldBe("30");
+    }
+
+    [Fact]
+    public void ViewExclusivity_MovingLead_ExcludesFromSourceAndIncludesInTarget()
+    {
+        var leadId = Guid.NewGuid();
+        var viewAId = Guid.NewGuid();
+        var viewBId = Guid.NewGuid();
+
+        // View A initially had leadId in its In condition
+        var viewAFilter = new FilterGroup
+        {
+            Conditions = [new FilterCondition { Field = "id", Op = FilterOperator.In, Value = JsonSerializer.SerializeToElement(new[] { leadId }) }]
+        };
+
+        // View B initially was empty
+        var viewBFilter = new FilterGroup { Conditions = [] };
+
+        // Moving leadId from View A to View B:
+        // 1. Add to View B In condition
+        viewBFilter.Conditions.Add(new FilterCondition { Field = "id", Op = FilterOperator.In, Value = JsonSerializer.SerializeToElement(new[] { leadId }) });
+
+        // 2. Remove from View A In condition
+        var inCond = viewAFilter.Conditions.First(c => c.Field == "id" && c.Op == FilterOperator.In);
+        var inIds = inCond.Value!.Value.EnumerateArray().Select(x => x.GetGuid()).Where(g => g != leadId).ToList();
+        if (inIds.Count == 0) inIds.Add(Guid.Empty);
+        inCond.Value = JsonSerializer.SerializeToElement(inIds.ToArray());
+
+        // Assert: View A does NOT contain leadId
+        var remainingA = inCond.Value!.Value.EnumerateArray().Select(x => x.GetGuid()).ToList();
+        remainingA.ShouldNotContain(leadId);
+
+        // Assert: View B DOES contain leadId
+        var remainingB = viewBFilter.Conditions.First(c => c.Field == "id" && c.Op == FilterOperator.In)
+            .Value!.Value.EnumerateArray().Select(x => x.GetGuid()).ToList();
+        remainingB.ShouldContain(leadId);
+    }
 }

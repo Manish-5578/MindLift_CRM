@@ -335,38 +335,45 @@ public sealed class SavedViewService(AppDbContext db, ITenantContext tenant, Set
         static Guid? ParseViewId(string? key)
         {
             if (string.IsNullOrWhiteSpace(key)) return null;
-            var clean = key.StartsWith("saved_") ? key[6..] : key;
+            var clean = key.Trim();
+            if (clean.StartsWith("saved-", StringComparison.OrdinalIgnoreCase) || clean.StartsWith("saved_", StringComparison.OrdinalIgnoreCase))
+            {
+                clean = clean[6..];
+            }
             return Guid.TryParse(clean, out var id) ? id : null;
         }
 
         var targetId = ParseViewId(request.TargetViewKey);
         var sourceId = ParseViewId(request.SourceViewKey);
 
-        // 1. Add record to target saved view if target is a saved view
+        var allViews = await db.SavedViews.Where(v => v.EntityType == request.EntityType).ToListAsync(cancellationToken);
+
+        // 1. Target is a Saved View
         if (targetId is { } tId)
         {
-            var targetView = await db.SavedViews.FirstOrDefaultAsync(v => v.Id == tId, cancellationToken);
+            var targetView = allViews.FirstOrDefault(v => v.Id == tId);
             if (targetView is not null)
             {
                 var filterGroup = targetView.Filter is null
                     ? new FilterGroup()
                     : JsonSerializer.Deserialize<FilterGroup>(targetView.Filter.RootElement.GetRawText()) ?? new FilterGroup();
 
-                string? targetStatus = null;
-                Guid? targetOwnerId = null;
-
-                foreach (var cond in filterGroup.Conditions)
+                // Clean up exclusion in target view if previously excluded
+                var notInCondition = filterGroup.Conditions.FirstOrDefault(c => c.Field == "id" && c.Op == FilterOperator.NotIn);
+                if (notInCondition?.Value is { ValueKind: JsonValueKind.Array } notInArr)
                 {
-                    if (cond.Field.Equals("status", StringComparison.OrdinalIgnoreCase) && cond.Op == FilterOperator.Eq && cond.Value is { ValueKind: JsonValueKind.String } sVal)
+                    var remaining = new List<Guid>();
+                    foreach (var item in notInArr.EnumerateArray())
                     {
-                        targetStatus = sVal.GetString();
+                        if (item.TryGetGuid(out var g) && !ids.Contains(g) && g != Guid.Empty) remaining.Add(g);
                     }
-                    else if (cond.Field.Equals("owner_id", StringComparison.OrdinalIgnoreCase) && cond.Op == FilterOperator.Eq && cond.Value is { ValueKind: JsonValueKind.String } oVal && Guid.TryParse(oVal.GetString(), out var oId))
-                    {
-                        targetOwnerId = oId;
-                    }
+                    if (remaining.Count > 0)
+                        notInCondition.Value = JsonSerializer.SerializeToElement(remaining.ToArray());
+                    else
+                        filterGroup.Conditions.Remove(notInCondition);
                 }
 
+                // Add to In condition of target view
                 var idCondition = filterGroup.Conditions.FirstOrDefault(c => c.Field == "id" && c.Op == FilterOperator.In);
                 if (idCondition != null)
                 {
@@ -380,9 +387,8 @@ public sealed class SavedViewService(AppDbContext db, ITenantContext tenant, Set
                     }
                     foreach (var id in ids) currentIds.Add(id);
                     idCondition.Value = JsonSerializer.SerializeToElement(currentIds.ToArray());
-                    targetView.Filter = JsonDocument.Parse(JsonSerializer.Serialize(filterGroup));
                 }
-                else if (targetStatus == null && targetOwnerId == null)
+                else
                 {
                     var currentIds = new HashSet<Guid>(ids);
                     filterGroup.Conditions.Add(new FilterCondition
@@ -391,52 +397,32 @@ public sealed class SavedViewService(AppDbContext db, ITenantContext tenant, Set
                         Op = FilterOperator.In,
                         Value = JsonSerializer.SerializeToElement(currentIds.ToArray())
                     });
-                    targetView.Filter = JsonDocument.Parse(JsonSerializer.Serialize(filterGroup));
                 }
-
-                if (request.EntityType == "leads")
-                {
-                    var leads = await db.Leads.Where(l => ids.Contains(l.Id)).ToListAsync(cancellationToken);
-                    foreach (var lead in leads)
-                    {
-                        if (!string.IsNullOrEmpty(targetStatus)) lead.Status = targetStatus;
-                        if (targetOwnerId.HasValue) lead.OwnerId = targetOwnerId.Value;
-                    }
-                }
+                targetView.Filter = JsonDocument.Parse(JsonSerializer.Serialize(filterGroup));
             }
-        }
 
-        // 2. Remove record from source saved view (remove from ID inclusion or add ID exclusion)
-        if (sourceId is { } sId && sId != targetId)
-        {
-            var sourceView = await db.SavedViews.FirstOrDefaultAsync(v => v.Id == sId, cancellationToken);
-            if (sourceView?.Filter is not null)
+            // Exclude from EVERY other saved view for strict exclusivity (no duplicate leads across views)
+            foreach (var otherView in allViews.Where(v => v.Id != tId))
             {
-                var filterGroup = JsonSerializer.Deserialize<FilterGroup>(sourceView.Filter.RootElement.GetRawText()) ?? new FilterGroup();
-                var idCondition = filterGroup.Conditions.FirstOrDefault(c => c.Field == "id" && c.Op == FilterOperator.In);
-                if (idCondition?.Value is { ValueKind: JsonValueKind.Array } arr)
+                var otherGroup = otherView.Filter is null
+                    ? new FilterGroup()
+                    : JsonSerializer.Deserialize<FilterGroup>(otherView.Filter.RootElement.GetRawText()) ?? new FilterGroup();
+
+                var otherIn = otherGroup.Conditions.FirstOrDefault(c => c.Field == "id" && c.Op == FilterOperator.In);
+                if (otherIn?.Value is { ValueKind: JsonValueKind.Array } arr)
                 {
-                    var currentIds = new List<Guid>();
+                    var remaining = new List<Guid>();
                     foreach (var item in arr.EnumerateArray())
                     {
-                        if (item.TryGetGuid(out var g) && !ids.Contains(g) && g != Guid.Empty)
-                        {
-                            currentIds.Add(g);
-                        }
+                        if (item.TryGetGuid(out var g) && !ids.Contains(g) && g != Guid.Empty) remaining.Add(g);
                     }
-
-                    if (currentIds.Count == 0)
-                    {
-                        currentIds.Add(Guid.Empty);
-                    }
-
-                    idCondition.Value = JsonSerializer.SerializeToElement(currentIds.ToArray());
+                    if (remaining.Count == 0) remaining.Add(Guid.Empty);
+                    otherIn.Value = JsonSerializer.SerializeToElement(remaining.ToArray());
                 }
                 else
                 {
-                    // For criteria-based source views, explicitly exclude the moved IDs so they don't linger in source
-                    var notInCondition = filterGroup.Conditions.FirstOrDefault(c => c.Field == "id" && c.Op == FilterOperator.NotIn);
-                    if (notInCondition?.Value is { ValueKind: JsonValueKind.Array } notInArr)
+                    var otherNotIn = otherGroup.Conditions.FirstOrDefault(c => c.Field == "id" && c.Op == FilterOperator.NotIn);
+                    if (otherNotIn?.Value is { ValueKind: JsonValueKind.Array } notInArr)
                     {
                         var excluded = new HashSet<Guid>();
                         foreach (var item in notInArr.EnumerateArray())
@@ -444,11 +430,11 @@ public sealed class SavedViewService(AppDbContext db, ITenantContext tenant, Set
                             if (item.TryGetGuid(out var g) && g != Guid.Empty) excluded.Add(g);
                         }
                         foreach (var id in ids) excluded.Add(id);
-                        notInCondition.Value = JsonSerializer.SerializeToElement(excluded.ToArray());
+                        otherNotIn.Value = JsonSerializer.SerializeToElement(excluded.ToArray());
                     }
                     else
                     {
-                        filterGroup.Conditions.Add(new FilterCondition
+                        otherGroup.Conditions.Add(new FilterCondition
                         {
                             Field = "id",
                             Op = FilterOperator.NotIn,
@@ -456,35 +442,34 @@ public sealed class SavedViewService(AppDbContext db, ITenantContext tenant, Set
                         });
                     }
                 }
-                sourceView.Filter = JsonDocument.Parse(JsonSerializer.Serialize(filterGroup));
+                otherView.Filter = JsonDocument.Parse(JsonSerializer.Serialize(otherGroup));
             }
         }
-
-        // Clean up exclusion in target view if previously excluded
-        if (targetId is { } targetCleanId)
+        else
         {
-            var targetView = await db.SavedViews.FirstOrDefaultAsync(v => v.Id == targetCleanId, cancellationToken);
-            if (targetView?.Filter is not null)
+            // Target is a Standard View: remove from ALL custom saved views
+            foreach (var otherView in allViews)
             {
-                var filterGroup = JsonSerializer.Deserialize<FilterGroup>(targetView.Filter.RootElement.GetRawText()) ?? new FilterGroup();
-                var notInCondition = filterGroup.Conditions.FirstOrDefault(c => c.Field == "id" && c.Op == FilterOperator.NotIn);
-                if (notInCondition?.Value is { ValueKind: JsonValueKind.Array } notInArr)
+                var otherGroup = otherView.Filter is null
+                    ? new FilterGroup()
+                    : JsonSerializer.Deserialize<FilterGroup>(otherView.Filter.RootElement.GetRawText()) ?? new FilterGroup();
+
+                var otherIn = otherGroup.Conditions.FirstOrDefault(c => c.Field == "id" && c.Op == FilterOperator.In);
+                if (otherIn?.Value is { ValueKind: JsonValueKind.Array } arr)
                 {
                     var remaining = new List<Guid>();
-                    foreach (var item in notInArr.EnumerateArray())
+                    foreach (var item in arr.EnumerateArray())
                     {
                         if (item.TryGetGuid(out var g) && !ids.Contains(g) && g != Guid.Empty) remaining.Add(g);
                     }
-                    if (remaining.Count > 0)
-                        notInCondition.Value = JsonSerializer.SerializeToElement(remaining.ToArray());
-                    else
-                        filterGroup.Conditions.Remove(notInCondition);
-                    targetView.Filter = JsonDocument.Parse(JsonSerializer.Serialize(filterGroup));
+                    if (remaining.Count == 0) remaining.Add(Guid.Empty);
+                    otherIn.Value = JsonSerializer.SerializeToElement(remaining.ToArray());
+                    otherView.Filter = JsonDocument.Parse(JsonSerializer.Serialize(otherGroup));
                 }
             }
         }
 
-        // 3. Handle standard views and status exclusivity for Leads
+        // 2. Handle Lead entity status and ownership exclusivity
         if (request.EntityType == "leads")
         {
             var leads = await db.Leads.Where(l => ids.Contains(l.Id)).ToListAsync(cancellationToken);
@@ -493,10 +478,22 @@ public sealed class SavedViewService(AppDbContext db, ITenantContext tenant, Set
                 if (request.TargetViewKey == "new")
                 {
                     lead.Status = "new";
+                    lead.DisqualifyReason = null;
                 }
                 else if (request.TargetViewKey == "disqualified")
                 {
                     lead.Status = "disqualified";
+                    lead.DisqualifyReason = "Not interested";
+                }
+                else if (request.TargetViewKey == "working")
+                {
+                    lead.Status = "working";
+                    lead.DisqualifyReason = null;
+                }
+                else if (request.TargetViewKey == "qualified")
+                {
+                    lead.Status = "qualified";
+                    lead.DisqualifyReason = null;
                 }
                 else if (request.TargetViewKey == "mine" && tenant.UserId is { } me)
                 {
@@ -505,14 +502,11 @@ public sealed class SavedViewService(AppDbContext db, ITenantContext tenant, Set
                 }
                 else if (request.TargetViewKey == "all" || request.TargetViewKey == "all_leads")
                 {
-                    if (lead.Status == "disqualified" && request.TargetViewKey == "all")
-                    {
-                        lead.Status = "working";
-                    }
+                    if (lead.Status == "disqualified") lead.Status = "working";
                 }
                 else
                 {
-                    // Moved from "new" to a custom or working view: ensure it no longer has "new" status
+                    // Moved from "new" to a custom saved view: change status away from "new" so View A ("new") will not show it
                     if (request.SourceViewKey == "new" && lead.Status == "new")
                     {
                         lead.Status = "working";

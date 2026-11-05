@@ -31,9 +31,13 @@
                             @((App.Bootstrap?.Company?.CompanyName ?? "M").Substring(0, 1).ToUpperInvariant())
                         </MudAvatar>
                     }
-                    <MudText Typo="Typo.subtitle1" Class="ml-hide-xs text-truncate" Style="font-weight: 600; font-size: 1.05rem; max-width: 140px;">
-                        @(App.Bootstrap?.Company?.CompanyName ?? "MindLift")
-                    </MudText>
+                    <MudTooltip Text="@(App.Bootstrap?.Company?.CompanyName ?? "MindLift")" Placement="Placement.Bottom">
+                        <MudText Typo="Typo.subtitle1" Class="ml-hide-xs text-truncate"
+                                 Style="font-weight: 600; font-size: 1.05rem; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; line-height: 1.2;"
+                                 title="@(App.Bootstrap?.Company?.CompanyName ?? "MindLift")">
+                            @(App.Bootstrap?.Company?.CompanyName ?? "MindLift")
+                        </MudText>
+                    </MudTooltip>
                 </div>
                 <MudIconButton Icon="@Icons.Material.Outlined.Menu" Color="Color.Inherit" Size="Size.Small" OnClick="@(() => _drawerOpen = !_drawerOpen)" aria-label="@T["Toggle navigation"]" data-testid="nav-menu-toggle" />
             </div>
