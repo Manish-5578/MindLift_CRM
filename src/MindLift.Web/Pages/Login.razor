@@ -5,6 +5,7 @@
 @inject AppState App
 @inject NavigationManager Nav
 @inject Translator T
+@inject IJSRuntime JS
 
 <PageTitle>@T["Sign in"] · MindLift</PageTitle>
 
@@ -56,6 +57,12 @@
 
             var tokenResp = await response.Content.ReadFromJsonAsync<TokenResponse>();
             Session.SetTokens(tokenResp!);
+            try
+            {
+                await JS.InvokeVoidAsync("sessionStorage.setItem", "ml_access_token", tokenResp!.AccessToken);
+                await JS.InvokeVoidAsync("sessionStorage.setItem", "ml_expires_at", tokenResp!.ExpiresAtUtc.ToString("o"));
+            }
+            catch { }
             await App.LoadAsync();
             if (tokenResp?.MustChangePassword == true || App.Bootstrap?.User.MustChangePassword == true)
             {

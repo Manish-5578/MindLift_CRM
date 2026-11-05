@@ -1,15 +1,17 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.WebAssembly.Http;
+using Microsoft.JSInterop;
 using MindLift.Shared.Contracts;
 
 namespace MindLift.Portal.Services;
 
 /// <summary>
-/// The signed-in customer for one company (slug). The access token lives in memory only;
+/// The signed-in customer for one company (slug). The access token lives in memory and sessionStorage;
 /// the refresh token is an HttpOnly cookie the browser sends to /api/v1/portal/{slug}/auth.
 /// </summary>
-public sealed class PortalSession(NavigationManager nav)
+public sealed class PortalSession(NavigationManager nav, IJSRuntime? js = null)
 {
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
     private HttpClient? _raw;
@@ -28,23 +30,43 @@ public sealed class PortalSession(NavigationManager nav)
     /// <summary>Loads branding for a company the first time its slug is seen, and tries to resume a session from the cookie.</summary>
     public async Task EnsureCompanyAsync(string slug)
     {
-        if (string.Equals(Slug, slug, StringComparison.OrdinalIgnoreCase) && Branding is not null)
+        var slugChanged = !string.Equals(Slug, slug, StringComparison.OrdinalIgnoreCase);
+        if (slugChanged || Branding is null)
         {
-            return;
+            Slug = slug;
+            try
+            {
+                Branding = await Raw.GetFromJsonAsync<PortalBrandingDto>($"api/v1/portal/{Uri.EscapeDataString(slug)}/branding");
+            }
+            catch (HttpRequestException)
+            {
+                Branding = null;
+            }
         }
 
-        Slug = slug;
-        User = null;
-        try
+        // 1. Instant tab reload restoration from sessionStorage if User is not yet in memory
+        if (User is null && !string.IsNullOrWhiteSpace(slug) && js is not null)
         {
-            Branding = await Raw.GetFromJsonAsync<PortalBrandingDto>($"api/v1/portal/{Uri.EscapeDataString(slug)}/branding");
-        }
-        catch (HttpRequestException)
-        {
-            Branding = null;
+            try
+            {
+                var storedJson = await js.InvokeAsync<string?>("sessionStorage.getItem", $"portal_{slug}_user");
+                if (!string.IsNullOrWhiteSpace(storedJson))
+                {
+                    var cached = System.Text.Json.JsonSerializer.Deserialize<PortalLoginResponse>(storedJson);
+                    if (cached is not null && cached.ExpiresAtUtc > DateTime.UtcNow)
+                    {
+                        User = cached;
+                        Changed?.Invoke();
+                    }
+                }
+            }
+            catch
+            {
+            }
         }
 
-        if (Branding is not null)
+        // 2. Cookie-based refresh if branding exists and we either need to restore or rotate
+        if (Branding is not null && (!IsSignedIn || ExpiresSoon))
         {
             await TryRefreshAsync();
         }
@@ -55,6 +77,17 @@ public sealed class PortalSession(NavigationManager nav)
     public void SignIn(PortalLoginResponse login)
     {
         User = login;
+        if (!string.IsNullOrWhiteSpace(Slug) && js is not null)
+        {
+            try
+            {
+                var json = System.Text.Json.JsonSerializer.Serialize(login);
+                _ = js.InvokeVoidAsync("sessionStorage.setItem", $"portal_{Slug}_user", json);
+            }
+            catch
+            {
+            }
+        }
         Changed?.Invoke();
     }
 
@@ -67,15 +100,44 @@ public sealed class PortalSession(NavigationManager nav)
         await _refreshLock.WaitAsync();
         try
         {
-            var resp = await Raw.PostAsJsonAsync($"api/v1/portal/{Uri.EscapeDataString(Slug)}/auth/refresh", new PortalRefreshRequest(null));
+            var req = new HttpRequestMessage(HttpMethod.Post, $"api/v1/portal/{Uri.EscapeDataString(Slug)}/auth/refresh")
+            {
+                Content = JsonContent.Create(new PortalRefreshRequest(null))
+            };
+            req.SetBrowserRequestCredentials(BrowserRequestCredentials.Include);
+            var resp = await Raw.SendAsync(req);
             if (resp.IsSuccessStatusCode)
             {
                 User = await resp.Content.ReadFromJsonAsync<PortalLoginResponse>();
-                return User is not null;
+                if (User is not null)
+                {
+                    if (js is not null)
+                    {
+                        try
+                        {
+                            var json = System.Text.Json.JsonSerializer.Serialize(User);
+                            await js.InvokeVoidAsync("sessionStorage.setItem", $"portal_{Slug}_user", json);
+                        }
+                        catch
+                        {
+                        }
+                    }
+                    return true;
+                }
             }
 
             if (resp.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
             {
+                if (js is not null)
+                {
+                    try
+                    {
+                        await js.InvokeVoidAsync("sessionStorage.removeItem", $"portal_{Slug}_user");
+                    }
+                    catch
+                    {
+                    }
+                }
                 User = null;
             }
 
@@ -95,9 +157,24 @@ public sealed class PortalSession(NavigationManager nav)
     {
         if (Slug is not null)
         {
+            if (js is not null)
+            {
+                try
+                {
+                    await js.InvokeVoidAsync("sessionStorage.removeItem", $"portal_{Slug}_user");
+                }
+                catch
+                {
+                }
+            }
             try
             {
-                await Raw.PostAsJsonAsync($"api/v1/portal/{Uri.EscapeDataString(Slug)}/auth/logout", new PortalRefreshRequest(null));
+                var req = new HttpRequestMessage(HttpMethod.Post, $"api/v1/portal/{Uri.EscapeDataString(Slug)}/auth/logout")
+                {
+                    Content = JsonContent.Create(new PortalRefreshRequest(null))
+                };
+                req.SetBrowserRequestCredentials(BrowserRequestCredentials.Include);
+                await Raw.SendAsync(req);
             }
             catch (HttpRequestException)
             {

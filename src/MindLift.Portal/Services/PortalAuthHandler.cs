@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using Microsoft.AspNetCore.Components.WebAssembly.Http;
 
 namespace MindLift.Portal.Services;
 
@@ -8,6 +9,7 @@ public sealed class PortalAuthHandler(PortalSession session) : DelegatingHandler
 {
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
+        request.SetBrowserRequestCredentials(BrowserRequestCredentials.Include);
         if (session.IsSignedIn && session.ExpiresSoon)
         {
             await session.TryRefreshAsync();
@@ -20,6 +22,7 @@ public sealed class PortalAuthHandler(PortalSession session) : DelegatingHandler
         {
             response.Dispose();
             var retry = new HttpRequestMessage(request.Method, request.RequestUri);
+            retry.SetBrowserRequestCredentials(BrowserRequestCredentials.Include);
             Attach(retry);
             response = await base.SendAsync(retry, cancellationToken);
         }

@@ -141,12 +141,12 @@ public sealed class AuthController(
         return new TokenResponse(result.AccessToken, result.ExpiresAtUtc, isMobile ? result.RefreshToken : null, result.MustChangePassword);
     }
 
-    private static CookieOptions RefreshCookieOptions(DateTimeOffset expires) => new()
+    private CookieOptions RefreshCookieOptions(DateTimeOffset expires) => new()
     {
         HttpOnly = true,
-        Secure = true,
+        Secure = Request.IsHttps,
         SameSite = SameSiteMode.Lax,
-        Path = "/api/v1/auth",
+        Path = "/",
         Expires = expires,
     };
 }

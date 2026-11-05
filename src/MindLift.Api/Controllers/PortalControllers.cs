@@ -134,12 +134,12 @@ public sealed class PortalAuthController(IPortalService portalService) : Control
         return result with { RefreshToken = null };
     }
 
-    private static CookieOptions CookieOptionsFor(string slug, DateTimeOffset expires) => new()
+    private CookieOptions CookieOptionsFor(string slug, DateTimeOffset expires) => new()
     {
         HttpOnly = true,
-        Secure = true,
-        SameSite = SameSiteMode.Strict,
-        Path = $"/api/v1/portal/{Uri.EscapeDataString(slug)}/auth",
+        Secure = Request.IsHttps,
+        SameSite = SameSiteMode.Lax,
+        Path = "/",
         Expires = expires,
     };
 }

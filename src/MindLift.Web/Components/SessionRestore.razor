@@ -1,12 +1,26 @@
-@* Restores the signed-in session on page load (refresh cookie) in background without blocking rendering. *@
-@ChildContent
+@using MindLift.Shared.Contracts
+@using Microsoft.AspNetCore.Components.WebAssembly.Http
+
+@if (_restoring)
+{
+    <div style="display:flex;height:100vh;width:100vw;align-items:center;justify-content:center;flex-direction:column;gap:16px;background-color:var(--mud-palette-background, #F8FAFC);">
+        <MudProgressCircular Color="Color.Primary" Size="Size.Medium" Indeterminate="true" />
+    </div>
+}
+else
+{
+    @ChildContent
+}
 
 @code {
     [Inject] private AuthSession Session { get; set; } = default!;
     [Inject] private AppState App { get; set; } = default!;
     [Inject] private HttpClient Http { get; set; } = default!;
     [Inject] private NavigationManager Nav { get; set; } = default!;
+    [Inject] private IJSRuntime JS { get; set; } = default!;
     [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private bool _restoring = true;
 
     protected override async Task OnInitializedAsync()
     {
@@ -18,41 +32,111 @@
                                uri.Contains("/verify-email", StringComparison.OrdinalIgnoreCase) ||
                                uri.Contains("/accept-invite", StringComparison.OrdinalIgnoreCase);
 
-        if (!Session.IsSignedIn && !isPublicAuthPage)
+        if (isPublicAuthPage)
         {
-            try
+            _restoring = false;
+            return;
+        }
+
+        if (Session.IsSignedIn)
+        {
+            if (App.Bootstrap is null)
             {
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-                var response = await Http.PostAsync("api/v1/auth/refresh", null, cts.Token);
-                if (response.IsSuccessStatusCode)
+                try { await App.LoadAsync(); } catch { }
+            }
+            _restoring = false;
+            return;
+        }
+
+        // 1. Instant tab-reload restore from sessionStorage
+        try
+        {
+            var storedToken = await JS.InvokeAsync<string?>("sessionStorage.getItem", "ml_access_token");
+            var storedExpires = await JS.InvokeAsync<string?>("sessionStorage.getItem", "ml_expires_at");
+            if (!string.IsNullOrWhiteSpace(storedToken) && DateTime.TryParse(storedExpires, out var exp) && exp > DateTime.UtcNow)
+            {
+                Session.SetTokens(new TokenResponse(storedToken, exp, null, false));
+                if (App.Bootstrap is null)
                 {
-                    var tokens = await response.Content.ReadFromJsonAsync<MindLift.Shared.Contracts.TokenResponse>(cancellationToken: cts.Token);
-                    if (tokens is not null)
+                    try { await App.LoadAsync(); } catch { }
+                }
+                _restoring = false;
+                StateHasChanged();
+
+                // Background refresh to keep cookies fresh and rotate token
+                _ = RefreshInBackgroundAsync();
+                return;
+            }
+        }
+        catch
+        {
+        }
+
+        // 2. Cookie-based session restore via /auth/refresh
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var req = new HttpRequestMessage(HttpMethod.Post, "api/v1/auth/refresh")
+            {
+                Content = JsonContent.Create(new RefreshRequest(null))
+            };
+            req.SetBrowserRequestCredentials(BrowserRequestCredentials.Include);
+            var response = await Http.SendAsync(req, cts.Token);
+            if (response.IsSuccessStatusCode)
+            {
+                var tokens = await response.Content.ReadFromJsonAsync<TokenResponse>(cancellationToken: cts.Token);
+                if (tokens is not null)
+                {
+                    Session.SetTokens(tokens);
+                    try
                     {
-                        Session.SetTokens(tokens);
-                        if (App.Bootstrap is null)
-                        {
-                            await App.LoadAsync();
-                        }
-                        StateHasChanged();
+                        await JS.InvokeVoidAsync("sessionStorage.setItem", "ml_access_token", tokens.AccessToken);
+                        await JS.InvokeVoidAsync("sessionStorage.setItem", "ml_expires_at", tokens.ExpiresAtUtc.ToString("o"));
+                    }
+                    catch { }
+
+                    if (App.Bootstrap is null)
+                    {
+                        try { await App.LoadAsync(); } catch { }
                     }
                 }
             }
-            catch
-            {
-                // The API is unreachable or timed out.
-            }
         }
-        else if (Session.IsSignedIn && App.Bootstrap is null)
+        catch
         {
-            try
+        }
+        finally
+        {
+            _restoring = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RefreshInBackgroundAsync()
+    {
+        try
+        {
+            var req = new HttpRequestMessage(HttpMethod.Post, "api/v1/auth/refresh")
             {
-                await App.LoadAsync();
-                StateHasChanged();
-            }
-            catch
+                Content = JsonContent.Create(new RefreshRequest(null))
+            };
+            req.SetBrowserRequestCredentials(BrowserRequestCredentials.Include);
+            var response = await Http.SendAsync(req);
+            if (response.IsSuccessStatusCode)
             {
+                var tokens = await response.Content.ReadFromJsonAsync<TokenResponse>();
+                if (tokens is not null)
+                {
+                    Session.SetTokens(tokens);
+                    try
+                    {
+                        await JS.InvokeVoidAsync("sessionStorage.setItem", "ml_access_token", tokens.AccessToken);
+                        await JS.InvokeVoidAsync("sessionStorage.setItem", "ml_expires_at", tokens.ExpiresAtUtc.ToString("o"));
+                    }
+                    catch { }
+                }
             }
         }
+        catch { }
     }
 }

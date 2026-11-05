@@ -113,4 +113,40 @@ public sealed class SessionAndTokenRotationTests
 
         isLogoutWithinGrace.ShouldBeFalse();
     }
+    [Fact]
+    public void PortalSession_IsSignedIn_ReflectsUserAndToken()
+    {
+        var session = new MindLift.Portal.Services.PortalSession(new TestNavManager());
+        session.IsSignedIn.ShouldBeFalse();
+        session.AccessToken.ShouldBeNull();
+
+        var login = new PortalLoginResponse("jwt-portal-token", Guid.NewGuid(), Guid.NewGuid(), null, "Sarah Connor", "Acme", "en", DateTime.UtcNow.AddHours(2), "portal-ref-123");
+        session.SignIn(login);
+
+        session.IsSignedIn.ShouldBeTrue();
+        session.AccessToken.ShouldBe("jwt-portal-token");
+        session.User.ShouldNotBeNull();
+        session.User.CustomerName.ShouldBe("Sarah Connor");
+    }
+
+    [Fact]
+    public async Task PortalSession_SignOut_ClearsSessionState()
+    {
+        var session = new MindLift.Portal.Services.PortalSession(new TestNavManager());
+        var login = new PortalLoginResponse("jwt-portal-token", Guid.NewGuid(), Guid.NewGuid(), null, "Sarah Connor", "Acme", "en", DateTime.UtcNow.AddHours(2), "portal-ref-123");
+        session.SignIn(login);
+        session.IsSignedIn.ShouldBeTrue();
+
+        await session.SignOutAsync();
+
+        session.IsSignedIn.ShouldBeFalse();
+        session.AccessToken.ShouldBeNull();
+        session.User.ShouldBeNull();
+    }
+
+    private sealed class TestNavManager : Microsoft.AspNetCore.Components.NavigationManager
+    {
+        public TestNavManager() => Initialize("http://localhost:5000/", "http://localhost:5000/");
+        protected override void NavigateToCore(string uri, bool forceLoad) { }
+    }
 }
