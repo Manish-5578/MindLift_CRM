@@ -1,10 +1,14 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using MindLift.Infrastructure.Persistence;
 
 #nullable disable
 
 namespace MindLift.Infrastructure.Persistence.Migrations
 {
-    /// <inheritdoc />
+    [DbContext(typeof(AppDbContext))]
+    [Migration("20261105133000_AddLeadCityAndState")]
     public partial class AddLeadCityAndState : Migration
     {
         /// <inheritdoc />

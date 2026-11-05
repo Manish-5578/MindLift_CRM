@@ -1,10 +1,14 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using MindLift.Infrastructure.Persistence;
 
 #nullable disable
 
 namespace MindLift.Infrastructure.Persistence.Migrations
 {
-    /// <inheritdoc />
+    [DbContext(typeof(AppDbContext))]
+    [Migration("20261105130000_AddCompanyBrandingAndSignature")]
     public partial class AddCompanyBrandingAndSignature : Migration
     {
         /// <inheritdoc />
