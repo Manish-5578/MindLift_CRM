@@ -5471,4 +5471,10 @@
   <data name="Companies by" xml:space="preserve">
     <value>الشركات حسب</value>
   </data>
+  <data name="Lead Description" xml:space="preserve">
+    <value>وصف العميل المتوقع</value>
+  </data>
+  <data name="Cannot be negative." xml:space="preserve">
+    <value>لا يمكن أن يكون رقمًا سالبًا.</value>
+  </data>
 </root>

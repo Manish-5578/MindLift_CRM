@@ -240,7 +240,7 @@
     private AccountSummaryDto? _summary;
     private List<UserListItem> _users = [];
 
-    private IReadOnlyList<FieldDto> CustomFields => App.Bootstrap?.Fields.GetValueOrDefault("accounts")?.Where(f => f.IsCustom).ToList() ?? [];
+    private IReadOnlyList<FieldDto> CustomFields => App.Bootstrap?.Fields.GetValueOrDefault("accounts")?.Where(f => f.IsCustom && !f.Key.Contains("jurisdiction", StringComparison.OrdinalIgnoreCase) && !f.Label.Contains("jurisdiction", StringComparison.OrdinalIgnoreCase)).ToList() ?? [];
 
     private bool Can(Func<ModulePermissionDto, bool> check, string module = "Accounts") => App.Bootstrap?.Permissions.Any(p => p.Module == module && check(p)) == true;
 

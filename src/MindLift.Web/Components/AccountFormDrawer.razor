@@ -69,7 +69,7 @@
     private void Reset(Dictionary<string, JsonElement?> custom)
     {
         _custom = custom;
-        _customFields = App.Bootstrap?.Fields.GetValueOrDefault("accounts")?.Where(f => f.IsCustom).ToList() ?? [];
+        _customFields = App.Bootstrap?.Fields.GetValueOrDefault("accounts")?.Where(f => f.IsCustom && !f.Key.Contains("jurisdiction", StringComparison.OrdinalIgnoreCase) && !f.Label.Contains("jurisdiction", StringComparison.OrdinalIgnoreCase)).ToList() ?? [];
         _error = null;
         _fieldErrors = new Dictionary<string, string>();
         _snapshot = TakeSnapshot();

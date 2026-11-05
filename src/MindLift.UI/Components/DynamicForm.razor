@@ -50,6 +50,7 @@
                         break;
                     case FormFieldKind.Multiline:
                         <MudTextField T="string" Value="Get(current.Key)" ValueChanged="v => SetAsync(current.Key, v)" Label="@LabelOf(current)" Lines="3" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                      Placeholder="@(current.Key.Equals("description", StringComparison.OrdinalIgnoreCase) ? T["Lead Description"] : null)"
                                       Disabled="@isReadOnly" Error="HasError(current.Key)" ErrorText="@ErrorOf(current.Key)" data-testid="@TestIdOf(current)" />
                         break;
                     default:
@@ -59,10 +60,14 @@
                         }
                         else if (current.Kind == FormFieldKind.Number)
                         {
-                            <MudTextField T="string" Value="@Get(current.Key)" ValueChanged="@(v => SetAsync(current.Key, SanitizeNumber(v)))" Label="@LabelOf(current)" Variant="Variant.Outlined" Margin="Margin.Dense"
-                                          InputType="InputType.Number" Immediate="true"
-                                          UserAttributes="@NumberAttributes"
-                                          Disabled="@isReadOnly" Error="HasError(current.Key)" ErrorText="@ErrorOf(current.Key)" data-testid="@TestIdOf(current)" />
+                            <MudNumericField T="int?" Value="@GetInt(current.Key)" ValueChanged="@(v => SetIntAsync(current.Key, v))"
+                                             Label="@LabelOf(current)" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                             Min="0"
+                                             Validation="@(new Func<int?, string?>(val => val < 0 ? T["Cannot be negative."] : null))"
+                                             Disabled="@isReadOnly"
+                                             Error="@(HasError(current.Key) || (GetInt(current.Key) < 0))"
+                                             ErrorText="@(ErrorOf(current.Key) ?? (GetInt(current.Key) < 0 ? T["Cannot be negative."] : null))"
+                                             data-testid="@TestIdOf(current)" />
                         }
                         else
                         {
@@ -111,6 +116,12 @@
 
     private string? Get(string key) => Values.GetValueOrDefault(key);
     private Guid? GetGuid(string key) => Guid.TryParse(Get(key), out var id) ? id : null;
+    private int? GetInt(string key) => int.TryParse(Get(key), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var n) ? Math.Max(0, n) : null;
+    private async Task SetIntAsync(string key, int? value)
+    {
+        if (value.HasValue && value.Value < 0) value = 0;
+        await SetAsync(key, value?.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
     private IReadOnlyCollection<string> SelectedIds(string key) => (Get(key) ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
     private bool IsChecked(string key) => Get(key) == "true";
     private static string FlagText(bool value) => value ? "true" : "false";

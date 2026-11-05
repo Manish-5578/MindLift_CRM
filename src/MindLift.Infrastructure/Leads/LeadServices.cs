@@ -99,6 +99,40 @@ public sealed class LeadService(
             source = source.Where(FilterCompiler.Compile<Lead>(query.Filter, registry, await FilterContextAsync(cancellationToken)));
         }
 
+        if (!string.IsNullOrWhiteSpace(query.ViewId))
+        {
+            var clean = query.ViewId.Trim();
+            if (clean.StartsWith("saved-", StringComparison.OrdinalIgnoreCase) || clean.StartsWith("saved_", StringComparison.OrdinalIgnoreCase))
+                clean = clean[6..];
+            if (Guid.TryParse(clean, out var currentViewId))
+            {
+                var otherViewDocs = await db.SavedViews.AsNoTracking()
+                    .Where(v => v.EntityType == "leads" && v.Id != currentViewId && v.Filter != null)
+                    .Select(v => v.Filter)
+                    .ToListAsync(cancellationToken);
+
+                var excludeOtherIds = new HashSet<Guid>();
+                foreach (var fDoc in otherViewDocs)
+                {
+                    if (fDoc == null) continue;
+                    var fg = System.Text.Json.JsonSerializer.Deserialize<FilterGroup>(fDoc.RootElement.GetRawText());
+                    var inCond = fg?.Conditions.FirstOrDefault(c => c.Field == "id" && c.Op == FilterOperator.In);
+                    if (inCond?.Value is { ValueKind: System.Text.Json.JsonValueKind.Array } arr)
+                    {
+                        foreach (var item in arr.EnumerateArray())
+                        {
+                            if (item.TryGetGuid(out var g) && g != Guid.Empty) excludeOtherIds.Add(g);
+                        }
+                    }
+                }
+
+                if (excludeOtherIds.Count > 0)
+                {
+                    source = source.Where(l => !excludeOtherIds.Contains(l.Id));
+                }
+            }
+        }
+
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             var term = query.Search.Trim().ToLowerInvariant();

@@ -110,8 +110,11 @@
                             </div>
                         </div>
 
-                        <MudTextField @bind-Value="_callSubject" Label="@T["Call Subject *"]" Placeholder="@T["e.g. Discovery call, Product demo"]"
-                                      Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" />
+                        <div class="d-flex gap-2">
+                            <MudTextField @bind-Value="_callSubject" Label="@T["Call Subject *"]" Placeholder="@T["e.g. Discovery call, Product demo"]"
+                                          Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" Class="ml-grow" />
+                            <MudNumericField T="int" @bind-Value="_callDuration" Min="0" Label="@T["Minutes"]" Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:110px;" />
+                        </div>
 
                         <MudTextField @bind-Value="_callNotes" Label="@T["Call Notes / Summary"]" Placeholder="@T["Discussed requirements, agreed on timeline..."]"
                                       Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />

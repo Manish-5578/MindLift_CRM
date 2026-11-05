@@ -163,6 +163,8 @@ public sealed class SaveActivityRequestValidator : AbstractValidator<SaveActivit
         RuleFor(x => x.Direction).MaximumLength(10);
         RuleFor(x => x.CallOutcome).MaximumLength(60);
         RuleFor(x => x.Location).MaximumLength(300);
+        RuleFor(x => x.DurationMinutes).GreaterThanOrEqualTo(0).When(x => x.DurationMinutes.HasValue).WithMessage("Duration cannot be negative.");
+        RuleFor(x => x.ReminderMinutes).GreaterThanOrEqualTo(0).When(x => x.ReminderMinutes.HasValue).WithMessage("Reminder minutes cannot be negative.");
     }
 }
 

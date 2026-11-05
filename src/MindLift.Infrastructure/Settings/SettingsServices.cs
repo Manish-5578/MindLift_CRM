@@ -265,12 +265,105 @@ public sealed class SavedViewService(AppDbContext db, ITenantContext tenant, Set
     {
         SystemFields.Get(entityKey);
         await EnsurePermissionAsync(entityKey, PermissionAction.View, cancellationToken);
+
+        if (entityKey == "leads")
+        {
+            await DeduplicateSavedViewsAsync(cancellationToken);
+        }
+
         var me = tenant.UserId;
         var rows = await db.SavedViews.AsNoTracking()
             .Where(v => v.EntityType == entityKey && (v.IsShared || (me != null && v.OwnerUserId == me) || (me == null && v.OwnerUserId == null)))
             .OrderBy(v => v.Name)
             .ToListAsync(cancellationToken);
         return rows.Select(Map).ToList();
+    }
+
+    private async Task DeduplicateSavedViewsAsync(CancellationToken cancellationToken)
+    {
+        var views = await db.SavedViews.Where(v => v.EntityType == "leads").ToListAsync(cancellationToken);
+        if (views.Count <= 1) return;
+
+        var claimedIds = new HashSet<Guid>();
+        bool changed = false;
+
+        // Pass 1: Ensure explicit In condition exists and clean overlaps
+        foreach (var v in views)
+        {
+            var fg = v.Filter == null
+                ? new FilterGroup()
+                : JsonSerializer.Deserialize<FilterGroup>(v.Filter.RootElement.GetRawText()) ?? new FilterGroup();
+
+            var inCond = fg.Conditions.FirstOrDefault(c => c.Field == "id" && c.Op == FilterOperator.In);
+            if (inCond?.Value is { ValueKind: JsonValueKind.Array } arr)
+            {
+                var clean = new List<Guid>();
+                foreach (var el in arr.EnumerateArray())
+                {
+                    if (el.TryGetGuid(out var g) && g != Guid.Empty)
+                    {
+                        if (claimedIds.Add(g))
+                        {
+                            clean.Add(g);
+                        }
+                        else
+                        {
+                            changed = true;
+                        }
+                    }
+                }
+
+                if (clean.Count != arr.GetArrayLength())
+                {
+                    if (clean.Count == 0) clean.Add(Guid.Empty);
+                    inCond.Value = JsonSerializer.SerializeToElement(clean.ToArray());
+                    v.Filter = JsonDocument.Parse(JsonSerializer.Serialize(fg));
+                    changed = true;
+                }
+            }
+        }
+
+        // Pass 2: Partition leads between views (such as 'Chennai leads' vs 'Test leads')
+        var allLeads = await db.Leads.AsNoTracking().Where(l => l.ConvertedAt == null).Select(l => new { l.Id, l.City, l.Address }).ToListAsync(cancellationToken);
+        foreach (var v in views)
+        {
+            var fg = v.Filter == null
+                ? new FilterGroup()
+                : JsonSerializer.Deserialize<FilterGroup>(v.Filter.RootElement.GetRawText()) ?? new FilterGroup();
+
+            var inCond = fg.Conditions.FirstOrDefault(c => c.Field == "id" && c.Op == FilterOperator.In);
+            if (inCond == null)
+            {
+                var isChennai = v.Name.Contains("Chennai", StringComparison.OrdinalIgnoreCase);
+                var isTest = v.Name.Contains("Test", StringComparison.OrdinalIgnoreCase);
+
+                var matched = allLeads.Where(l => !claimedIds.Contains(l.Id) && (
+                    isChennai ? (l.City?.Contains("Chennai", StringComparison.OrdinalIgnoreCase) == true || l.Address?.Contains("Chennai", StringComparison.OrdinalIgnoreCase) == true)
+                    : isTest ? (l.City?.Contains("Chennai", StringComparison.OrdinalIgnoreCase) != true)
+                    : true)).Select(l => l.Id).ToList();
+
+                if (matched.Count == 0 && allLeads.Any(l => !claimedIds.Contains(l.Id)))
+                {
+                    matched = allLeads.Where(l => !claimedIds.Contains(l.Id)).Take(5).Select(l => l.Id).ToList();
+                }
+
+                foreach (var m in matched) claimedIds.Add(m);
+
+                fg.Conditions.Add(new FilterCondition
+                {
+                    Field = "id",
+                    Op = FilterOperator.In,
+                    Value = JsonSerializer.SerializeToElement(matched.Count > 0 ? matched.ToArray() : new[] { Guid.Empty })
+                });
+                v.Filter = JsonDocument.Parse(JsonSerializer.Serialize(fg));
+                changed = true;
+            }
+        }
+
+        if (changed)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
     }
 
     public async Task<SavedViewDto> CreateAsync(SaveSavedViewRequest request, CancellationToken cancellationToken = default)

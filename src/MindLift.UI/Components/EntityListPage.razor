@@ -628,7 +628,7 @@
     private ListQuery? _lastQuery;
 
     /// <summary>The search, filters and sort the list is showing now, so an export can ask for exactly the same records.</summary>
-    public ListQuery CurrentQuery => _lastQuery ?? new ListQuery(_state.Search, EffectiveFilter(), _state.SortField ?? DefaultSortField, DefaultSortDir, 1, PageSize);
+    public ListQuery CurrentQuery => _lastQuery ?? new ListQuery(_state.Search, EffectiveFilter(), _state.SortField ?? DefaultSortField, DefaultSortDir, 1, PageSize, ViewId: _state.View);
 
     private async Task LoadAsync()
     {

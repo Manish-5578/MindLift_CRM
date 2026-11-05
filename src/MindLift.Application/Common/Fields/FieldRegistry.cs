@@ -61,6 +61,8 @@ public static class SystemFields
             F("website", "Website", FieldType.Url, nameof(Account.Website)),
             F("phone", "Phone", FieldType.Phone, nameof(Account.Phone)),
             F("industry", "Industry", FieldType.Text, nameof(Account.Industry)),
+            F("parent_account_id", "Parent company", FieldType.Lookup, nameof(Account.ParentAccountId)),
+            F("sub_company", "Sub company", FieldType.Lookup, nameof(Account.ParentAccountId)),
             F("owner_id", "Owner", FieldType.User, nameof(Account.OwnerId)),
             F("created_at", "Created", FieldType.DateTime, nameof(Account.CreatedAt)),
         ]),

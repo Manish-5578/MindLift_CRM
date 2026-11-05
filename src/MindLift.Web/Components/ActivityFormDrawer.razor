@@ -60,22 +60,25 @@
                 case ActivityTypes.Task:
                     fields.Add(new("dueAt", "Due", FormFieldKind.DateTime, Columns: 6, TestId: "activity-due"));
                     fields.Add(new("priority", "Priority", FormFieldKind.Picklist, Options: [Option("Low", 0), Option("Normal", 1), Option("High", 2)], Columns: 6));
-                    fields.Add(new("reminderMinutes", "Remind me (minutes before)", FormFieldKind.Number));
+                    fields.Add(new("durationMinutes", "Duration (minutes)", FormFieldKind.Number, Columns: 6));
+                    fields.Add(new("reminderMinutes", "Remind me (minutes before)", FormFieldKind.Number, Columns: 6));
                     break;
                 case ActivityTypes.Call:
                     fields.Add(new("dueAt", "When", FormFieldKind.DateTime, Columns: 6));
                     fields.Add(new("direction", "Direction", FormFieldKind.Picklist, Options: [Option("Outbound", 0), Option("Inbound", 1)], Columns: 6));
                     fields.Add(new("callOutcome", "Outcome", FormFieldKind.Picklist,
                         Options: App.Bootstrap?.Picklists.FirstOrDefault(p => p.Key == "call_outcome")?.Values ?? [], Columns: 6));
-                    fields.Add(new("durationMinutes", "Minutes", FormFieldKind.Number, Columns: 6));
+                    fields.Add(new("durationMinutes", "Duration (minutes)", FormFieldKind.Number, Columns: 6));
+                    fields.Add(new("reminderMinutes", "Remind me (minutes before)", FormFieldKind.Number, Columns: 6));
                     break;
                 case ActivityTypes.Meeting:
                     fields.Add(new("dueAt", "Starts", FormFieldKind.DateTime, Columns: 6, TestId: "activity-due"));
                     fields.Add(new("endAt", "Ends", FormFieldKind.DateTime, Columns: 6));
+                    fields.Add(new("durationMinutes", "Duration (minutes)", FormFieldKind.Number, Columns: 6));
+                    fields.Add(new("reminderMinutes", "Remind me (minutes before)", FormFieldKind.Number, Columns: 6));
                     fields.Add(new("location", "Location or link"));
                     fields.Add(new("attendees", "Guests (email addresses)", FormFieldKind.Multiline, TestId: "activity-attendees"));
                     fields.Add(new("sendInvitations", "Email calendar invitations to the guests", FormFieldKind.Checkbox, TestId: "activity-send-invites"));
-                    fields.Add(new("reminderMinutes", "Remind me (minutes before)", FormFieldKind.Number));
                     break;
             }
 
@@ -179,12 +182,12 @@
         _busy = true;
         try
         {
-            int? minutes = int.TryParse(Value("durationMinutes"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var m) ? m : null;
+            int? minutes = int.TryParse(Value("durationMinutes"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var m) ? Math.Max(0, m) : null;
             Guid? owner = Guid.TryParse(Value("ownerId"), out var o) ? o : null;
             var request = new SaveActivityRequest(
                 _type, Value("subject")!, Value("description"), _type == ActivityTypes.Task ? Value("priority") : null,
                 FromLocalInput(Value("dueAt")), FromLocalInput(Value("endAt")), minutes,
-                _type == ActivityTypes.Call ? Value("direction") : null, _type == ActivityTypes.Call ? Value("callOutcome") : null, Value("location"), int.TryParse(Value("reminderMinutes"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var reminder) ? reminder : null,
+                _type == ActivityTypes.Call ? Value("direction") : null, _type == ActivityTypes.Call ? Value("callOutcome") : null, Value("location"), int.TryParse(Value("reminderMinutes"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var reminder) ? Math.Max(0, reminder) : null,
                 _id is null ? LeadId : null, _id is null ? ContactId : null, _id is null ? AccountId : null, _id is null ? DealId : null, owner,
                 _type == ActivityTypes.Meeting ? Emails(Value("attendees")) : null, _type == ActivityTypes.Meeting && Value("sendInvitations") == "true",
                 _type == ActivityTypes.Note ? Ids(Value("mentions")) : null);
