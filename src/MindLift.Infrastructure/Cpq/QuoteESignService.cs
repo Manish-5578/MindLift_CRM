@@ -80,7 +80,8 @@ public sealed class QuoteESignService(
         await db.SaveChangesAsync(ct);
 
         var logs = await GetLogsForQuoteAsync(quote.Id, ct);
-        return MapDetails(quote, logs);
+        var settings = await db.TenantSettings.IgnoreQueryFilters().FirstOrDefaultAsync(s => s.TenantId == quote.TenantId, ct);
+            return MapDetails(quote, logs, settings);
     }
 
     public async Task<QuoteESignDetailsDto> GetSigningDetailsByTokenAsync(string token, string? ipAddress, string? userAgent, CancellationToken ct = default)
@@ -144,7 +145,8 @@ public sealed class QuoteESignService(
                 .OrderBy(l => l.Timestamp)
                 .ToListAsync(ct);
 
-            return MapDetails(quote, logs);
+            var settings = await db.TenantSettings.IgnoreQueryFilters().FirstOrDefaultAsync(s => s.TenantId == quote.TenantId, ct);
+            return MapDetails(quote, logs, settings);
         }
     }
 
@@ -159,7 +161,8 @@ public sealed class QuoteESignService(
             ?? throw new NotFoundException("Quote", quoteId);
 
         var logs = await GetLogsForQuoteAsync(quote.Id, ct);
-        return MapDetails(quote, logs);
+        var settings = await db.TenantSettings.IgnoreQueryFilters().FirstOrDefaultAsync(s => s.TenantId == quote.TenantId, ct);
+            return MapDetails(quote, logs, settings);
     }
 
     public async Task<QuoteESignDetailsDto> SignAsync(SignQuoteRequest req, string? ipAddress, string? userAgent, CancellationToken ct = default)
@@ -237,7 +240,8 @@ public sealed class QuoteESignService(
                 .OrderBy(l => l.Timestamp)
                 .ToListAsync(ct);
 
-            return MapDetails(quote, logs);
+            var settings = await db.TenantSettings.IgnoreQueryFilters().FirstOrDefaultAsync(s => s.TenantId == quote.TenantId, ct);
+            return MapDetails(quote, logs, settings);
         }
     }
 
@@ -294,7 +298,8 @@ public sealed class QuoteESignService(
                 .OrderBy(l => l.Timestamp)
                 .ToListAsync(ct);
 
-            return MapDetails(quote, logs);
+            var settings = await db.TenantSettings.IgnoreQueryFilters().FirstOrDefaultAsync(s => s.TenantId == quote.TenantId, ct);
+            return MapDetails(quote, logs, settings);
         }
     }
 
@@ -328,7 +333,8 @@ public sealed class QuoteESignService(
         await db.SaveChangesAsync(ct);
 
         var logs = await GetLogsForQuoteAsync(quote.Id, ct);
-        return MapDetails(quote, logs);
+        var settings = await db.TenantSettings.IgnoreQueryFilters().FirstOrDefaultAsync(s => s.TenantId == quote.TenantId, ct);
+            return MapDetails(quote, logs, settings);
     }
 
     public async Task<IReadOnlyList<QuoteSignatureLogDto>> GetAuditTrailAsync(Guid quoteId, CancellationToken ct = default)
@@ -375,7 +381,7 @@ public sealed class QuoteESignService(
             .ToListAsync(ct);
     }
 
-    private static QuoteESignDetailsDto MapDetails(Quote q, List<QuoteSignatureLog> logs)
+    private static QuoteESignDetailsDto MapDetails(Quote q, List<QuoteSignatureLog> logs, TenantSettings? settings = null)
     {
         return new QuoteESignDetailsDto
         {
@@ -397,6 +403,11 @@ public sealed class QuoteESignService(
             ExpirationDate = q.ExpirationDate,
             TermsAndConditions = q.TermsAndConditions,
             Notes = q.Notes,
+            CompanyName = settings?.CompanyName,
+            CompanyLogoUrl = settings?.LogoUrl,
+            CompanySignatureUrl = settings?.SignatureUrl,
+            CompanySignatoryName = settings?.SignatoryName,
+            CompanySignatoryTitle = settings?.SignatoryTitle,
             ESignStatus = q.ESignStatus,
             SignerEmail = q.SignerEmail,
             SignerName = q.SignerName,

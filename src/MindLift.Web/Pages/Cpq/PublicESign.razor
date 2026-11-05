@@ -31,9 +31,15 @@
             <MudPaper Class="pa-6 mb-4" Elevation="1" Style="border-radius: 12px; border: 1px solid var(--mud-palette-divider);">
                 @* Header *@
                 <div class="d-flex justify-space-between align-center flex-wrap gap-3 pb-4" style="border-bottom: 1px solid var(--mud-palette-divider);">
-                    <div>
-                        <MudText Typo="Typo.h5" Style="font-weight: 700;">@_details.Title</MudText>
-                        <MudText Typo="Typo.body2" Class="ml-muted">@T["Quotation"] #@_details.QuoteNumber • @T["Issued:"] @_details.IssueDate.ToString("MMM dd, yyyy")</MudText>
+                    <div class="d-flex align-center gap-3">
+                        @if (!string.IsNullOrWhiteSpace(_details.CompanyLogoUrl))
+                        {
+                            <img src="@_details.CompanyLogoUrl" alt="Company Logo" style="max-height: 50px; max-width: 150px; object-fit: contain;" />
+                        }
+                        <div>
+                            <MudText Typo="Typo.h5" Style="font-weight: 700;">@_details.Title</MudText>
+                            <MudText Typo="Typo.body2" Class="ml-muted">@(!string.IsNullOrWhiteSpace(_details.CompanyName) ? $"{_details.CompanyName} • " : "")@T["Quotation"] #@_details.QuoteNumber • @T["Issued:"] @_details.IssueDate.ToString("MMM dd, yyyy")</MudText>
+                        </div>
                     </div>
                     <div>
                         <MudChip T="string" Variant="Variant.Filled"
@@ -123,6 +129,33 @@
                 </div>
 
                 @* Terms & Notes *@
+                @if (!string.IsNullOrWhiteSpace(_details.CompanySignatureUrl) || !string.IsNullOrWhiteSpace(_details.CompanySignatoryName))
+                {
+                    <div class="d-flex justify-space-between align-center pa-3 my-3 rounded" style="background: var(--mud-palette-background-grey); border: 1px solid var(--mud-palette-divider);">
+                        <div>
+                            <div class="text-caption ml-muted">@T["Issued & Endorsed by:"]</div>
+                            <div style="font-weight: 600;">@(!string.IsNullOrWhiteSpace(_details.CompanySignatoryName) ? _details.CompanySignatoryName : _details.CompanyName)</div>
+                            @if (!string.IsNullOrWhiteSpace(_details.CompanySignatoryTitle))
+                            {
+                                <div class="text-caption ml-muted">@_details.CompanySignatoryTitle</div>
+                            }
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(_details.CompanySignatureUrl))
+                        {
+                            @if (_details.CompanySignatureUrl.StartsWith("data:image") || _details.CompanySignatureUrl.StartsWith("http"))
+                            {
+                                <img src="@_details.CompanySignatureUrl" alt="Company Signature" style="max-height: 44px; max-width: 140px; object-fit: contain;" />
+                            }
+                            else
+                            {
+                                <div style="font-family: 'Brush Script MT', 'cursive', 'Georgia'; font-size: 1.6rem; color: var(--mud-palette-primary);">
+                                    @_details.CompanySignatureUrl
+                                </div>
+                            }
+                        }
+                    </div>
+                }
+
                 @if (!string.IsNullOrWhiteSpace(_details.TermsAndConditions))
                 {
                     <div class="pa-3 my-4 rounded" style="background: var(--mud-palette-background-grey); border: 1px solid var(--mud-palette-divider);">

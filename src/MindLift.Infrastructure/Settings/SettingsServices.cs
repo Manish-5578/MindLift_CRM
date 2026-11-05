@@ -83,6 +83,11 @@ public sealed class CompanySettingsService(AppDbContext db, ITenantContext tenan
         row.DefaultTaxRate = request.DefaultTaxRate;
         row.TaxRegistrationNumber = request.TaxRegistrationNumber;
         row.PrimaryColor = string.IsNullOrWhiteSpace(request.PrimaryColor) ? null : request.PrimaryColor.ToUpperInvariant();
+        row.Address = request.Address?.Trim();
+        row.LogoUrl = request.LogoUrl;
+        row.SignatureUrl = request.SignatureUrl;
+        row.SignatoryName = request.SignatoryName?.Trim();
+        row.SignatoryTitle = request.SignatoryTitle?.Trim();
 
         await db.SaveChangesAsync(cancellationToken);
         await version.BumpAsync(cancellationToken);
@@ -222,7 +227,8 @@ public sealed class CompanySettingsService(AppDbContext db, ITenantContext tenan
 
     private static CompanySettingsDto MapCompany(TenantSettings s) => new(
         s.CompanyName, s.Email, s.Phone, s.BaseCurrency, s.DefaultLanguage, s.TimeZoneId, s.WeekStartDay,
-        s.FiscalYearStartMonth, s.TaxEnabled, s.TaxLabel, s.DefaultTaxRate, s.TaxRegistrationNumber, s.PrimaryColor);
+        s.FiscalYearStartMonth, s.TaxEnabled, s.TaxLabel, s.DefaultTaxRate, s.TaxRegistrationNumber, s.PrimaryColor,
+        s.Address, s.LogoUrl, s.SignatureUrl, s.SignatoryName, s.SignatoryTitle);
 
     private static ModuleSettingDto MapModule(ModuleSetting m) => new(
         m.Module.ToString(), m.IsEnabled, m.SingularLabel, m.PluralLabel, m.SortOrder);

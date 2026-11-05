@@ -52,8 +52,10 @@ public sealed class BootstrapService(
                 : new ModulePermissionDto(module.ToString(), permission.CanView, permission.CanCreate, permission.CanEdit, permission.CanDelete, permission.CanExport, permission.CanImport, permission.Scope.ToString()));
         }
 
-        var canViewSettings = await permissions.HasAsync(AppModule.Settings, PermissionAction.View, cancellationToken);
-        var effectiveCompany = canViewSettings ? snapshot.Company : null;
+        var canViewCompany = await permissions.HasAsync(AppModule.Settings, PermissionAction.View, cancellationToken)
+            || await permissions.HasAsync(AppModule.Invoices, PermissionAction.View, cancellationToken)
+            || await permissions.HasAsync(AppModule.Quotations, PermissionAction.View, cancellationToken);
+        var effectiveCompany = canViewCompany ? snapshot.Company : null;
 
         return new BootstrapDto(
             me,

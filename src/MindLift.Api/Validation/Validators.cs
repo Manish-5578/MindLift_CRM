@@ -320,6 +320,9 @@ public sealed class SaveCompanySettingsRequestValidator : AbstractValidator<Save
         RuleFor(x => x.TaxLabel).MaximumLength(30);
         RuleFor(x => x.TaxRegistrationNumber).MaximumLength(50);
         RuleFor(x => x.PrimaryColor).MaximumLength(7);
+        RuleFor(x => x.Address).MaximumLength(500);
+        RuleFor(x => x.SignatoryName).MaximumLength(100);
+        RuleFor(x => x.SignatoryTitle).MaximumLength(100);
     }
 }
 

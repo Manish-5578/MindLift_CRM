@@ -7,6 +7,7 @@
 @inject HttpClient Http
 @inject ISnackbar Snackbar
 @inject IDialogService Dialogs
+@inject AppState App
 @inject NavigationManager Nav
 @inject Translator T
 
@@ -291,6 +292,43 @@
                     <MudText Typo="Typo.h6" Style="font-weight:700">@_activeQuote.Currency @_activeQuote.GrandTotal.ToString("N2")</MudText>
                 </div>
             </div>
+
+            <!-- Official Endorsement & Authorized Signature -->
+            <div class="d-flex justify-space-between align-end flex-wrap gap-4 mt-4 pt-3" style="border-top: 1px dashed var(--mud-palette-divider);">
+                <div>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@T["Authorized commercial proposal by {0}.", _company?.CompanyName ?? "MindLift CRM"]</MudText>
+                </div>
+
+                <div class="d-flex flex-column align-end text-right">
+                    <div class="text-caption ml-muted mb-1">@T["Authorized Signatory"]</div>
+                    @if (!string.IsNullOrWhiteSpace(_company?.SignatureUrl))
+                    {
+                        @if (_company.SignatureUrl.StartsWith("data:image") || _company.SignatureUrl.StartsWith("http"))
+                        {
+                            <img src="@_company.SignatureUrl" alt="Authorized Signature" style="max-height: 48px; max-width: 160px; object-fit: contain;" />
+                        }
+                        else
+                        {
+                            <div style="font-family: 'Brush Script MT', 'cursive', 'Georgia'; font-size: 1.8rem; color: var(--mud-palette-primary); line-height: 1;">
+                                @_company.SignatureUrl
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div style="font-family: 'Brush Script MT', 'cursive', 'Georgia'; font-size: 1.4rem; color: var(--mud-palette-primary); line-height: 1;">
+                            @(!string.IsNullOrWhiteSpace(_company?.SignatoryName) ? _company.SignatoryName : (_company?.CompanyName ?? "MindLift CRM"))
+                        </div>
+                    }
+                    <div style="border-top: 1px solid var(--mud-palette-divider); width: 180px; margin-top: 4px; padding-top: 2px;">
+                        <div style="font-weight: 600; font-size: 12px;">@(!string.IsNullOrWhiteSpace(_company?.SignatoryName) ? _company.SignatoryName : T["Authorized Signatory"])</div>
+                        @if (!string.IsNullOrWhiteSpace(_company?.SignatoryTitle))
+                        {
+                            <div class="text-caption ml-muted">@_company.SignatoryTitle</div>
+                        }
+                    </div>
+                </div>
+            </div>
         }
     </DialogContent>
     <DialogActions>
@@ -317,6 +355,7 @@
     private bool _loading = true;
     private bool _saving = false;
     private List<QuoteDto> _quotes = [];
+    private CompanySettingsDto? _company;
 
     private string _searchQuery = "";
     private QuoteStatus? _statusFilter;
@@ -344,6 +383,11 @@
     protected override async Task OnInitializedAsync()
     {
         await LoadQuotesAsync();
+        try
+        {
+            _company = App.Bootstrap?.Company ?? await Http.GetFromJsonAsync<CompanySettingsDto>("api/v1/settings/company/profile");
+        }
+        catch { }
     }
 
     private async Task LoadQuotesAsync()

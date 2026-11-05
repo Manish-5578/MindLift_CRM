@@ -17,7 +17,12 @@ public sealed record CompanySettingsDto(
     string? TaxLabel,
     decimal DefaultTaxRate,
     string? TaxRegistrationNumber,
-    string? PrimaryColor);
+    string? PrimaryColor,
+    string? Address = null,
+    string? LogoUrl = null,
+    string? SignatureUrl = null,
+    string? SignatoryName = null,
+    string? SignatoryTitle = null);
 
 public sealed record SaveCompanySettingsRequest(
     string CompanyName,
@@ -31,7 +36,12 @@ public sealed record SaveCompanySettingsRequest(
     string? TaxLabel,
     decimal DefaultTaxRate,
     string? TaxRegistrationNumber,
-    string? PrimaryColor);
+    string? PrimaryColor,
+    string? Address = null,
+    string? LogoUrl = null,
+    string? SignatureUrl = null,
+    string? SignatoryName = null,
+    string? SignatoryTitle = null);
 
 // ---------- Currencies ----------
 

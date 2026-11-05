@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MindLift.Api.Auth;
 using MindLift.Application.Common.Fields;
@@ -18,6 +19,11 @@ public sealed class SettingsController(
     PicklistPipelineService picklistsAndPipelines) : ControllerBase
 {
     // ---------- Company, currencies, modules ----------
+
+    [HttpGet("company/profile")]
+    [Authorize]
+    public async Task<ActionResult<CompanySettingsDto>> GetCompanyProfile(CancellationToken cancellationToken)
+        => Ok(await company.GetCompanyAsync(cancellationToken));
 
     [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("company")]

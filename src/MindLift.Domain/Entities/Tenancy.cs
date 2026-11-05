@@ -118,6 +118,11 @@ public sealed class TenantSettings : TenantEntity
     public decimal DefaultTaxRate { get; set; }
     public string? TaxRegistrationNumber { get; set; }
     public string? PrimaryColor { get; set; }
+    public string? Address { get; set; }
+    public string? LogoUrl { get; set; }
+    public string? SignatureUrl { get; set; }
+    public string? SignatoryName { get; set; }
+    public string? SignatoryTitle { get; set; }
     public bool SampleDataLoaded { get; set; }
 
     /// <summary>When true, documents are also read by a language model that finds the fields each document type defines. Off by default: the text is sent to the model.</summary>

@@ -12490,6 +12490,26 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("primary_color");
 
+                    b.Property<string>("Address")
+                        .HasColumnType("text")
+                        .HasColumnName("address");
+
+                    b.Property<string>("LogoUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("logo_url");
+
+                    b.Property<string>("SignatureUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("signature_url");
+
+                    b.Property<string>("SignatoryName")
+                        .HasColumnType("text")
+                        .HasColumnName("signatory_name");
+
+                    b.Property<string>("SignatoryTitle")
+                        .HasColumnType("text")
+                        .HasColumnName("signatory_title");
+
                     b.Property<bool>("SampleDataLoaded")
                         .HasColumnType("boolean")
                         .HasColumnName("sample_data_loaded");

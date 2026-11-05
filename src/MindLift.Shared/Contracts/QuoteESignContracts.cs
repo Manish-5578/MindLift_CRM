@@ -63,6 +63,11 @@ public sealed class QuoteESignDetailsDto
     public DateTime? ExpirationDate { get; set; }
     public string? TermsAndConditions { get; set; }
     public string? Notes { get; set; }
+    public string? CompanyName { get; set; }
+    public string? CompanyLogoUrl { get; set; }
+    public string? CompanySignatureUrl { get; set; }
+    public string? CompanySignatoryName { get; set; }
+    public string? CompanySignatoryTitle { get; set; }
 
     // E-Sign Specific
     public string ESignStatus { get; set; } = "Draft";

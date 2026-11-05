@@ -26,6 +26,7 @@
         <MlCard Title="Business details">
             <div class="ml-stack">
                 <MudTextField @bind-Value="_draft.CompanyName" Label="@T["Company name"]" Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" Error="@(_errors.ContainsKey("companyName"))" ErrorText="@(Err("companyName"))" />
+                <MudTextField @bind-Value="_draft.Address" Label="@T["Office / Registered Address"]" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" Placeholder="@T["Street, Building, City, Country"]" />
                 <MudGrid Spacing="3">
                     <MudItem xs="12" sm="6"><MudTextField @bind-Value="_draft.Email" Label="@T["Email"]" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
                     <MudItem xs="12" sm="6"><MudTextField @bind-Value="_draft.Phone" Label="@T["Phone"]" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
@@ -48,6 +49,97 @@
                     </MudItem>
                     <MudItem xs="12" sm="6"><MudNumericField @bind-Value="_draft.FiscalYearStartMonth" Label="@T["Fiscal year starts (month 1–12)"]" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" Max="12" /></MudItem>
                 </MudGrid>
+            </div>
+        </MlCard>
+
+        <div style="height:24px"></div>
+
+        <MlCard Title="Company Logo" Subtitle="Upload your business logo to appear on invoices, quotes, receipts, and customer documents.">
+            <div class="ml-stack">
+                @if (!string.IsNullOrWhiteSpace(_draft.LogoUrl))
+                {
+                    <div class="d-flex align-center justify-space-between pa-3 rounded" style="border: 1px solid var(--mud-palette-divider); background: var(--mud-palette-surface); max-width: 440px;">
+                        <div class="d-flex align-center gap-3">
+                            <img src="@_draft.LogoUrl" alt="Company Logo" style="max-height: 60px; max-width: 180px; object-fit: contain; border-radius: 4px;" />
+                            <div class="text-caption ml-muted">@T["Active Logo"]</div>
+                        </div>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="() => _draft.LogoUrl = null" Title="@T["Remove Logo"]" />
+                    </div>
+                }
+
+                <div class="d-flex align-center flex-wrap gap-3 mt-2">
+                    <label class="mud-button-root mud-button mud-button-outlined mud-button-outlined-primary mud-button-outlined-size-small" style="cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                        <MudIcon Icon="@Icons.Material.Outlined.Upload" Size="Size.Small" />
+                        <span>@T["Upload Logo Image"]</span>
+                        <InputFile OnChange="OnLogoFileSelected" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="display:none;" />
+                    </label>
+                    <span class="text-caption ml-muted">@T["PNG, JPG, SVG or WEBP up to 2MB"]</span>
+                </div>
+
+                <MudTextField @bind-Value="_draft.LogoUrl" Label="@T["Or provide Logo URL / Data URI"]"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="https://example.com/logo.png" />
+            </div>
+        </MlCard>
+
+        <div style="height:24px"></div>
+
+        <MlCard Title="Official Signature & Signatory" Subtitle="Authorized signature and designation to endorse quotes, invoices, proposals, and agreements.">
+            <div class="ml-stack">
+                <MudGrid Spacing="3">
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="_draft.SignatoryName" Label="@T["Signatory Full Name"]" Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="e.g. John Smith" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="_draft.SignatoryTitle" Label="@T["Designation / Job Title"]" Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="e.g. Managing Director / Authorized Signatory" />
+                    </MudItem>
+                </MudGrid>
+
+                @if (!string.IsNullOrWhiteSpace(_draft.SignatureUrl))
+                {
+                    <div class="pa-4 rounded mt-2" style="border: 2px dashed var(--mud-palette-divider); background: var(--mud-palette-surface); max-width: 400px;">
+                        <div class="text-caption ml-muted mb-1">@T["Signature Preview"]</div>
+                        <div class="d-flex align-center justify-center my-2" style="min-height: 50px;">
+                            @if (_draft.SignatureUrl.StartsWith("data:image") || _draft.SignatureUrl.StartsWith("http"))
+                            {
+                                <img src="@_draft.SignatureUrl" alt="Authorized Signature" style="max-height: 60px; max-width: 220px; object-fit: contain;" />
+                            }
+                            else
+                            {
+                                <div style="font-family: 'Brush Script MT', 'cursive', 'Georgia'; font-size: 2rem; color: var(--mud-palette-primary);">
+                                    @_draft.SignatureUrl
+                                </div>
+                            }
+                        </div>
+                        <div class="d-flex justify-space-between align-center pt-2 mt-2" style="border-top: 1px solid var(--mud-palette-divider);">
+                            <div class="text-caption">
+                                <strong>@(!string.IsNullOrWhiteSpace(_draft.SignatoryName) ? _draft.SignatoryName : T["Authorized Signatory"])</strong>
+                                @if (!string.IsNullOrWhiteSpace(_draft.SignatoryTitle))
+                                {
+                                    <span class="ml-muted"> • @_draft.SignatoryTitle</span>
+                                }
+                            </div>
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="() => _draft.SignatureUrl = null" Title="@T["Remove Signature"]" />
+                        </div>
+                    </div>
+                }
+
+                <div class="d-flex align-center flex-wrap gap-3 mt-2">
+                    <label class="mud-button-root mud-button mud-button-outlined mud-button-outlined-primary mud-button-outlined-size-small" style="cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                        <MudIcon Icon="@Icons.Material.Outlined.Draw" Size="Size.Small" />
+                        <span>@T["Upload Signature Image"]</span>
+                        <InputFile OnChange="OnSignatureFileSelected" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="display:none;" />
+                    </label>
+
+                    @if (!string.IsNullOrWhiteSpace(_draft.SignatoryName))
+                    {
+                        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Size="Size.Small" StartIcon="@Icons.Material.Outlined.EditNote" OnClick="AdoptTypedSignature">
+                            @T["Adopt Typed Signature ({0})", _draft.SignatoryName]
+                        </MudButton>
+                    }
+                </div>
+
+                <MudTextField @bind-Value="_draft.SignatureUrl" Label="@T["Or provide Signature Image URL / Text"]"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="@T["Signature image URL or digital signature text"]" />
             </div>
         </MlCard>
 
@@ -93,6 +185,7 @@
         public string CompanyName { get; set; } = string.Empty;
         public string? Email { get; set; }
         public string? Phone { get; set; }
+        public string? Address { get; set; }
         public string DefaultLanguage { get; set; } = "en";
         public string TimeZoneId { get; set; } = "UTC";
         public int WeekStartDay { get; set; } = 1;
@@ -102,11 +195,14 @@
         public decimal DefaultTaxRate { get; set; }
         public string? TaxRegistrationNumber { get; set; }
         public string? PrimaryColor { get; set; }
+        public string? LogoUrl { get; set; }
+        public string? SignatureUrl { get; set; }
+        public string? SignatoryName { get; set; }
+        public string? SignatoryTitle { get; set; }
     }
 
     private string? Err(string field) => _errors.TryGetValue(field, out var message) ? message : null;
 
-    /// <summary>The same rules as the server (hex format and contrast with white text), so the mistake shows before saving.</summary>
     private string? BrandProblem => BrandColor.Validate(_draft.PrimaryColor);
 
     private string SwatchStyle => "display:inline-block;width:32px;height:32px;border-radius:8px;border:1px solid var(--ml-border);background:"
@@ -134,6 +230,7 @@
                 CompanyName = _model.CompanyName,
                 Email = _model.Email,
                 Phone = _model.Phone,
+                Address = _model.Address,
                 DefaultLanguage = _model.DefaultLanguage,
                 TimeZoneId = _model.TimeZoneId,
                 WeekStartDay = _model.WeekStartDay,
@@ -143,6 +240,10 @@
                 DefaultTaxRate = _model.DefaultTaxRate,
                 TaxRegistrationNumber = _model.TaxRegistrationNumber,
                 PrimaryColor = _model.PrimaryColor,
+                LogoUrl = _model.LogoUrl,
+                SignatureUrl = _model.SignatureUrl,
+                SignatoryName = _model.SignatoryName,
+                SignatoryTitle = _model.SignatoryTitle,
             };
         }
         catch (HttpRequestException)
@@ -155,9 +256,69 @@
         }
     }
 
+    private async Task OnLogoFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file is null) return;
+        if (file.Size > 2 * 1024 * 1024)
+        {
+            Snackbar.Add(T["Image file size must be under 2MB."], Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            using var stream = file.OpenReadStream(2 * 1024 * 1024);
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            var bytes = ms.ToArray();
+            var contentType = string.IsNullOrWhiteSpace(file.ContentType) ? "image/png" : file.ContentType;
+            _draft.LogoUrl = $"data:{contentType};base64,{Convert.ToBase64String(bytes)}";
+            Snackbar.Add(T["Logo uploaded successfully!"], Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Upload failed: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task OnSignatureFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file is null) return;
+        if (file.Size > 2 * 1024 * 1024)
+        {
+            Snackbar.Add(T["Signature image size must be under 2MB."], Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            using var stream = file.OpenReadStream(2 * 1024 * 1024);
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            var bytes = ms.ToArray();
+            var contentType = string.IsNullOrWhiteSpace(file.ContentType) ? "image/png" : file.ContentType;
+            _draft.SignatureUrl = $"data:{contentType};base64,{Convert.ToBase64String(bytes)}";
+            Snackbar.Add(T["Signature uploaded successfully!"], Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Upload failed: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void AdoptTypedSignature()
+    {
+        if (!string.IsNullOrWhiteSpace(_draft.SignatoryName))
+        {
+            _draft.SignatureUrl = _draft.SignatoryName.Trim();
+            Snackbar.Add(T["Typed digital signature adopted!"], Severity.Info);
+        }
+    }
+
     private async Task SaveAsync()
     {
-        // The button stays enabled so people can see why a save is refused (plan 18.8.4). The message is already under the field.
         if (BrandProblem is not null)
         {
             Snackbar.Add(T["Please fix the highlighted fields."], Severity.Error);
@@ -171,7 +332,8 @@
             var request = new SaveCompanySettingsRequest(
                 _draft.CompanyName, _draft.Email, _draft.Phone, _draft.DefaultLanguage, _draft.TimeZoneId,
                 _draft.WeekStartDay, _draft.FiscalYearStartMonth, _draft.TaxEnabled, _draft.TaxLabel,
-                _draft.DefaultTaxRate, _draft.TaxRegistrationNumber, string.IsNullOrWhiteSpace(_draft.PrimaryColor) ? null : _draft.PrimaryColor.Trim());
+                _draft.DefaultTaxRate, _draft.TaxRegistrationNumber, string.IsNullOrWhiteSpace(_draft.PrimaryColor) ? null : _draft.PrimaryColor.Trim(),
+                _draft.Address, _draft.LogoUrl, _draft.SignatureUrl, _draft.SignatoryName, _draft.SignatoryTitle);
 
             var response = await Http.PutAsJsonAsync("api/v1/settings/company", request);
             if (response.IsSuccessStatusCode)
@@ -194,5 +356,3 @@
         }
     }
 }
-
-

@@ -29,6 +29,8 @@ public sealed class PaymentLinkDto
     public string? InvoiceNumber { get; set; }
     public Guid? QuoteId { get; set; }
     public string? QuoteNumber { get; set; }
+    public string? CompanyName { get; set; }
+    public string? CompanyLogoUrl { get; set; }
     public string? CustomerEmail { get; set; }
     public string? CustomerName { get; set; }
     public string PaymentToken { get; set; } = string.Empty;
@@ -62,6 +64,8 @@ public sealed class PublicCheckoutDto
     public bool AllowPartial { get; set; }
     public string? InvoiceNumber { get; set; }
     public string? QuoteNumber { get; set; }
+    public string? CompanyName { get; set; }
+    public string? CompanyLogoUrl { get; set; }
 }
 
 public sealed class ProcessPaymentRequest

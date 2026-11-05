@@ -158,6 +158,7 @@ public sealed class PaymentLinkService(
             }
 
             var remaining = Math.Max(0, link.Amount - link.PaidAmount);
+            var settings = await db.TenantSettings.IgnoreQueryFilters().FirstOrDefaultAsync(s => s.TenantId == link.TenantId, ct);
 
             return new PublicCheckoutDto
             {
@@ -177,7 +178,9 @@ public sealed class PaymentLinkService(
                 ExpiresAt = link.ExpiresAt,
                 AllowPartial = link.AllowPartial,
                 InvoiceNumber = link.Invoice?.InvoiceNumber,
-                QuoteNumber = link.Quote?.QuoteNumber
+                QuoteNumber = link.Quote?.QuoteNumber,
+                CompanyName = settings?.CompanyName,
+                CompanyLogoUrl = settings?.LogoUrl
             };
         }
     }
