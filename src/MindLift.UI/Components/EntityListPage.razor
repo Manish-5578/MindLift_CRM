@@ -24,6 +24,12 @@
                 }
             </MudButtonGroup>
             </div>
+            @if (CurrentView is { SavedId: { } currentViewSavedId, CanDelete: true } && OnRenameView.HasDelegate)
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Edit" OnClick="() => OpenRenameView(currentViewSavedId, CurrentView.Label)" aria-label="@T["Rename view"]" data-testid="rename-view">
+                    @T["Rename view"]
+                </MudButton>
+            }
             @if (CurrentView is { SavedId: { } savedId, CanDelete: true } && OnDeleteView.HasDelegate)
             {
                 <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small" StartIcon="@Icons.Material.Outlined.DeleteOutline" OnClick="() => DeleteViewAsync(savedId)" aria-label="@T["Delete view"]" data-testid="delete-view">
@@ -37,8 +43,15 @@
                     @foreach (var sv in SavedViews.Where(v => v.CanDelete && v.SavedId.HasValue))
                     {
                         var svId = sv.SavedId!.Value;
+                        var svLabel = sv.Label;
+                        if (OnRenameView.HasDelegate)
+                        {
+                            <MudMenuItem Icon="@Icons.Material.Outlined.Edit" OnClick="() => OpenRenameView(svId, svLabel)">
+                                @T["Rename '{0}'", svLabel]
+                            </MudMenuItem>
+                        }
                         <MudMenuItem Icon="@Icons.Material.Outlined.DeleteOutline" IconColor="Color.Error" OnClick="() => DeleteViewAsync(svId)">
-                            @T["Delete '{0}'", sv.Label]
+                            @T["Delete '{0}'", svLabel]
                         </MudMenuItem>
                     }
                 </MudMenu>
@@ -242,6 +255,17 @@
     </div>
 </MudDrawer>
 
+<MudDialog @bind-Visible="_renameViewOpen" Options="new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true }" data-testid="rename-view-dialog">
+    <TitleContent><MudText Typo="Typo.h6">@T["Rename view"]</MudText></TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_renameViewName" Label="@T["View Name"]" Variant="Variant.Outlined" MaxLength="80" Required="true" data-testid="rename-view-name" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _renameViewOpen = false">@T["Cancel"]</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="string.IsNullOrWhiteSpace(_renameViewName)" OnClick="ConfirmRenameViewAsync" data-testid="rename-view-confirm">@T["Save"]</MudButton>
+    </DialogActions>
+</MudDialog>
+
 <MudDialog @bind-Visible="_saveViewOpen" Options="new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true }" data-testid="save-view-dialog">
     <TitleContent><MudText Typo="Typo.h6">@T["Save view"]</MudText></TitleContent>
     <DialogContent>
@@ -318,6 +342,7 @@
     /// <summary>Stores a new saved view. Without it there is no "Save view" button.</summary>
     [Parameter] public EventCallback<SaveViewRequest> OnSaveView { get; set; }
 
+    [Parameter] public EventCallback<(Guid Id, string NewName)> OnRenameView { get; set; }
     [Parameter] public EventCallback<Guid> OnDeleteView { get; set; }
 
     /// <summary>Where this list remembers the columns a user hid, in the browser (for example "leads").</summary>
@@ -330,6 +355,23 @@
     private bool _saveViewOpen;
     private string _viewName = string.Empty;
     private bool _viewShared;
+    private bool _renameViewOpen;
+    private Guid _renameViewId;
+    private string _renameViewName = string.Empty;
+
+    private void OpenRenameView(Guid id, string currentName)
+    {
+        _renameViewId = id;
+        _renameViewName = currentName;
+        _renameViewOpen = true;
+    }
+
+    private async Task ConfirmRenameViewAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_renameViewName)) return;
+        _renameViewOpen = false;
+        await OnRenameView.InvokeAsync((_renameViewId, _renameViewName.Trim()));
+    }
 
     public IReadOnlyList<ListView> AllViewsList => AllViews;
 

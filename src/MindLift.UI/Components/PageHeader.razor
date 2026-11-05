@@ -6,11 +6,11 @@
         <MudBreadcrumbs Items="TranslatedBreadcrumbs" Class="ml-breadcrumbs" MaxItems="4" />
     }
     <div class="ml-page-header__row">
-        <div class="ml-page-header__titles">
-            <MudText Typo="Typo.h4" Class="ml-truncate" data-testid="page-title">@(TranslateTitle ? T[Title] : Title)</MudText>
+        <div class="ml-page-header__titles" style="min-width:0; max-width:100%; overflow:hidden;">
+            <MudText Typo="Typo.h4" Class="ml-truncate" title="@(TranslateTitle ? T[Title] : Title)" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;" data-testid="page-title">@(TranslateTitle ? T[Title] : Title)</MudText>
             @if (!string.IsNullOrWhiteSpace(Subtitle))
             {
-                <MudText Typo="Typo.body2" Class="ml-muted">@T[Subtitle]</MudText>
+                <MudText Typo="Typo.body2" Class="ml-muted ml-truncate" title="@Subtitle" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;">@T[Subtitle]</MudText>
             }
         </div>
         @if (Actions is not null)

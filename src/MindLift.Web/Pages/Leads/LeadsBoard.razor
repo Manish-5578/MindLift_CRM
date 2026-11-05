@@ -88,8 +88,8 @@
 
         _card = lead =>
             @<div class="ml-stack-sm">
-                <a href="@("/leads/" + lead.Id)" draggable="false" class="ml-link" style="text-decoration:none">
-                    <MudText Typo="Typo.subtitle1" Class="ml-truncate">@LeadTitle(lead)</MudText>
+                <a href="@("/leads/" + lead.Id)" draggable="false" class="ml-link" style="text-decoration:none; display:block; overflow:hidden;">
+                    <MudText Typo="Typo.subtitle1" Class="ml-truncate" title="@LeadTitle(lead)" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">@LeadTitle(lead)</MudText>
                 </a>
                 <MudText Typo="Typo.body2" Class="ml-muted ml-truncate">@LeadSubtitle(lead)</MudText>
                 <div class="ml-row ml-row--between">

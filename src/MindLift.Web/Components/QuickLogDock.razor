@@ -154,28 +154,7 @@
                     </div>
                 </MudTabPanel>
 
-                <MudTabPanel Text="@T["Note"]" Icon="@Icons.Material.Outlined.StickyNote2">
-                    <div class="pa-3 d-flex flex-column gap-2">
-                        <MudTextField @bind-Value="_noteSubject" Label="@T["Note Title *"]" Placeholder="@T["e.g. Budget update, Internal reminder"]"
-                                      Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" />
 
-                        <MudTextField @bind-Value="_noteContent" Label="@T["Note Content *"]" Placeholder="@T["Write notes here..."]"
-                                      Variant="Variant.Outlined" Margin="Margin.Dense" Lines="4" Required="true" />
-
-                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LogNoteAsync" Disabled="@(_saving || string.IsNullOrWhiteSpace(_noteSubject) || !_targetId.HasValue)" data-testid="quick-log-note-btn">
-                            @if (_saving)
-                            {
-                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="me-2" />
-                                @T["Saving Note..."]
-                            }
-                            else
-                            {
-                                <MudIcon Icon="@Icons.Material.Filled.Save" Size="Size.Small" Class="me-1" />
-                                @T["Save Note"]
-                            }
-                        </MudButton>
-                    </div>
-                </MudTabPanel>
 
                 <MudTabPanel Text="@T["Task"]" Icon="@Icons.Material.Outlined.TaskAlt">
                     <div class="pa-3 d-flex flex-column gap-2">

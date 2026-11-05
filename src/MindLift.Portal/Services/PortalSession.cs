@@ -11,7 +11,7 @@ namespace MindLift.Portal.Services;
 /// The signed-in customer for one company (slug). The access token lives in memory and sessionStorage;
 /// the refresh token is an HttpOnly cookie the browser sends to /api/v1/portal/{slug}/auth.
 /// </summary>
-public sealed class PortalSession(NavigationManager nav, IJSRuntime? js = null)
+public sealed class PortalSession(NavigationManager nav, IJSRuntime? js = null) : IDisposable
 {
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
     private HttpClient? _raw;
@@ -77,6 +77,7 @@ public sealed class PortalSession(NavigationManager nav, IJSRuntime? js = null)
     public void SignIn(PortalLoginResponse login)
     {
         User = login;
+        StartBackgroundRefresh();
         if (!string.IsNullOrWhiteSpace(Slug) && js is not null)
         {
             try
@@ -91,7 +92,27 @@ public sealed class PortalSession(NavigationManager nav, IJSRuntime? js = null)
         Changed?.Invoke();
     }
 
-    public bool ExpiresSoon => User?.ExpiresAtUtc is { } exp && exp <= DateTime.UtcNow.AddSeconds(60);
+    public bool ExpiresSoon => User?.ExpiresAtUtc is { } exp && exp <= DateTime.UtcNow.AddMinutes(5);
+
+    private Timer? _slidingRefreshTimer;
+
+    private void StartBackgroundRefresh()
+    {
+        _slidingRefreshTimer?.Dispose();
+        _slidingRefreshTimer = new Timer(_ =>
+        {
+            if (IsSignedIn && ExpiresSoon)
+            {
+                _ = TryRefreshAsync();
+            }
+        }, null, TimeSpan.FromMinutes(2), TimeSpan.FromMinutes(2));
+    }
+
+    public void Dispose()
+    {
+        _slidingRefreshTimer?.Dispose();
+        _refreshLock.Dispose();
+    }
 
     /// <summary>Uses the refresh cookie to get a new access token. Returns false when the session has ended.</summary>
     public async Task<bool> TryRefreshAsync()
@@ -139,6 +160,7 @@ public sealed class PortalSession(NavigationManager nav, IJSRuntime? js = null)
                     }
                 }
                 User = null;
+                _slidingRefreshTimer?.Dispose();
             }
 
             return false;
@@ -155,6 +177,7 @@ public sealed class PortalSession(NavigationManager nav, IJSRuntime? js = null)
 
     public async Task SignOutAsync()
     {
+        _slidingRefreshTimer?.Dispose();
         if (Slug is not null)
         {
             if (js is not null)

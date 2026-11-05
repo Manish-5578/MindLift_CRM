@@ -17,7 +17,7 @@ public sealed class TokenService(IOptions<JwtOptions> options, IClock clock)
     public (string Token, DateTime ExpiresAtUtc) CreateAccessToken(AppUser user, bool isPlatformAdmin)
     {
         var now = clock.UtcNow;
-        var expires = now.AddMinutes(_options.AccessTokenMinutes);
+        var expires = now.AddMinutes(Math.Max(_options.AccessTokenMinutes, 60));
 
         var claims = new List<Claim>
         {

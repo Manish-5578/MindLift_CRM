@@ -11,8 +11,8 @@
                 <MudIcon Icon="@Icons.Material.Filled.Transform" />
             </MudAvatar>
             <div>
-                <MudText Typo="Typo.h6" Style="font-weight:700">@(TargetMode == "contact" ? T["Move Lead to Contact"] : TargetMode == "engagement" ? T["Move Lead to Engagement"] : T["Convert Lead to Customer"])</MudText>
-                <MudText Typo="Typo.caption" Class="mud-text-secondary">@(TargetMode == "contact" ? T["Complete any missing details to create an active contact from this lead."] : TargetMode == "engagement" ? T["Set up the engagement details, pipeline stage, and converted customer."] : T["Transform this lead into an active contact, organization account, and deal pipeline opportunity."])</MudText>
+                <MudText Typo="Typo.h6" Style="font-weight:700">@(TargetMode == "engagement" ? T["Move Lead to Engagement"] : T["Convert Lead to Customer"])</MudText>
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">@(TargetMode == "engagement" ? T["Set up the engagement details, pipeline stage, and converted customer."] : T["Transform this lead into an active contact, organization account, and deal pipeline opportunity."])</MudText>
             </div>
         </div>
     </TitleContent>
@@ -312,11 +312,7 @@
                 _contactFirstName = parts.Length > 0 ? parts[0] : "";
                 _contactLastName = parts.Length > 1 ? parts[1] : "";
 
-                if (TargetMode == "contact")
-                {
-                    _createDeal = false;
-                }
-                else if (TargetMode == "engagement")
+                if (TargetMode == "engagement")
                 {
                     _createDeal = true;
                 }

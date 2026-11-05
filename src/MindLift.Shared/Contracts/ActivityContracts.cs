@@ -8,7 +8,7 @@ public static class ActivityTypes
     public const string Meeting = "Meeting";
     public const string Note = "Note";
 
-    public static readonly IReadOnlyList<string> All = [Task, Call, Meeting, Note];
+    public static readonly IReadOnlyList<string> All = [Task, Call, Meeting];
 }
 
 public sealed record ActivityDto(

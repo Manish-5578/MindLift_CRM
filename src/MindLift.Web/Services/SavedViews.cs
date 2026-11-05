@@ -41,6 +41,25 @@ public static class SavedViews
         return response.IsSuccessStatusCode ? null : await ProblemText.FromAsync(response, failure);
     }
 
+    /// <summary>Renames an existing saved view.</summary>
+    public static async Task<string?> RenameAsync(HttpClient http, Guid id, string newName, string entity, string failure)
+    {
+        try
+        {
+            var existing = await http.GetFromJsonAsync<List<SavedViewDto>>($"api/v1/views/{entity}");
+            var current = existing?.FirstOrDefault(v => v.Id == id);
+            if (current is null) return failure;
+
+            var response = await http.PutAsJsonAsync($"api/v1/views/{id}",
+                new SaveSavedViewRequest(entity, newName, current.IsShared, current.IsDefault, current.Filter, current.Columns, current.SortField, current.SortDir));
+            return response.IsSuccessStatusCode ? null : await ProblemText.FromAsync(response, failure);
+        }
+        catch (HttpRequestException ex)
+        {
+            return ex.Message;
+        }
+    }
+
     /// <summary>Deletes a view. Returns null on success, or the reason it could not be deleted.</summary>
     public static async Task<string?> DeleteAsync(HttpClient http, Guid id, string failure)
     {

@@ -8,7 +8,7 @@
         <MudText Typo="Typo.body1" Class="ml-muted">@T[Message]</MudText>
     </DialogContent>
     <DialogActions>
-        <MudButton Variant="Variant.Text" OnClick="Cancel" data-testid="confirm-cancel">@T["Cancel"]</MudButton>
+        <MudButton Variant="Variant.Text" OnClick="Cancel" data-testid="confirm-cancel">@T[CancelText]</MudButton>
         <MudButton Variant="Variant.Filled" Color="@(Danger ? Color.Error : Color.Primary)" OnClick="Confirm" data-testid="confirm-ok">@T[ConfirmText]</MudButton>
     </DialogActions>
 </MudDialog>
@@ -19,6 +19,7 @@
     [Parameter] public string Title { get; set; } = "Are you sure?";
     [Parameter] public string Message { get; set; } = string.Empty;
     [Parameter] public string ConfirmText { get; set; } = "Confirm";
+    [Parameter] public string CancelText { get; set; } = "Cancel";
 
     /// <summary>Destructive actions use the error colour so the button reads as risky.</summary>
     [Parameter] public bool Danger { get; set; }

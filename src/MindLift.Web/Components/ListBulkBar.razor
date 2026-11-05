@@ -88,7 +88,7 @@
     private async Task DeleteAsync()
     {
         var count = Selection.Count.ToString("N0");
-        if (!await Dialogs.ConfirmAsync(T["Delete {0} {1}?", count, ItemLabel], T["This cannot be undone."], T["Delete"], danger: true))
+        if (!await Dialogs.ConfirmAsync(T["Are you sure you want to delete?"], T["Are you sure you want to delete {0} {1}? This cannot be undone.", count, ItemLabel], T["Yes"], danger: true, cancelText: T["No"]))
         {
             return;
         }

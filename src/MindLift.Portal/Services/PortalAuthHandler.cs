@@ -10,7 +10,7 @@ public sealed class PortalAuthHandler(PortalSession session) : DelegatingHandler
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         request.SetBrowserRequestCredentials(BrowserRequestCredentials.Include);
-        if (session.IsSignedIn && session.ExpiresSoon)
+        if (session.IsSignedIn && (session.ExpiresSoon || session.User?.ExpiresAtUtc <= DateTime.UtcNow))
         {
             await session.TryRefreshAsync();
         }
@@ -18,13 +18,16 @@ public sealed class PortalAuthHandler(PortalSession session) : DelegatingHandler
         Attach(request);
         var response = await base.SendAsync(request, cancellationToken);
 
-        if (response.StatusCode == HttpStatusCode.Unauthorized && request.Content is null && await session.TryRefreshAsync())
+        if (response.StatusCode == HttpStatusCode.Unauthorized && await session.TryRefreshAsync())
         {
-            response.Dispose();
-            var retry = new HttpRequestMessage(request.Method, request.RequestUri);
-            retry.SetBrowserRequestCredentials(BrowserRequestCredentials.Include);
-            Attach(retry);
-            response = await base.SendAsync(retry, cancellationToken);
+            if (request.Content is null)
+            {
+                response.Dispose();
+                var retry = new HttpRequestMessage(request.Method, request.RequestUri);
+                retry.SetBrowserRequestCredentials(BrowserRequestCredentials.Include);
+                Attach(retry);
+                response = await base.SendAsync(retry, cancellationToken);
+            }
         }
 
         return response;

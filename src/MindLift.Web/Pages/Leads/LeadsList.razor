@@ -18,7 +18,7 @@
         <EntityListPage @ref="_list" TItem="LeadListItemDto" Title="@App.ModuleLabel(AppModule.Leads)" ItemLabel="@ItemLabel"
                         Views="_views" DefaultView="@AllView" Columns="_columns" CardTemplate="_card" Loader="LoadAsync" RowHref="LeadHref"
                         Fields="LeadFields" Picklists="App.Bootstrap.Picklists" Users="_users"
-                        ItemId="r => r.Id" SavedViews="_savedViews" OnSaveView="SaveViewAsync" OnDeleteView="DeleteViewAsync" ColumnStorageKey="leads"
+                        ItemId="r => r.Id" SavedViews="_savedViews" OnSaveView="SaveViewAsync" OnRenameView="RenameViewAsync" OnDeleteView="DeleteViewAsync" ColumnStorageKey="leads"
                         SearchPlaceholder="Search name, email, company or phone" EmptyIcon="@Icons.Material.Outlined.PersonSearch"
                         EmptyTitle="No leads yet" EmptyMessage="Leads from web forms, WhatsApp, email or imports appear here."
                         DefaultSortField="created_at" DefaultSortDir="desc">
@@ -63,8 +63,7 @@
                 </div>
             </BulkActions>
             <RowMenu Context="row">
-                <MudMenuItem Href="@("/leads/" + row.Id)" Icon="@Icons.Material.Outlined.OpenInNew" data-testid="row-open">@T["Open"]</MudMenuItem>
-                <MudMenuItem OnClick="() => AddToContactAsync(row)" Icon="@Icons.Material.Outlined.PersonAdd" data-testid="row-add-contact">@T["Add to contact"]</MudMenuItem>
+                <MudMenuItem Href="@LeadHref(row)" Icon="@Icons.Material.Outlined.OpenInNew" data-testid="row-open">@T["Open"]</MudMenuItem>
                 <MudMenuItem OnClick="() => MoveToEngagementAsync(row)" Icon="@Icons.Material.Outlined.Handshake" data-testid="row-move-engagement">@T["Move to engagement"]</MudMenuItem>
                 <MudMenuItem OnClick="() => OpenStickyNoteAsync(row)" Icon="@Icons.Material.Outlined.EditNote" data-testid="row-notes">@T["Notes"]</MudMenuItem>
                 @if (CanEditRecords)
@@ -309,7 +308,11 @@
         }
     }
 
-    private static string? LeadHref(LeadListItemDto lead) => "/leads/" + lead.Id;
+    private string? LeadHref(LeadListItemDto lead)
+    {
+        var view = _list?.CurrentViewKey;
+        return string.IsNullOrEmpty(view) ? $"/leads/{lead.Id}" : $"/leads/{lead.Id}?returnView={Uri.EscapeDataString(view)}";
+    }
 
     private static string LeadTitle(LeadListItemDto lead) =>
         !string.IsNullOrWhiteSpace(lead.CompanyName) ? lead.CompanyName : (!string.IsNullOrWhiteSpace(lead.FullName) ? lead.FullName : "—");
@@ -318,49 +321,6 @@
         !string.IsNullOrWhiteSpace(lead.FullName) ? lead.FullName : (lead.Email ?? lead.Phone ?? "—");
 
     private static string Secondary(LeadListItemDto lead) => LeadSubtitle(lead);
-
-    private async Task AddToContactAsync(LeadListItemDto lead)
-    {
-        bool hasSufficient = (!string.IsNullOrWhiteSpace(lead.FirstName) || !string.IsNullOrWhiteSpace(lead.LastName) || !string.IsNullOrWhiteSpace(lead.FullName))
-            && lead.FullName != "—";
-
-        if (hasSufficient)
-        {
-            try
-            {
-                var res = await Http.PostAsJsonAsync($"api/v1/leads/{lead.Id}/quick-convert-contact", new QuickConvertContactRequest());
-                if (res.IsSuccessStatusCode)
-                {
-                    var result = await res.Content.ReadFromJsonAsync<ConvertLeadResult>();
-                    Snackbar.Add(T["Lead successfully added to Contacts!"], Severity.Success, config =>
-                    {
-                        if (result?.ContactId != null)
-                        {
-                            config.Action = T["View Contact"];
-                            config.ActionColor = Color.Primary;
-                            config.OnClick = _ => { Nav.NavigateTo($"/contacts/{result.ContactId}"); return Task.CompletedTask; };
-                        }
-                    });
-                    if (_list is not null) await _list.ReloadAsync();
-                    return;
-                }
-            }
-            catch { /* fallback to dialog */ }
-        }
-
-        var parameters = new DialogParameters<LeadConvertDialog>
-        {
-            { x => x.LeadId, lead.Id },
-            { x => x.TargetMode, "contact" }
-        };
-        var dialog = await Dialogs.ShowAsync<LeadConvertDialog>(T["Move Lead to Contact"], parameters,
-            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true });
-        var diagResult = await dialog.Result;
-        if (!diagResult.Canceled && _list is not null)
-        {
-            await _list.ReloadAsync();
-        }
-    }
 
     private async Task MoveToEngagementAsync(LeadListItemDto lead)
     {
@@ -454,11 +414,11 @@
         {
             Header = "Company", SortField = "company_name",
             Cell = lead =>
-                @<div class="ml-cell-primary">
+                @<div class="ml-cell-primary" style="max-width: 280px; overflow: hidden;">
                     <UserAvatar Name="@LeadTitle(lead)" Id="@lead.Id" Size="32" />
-                    <div class="ml-cell-primary__text">
-                        <div class="d-flex align-center gap-1">
-                            <MudText Typo="Typo.subtitle2" Class="ml-truncate">@LeadTitle(lead)</MudText>
+                    <div class="ml-cell-primary__text" style="min-width:0; max-width: 230px; overflow: hidden;">
+                        <div class="d-flex align-center gap-1" style="min-width:0; overflow: hidden;">
+                            <span class="text-truncate" title="@LeadTitle(lead)" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:inline-block; max-width: 200px; font-weight: 600; font-size: 0.875rem;">@LeadTitle(lead)</span>
                             @if (!string.IsNullOrWhiteSpace(lead.Description))
                             {
                                 <MudTooltip Text="@lead.Description">
@@ -468,7 +428,7 @@
                                 </MudTooltip>
                             }
                         </div>
-                        <MudText Typo="Typo.caption" Class="ml-muted ml-truncate">@LeadSubtitle(lead)</MudText>
+                        <span class="text-truncate ml-muted" title="@LeadSubtitle(lead)" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:inline-block; max-width: 200px; font-size: 0.75rem;">@LeadSubtitle(lead)</span>
                     </div>
                 </div>,
         },
@@ -512,6 +472,14 @@
         new(NewView, "New", new FilterGroup
         {
             Conditions = [new FilterCondition { Field = "status", Op = FilterOperator.Eq, Value = JsonSerializer.SerializeToElement("new") }],
+        }),
+        new("disqualified", "Not interested", new FilterGroup
+        {
+            Conditions = [new FilterCondition { Field = "status", Op = FilterOperator.Eq, Value = JsonSerializer.SerializeToElement("disqualified") }],
+        }),
+        new("all_leads", "All leads", new FilterGroup
+        {
+            Conditions = [],
         }),
     ];
 
@@ -562,9 +530,23 @@
         await LoadSavedViewsAsync();
     }
 
+    private async Task RenameViewAsync((Guid Id, string NewName) args)
+    {
+        var problem = await SavedViews.RenameAsync(Http, args.Id, args.NewName, "leads", T["We could not rename this view."]);
+        if (problem is not null)
+        {
+            Snackbar.Add(problem, Severity.Error);
+            return;
+        }
+
+        Snackbar.Add(T["View renamed to {0}", args.NewName], Severity.Success);
+        await LoadSavedViewsAsync();
+        if (_list is not null) await _list.ReloadAsync();
+    }
+
     private async Task DeleteViewAsync(Guid id)
     {
-        if (!await Dialogs.ConfirmAsync(T["Delete this view?"], T["The tab is removed for everyone it was shared with."], T["Delete"], danger: true))
+        if (!await Dialogs.ConfirmAsync(T["Are you sure you want to delete?"], T["Are you sure you want to delete this view? The tab is removed for everyone it was shared with."], T["Yes"], danger: true))
         {
             return;
         }
@@ -594,7 +576,7 @@
 
     private async Task DeleteRowAsync(Guid id, string? name)
     {
-        if (!await Dialogs.ConfirmAsync(T["Delete {0}?", name ?? T["this record"]], T["This cannot be undone."], T["Delete"], danger: true))
+        if (!await Dialogs.ConfirmAsync(T["Are you sure you want to delete?"], T["Are you sure you want to delete {0}? This cannot be undone.", name ?? T["this record"]], T["Yes"], danger: true, cancelText: T["No"]))
         {
             return;
         }

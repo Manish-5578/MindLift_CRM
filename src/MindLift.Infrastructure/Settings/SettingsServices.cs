@@ -406,7 +406,7 @@ public sealed class SavedViewService(AppDbContext db, ITenantContext tenant, Set
             }
         }
 
-        // 2. Remove record from source saved view if source was an ID-scoped saved view
+        // 2. Remove record from source saved view (remove from ID inclusion or add ID exclusion)
         if (sourceId is { } sId && sId != targetId)
         {
             var sourceView = await db.SavedViews.FirstOrDefaultAsync(v => v.Id == sId, cancellationToken);
@@ -431,12 +431,60 @@ public sealed class SavedViewService(AppDbContext db, ITenantContext tenant, Set
                     }
 
                     idCondition.Value = JsonSerializer.SerializeToElement(currentIds.ToArray());
-                    sourceView.Filter = JsonDocument.Parse(JsonSerializer.Serialize(filterGroup));
+                }
+                else
+                {
+                    // For criteria-based source views, explicitly exclude the moved IDs so they don't linger in source
+                    var notInCondition = filterGroup.Conditions.FirstOrDefault(c => c.Field == "id" && c.Op == FilterOperator.NotIn);
+                    if (notInCondition?.Value is { ValueKind: JsonValueKind.Array } notInArr)
+                    {
+                        var excluded = new HashSet<Guid>();
+                        foreach (var item in notInArr.EnumerateArray())
+                        {
+                            if (item.TryGetGuid(out var g) && g != Guid.Empty) excluded.Add(g);
+                        }
+                        foreach (var id in ids) excluded.Add(id);
+                        notInCondition.Value = JsonSerializer.SerializeToElement(excluded.ToArray());
+                    }
+                    else
+                    {
+                        filterGroup.Conditions.Add(new FilterCondition
+                        {
+                            Field = "id",
+                            Op = FilterOperator.NotIn,
+                            Value = JsonSerializer.SerializeToElement(ids.ToArray())
+                        });
+                    }
+                }
+                sourceView.Filter = JsonDocument.Parse(JsonSerializer.Serialize(filterGroup));
+            }
+        }
+
+        // Clean up exclusion in target view if previously excluded
+        if (targetId is { } targetCleanId)
+        {
+            var targetView = await db.SavedViews.FirstOrDefaultAsync(v => v.Id == targetCleanId, cancellationToken);
+            if (targetView?.Filter is not null)
+            {
+                var filterGroup = JsonSerializer.Deserialize<FilterGroup>(targetView.Filter.RootElement.GetRawText()) ?? new FilterGroup();
+                var notInCondition = filterGroup.Conditions.FirstOrDefault(c => c.Field == "id" && c.Op == FilterOperator.NotIn);
+                if (notInCondition?.Value is { ValueKind: JsonValueKind.Array } notInArr)
+                {
+                    var remaining = new List<Guid>();
+                    foreach (var item in notInArr.EnumerateArray())
+                    {
+                        if (item.TryGetGuid(out var g) && !ids.Contains(g) && g != Guid.Empty) remaining.Add(g);
+                    }
+                    if (remaining.Count > 0)
+                        notInCondition.Value = JsonSerializer.SerializeToElement(remaining.ToArray());
+                    else
+                        filterGroup.Conditions.Remove(notInCondition);
+                    targetView.Filter = JsonDocument.Parse(JsonSerializer.Serialize(filterGroup));
                 }
             }
         }
 
-        // 3. Handle standard views for Leads
+        // 3. Handle standard views and status exclusivity for Leads
         if (request.EntityType == "leads")
         {
             var leads = await db.Leads.Where(l => ids.Contains(l.Id)).ToListAsync(cancellationToken);
@@ -446,13 +494,30 @@ public sealed class SavedViewService(AppDbContext db, ITenantContext tenant, Set
                 {
                     lead.Status = "new";
                 }
+                else if (request.TargetViewKey == "disqualified")
+                {
+                    lead.Status = "disqualified";
+                }
                 else if (request.TargetViewKey == "mine" && tenant.UserId is { } me)
                 {
                     lead.OwnerId = me;
+                    if (lead.Status == "disqualified") lead.Status = "working";
                 }
-                else if (request.TargetViewKey == "all")
+                else if (request.TargetViewKey == "all" || request.TargetViewKey == "all_leads")
                 {
-                    if (lead.Status == "disqualified")
+                    if (lead.Status == "disqualified" && request.TargetViewKey == "all")
+                    {
+                        lead.Status = "working";
+                    }
+                }
+                else
+                {
+                    // Moved from "new" to a custom or working view: ensure it no longer has "new" status
+                    if (request.SourceViewKey == "new" && lead.Status == "new")
+                    {
+                        lead.Status = "working";
+                    }
+                    if (request.SourceViewKey == "disqualified" && lead.Status == "disqualified")
                     {
                         lead.Status = "working";
                     }

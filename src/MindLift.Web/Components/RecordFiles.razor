@@ -27,7 +27,10 @@
             <div class="ml-row" style="padding:6px 0;border-bottom:1px solid var(--ml-border)" data-testid="record-file">
                 <MudIcon Icon="@Icons.Material.Outlined.InsertDriveFile" Class="ml-muted" />
                 <div class="ml-grow" style="min-width:0">
-                    <MudText Typo="Typo.body2" Class="ml-truncate">@current.FileName</MudText>
+                    <div class="d-flex align-center gap-1">
+                        <MudText Typo="Typo.body2" Class="ml-truncate">@current.FileName</MudText>
+                        <MudIconButton Icon="@Icons.Material.Outlined.Visibility" Size="Size.Small" Color="Color.Primary" Style="padding:2px;" OnClick="() => PreviewFileAsync(current)" Title="@T["Preview document"]" aria-label="@("Preview " + current.FileName)" data-testid="file-preview" />
+                    </div>
                     <MudText Typo="Typo.caption" Class="ml-muted">@Formatting.FileSize(current.SizeBytes) · <DateText Value="@current.CreatedAtUtc" /></MudText>
                 </div>
                 <MudIconButton Icon="@Icons.Material.Outlined.Download" Size="Size.Small" OnClick="() => DownloadAsync(current)" aria-label="@("Download " + current.FileName)" data-testid="file-download" />
@@ -39,6 +42,50 @@
         }
     </div>
 </MlCard>
+
+<MudDialog @bind-Visible="_previewOpen" Options="new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true, CloseButton = true }">
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Outlined.Visibility" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">@_previewFile?.FileName</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (_previewFile is not null)
+        {
+            var ext = System.IO.Path.GetExtension(_previewFile.FileName).ToLowerInvariant();
+            var url = $"api/v1/files/{_previewFile.Id}/download";
+            @if (ext is ".jpg" or ".jpeg" or ".png" or ".webp")
+            {
+                <div class="text-center pa-4">
+                    <img src="@url" alt="@_previewFile.FileName" style="max-width:100%; max-height:75vh; object-fit:contain; border-radius:6px;" />
+                </div>
+            }
+            else if (ext is ".pdf")
+            {
+                <iframe src="@url" style="width:100%; height:75vh; border:1px solid var(--ml-border); border-radius:6px;"></iframe>
+            }
+            else
+            {
+                <div class="pa-8 text-center">
+                    <MudIcon Icon="@Icons.Material.Outlined.InsertDriveFile" Size="Size.Large" Class="ml-muted mb-2" />
+                    <MudText Typo="Typo.body1">@_previewFile.FileName</MudText>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@Formatting.FileSize(_previewFile.SizeBytes)</MudText>
+                    <div class="mt-4">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Download" OnClick="() => DownloadAsync(_previewFile)">@T["Download to view"]</MudButton>
+                    </div>
+                </div>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        @if (_previewFile is not null)
+        {
+            <MudButton StartIcon="@Icons.Material.Outlined.Download" OnClick="() => DownloadAsync(_previewFile)">@T["Download"]</MudButton>
+        }
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => _previewOpen = false">@T["Close"]</MudButton>
+    </DialogActions>
+</MudDialog>
 
 @code {
     /// <summary>The kind of record: leads, contacts, accounts or deals.</summary>
@@ -132,9 +179,18 @@
         await JS.InvokeVoidAsync("mindlift.downloadFile", file.FileName, file.ContentType, Convert.ToBase64String(await response.Content.ReadAsByteArrayAsync()));
     }
 
+    private bool _previewOpen;
+    private StoredFileDto? _previewFile;
+
+    private void PreviewFileAsync(StoredFileDto file)
+    {
+        _previewFile = file;
+        _previewOpen = true;
+    }
+
     private async Task DeleteAsync(StoredFileDto file)
     {
-        if (!await Dialogs.ConfirmAsync($"Delete {file.FileName}?", T["The file is removed from this record."], T["Delete"], danger: true))
+        if (!await Dialogs.ConfirmAsync(T["Are you sure you want to delete?"], T["Are you sure you want to delete {0}? This cannot be undone.", file.FileName], T["Yes"], danger: true))
         {
             return;
         }

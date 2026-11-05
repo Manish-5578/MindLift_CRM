@@ -8,13 +8,14 @@ public static class DialogServiceExtensions
     /// Asks the user to confirm an action. Returns true only when they press the confirm button;
     /// Cancel, Esc and closing the dialog all return false. Use <paramref name="danger"/> for deletes and other risky actions.
     /// </summary>
-    public static async Task<bool> ConfirmAsync(this IDialogService dialogs, string title, string message, string confirmText = "Confirm", bool danger = false)
+    public static async Task<bool> ConfirmAsync(this IDialogService dialogs, string title, string message, string confirmText = "Confirm", bool danger = false, string cancelText = "Cancel")
     {
         var parameters = new DialogParameters<ConfirmDialog>
         {
             { x => x.Title, title },
             { x => x.Message, message },
             { x => x.ConfirmText, confirmText },
+            { x => x.CancelText, cancelText },
             { x => x.Danger, danger },
         };
 
@@ -22,6 +23,16 @@ public static class DialogServiceExtensions
         var reference = await dialogs.ShowAsync<ConfirmDialog>(title, parameters, options);
         var result = await reference.Result;
         return result is { Canceled: false } && result.Data is true;
+    }
+
+    public static async Task<bool> ConfirmDeleteAsync(this IDialogService dialogs, string itemName)
+    {
+        return await dialogs.ConfirmAsync(
+            "Are you sure you want to delete?",
+            $"Are you sure you want to delete {itemName}? This cannot be undone.",
+            confirmText: "Yes",
+            danger: true,
+            cancelText: "No");
     }
 
     /// <summary>

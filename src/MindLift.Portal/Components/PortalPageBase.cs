@@ -91,8 +91,11 @@ public abstract class PortalPageBase : ComponentBase, IDisposable
 
         if (RequiresSignIn && !Session.IsSignedIn)
         {
-            Nav.NavigateTo(Link("login"));
-            return;
+            if (!await Session.TryRefreshAsync())
+            {
+                Nav.NavigateTo(Link("login"));
+                return;
+            }
         }
 
         await LoadAsync();

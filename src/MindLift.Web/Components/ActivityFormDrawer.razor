@@ -54,7 +54,7 @@
     {
         get
         {
-            var fields = new List<FormField> { new("subject", _type == ActivityTypes.Note ? "Title" : "Subject", Required: true, TestId: "activity-subject") };
+            var fields = new List<FormField> { new("subject", "Subject", Required: true, TestId: "activity-subject") };
             switch (_type)
             {
                 case ActivityTypes.Task:
@@ -79,16 +79,8 @@
                     break;
             }
 
-            if (_type == ActivityTypes.Note)
-            {
-                fields.Add(new("mentions", "Mention people", FormFieldKind.Users, TestId: "activity-mentions"));
-            }
-
-            fields.Add(new("description", _type == ActivityTypes.Note ? "Note" : "Details", FormFieldKind.Multiline, TestId: "activity-description"));
-            if (_type != ActivityTypes.Note)
-            {
-                fields.Add(new("ownerId", "Assigned to", FormFieldKind.User));
-            }
+            fields.Add(new("description", "Details", FormFieldKind.Multiline, TestId: "activity-description"));
+            fields.Add(new("ownerId", "Assigned to", FormFieldKind.User));
 
             return fields;
         }
@@ -152,7 +144,15 @@
 
     private string? Value(string key) => string.IsNullOrWhiteSpace(_values.GetValueOrDefault(key)) ? null : _values[key]!.Trim();
 
-    private async Task OnOpenChanged(bool value) => await OpenChanged.InvokeAsync(value);
+    private async Task OnOpenChanged(bool value)
+    {
+        Open = value;
+        if (!value)
+        {
+            Reset();
+        }
+        await OpenChanged.InvokeAsync(value);
+    }
 
     private async Task SaveAsync()
     {
@@ -161,6 +161,18 @@
         if (Value("subject") is null)
         {
             _fieldErrors = new Dictionary<string, string> { ["subject"] = "Enter a subject." };
+            return;
+        }
+
+        if (int.TryParse(Value("durationMinutes"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var checkDuration) && checkDuration < 0)
+        {
+            _fieldErrors = new Dictionary<string, string> { ["durationMinutes"] = "Minutes cannot be negative." };
+            return;
+        }
+
+        if (int.TryParse(Value("reminderMinutes"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var checkReminder) && checkReminder < 0)
+        {
+            _fieldErrors = new Dictionary<string, string> { ["reminderMinutes"] = "Reminder minutes cannot be negative." };
             return;
         }
 

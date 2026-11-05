@@ -45,11 +45,13 @@
             if (!discard)
             {
                 // The drawer closed itself in the browser. Tell it to stay open.
+                Open = true;
                 await OpenChanged.InvokeAsync(true);
                 return;
             }
         }
 
+        Open = value;
         await OpenChanged.InvokeAsync(value);
     }
 }

@@ -234,3 +234,13 @@ html[dir="rtl"] .ml-nav .mud-nav-link.active { box-shadow:inset -3px 0 0 var(--m
 
 /* The router moves focus to the page heading on each navigation (for screen readers). It is not something to type in, so it draws no outline. */
 h1[tabindex="-1"]:focus, h1[tabindex="-1"]:focus-visible, [tabindex="-1"]:focus:not(input):not(textarea):not(select):not(button) { outline: none; box-shadow: none; }
+
+/* Ensure closed / inactive drawer backdrops never intercept clicks or block other tabs */
+.mud-overlay:not(.mud-overlay--open),
+.mud-drawer--closed ~ .mud-drawer-overlay,
+.mud-drawer-overlay:not(.mud-overlay--open),
+.mud-drawer-overlay[style*="visibility: hidden"],
+.mud-drawer-overlay[style*="display: none"] {
+    pointer-events: none !important;
+    display: none !important;
+}

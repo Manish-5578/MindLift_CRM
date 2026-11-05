@@ -125,6 +125,14 @@
 
     private async Task SetAsync(string key, string? value)
     {
+        var field = Fields.FirstOrDefault(f => f.Key == key);
+        if (field?.Kind == FormFieldKind.Number && value is not null)
+        {
+            if (value.StartsWith('-') || (int.TryParse(value, out var n) && n < 0))
+            {
+                value = "0";
+            }
+        }
         Values[key] = value;
         await OnFieldChanged.InvokeAsync(key);
     }

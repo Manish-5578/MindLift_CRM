@@ -30,7 +30,7 @@ public sealed record ListState(string View, string? Search = null, int Page = 1,
         var values = ParseQuery(queryString);
 
         var view = values.GetValueOrDefault(ViewKey) ?? defaultView;
-        if (knownViews is not null && !knownViews.Contains(view))
+        if (knownViews is not null && knownViews.Count > 0 && !knownViews.Contains(view) && !view.StartsWith("saved_"))
         {
             view = defaultView;
         }

@@ -27,7 +27,7 @@
                      OnClick="() => SetTabAsync(current)" data-testid="@("tab-" + current)">@label@(Count(current) is { } n ? $" ({n})" : "")</MudChip>
         }
         <MudSelect T="string" Value="_type" ValueChanged="SetTypeAsync" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" Placeholder="@T["All types"]" Style="max-width:160px" aria-label="@T["Type"]" data-testid="type-filter">
-            @foreach (var type in new[] { "Task", "Call", "Meeting", "Note" })
+            @foreach (var type in new[] { "Task", "Call", "Meeting" })
             {
                 <MudSelectItem T="string" Value="@type">@type</MudSelectItem>
             }
