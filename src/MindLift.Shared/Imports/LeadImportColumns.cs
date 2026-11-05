@@ -27,7 +27,8 @@ public static class LeadImportColumns
         ("description", "Notes", ["description", "notes"]),
     ];
 
-    /// <summary>The only field a row cannot be created without.</summary>
+    /// <summary>The fields a row cannot be created without.</summary>
+    public static readonly IReadOnlyList<string> RequiredFields = ["company_name", "address"];
     public const string RequiredField = "company_name";
 
     /// <summary>Lower-cases a header and keeps only letters and digits.</summary>

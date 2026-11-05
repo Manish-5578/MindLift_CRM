@@ -48,8 +48,9 @@ public sealed class LeadExcelAndImportTests
         helpWorksheet.Cell(1, 3).GetString().ShouldBe("Description");
         helpWorksheet.Cell(1, 4).GetString().ShouldBe("Allowed / Example Values");
 
-        // Requirement: Company must be marked Mandatory, City and State marked Optional
+        // Requirement: Company and Address must be marked Mandatory, City and State marked Optional
         var foundCompanyRow = false;
+        var foundAddressRow = false;
         var foundCityRow = false;
         var foundStateRow = false;
         var lastHelpRow = helpWorksheet.LastRowUsed()!.RowNumber();
@@ -61,6 +62,11 @@ public sealed class LeadExcelAndImportTests
             {
                 req.ShouldBe("Mandatory");
                 foundCompanyRow = true;
+            }
+            else if (field == "Address")
+            {
+                req.ShouldBe("Mandatory");
+                foundAddressRow = true;
             }
             else if (field == "City")
             {
@@ -74,6 +80,7 @@ public sealed class LeadExcelAndImportTests
             }
         }
         foundCompanyRow.ShouldBeTrue("Company row should exist in Help sheet and be marked Mandatory.");
+        foundAddressRow.ShouldBeTrue("Address row should exist in Help sheet and be marked Mandatory.");
         foundCityRow.ShouldBeTrue("City row should exist in Help sheet and be marked Optional.");
         foundStateRow.ShouldBeTrue("State row should exist in Help sheet and be marked Optional.");
     }
@@ -209,26 +216,29 @@ public sealed class LeadExcelAndImportTests
     }
 
     [Fact]
-    public void LeadImport_SupportsOptionalCityAndState_AndRequiresCompany()
+    public void LeadImport_SupportsOptionalCityAndState_AndRequiresCompanyAndAddress()
     {
         // 1. Headers containing City and State
-        var headers = new[] { "Company", "First Name", "City", "State" };
+        var headers = new[] { "Company", "Address", "First Name", "City", "State" };
         var map = LeadImportColumns.Map(headers);
         map["company_name"].ShouldBe(0);
-        map["first_name"].ShouldBe(1);
-        map["city"].ShouldBe(2);
-        map["state"].ShouldBe(3);
+        map["address"].ShouldBe(1);
+        map["first_name"].ShouldBe(2);
+        map["city"].ShouldBe(3);
+        map["state"].ShouldBe(4);
 
         // 2. City and State are recognized optional fields
         var recognition = LeadImportColumns.Recognize(headers);
-        recognition.Count.ShouldBe(4);
+        recognition.Count.ShouldBe(5);
         recognition[0].Field.ShouldBe("company_name");
-        recognition[2].Field.ShouldBe("city");
-        recognition[2].FieldLabel.ShouldBe("City");
-        recognition[3].Field.ShouldBe("state");
-        recognition[3].FieldLabel.ShouldBe("State");
+        recognition[1].Field.ShouldBe("address");
+        recognition[3].Field.ShouldBe("city");
+        recognition[3].FieldLabel.ShouldBe("City");
+        recognition[4].Field.ShouldBe("state");
+        recognition[4].FieldLabel.ShouldBe("State");
 
-        // 3. Required column is company_name
+        // 3. Required columns are company_name and address
         LeadImportColumns.RequiredField.ShouldBe("company_name");
+        LeadImportColumns.RequiredFields.ShouldBe(["company_name", "address"]);
     }
 }

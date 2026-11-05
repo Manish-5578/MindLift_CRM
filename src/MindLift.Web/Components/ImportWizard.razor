@@ -32,7 +32,7 @@
                 }
 
                 <MudText Typo="Typo.body2" Class="ml-muted">
-                    @T["We read these columns: {0}. Anything else is ignored. {1} is required.", string.Join(", ", Fields.Select(f => T[f.Label])), RequiredLabel]
+                    @T["We read these columns: {0}. Anything else is ignored. {1} required.", string.Join(", ", Fields.Select(f => T[f.Label])), RequiredLabel.Contains(" and ") ? RequiredLabel + " are" : RequiredLabel + " is"]
                 </MudText>
                 <div>
                     <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Outlined.Download" Href="@TemplateHref" download="@TemplateFileName" data-testid="download-template">@T["Download a template"]</MudButton>
@@ -62,7 +62,7 @@
 
                 @if (!HasRequired)
                 {
-                    <MudAlert Severity="Severity.Error" Dense="true" data-testid="import-no-first-name">@T["There is no {0} column, so nothing can be imported. Rename a column or choose another file.", RequiredLabel]</MudAlert>
+                    <MudAlert Severity="Severity.Error" Dense="true" data-testid="import-no-first-name">@T["Missing required column(s): {0}. Rename a column or choose another file.", RequiredLabel]</MudAlert>
                 }
 
                 @if (TooManyRows)
@@ -149,6 +149,7 @@
     [Parameter, EditorRequired] public string ListHref { get; set; } = string.Empty;
     [Parameter, EditorRequired] public IReadOnlyList<(string Field, string Label, string[] Aliases)> Fields { get; set; } = [];
     [Parameter, EditorRequired] public string RequiredField { get; set; } = string.Empty;
+    [Parameter] public IReadOnlyList<string>? RequiredFields { get; set; }
     [Parameter, EditorRequired] public string RequiredLabel { get; set; } = string.Empty;
 
     /// <summary>One record in plain words, for example "contact".</summary>
@@ -172,7 +173,9 @@
 
     private string ItemLabel => App.ModuleLabel(Module).ToLowerInvariant();
 
-    private bool HasRequired => _matches.Any(m => m.Field == RequiredField);
+    private bool HasRequired => RequiredFields is { Count: > 0 }
+        ? RequiredFields.All(rf => _matches.Any(m => m.Field == rf))
+        : _matches.Any(m => m.Field == RequiredField);
 
     private bool TooManyRows => _rows.Count - 1 > MaxRows;
 
@@ -274,7 +277,7 @@
     {
         if (!HasRequired)
         {
-            Snackbar.Add(T["Add a {0} column before importing.", RequiredLabel], Severity.Error);
+            Snackbar.Add(T["Required column(s) missing: {0}.", RequiredLabel], Severity.Error);
             return;
         }
 

@@ -1068,7 +1068,7 @@ public sealed class LeadService(
             ("Company", "Mandatory", "The company, organization or business name.", "Free text. E.g. Acme Corp"),
             ("First Name", "Optional", "Contact person's first / given name.", "Free text. E.g. Jane"),
             ("Last Name", "Optional", "Contact person's last / family name.", "Free text. E.g. Doe"),
-            ("Address", "Optional", "Physical or street address of the lead or organization.", "Free text. E.g. 100 Main St"),
+            ("Address", "Mandatory", "Physical or street address of the lead or organization.", "Free text. E.g. 100 Main St"),
             ("City", "Optional", "City or town of the lead.", "Free text. E.g. New York, London, Dubai"),
             ("State", "Optional", "State, province, or region of the lead.", "Free text. E.g. NY, California, Ontario"),
             ("Email", "Optional", "Contact's email address. Used for duplicate checking.", "Valid email format. E.g. jane.doe@acme.com"),
@@ -1231,7 +1231,9 @@ public sealed class LeadService(
         var headers = rows[0];
         var matches = LeadImportColumns.Recognize(headers);
         var map = LeadImportColumns.Map(headers);
-        var hasReq = map.TryGetValue("company_name", out var c) && c >= 0;
+        var hasCompany = map.TryGetValue("company_name", out var c) && c >= 0;
+        var hasAddress = map.TryGetValue("address", out var a) && a >= 0;
+        var hasReq = hasCompany && hasAddress;
 
         var previewRows = rows.Skip(1).Take(10).Select(r => (IReadOnlyList<string>)r).ToList();
         return new ImportPreviewDto(fileName, headers, previewRows, rows.Count - 1, matches, hasReq, null);
@@ -1267,6 +1269,12 @@ public sealed class LeadService(
             throw new ValidationException(new Dictionary<string, string[]> { ["file"] = ["The file needs a 'Company' column."] });
         }
 
+        var hasAddress = columns.TryGetValue("address", out var addrIdx) && addrIdx >= 0;
+        if (!hasAddress)
+        {
+            throw new ValidationException(new Dictionary<string, string[]> { ["file"] = ["The file needs an 'Address' column."] });
+        }
+
         var created = 0;
         var skipped = 0;
         var failed = 0;
@@ -1285,9 +1293,16 @@ public sealed class LeadService(
                 continue;
             }
 
+            var address = Cell("address");
+            if (string.IsNullOrWhiteSpace(address))
+            {
+                failed++;
+                if (errors.Count < 20) errors.Add($"Row {i + 1}: Address is required.");
+                continue;
+            }
+
             var first = Cell("first_name") ?? string.Empty;
             var last = Cell("last_name") ?? string.Empty;
-            var address = Cell("address");
             var city = Cell("city");
             var state = Cell("state");
 

@@ -69,9 +69,10 @@ public sealed class LeadImportColumnsTests
     }
 
     [Fact]
-    public void Company_is_the_required_field()
+    public void Company_and_address_are_the_required_fields()
     {
         LeadImportColumns.RequiredField.ShouldBe("company_name");
+        LeadImportColumns.RequiredFields.ShouldBe(["company_name", "address"]);
     }
 
     [Fact]
