@@ -1,0 +1,184 @@
+@using MindLift.Shared.Contracts
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject Translator T
+
+<MudDialog Options="new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true }">
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.Security" Color="Color.Primary" />
+            <MudText Typo="Typo.h6" Style="font-weight:600">
+                @(IsEdit ? T["Update Deal Competitor"] : T["Add Competitor to Deal"])
+            </MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <div class="d-flex flex-column gap-3 py-2">
+            @if (!IsEdit)
+            {
+                @if (_loadingCompetitors)
+                {
+                    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+                }
+                else if (_availableCompetitors.Count == 0)
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true">
+                        @T["No registered competitors found. Create one first or manage competitors in Settings."]
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudSelect T="Guid" @bind-Value="_competitorId" Label="@T["Select Competitor *"]"
+                               Variant="Variant.Outlined" Margin="Margin.Dense" Required="true">
+                        @foreach (var c in _availableCompetitors)
+                        {
+                            <MudSelectItem T="Guid" Value="@c.Id">@c.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                }
+            }
+
+            <MudSelect T="string" @bind-Value="_threatLevel" Label="@T["Threat Level *"]"
+                       Variant="Variant.Outlined" Margin="Margin.Dense" Required="true">
+                <MudSelectItem Value="@("High")">
+                    <span style="color: var(--mud-palette-error); font-weight: 600;">@T["High Threat"]</span>
+                </MudSelectItem>
+                <MudSelectItem Value="@("Medium")">
+                    <span style="color: var(--mud-palette-warning); font-weight: 600;">@T["Medium Threat"]</span>
+                </MudSelectItem>
+                <MudSelectItem Value="@("Low")">
+                    <span style="color: var(--mud-palette-info); font-weight: 600;">@T["Low Threat"]</span>
+                </MudSelectItem>
+            </MudSelect>
+
+            <MudTextField @bind-Value="_strengthsObserved" Label="@T["Strengths Observed on this Deal"]"
+                          Placeholder="Why does the prospect like them?"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />
+
+            <MudTextField @bind-Value="_weaknessesObserved" Label="@T["Weaknesses Observed on this Deal"]"
+                          Placeholder="Prospect pain points with this competitor"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />
+
+            <MudTextField @bind-Value="_notes" Label="@T["Strategy / Counter-Action Notes"]"
+                          Placeholder="How will we position against them to win?"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />
+
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert>
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Cancel" Disabled="_saving">@T["Cancel"]</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync"
+                   Disabled="@(_saving || (!IsEdit && _competitorId == Guid.Empty))">
+            @(_saving ? T["Saving..."] : T["Save"])
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public Guid DealId { get; set; }
+    [Parameter] public DealCompetitorDto? Existing { get; set; }
+    [Parameter] public IReadOnlyList<Guid> ExcludeCompetitorIds { get; set; } = [];
+
+    private bool IsEdit => Existing is not null;
+    private bool _loadingCompetitors = true;
+    private bool _saving;
+    private string? _error;
+
+    private Guid _competitorId;
+    private string _threatLevel = "Medium";
+    private string? _strengthsObserved;
+    private string? _weaknessesObserved;
+    private string? _notes;
+
+    private readonly List<CompetitorDto> _availableCompetitors = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Existing is not null)
+        {
+            _competitorId = Existing.CompetitorId;
+            _threatLevel = Existing.ThreatLevel;
+            _strengthsObserved = Existing.StrengthsObserved;
+            _weaknessesObserved = Existing.WeaknessesObserved;
+            _notes = Existing.Notes;
+            _loadingCompetitors = false;
+        }
+        else
+        {
+            await LoadCompetitorsAsync();
+        }
+    }
+
+    private async Task LoadCompetitorsAsync()
+    {
+        _loadingCompetitors = true;
+        try
+        {
+            var list = await Http.GetFromJsonAsync<IReadOnlyList<CompetitorDto>>("api/v1/competitors?activeOnly=true");
+            _availableCompetitors.Clear();
+            if (list is not null)
+            {
+                var excludeSet = ExcludeCompetitorIds.ToHashSet();
+                _availableCompetitors.AddRange(list.Where(c => !excludeSet.Contains(c.Id)));
+                if (_availableCompetitors.Count > 0)
+                {
+                    _competitorId = _availableCompetitors[0].Id;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loadingCompetitors = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _error = null;
+        try
+        {
+            HttpResponseMessage res;
+            if (IsEdit)
+            {
+                var req = new UpdateDealCompetitorRequest(_threatLevel, _strengthsObserved?.Trim(), _weaknessesObserved?.Trim(), _notes?.Trim());
+                res = await Http.PutAsJsonAsync($"api/v1/deals/{DealId}/competitors/{_competitorId}", req);
+            }
+            else
+            {
+                var req = new AddDealCompetitorRequest(_competitorId, _threatLevel, _strengthsObserved?.Trim(), _weaknessesObserved?.Trim(), _notes?.Trim());
+                res = await Http.PostAsJsonAsync($"api/v1/deals/{DealId}/competitors", req);
+            }
+
+            if (!res.IsSuccessStatusCode)
+            {
+                _error = await res.Content.ReadAsStringAsync();
+                return;
+            }
+
+            Snackbar.Add(IsEdit ? T["Deal competitor updated."] : T["Competitor added to deal."], Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}
+

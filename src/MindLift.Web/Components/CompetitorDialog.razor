@@ -1,0 +1,128 @@
+@using MindLift.Shared.Contracts
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject Translator T
+
+<MudDialog Options="new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true }">
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.Shield" Color="Color.Primary" />
+            <MudText Typo="Typo.h6" Style="font-weight:600">
+                @(IsEdit ? T["Edit Competitor"] : T["Add New Competitor"])
+            </MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <div class="d-flex flex-column gap-3 py-2">
+            <MudTextField @bind-Value="_name" Label="@T["Competitor Name *"]" Placeholder="e.g. Acme Corp, Salesforce"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Required="true"
+                          Error="@(!string.IsNullOrWhiteSpace(_error) && string.IsNullOrWhiteSpace(_name))" />
+
+            <MudTextField @bind-Value="_website" Label="@T["Website"]" Placeholder="https://example.com"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" />
+
+            <MudTextField @bind-Value="_pricingStrategy" Label="@T["Pricing Strategy"]" Placeholder="e.g. Discount heavy, premium enterprise, freemium"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" />
+
+            <MudTextField @bind-Value="_strengths" Label="@T["Competitor Strengths"]" Placeholder="What do they do well?"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />
+
+            <MudTextField @bind-Value="_weaknesses" Label="@T["Competitor Weaknesses"]" Placeholder="Where are their gaps?"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />
+
+            <MudTextField @bind-Value="_battlecard" Label="@T["Battlecard & Counter-Pitch"]"
+                          Placeholder="Key arguments to win against this competitor"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Lines="3" />
+
+            <MudCheckBox @bind-Value="_isActive" Label="@T["Active Competitor"]" Color="Color.Primary" Dense="true" />
+
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert>
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Cancel" Disabled="_saving">@T["Cancel"]</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="_saving">
+            @(_saving ? T["Saving..."] : T["Save Competitor"])
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public CompetitorDto? Existing { get; set; }
+
+    private bool IsEdit => Existing is not null;
+    private string _name = string.Empty;
+    private string? _website;
+    private string? _strengths;
+    private string? _weaknesses;
+    private string? _battlecard;
+    private string? _pricingStrategy;
+    private bool _isActive = true;
+
+    private bool _saving;
+    private string? _error;
+
+    protected override void OnInitialized()
+    {
+        if (Existing is not null)
+        {
+            _name = Existing.Name;
+            _website = Existing.Website;
+            _strengths = Existing.Strengths;
+            _weaknesses = Existing.Weaknesses;
+            _battlecard = Existing.Battlecard;
+            _pricingStrategy = Existing.PricingStrategy;
+            _isActive = Existing.IsActive;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_name))
+        {
+            _error = T["Competitor name is required."];
+            return;
+        }
+
+        _saving = true;
+        _error = null;
+        try
+        {
+            var req = new SaveCompetitorRequest(_name.Trim(), _website?.Trim(), _strengths?.Trim(), _weaknesses?.Trim(), _battlecard?.Trim(), _pricingStrategy?.Trim(), _isActive);
+            HttpResponseMessage res;
+            if (IsEdit)
+            {
+                res = await Http.PutAsJsonAsync($"api/v1/competitors/{Existing!.Id}", req);
+            }
+            else
+            {
+                res = await Http.PostAsJsonAsync("api/v1/competitors", req);
+            }
+
+            if (!res.IsSuccessStatusCode)
+            {
+                _error = await res.Content.ReadAsStringAsync();
+                return;
+            }
+
+            Snackbar.Add(IsEdit ? T["Competitor updated successfully."] : T["Competitor created successfully."], Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}
+

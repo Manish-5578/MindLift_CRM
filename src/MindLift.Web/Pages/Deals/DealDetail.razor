@@ -68,6 +68,27 @@
                         <div class="ml-kv__label">@T["Amount"]</div><div class="ml-kv__value"><MoneyText Amount="_deal.Amount" Currency="@_deal.Currency" />@if (_deal.Currency != BaseCurrency) { <span class="ml-muted"> ≈ @_deal.AmountInBase.ToString("N0") @BaseCurrency</span> }</div>
                         <div class="ml-kv__label">@T["Probability"]</div><div class="ml-kv__value">@_deal.Probability%</div>
                         <div class="ml-kv__label">@T["Expected close"]</div><div class="ml-kv__value"><DateText Value="@_deal.ExpectedCloseDate" /></div>
+                        <div class="ml-kv__label">@T["Forecast category"]</div>
+                        <div class="ml-kv__value">
+                            <MudMenu Dense="true" AnchorOrigin="Origin.BottomLeft" Disabled="@(!Can(p => p.CanEdit))">
+                                <ActivatorContent>
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Filled"
+                                             Color="@ForecastCategoryColor(_deal.ForecastCategory)"
+                                             Icon="@Icons.Material.Filled.ArrowDropDown"
+                                             Style="cursor: pointer;">
+                                        @ForecastCategoryLabel(_deal.ForecastCategory)
+                                    </MudChip>
+                                </ActivatorContent>
+                                <ChildContent>
+                                    @foreach (var cat in ForecastCategories.All)
+                                    {
+                                        <MudMenuItem OnClick="() => ChangeForecastCategoryAsync(cat)">
+                                            @ForecastCategoryLabel(cat)
+                                        </MudMenuItem>
+                                    }
+                                </ChildContent>
+                            </MudMenu>
+                        </div>
                         @if (_deal.ClosedAtUtc is not null)
                         {
                             <div class="ml-kv__label">@T["Closed"]</div><div class="ml-kv__value"><DateText Value="@_deal.ClosedAtUtc" /></div>
@@ -223,6 +244,160 @@
                     </MlCard>
                 }
 
+                @* Revenue Splits Card *@
+                <MlCard Title="Revenue Splits" TestId="deal-splits-card">
+                    <HeaderActions>
+                        @if (Can(p => p.CanEdit))
+                        {
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                                       StartIcon="@Icons.Material.Filled.CallSplit"
+                                       OnClick="OpenManageSplitsDialog" data-testid="manage-splits-btn">
+                                @T["Manage Splits"]
+                            </MudButton>
+                        }
+                    </HeaderActions>
+                    <ChildContent>
+                        @if (_splitsLoading)
+                        {
+                            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-2" />
+                        }
+                        else if (_splitsSummary is null || _splitsSummary.Splits.Count == 0)
+                        {
+                            <div class="pa-4 text-center">
+                                <MudIcon Icon="@Icons.Material.Outlined.CallSplit" Color="Color.Default" Style="font-size: 2.2rem; opacity: 0.5;" />
+                                <MudText Typo="Typo.body2" Class="ml-muted mt-1">
+                                    @T["No split members configured. 100% credited to deal owner."]
+                                </MudText>
+                            </div>
+                        }
+                        else
+                        {
+                            <MudSimpleTable Dense="true" Hover="true" Elevation="0" Style="background: transparent;">
+                                <thead>
+                                    <tr>
+                                        <th>@T["Team Member"]</th>
+                                        <th>@T["Type"]</th>
+                                        <th style="text-align: right;">@T["Percentage"]</th>
+                                        <th style="text-align: right;">@T["Split Amount"]</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var s in _splitsSummary.Splits)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <div style="font-weight: 500;">@s.UserName</div>
+                                                @if (!string.IsNullOrWhiteSpace(s.Note)) { <div class="text-caption ml-muted">@s.Note</div> }
+                                            </td>
+                                            <td>
+                                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="@(s.SplitType == "Revenue" ? Color.Primary : Color.Secondary)">
+                                                    @s.SplitType
+                                                </MudChip>
+                                            </td>
+                                            <td style="text-align: right; font-weight: 600;">@s.Percentage.ToString("G29")%</td>
+                                            <td style="text-align: right; font-weight: 600;">@s.Amount.ToString("N2") @_splitsSummary.Currency</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </MudSimpleTable>
+                            @if (!_splitsSummary.IsValid)
+                            {
+                                <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
+                                    @T["Total revenue splits do not equal 100% ({0}%). Click 'Manage Splits' to adjust.", _splitsSummary.TotalRevenuePercentage.ToString("G29")]
+                                </MudAlert>
+                            }
+                        }
+                    </ChildContent>
+                </MlCard>
+
+                @* Competitor Tracking Card *@
+                <MlCard Title="Competitors" TestId="deal-competitors-card">
+                    <HeaderActions>
+                        @if (Can(p => p.CanEdit))
+                        {
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                                       StartIcon="@Icons.Material.Filled.Security"
+                                       OnClick="OpenAddCompetitorDialog" data-testid="add-competitor-btn">
+                                @T["Add Competitor"]
+                            </MudButton>
+                        }
+                    </HeaderActions>
+                    <ChildContent>
+                        @if (_competitorsLoading)
+                        {
+                            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-2" />
+                        }
+                        else if (_dealCompetitors.Count == 0)
+                        {
+                            <div class="pa-4 text-center">
+                                <MudIcon Icon="@Icons.Material.Outlined.Shield" Color="Color.Default" Style="font-size: 2.2rem; opacity: 0.5;" />
+                                <MudText Typo="Typo.body2" Class="ml-muted mt-1">
+                                    @T["No competitors identified on this deal yet. Add competitors to track threat level and counter-strategy."]
+                                </MudText>
+                            </div>
+                        }
+                        else
+                        {
+                            <MudSimpleTable Dense="true" Hover="true" Elevation="0" Style="background: transparent;">
+                                <thead>
+                                    <tr>
+                                        <th>@T["Competitor"]</th>
+                                        <th>@T["Threat Level"]</th>
+                                        <th>@T["Observed Intelligence"]</th>
+                                        @if (Can(p => p.CanEdit))
+                                        {
+                                            <th style="width: 80px; text-align: center;">@T["Action"]</th>
+                                        }
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var c in _dealCompetitors)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <div style="font-weight: 600;">@c.CompetitorName</div>
+                                                @if (!string.IsNullOrWhiteSpace(c.Website))
+                                                {
+                                                    <div class="text-caption"><a href="@c.Website" target="_blank" class="ml-link">@c.Website</a></div>
+                                                }
+                                            </td>
+                                            <td>
+                                                <MudChip T="string" Size="Size.Small" Variant="Variant.Filled"
+                                                         Color="@(c.ThreatLevel == "High" ? Color.Error : c.ThreatLevel == "Medium" ? Color.Warning : Color.Info)">
+                                                    @c.ThreatLevel
+                                                </MudChip>
+                                            </td>
+                                            <td>
+                                                @if (!string.IsNullOrWhiteSpace(c.StrengthsObserved))
+                                                {
+                                                    <div class="text-caption"><strong>@T["Strengths:"]</strong> @c.StrengthsObserved</div>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(c.WeaknessesObserved))
+                                                {
+                                                    <div class="text-caption"><strong>@T["Gaps:"]</strong> @c.WeaknessesObserved</div>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(c.Notes))
+                                                {
+                                                    <div class="text-caption ml-muted" style="font-style: italic;">@c.Notes</div>
+                                                }
+                                            </td>
+                                            @if (Can(p => p.CanEdit))
+                                            {
+                                                <td style="text-align: center;">
+                                                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" Color="Color.Primary"
+                                                                   OnClick="() => OpenEditDealCompetitorDialog(c)" />
+                                                    <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Color="Color.Error"
+                                                                   OnClick="() => RemoveDealCompetitorAsync(c.CompetitorId, c.CompetitorName)" />
+                                                </td>
+                                            }
+                                        </tr>
+                                    }
+                                </tbody>
+                            </MudSimpleTable>
+                        }
+                    </ChildContent>
+                </MlCard>
+
                 <MlCard Title="Stage history">
                     <Timeline Items="HistoryItems()" EmptyText="No moves yet." />
                 </MlCard>
@@ -298,6 +473,157 @@
     private bool _lineItemsFeatureAvailable = false;
     private DealLineItemsSummaryDto? _lineItemsSummary;
     private string? _stageMoveError;
+    private bool _splitsLoading;
+    private DealSplitSummaryDto? _splitsSummary;
+    private bool _competitorsLoading;
+    private readonly List<DealCompetitorDto> _dealCompetitors = [];
+
+    private Color ForecastCategoryColor(string cat) => cat switch
+    {
+        "Closed" => Color.Success,
+        "Commit" => Color.Primary,
+        "BestCase" => Color.Info,
+        "Pipeline" => Color.Warning,
+        _ => Color.Default
+    };
+
+    private string ForecastCategoryLabel(string cat) => cat switch
+    {
+        "Closed" => T["Closed"],
+        "Commit" => T["Commit"],
+        "BestCase" => T["Best Case"],
+        "Pipeline" => T["Pipeline"],
+        "Omitted" => T["Omitted"],
+        _ => cat
+    };
+
+    private async Task ChangeForecastCategoryAsync(string newCategory)
+    {
+        try
+        {
+            var res = await Http.PutAsJsonAsync($"api/v1/forecasting/deals/{Id}/category", new UpdateDealForecastCategoryRequest(newCategory));
+            if (res.IsSuccessStatusCode)
+            {
+                Snackbar.Add(T["Forecast category updated to {0}.", ForecastCategoryLabel(newCategory)], Severity.Success);
+                await LoadAsync();
+            }
+            else
+            {
+                Snackbar.Add(await res.Content.ReadAsStringAsync(), Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task LoadSplitsAsync()
+    {
+        _splitsLoading = true;
+        try
+        {
+            _splitsSummary = await Http.GetFromJsonAsync<DealSplitSummaryDto>($"api/v1/deals/{Id}/splits");
+        }
+        catch
+        {
+            _splitsSummary = null;
+        }
+        finally
+        {
+            _splitsLoading = false;
+        }
+    }
+
+    private async Task OpenManageSplitsDialog()
+    {
+        var parameters = new DialogParameters<DealSplitsDialog>
+        {
+            { x => x.DealId, Id },
+            { x => x.DealName, _deal?.Name ?? "" },
+            { x => x.DealAmount, _deal?.Amount ?? 0m },
+            { x => x.Currency, _deal?.Currency ?? "USD" },
+            { x => x.DefaultOwnerId, _deal?.OwnerId ?? Guid.Empty },
+            { x => x.Users, _users }
+        };
+        var dialog = await Dialogs.ShowAsync<DealSplitsDialog>(T["Deal Revenue Splits"], parameters);
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+        {
+            await LoadSplitsAsync();
+        }
+    }
+
+    private async Task LoadDealCompetitorsAsync()
+    {
+        _competitorsLoading = true;
+        try
+        {
+            var list = await Http.GetFromJsonAsync<IReadOnlyList<DealCompetitorDto>>($"api/v1/deals/{Id}/competitors");
+            _dealCompetitors.Clear();
+            if (list is not null)
+            {
+                _dealCompetitors.AddRange(list);
+            }
+        }
+        catch
+        {
+            _dealCompetitors.Clear();
+        }
+        finally
+        {
+            _competitorsLoading = false;
+        }
+    }
+
+    private async Task OpenAddCompetitorDialog()
+    {
+        var parameters = new DialogParameters<DealCompetitorDialog>
+        {
+            { x => x.DealId, Id },
+            { x => x.ExcludeCompetitorIds, _dealCompetitors.Select(c => c.CompetitorId).ToList() }
+        };
+        var dialog = await Dialogs.ShowAsync<DealCompetitorDialog>(T["Add Competitor to Deal"], parameters);
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+        {
+            await LoadDealCompetitorsAsync();
+        }
+    }
+
+    private async Task OpenEditDealCompetitorDialog(DealCompetitorDto existing)
+    {
+        var parameters = new DialogParameters<DealCompetitorDialog>
+        {
+            { x => x.DealId, Id },
+            { x => x.Existing, existing }
+        };
+        var dialog = await Dialogs.ShowAsync<DealCompetitorDialog>(T["Edit Deal Competitor"], parameters);
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+        {
+            await LoadDealCompetitorsAsync();
+        }
+    }
+
+    private async Task RemoveDealCompetitorAsync(Guid competitorId, string competitorName)
+    {
+        if (!await Dialogs.ConfirmAsync(T["Remove Competitor"], T["Remove {0} from this deal?", competitorName], T["Remove"], danger: true))
+        {
+            return;
+        }
+
+        var res = await Http.DeleteAsync($"api/v1/deals/{Id}/competitors/{competitorId}");
+        if (res.IsSuccessStatusCode)
+        {
+            Snackbar.Add(T["Competitor removed from deal."], Severity.Success);
+            await LoadDealCompetitorsAsync();
+        }
+        else
+        {
+            Snackbar.Add(await res.Content.ReadAsStringAsync(), Severity.Error);
+        }
+    }
 
     private string BaseCurrency => App.Bootstrap?.Currencies.BaseCurrency ?? string.Empty;
 
@@ -345,6 +671,8 @@
                 _history = await Http.GetFromJsonAsync<List<DealStageHistoryDto>>($"api/v1/deals/{Id}/history") ?? [];
                 _onboarding = _deal!.Status == "Won" ? await Http.GetFromJsonAsync<List<OnboardingProgressDto>>($"api/v1/activities/onboarding/{Id}") ?? [] : [];
                 await LoadLineItemsAsync();
+                await LoadSplitsAsync();
+                await LoadDealCompetitorsAsync();
             }
         }
         catch (HttpRequestException)

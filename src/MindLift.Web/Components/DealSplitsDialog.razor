@@ -1,0 +1,274 @@
+@using MindLift.Shared.Contracts
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject Translator T
+
+<MudDialog Options="new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true }">
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.CallSplit" Color="Color.Primary" />
+            <div>
+                <MudText Typo="Typo.h6" Style="font-weight:600">@T["Deal Revenue Splits"]</MudText>
+                <MudText Typo="Typo.caption" Class="ml-muted">@DealName • @DealAmount.ToString("N2") @Currency</MudText>
+            </div>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (_loading)
+        {
+            <div class="py-6 text-center">
+                <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+            </div>
+        }
+        else
+        {
+            <div class="d-flex flex-column gap-4 py-2">
+                @* Split Health Banner *@
+                <div class="pa-3 rounded d-flex align-center justify-space-between flex-wrap gap-2"
+                     style="@(IsTotalValid ? "background: var(--mud-palette-success-hover); border: 1px solid var(--mud-palette-success);" : "background: var(--mud-palette-warning-hover); border: 1px solid var(--mud-palette-warning);")">
+                    <div class="d-flex align-center gap-2">
+                        <MudIcon Icon="@(IsTotalValid ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.WarningAmber)"
+                                 Color="@(IsTotalValid ? Color.Success : Color.Warning)" />
+                        <div>
+                            <div style="font-weight: 600; font-size: 14px;">
+                                @(IsTotalValid ? T["Revenue splits equal 100%"] : T["Revenue splits must total exactly 100%"])
+                            </div>
+                            <div class="text-caption ml-muted">
+                                @T["Current total: {0}% ({1} {2})", TotalRevenuePercent.ToString("G29"), TotalRevenueAmount.ToString("N2"), Currency]
+                            </div>
+                        </div>
+                    </div>
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Balance" OnClick="SplitEvenly" Disabled="@(_rows.Count <= 1)">
+                        @T["Split evenly"]
+                    </MudButton>
+                </div>
+
+                @* Splits Table *@
+                <MudSimpleTable Dense="true" Hover="true" Elevation="0" Style="border: 1px solid var(--mud-palette-divider); border-radius: 6px;">
+                    <thead>
+                        <tr>
+                            <th style="width: 32%;">@T["Team Member"]</th>
+                            <th style="width: 20%;">@T["Split Type"]</th>
+                            <th style="width: 18%;">@T["Percentage"]</th>
+                            <th style="width: 20%; text-align: right;">@T["Calculated Amount"]</th>
+                            <th style="width: 10%; text-align: center;">@T["Action"]</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (_rows.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="5" class="pa-4 text-center ml-muted">
+                                    @T["No split members configured yet. Add members below to distribute deal credit."]
+                                </td>
+                            </tr>
+                        }
+                        @for (var i = 0; i < _rows.Count; i++)
+                        {
+                            var row = _rows[i];
+                            var rowIndex = i;
+                            <tr>
+                                <td>
+                                    <MudSelect T="Guid" @bind-Value="row.UserId" Margin="Margin.Dense" Variant="Variant.Outlined" Dense="true">
+                                        @foreach (var user in Users)
+                                        {
+                                            <MudSelectItem T="Guid" Value="@user.Id">@user.FullName</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                </td>
+                                <td>
+                                    <MudSelect T="string" @bind-Value="row.SplitType" Margin="Margin.Dense" Variant="Variant.Outlined" Dense="true">
+                                        <MudSelectItem Value="@("Revenue")">@T["Revenue (100% Pool)"]</MudSelectItem>
+                                        <MudSelectItem Value="@("Overlay")">@T["Overlay (Credit Only)"]</MudSelectItem>
+                                    </MudSelect>
+                                </td>
+                                <td>
+                                    <MudNumericField @bind-Value="row.Percentage" Margin="Margin.Dense" Variant="Variant.Outlined"
+                                                     Min="0m" Max="100m" Step="5m" Format="N1" Adornment="Adornment.End" AdornmentText="%" />
+                                </td>
+                                <td style="text-align: right; font-weight: 500;">
+                                    @((DealAmount * row.Percentage / 100m).ToString("N2")) @Currency
+                                </td>
+                                <td style="text-align: center;">
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Color="Color.Error"
+                                                   OnClick="() => RemoveRow(rowIndex)" Disabled="@(_rows.Count <= 1)" />
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+
+                <div>
+                    <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.PersonAdd" OnClick="AddRow">
+                        @T["Add Split Member"]
+                    </MudButton>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(_error))
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert>
+                }
+            </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Cancel" Disabled="_saving">@T["Cancel"]</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync"
+                   Disabled="@(_loading || _saving || !IsTotalValid)">
+            @(_saving ? T["Saving..."] : T["Save Splits"])
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public Guid DealId { get; set; }
+    [Parameter] public string DealName { get; set; } = string.Empty;
+    [Parameter] public decimal DealAmount { get; set; }
+    [Parameter] public string Currency { get; set; } = "USD";
+    [Parameter] public Guid DefaultOwnerId { get; set; }
+    [Parameter] public IReadOnlyList<UserListItem> Users { get; set; } = [];
+
+    private bool _loading = true;
+    private bool _saving;
+    private string? _error;
+    private readonly List<SplitRow> _rows = [];
+
+    private sealed class SplitRow
+    {
+        public Guid UserId { get; set; }
+        public string SplitType { get; set; } = "Revenue";
+        public decimal Percentage { get; set; } = 100m;
+        public string? Note { get; set; }
+    }
+
+    private decimal TotalRevenuePercent => _rows.Where(r => r.SplitType == "Revenue").Sum(r => r.Percentage);
+    private decimal TotalRevenueAmount => DealAmount * TotalRevenuePercent / 100m;
+    private bool IsTotalValid => Math.Abs(TotalRevenuePercent - 100m) < 0.001m;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var summary = await Http.GetFromJsonAsync<DealSplitSummaryDto>($"api/v1/deals/{DealId}/splits");
+            _rows.Clear();
+            if (summary?.Splits is { Count: > 0 } splits)
+            {
+                foreach (var s in splits)
+                {
+                    _rows.Add(new SplitRow
+                    {
+                        UserId = s.UserId,
+                        SplitType = s.SplitType,
+                        Percentage = s.Percentage,
+                        Note = s.Note
+                    });
+                }
+            }
+            else
+            {
+                // Default to owner at 100%
+                var initialUserId = DefaultOwnerId != Guid.Empty ? DefaultOwnerId : (Users.FirstOrDefault()?.Id ?? Guid.Empty);
+                _rows.Add(new SplitRow
+                {
+                    UserId = initialUserId,
+                    SplitType = "Revenue",
+                    Percentage = 100m
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void AddRow()
+    {
+        var existingUserIds = _rows.Select(r => r.UserId).ToHashSet();
+        var candidateUser = Users.FirstOrDefault(u => !existingUserIds.Contains(u.Id)) ?? Users.FirstOrDefault();
+        if (candidateUser is not null)
+        {
+            var currentRevenueTotal = TotalRevenuePercent;
+            var remaining = Math.Max(0m, 100m - currentRevenueTotal);
+            _rows.Add(new SplitRow
+            {
+                UserId = candidateUser.Id,
+                SplitType = "Revenue",
+                Percentage = remaining
+            });
+        }
+    }
+
+    private void RemoveRow(int index)
+    {
+        if (index >= 0 && index < _rows.Count)
+        {
+            _rows.RemoveAt(index);
+        }
+    }
+
+    private void SplitEvenly()
+    {
+        var revRows = _rows.Where(r => r.SplitType == "Revenue").ToList();
+        if (revRows.Count == 0) return;
+
+        var each = Math.Round(100m / revRows.Count, 2);
+        var total = each * revRows.Count;
+        var diff = 100m - total;
+
+        for (var i = 0; i < revRows.Count; i++)
+        {
+            revRows[i].Percentage = each + (i == 0 ? diff : 0m);
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (!IsTotalValid)
+        {
+            _error = T["Revenue splits must total exactly 100%."];
+            return;
+        }
+
+        _saving = true;
+        _error = null;
+        try
+        {
+            var request = new SetDealSplitsRequest(_rows.Select(r => new SaveDealSplitMemberRequest(r.UserId, r.SplitType, r.Percentage, r.Note)).ToList());
+            var res = await Http.PutAsJsonAsync($"api/v1/deals/{DealId}/splits", request);
+            if (!res.IsSuccessStatusCode)
+            {
+                _error = await res.Content.ReadAsStringAsync();
+                return;
+            }
+
+            Snackbar.Add(T["Deal splits saved successfully."], Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}
+

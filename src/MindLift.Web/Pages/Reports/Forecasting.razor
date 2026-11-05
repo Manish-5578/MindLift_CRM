@@ -1,0 +1,346 @@
+@page "/reports/forecasting"
+@page "/forecasting"
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject Translator T
+@using MindLift.Shared.Contracts
+
+<PageTitle>@T["Sales Forecasting"] · MindLift</PageTitle>
+
+<div class="ml-page ml-page--wide">
+    <div class="d-flex align-center justify-space-between flex-wrap gap-4 mb-4">
+        <div>
+            <div class="d-flex align-center gap-2">
+                <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Color="Color.Primary" Size="Size.Large" />
+                <MudText Typo="Typo.h5" Style="font-weight:700">@T["Sales Forecasting & Weighted Pipeline"]</MudText>
+            </div>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                @T["Quarterly revenue projections, probability-weighted deal pipeline, and sales rep quota attainment."]
+            </MudText>
+        </div>
+
+        <div class="d-flex align-center gap-2">
+            <MudButton Variant="Variant.Outlined" Color="Color.Default" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.ArrowBack" Href="/reports">
+                @T["Reports"]
+            </MudButton>
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh" Color="Color.Primary" Size="Size.Small"
+                           OnClick="LoadAsync" Disabled="_loading" Title="@T["Refresh forecast"]" />
+        </div>
+    </div>
+
+    @* Filter Toolbar *@
+    <MudPaper Class="pa-3 mb-4 d-flex align-center gap-3 flex-wrap" Elevation="0" Style="border: 1px solid var(--mud-palette-divider); border-radius: 8px;">
+        <MudSelect T="string" Label="@T["Time Horizon"]" Value="_selectedHorizon" ValueChanged="OnHorizonChanged"
+                   Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Style="min-width: 160px;">
+            <MudSelectItem Value="@("this_quarter")">@T["Current Quarter"]</MudSelectItem>
+            <MudSelectItem Value="@("this_month")">@T["Current Month"]</MudSelectItem>
+            <MudSelectItem Value="@("this_year")">@T["Current Year"]</MudSelectItem>
+            <MudSelectItem Value="@("all_time")">@T["All Open Deals"]</MudSelectItem>
+        </MudSelect>
+
+        @if (_pipelines.Count > 0)
+        {
+            <MudSelect T="Guid?" Label="@T["Pipeline"]" Value="_selectedPipelineId" ValueChanged="OnPipelineChanged"
+                       Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Style="min-width: 180px;">
+                <MudSelectItem T="Guid?" Value="@((Guid?)null)">@T["All Pipelines"]</MudSelectItem>
+                @foreach (var p in _pipelines)
+                {
+                    <MudSelectItem T="Guid?" Value="@((Guid?)p.Id)">@p.Name</MudSelectItem>
+                }
+            </MudSelect>
+        }
+
+        @if (_users.Count > 0)
+        {
+            <MudSelect T="Guid?" Label="@T["Sales Rep"]" Value="_selectedUserId" ValueChanged="OnUserChanged"
+                       Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Style="min-width: 180px;">
+                <MudSelectItem T="Guid?" Value="@((Guid?)null)">@T["All Team Members"]</MudSelectItem>
+                @foreach (var u in _users)
+                {
+                    <MudSelectItem T="Guid?" Value="@((Guid?)u.Id)">@u.FullName</MudSelectItem>
+                }
+            </MudSelect>
+        }
+    </MudPaper>
+
+    @if (_loading)
+    {
+        <div class="py-12 text-center">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+        </div>
+    }
+    else if (_summary is null)
+    {
+        <MudAlert Severity="Severity.Warning" Dense="true">@T["No forecast data available for this selection."]</MudAlert>
+    }
+    else
+    {
+        @* Top Metric Cards *@
+        <MudGrid Spacing="2" Class="mb-4">
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="pa-3 elevation-0" Style="border: 1px solid var(--mud-palette-divider); border-radius: 8px;">
+                    <div class="d-flex justify-space-between align-center mb-1">
+                        <span class="text-caption mud-text-secondary">@T["Quota Target"]</span>
+                        <MudIcon Icon="@Icons.Material.Filled.Flag" Size="Size.Small" Color="Color.Default" />
+                    </div>
+                    <div class="text-h6" style="font-weight: 700;">
+                        @_summary.TotalQuota.ToString("N0")
+                    </div>
+                    <div class="text-caption ml-muted">@T["Assigned sales quota"]</div>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="pa-3 elevation-0" Style="border: 1px solid var(--mud-palette-divider); border-radius: 8px;">
+                    <div class="d-flex justify-space-between align-center mb-1">
+                        <span class="text-caption mud-text-secondary">@T["Closed Won"]</span>
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success" />
+                    </div>
+                    <div class="text-h6" style="font-weight: 700; color: var(--mud-palette-success);">
+                        @_summary.ClosedWonAmount.ToString("N0")
+                    </div>
+                    <div class="text-caption ml-muted">
+                        @T["{0}% of target secured", (_summary.TotalQuota > 0 ? (_summary.ClosedWonAmount / _summary.TotalQuota * 100m).ToString("N1") : "0")]
+                    </div>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="pa-3 elevation-0" Style="border: 1px solid var(--mud-palette-divider); border-radius: 8px;">
+                    <div class="d-flex justify-space-between align-center mb-1">
+                        <span class="text-caption mud-text-secondary">@T["Commit + Closed"]</span>
+                        <MudIcon Icon="@Icons.Material.Filled.Verified" Size="Size.Small" Color="Color.Primary" />
+                    </div>
+                    <div class="text-h6" style="font-weight: 700; color: var(--mud-palette-primary);">
+                        @((_summary.ClosedWonAmount + _summary.CommitAmount).ToString("N0"))
+                    </div>
+                    <div class="text-caption ml-muted">
+                        @T["Commit: {0}", _summary.CommitAmount.ToString("N0")]
+                    </div>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="pa-3 elevation-0" Style="border: 1px solid var(--mud-palette-divider); border-radius: 8px;">
+                    <div class="d-flex justify-space-between align-center mb-1">
+                        <span class="text-caption mud-text-secondary">@T["Projected Attainment"]</span>
+                        <MudIcon Icon="@Icons.Material.Filled.AutoGraph" Size="Size.Small" Color="@(_summary.AttainmentPercentage >= 100m ? Color.Success : Color.Warning)" />
+                    </div>
+                    <div class="text-h6" style="font-weight: 700;">
+                        @_summary.AttainmentPercentage.ToString("N1")%
+                    </div>
+                    <div class="text-caption ml-muted">
+                        @T["Proj: {0} • Gap: {1}", _summary.ProjectedAttainmentAmount.ToString("N0"), _summary.GapToTarget.ToString("N0")]
+                    </div>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        @* Category Breakdown & Weighted Analysis *@
+        <div class="d-flex gap-4 flex-wrap mb-4">
+            <div style="flex: 1; min-width: 320px;">
+                <MudCard Elevation="0" Style="border: 1px solid var(--mud-palette-divider); border-radius: 8px;">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">@T["Pipeline by Forecast Category"]</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent Class="pt-0">
+                        <MudSimpleTable Dense="true" Hover="true" Elevation="0">
+                            <thead>
+                                <tr>
+                                    <th>@T["Category"]</th>
+                                    <th style="text-align: center;">@T["Deals"]</th>
+                                    <th style="text-align: right;">@T["Unweighted Total"]</th>
+                                    <th style="text-align: right;">@T["Weighted Projection"]</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var cat in _summary.ByCategory)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex align-center gap-2">
+                                                <div style="width: 10px; height: 10px; border-radius: 50%; background: @CategoryColor(cat.Category);"></div>
+                                                <span style="font-weight: 500;">@CategoryLabel(cat.Category)</span>
+                                            </div>
+                                        </td>
+                                        <td style="text-align: center;">@cat.DealCount</td>
+                                        <td style="text-align: right;">@cat.TotalAmount.ToString("N0")</td>
+                                        <td style="text-align: right; font-weight: 600;">@cat.WeightedAmount.ToString("N0")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    </MudCardContent>
+                </MudCard>
+            </div>
+        </div>
+
+        @* User Attainment Table *@
+        <MudCard Elevation="0" Style="border: 1px solid var(--mud-palette-divider); border-radius: 8px;">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">@T["Sales Rep Quota Attainment"]</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent Class="pt-0">
+                <MudTable Items="_summary.ByUser" Dense="true" Hover="true" Elevation="0">
+                    <HeaderContent>
+                        <MudTh>@T["Sales Rep"]</MudTh>
+                        <MudTh style="text-align: right;">@T["Quota Target"]</MudTh>
+                        <MudTh style="text-align: right;">@T["Closed Won"]</MudTh>
+                        <MudTh style="text-align: right;">@T["Commit"]</MudTh>
+                        <MudTh style="text-align: right;">@T["Best Case"]</MudTh>
+                        <MudTh style="text-align: right;">@T["Weighted Pipeline"]</MudTh>
+                        <MudTh style="width: 220px;">@T["Attainment %"]</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>
+                            <span style="font-weight: 600;">@context.UserName</span>
+                        </MudTd>
+                        <MudTd style="text-align: right;">@context.QuotaTarget.ToString("N0")</MudTd>
+                        <MudTd style="text-align: right; font-weight: 500; color: var(--mud-palette-success);">@context.ClosedWonAmount.ToString("N0")</MudTd>
+                        <MudTd style="text-align: right;">@context.CommitAmount.ToString("N0")</MudTd>
+                        <MudTd style="text-align: right;">@context.BestCaseAmount.ToString("N0")</MudTd>
+                        <MudTd style="text-align: right; font-weight: 500;">@context.WeightedPipelineAmount.ToString("N0")</MudTd>
+                        <MudTd>
+                            <div class="d-flex align-center gap-2">
+                                <MudProgressLinear Color="@(context.AttainmentPercentage >= 100m ? Color.Success : context.AttainmentPercentage >= 70m ? Color.Primary : Color.Warning)"
+                                                   Value="@((double)Math.Min(100m, context.AttainmentPercentage))" Style="height: 8px; border-radius: 4px;" />
+                                <span style="font-size: 12px; font-weight: 600; min-width: 45px;">@context.AttainmentPercentage.ToString("N0")%</span>
+                            </div>
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>
+                        <div class="pa-4 text-center ml-muted">@T["No sales reps found matching this filter."]</div>
+                    </NoRecordsContent>
+                </MudTable>
+            </MudCardContent>
+        </MudCard>
+    }
+</div>
+
+@code {
+    private bool _loading = true;
+    private ForecastSummaryDto? _summary;
+    private string _selectedHorizon = "this_quarter";
+    private Guid? _selectedPipelineId;
+    private Guid? _selectedUserId;
+
+    private readonly List<PipelineDto> _pipelines = [];
+    private readonly List<UserListItem> _users = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadFiltersAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadFiltersAsync()
+    {
+        try
+        {
+            var pTask = Http.GetFromJsonAsync<IReadOnlyList<PipelineDto>>("api/v1/pipelines");
+            var uTask = Http.GetFromJsonAsync<IReadOnlyList<UserListItem>>("api/v1/users");
+            await Task.WhenAll(pTask, uTask);
+
+            if (pTask.Result is not null) _pipelines.AddRange(pTask.Result);
+            if (uTask.Result is not null) _users.AddRange(uTask.Result);
+        }
+        catch
+        {
+            // Optional filters fallback
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            DateTime? start = null;
+            DateTime? end = null;
+            var now = DateTime.UtcNow;
+
+            switch (_selectedHorizon)
+            {
+                case "this_month":
+                    start = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+                    end = start.Value.AddMonths(1).AddSeconds(-1);
+                    break;
+                case "this_quarter":
+                    var qMonth = ((now.Month - 1) / 3) * 3 + 1;
+                    start = new DateTime(now.Year, qMonth, 1, 0, 0, 0, DateTimeKind.Utc);
+                    end = start.Value.AddMonths(3).AddSeconds(-1);
+                    break;
+                case "this_year":
+                    start = new DateTime(now.Year, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                    end = new DateTime(now.Year, 12, 31, 23, 59, 59, DateTimeKind.Utc);
+                    break;
+                case "all_time":
+                default:
+                    start = null;
+                    end = null;
+                    break;
+            }
+
+            var queryParams = new List<string>();
+            if (start.HasValue) queryParams.Add($"startDate={Uri.EscapeDataString(start.Value.ToString("o"))}");
+            if (end.HasValue) queryParams.Add($"endDate={Uri.EscapeDataString(end.Value.ToString("o"))}");
+            if (_selectedPipelineId.HasValue) queryParams.Add($"pipelineId={_selectedPipelineId.Value}");
+            if (_selectedUserId.HasValue) queryParams.Add($"userId={_selectedUserId.Value}");
+
+            var url = "api/v1/forecasting/summary" + (queryParams.Count > 0 ? "?" + string.Join("&", queryParams) : "");
+            _summary = await Http.GetFromJsonAsync<ForecastSummaryDto>(url);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(T["Failed to load forecast: {0}", ex.Message], Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OnHorizonChanged(string val)
+    {
+        _selectedHorizon = val;
+        await LoadAsync();
+    }
+
+    private async Task OnPipelineChanged(Guid? val)
+    {
+        _selectedPipelineId = val;
+        await LoadAsync();
+    }
+
+    private async Task OnUserChanged(Guid? val)
+    {
+        _selectedUserId = val;
+        await LoadAsync();
+    }
+
+    private string CategoryLabel(string cat) => cat switch
+    {
+        "Closed" => T["Closed / Won"],
+        "Commit" => T["Commit (High Confidence)"],
+        "BestCase" => T["Best Case (Probable)"],
+        "Pipeline" => T["Open Pipeline"],
+        "Omitted" => T["Omitted"],
+        _ => cat
+    };
+
+    private string CategoryColor(string cat) => cat switch
+    {
+        "Closed" => "#10B981",
+        "Commit" => "#3B82F6",
+        "BestCase" => "#8B5CF6",
+        "Pipeline" => "#F59E0B",
+        "Omitted" => "#9CA3AF",
+        _ => "#6B7280"
+    };
+}
+

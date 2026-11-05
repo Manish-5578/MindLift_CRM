@@ -1,0 +1,229 @@
+@page "/settings/competitors"
+@page "/competitors"
+@using MindLift.Shared.Contracts
+@using MindLift.Web.Components
+@inject HttpClient Http
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+@inject Translator T
+
+<PageTitle>@T["Competitors"] · MindLift</PageTitle>
+
+<div class="ml-page ml-page--wide">
+    <div class="d-flex align-center justify-space-between flex-wrap gap-4 mb-3">
+        <div>
+            <h1 class="mud-typography mud-typography-h5" style="font-weight:700;">@T["Competitors & Battlecards"]</h1>
+            <div class="mud-text-secondary" style="font-size:14px;">
+                @T["Track market rivals, battlecard counter-pitches, strengths, and your competitive win rate on deals."]
+            </div>
+        </div>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.Add" OnClick="() => OpenCompetitorDialog(null)">
+            @T["Add Competitor"]
+        </MudButton>
+    </div>
+
+    <SettingsNav Current="/settings/competitors" />
+
+    @if (_loading)
+    {
+        <div class="py-6 text-center">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+        </div>
+    }
+    else
+    {
+        @* Analytics Summary KPI Cards *@
+        @if (_analytics is not null)
+        {
+            <MudGrid Spacing="2" Class="mb-4">
+                <MudItem xs="12" sm="4">
+                    <MudPaper Class="pa-3 d-flex align-center gap-3" Elevation="0" Style="border:1px solid var(--mud-palette-divider); border-radius:8px;">
+                        <MudAvatar Color="Color.Primary" Variant="Variant.Filled" Size="Size.Medium">
+                            <MudIcon Icon="@Icons.Material.Filled.Shield" Size="Size.Small" />
+                        </MudAvatar>
+                        <div>
+                            <div class="text-caption mud-text-secondary">@T["Tracked Competitors"]</div>
+                            <div class="text-h6" style="font-weight:700;">@_analytics.TotalCompetitors</div>
+                        </div>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudPaper Class="pa-3 d-flex align-center gap-3" Elevation="0" Style="border:1px solid var(--mud-palette-divider); border-radius:8px;">
+                        <MudAvatar Color="Color.Warning" Variant="Variant.Filled" Size="Size.Medium">
+                            <MudIcon Icon="@Icons.Material.Filled.Handshake" Size="Size.Small" />
+                        </MudAvatar>
+                        <div>
+                            <div class="text-caption mud-text-secondary">@T["Deals with Competitors"]</div>
+                            <div class="text-h6" style="font-weight:700;">@_analytics.TotalDealsWithCompetitors</div>
+                        </div>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudPaper Class="pa-3 d-flex align-center gap-3" Elevation="0" Style="border:1px solid var(--mud-palette-divider); border-radius:8px;">
+                        <MudAvatar Color="Color.Success" Variant="Variant.Filled" Size="Size.Medium">
+                            <MudIcon Icon="@Icons.Material.Filled.EmojiEvents" Size="Size.Small" />
+                        </MudAvatar>
+                        <div>
+                            <div class="text-caption mud-text-secondary">@T["Competitive Win Rate"]</div>
+                            <div class="text-h6" style="font-weight:700; color: var(--mud-palette-success);">
+                                @_analytics.OverallWinRateAgainstCompetitors.ToString("N1")%
+                            </div>
+                        </div>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        }
+
+        @* Competitor List Table *@
+        <MudTable Items="_competitors" Dense="true" Hover="true" Elevation="0"
+                  Style="border:1px solid var(--mud-palette-divider); border-radius:8px;">
+            <HeaderContent>
+                <MudTh>@T["Competitor"]</MudTh>
+                <MudTh>@T["Battlecard / Strategy"]</MudTh>
+                <MudTh style="text-align: center;">@T["Deals (Won / Lost)"]</MudTh>
+                <MudTh style="text-align: right;">@T["Win Rate"]</MudTh>
+                <MudTh style="text-align: right;">@T["Won Revenue"]</MudTh>
+                <MudTh style="text-align: center;">@T["Status"]</MudTh>
+                <MudTh style="text-align: center;">@T["Actions"]</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>
+                    <div>
+                        <span style="font-weight: 600;">@context.Name</span>
+                        @if (!string.IsNullOrWhiteSpace(context.Website))
+                        {
+                            <div class="text-caption">
+                                <a href="@context.Website" target="_blank" class="ml-link">@context.Website</a>
+                            </div>
+                        }
+                    </div>
+                </MudTd>
+                <MudTd>
+                    <div style="max-width: 320px;">
+                        @if (!string.IsNullOrWhiteSpace(context.Battlecard))
+                        {
+                            <div class="text-caption" style="font-style: italic;">"@context.Battlecard"</div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(context.Strengths))
+                        {
+                            <div class="text-caption ml-muted"><strong>@T["Strengths:"]</strong> @context.Strengths</div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(context.Weaknesses))
+                        {
+                            <div class="text-caption ml-muted"><strong>@T["Gaps:"]</strong> @context.Weaknesses</div>
+                        }
+                        @if (string.IsNullOrWhiteSpace(context.Battlecard) && string.IsNullOrWhiteSpace(context.Strengths))
+                        {
+                            <span class="ml-muted">—</span>
+                        }
+                    </div>
+                </MudTd>
+                <MudTd style="text-align: center;">
+                    <span style="font-weight: 500;">@context.WonDealsCount</span>
+                    <span class="ml-muted"> / </span>
+                    <span class="ml-muted">@context.LostDealsCount</span>
+                    <div class="text-caption ml-muted">@context.TotalDealsCount @T["total"]</div>
+                </MudTd>
+                <MudTd style="text-align: right;">
+                    <MudChip T="string" Size="Size.Small"
+                             Color="@(context.WinRatePercentage >= 50m ? Color.Success : context.WinRatePercentage > 0m ? Color.Warning : Color.Default)"
+                             Variant="Variant.Filled">
+                        @context.WinRatePercentage.ToString("N1")%
+                    </MudChip>
+                </MudTd>
+                <MudTd style="text-align: right; font-weight: 600;">
+                    @context.WonRevenue.ToString("N0")
+                </MudTd>
+                <MudTd style="text-align: center;">
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined"
+                             Color="@(context.IsActive ? Color.Success : Color.Default)">
+                        @(context.IsActive ? T["Active"] : T["Inactive"])
+                    </MudChip>
+                </MudTd>
+                <MudTd style="text-align: center;">
+                    <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" Color="Color.Primary"
+                                   OnClick="() => OpenCompetitorDialog(context)" />
+                    <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Color="Color.Error"
+                                   OnClick="() => DeleteCompetitorAsync(context)" />
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <div class="pa-6 text-center">
+                    <MudIcon Icon="@Icons.Material.Outlined.Shield" Color="Color.Default" Style="font-size: 2.5rem; opacity: 0.5;" />
+                    <MudText Typo="Typo.body2" Class="ml-muted mt-2">
+                        @T["No competitors registered yet. Click 'Add Competitor' above to create battlecards."]
+                    </MudText>
+                </div>
+            </NoRecordsContent>
+        </MudTable>
+    }
+</div>
+
+@code {
+    private bool _loading = true;
+    private readonly List<CompetitorDto> _competitors = [];
+    private CompetitorAnalyticsSummaryDto? _analytics;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var listTask = Http.GetFromJsonAsync<IReadOnlyList<CompetitorDto>>("api/v1/competitors");
+            var analyticsTask = Http.GetFromJsonAsync<CompetitorAnalyticsSummaryDto>("api/v1/competitors/analytics");
+
+            await Task.WhenAll(listTask, analyticsTask);
+
+            _competitors.Clear();
+            if (listTask.Result is not null)
+            {
+                _competitors.AddRange(listTask.Result);
+            }
+            _analytics = analyticsTask.Result;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(T["Failed to load competitors: {0}", ex.Message], Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenCompetitorDialog(CompetitorDto? competitor)
+    {
+        var parameters = new DialogParameters { ["Existing"] = competitor };
+        var dialog = await Dialogs.ShowAsync<CompetitorDialog>(competitor is null ? T["Add Competitor"] : T["Edit Competitor"], parameters);
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task DeleteCompetitorAsync(CompetitorDto competitor)
+    {
+        if (!await Dialogs.ConfirmAsync(T["Delete Competitor"], T["Are you sure you want to delete {0}? This cannot be undone.", competitor.Name], T["Delete"], danger: true))
+        {
+            return;
+        }
+
+        var res = await Http.DeleteAsync($"api/v1/competitors/{competitor.Id}");
+        if (res.IsSuccessStatusCode)
+        {
+            Snackbar.Add(T["Competitor deleted."], Severity.Success);
+            await LoadAsync();
+        }
+        else
+        {
+            Snackbar.Add(await res.Content.ReadAsStringAsync(), Severity.Error);
+        }
+    }
+}
