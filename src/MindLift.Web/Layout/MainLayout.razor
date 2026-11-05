@@ -161,6 +161,7 @@
             if (App.CanView(AppModule.Products)) items.Add(new(App.ModuleLabel(AppModule.Products), "/products", Icons.Material.Outlined.Inventory2));
             if (App.CanView(AppModule.Quotations)) items.Add(new(App.ModuleLabel(AppModule.Quotations), "/quotes", Icons.Material.Outlined.RequestQuote));
             if (App.CanView(AppModule.Invoices)) items.Add(new(App.ModuleLabel(AppModule.Invoices), "/invoices", Icons.Material.Outlined.ReceiptLong));
+            if (App.CanView(AppModule.Invoices)) items.Add(new("Payment Links", "/payment-links", Icons.Material.Outlined.Link));
             if (App.CanView(AppModule.Documents)) items.Add(new(App.ModuleLabel(AppModule.Documents), "/documents", Icons.Material.Outlined.DocumentScanner));
             if (App.CanView(AppModule.Tickets)) items.Add(new("Tickets", "/tickets", Icons.Material.Outlined.SupportAgent));
             if (App.CanView(AppModule.Campaigns)) items.Add(new("Campaigns", "/campaigns", Icons.Material.Outlined.Campaign));

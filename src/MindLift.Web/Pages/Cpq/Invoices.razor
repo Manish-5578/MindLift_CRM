@@ -2,6 +2,7 @@
 @using MindLift.Shared.Contracts
 @using MindLift.Shared.Enums
 @using MindLift.UI.Components
+@using MindLift.Web.Components
 @using System.Net.Http.Json
 @inject HttpClient Http
 @inject ISnackbar Snackbar
@@ -160,6 +161,7 @@
                         <MudMenuItem Icon="@Icons.Material.Outlined.Visibility" OnClick="@(() => ViewInvoice(context))">@T["View Invoice"]</MudMenuItem>
                         @if (context.BalanceDue > 0 && context.Status != InvoiceStatus.Cancelled)
                         {
+                            <MudMenuItem Icon="@Icons.Material.Outlined.Link" OnClick="@(() => OpenPaymentLinkDialog(context))">@T["Generate Payment Link"]</MudMenuItem>
                             <MudMenuItem Icon="@Icons.Material.Outlined.Payment" OnClick="@(() => OpenRecordPaymentDialog(context))">@T["Record Payment"]</MudMenuItem>
                         }
                         @if (context.Status != InvoiceStatus.Cancelled && context.Status != InvoiceStatus.Paid)
@@ -570,5 +572,19 @@
         {
             _saving = false;
         }
+    }
+
+    private async Task OpenPaymentLinkDialog(InvoiceDto invoice)
+    {
+        var parameters = new DialogParameters<PaymentLinkDialog>
+        {
+            { x => x.InvoiceId, invoice.Id },
+            { x => x.DefaultTitle, $"Payment for Invoice {invoice.InvoiceNumber}" },
+            { x => x.DefaultAmount, invoice.BalanceDue > 0 ? invoice.BalanceDue : invoice.GrandTotal },
+            { x => x.DefaultCurrency, invoice.Currency },
+            { x => x.DefaultCustomerName, invoice.AccountName ?? invoice.ContactName }
+        };
+
+        await Dialogs.ShowAsync<PaymentLinkDialog>(T["Generate Payment Link"], parameters);
     }
 }

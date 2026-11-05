@@ -1,0 +1,191 @@
+@using MindLift.Shared.Contracts
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject Translator T
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+
+<MudDialog Options="new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true }">
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.Link" Color="Color.Primary" />
+            <MudText Typo="Typo.h6" Style="font-weight:600">@T["Generate Online Payment Link"]</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <div class="d-flex flex-column gap-3 py-2">
+            <MudText Typo="Typo.body2" Class="ml-muted">
+                @T["Create a secure, direct checkout link for instant customer payments via credit card or digital wallets." ]
+            </MudText>
+
+            <MudTextField @bind-Value="_title" Label="@T["Payment Title *"]"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Required="true"
+                          Placeholder="e.g. Invoice Payment INV-1004" />
+
+            <div class="d-flex gap-3">
+                <MudTextField @bind-Value="_currency" Label="@T["Currency"]"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width: 100px;" ReadOnly="true" />
+
+                <MudNumericField @bind-Value="_amount" Label="@T["Amount *"]"
+                                 Variant="Variant.Outlined" Margin="Margin.Dense" Min="0.01m" Step="1m" Format="N2" />
+            </div>
+
+            <MudTextField @bind-Value="_customerName" Label="@T["Customer Name"]"
+                          Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Placeholder="e.g. Acme Corp / Jane Doe" />
+
+            <MudTextField @bind-Value="_customerEmail" Label="@T["Customer Email"]"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Email"
+                          Placeholder="billing@customer.com" />
+
+            <div class="d-flex gap-3 align-center">
+                <MudNumericField @bind-Value="_expiresInDays" Label="@T["Expires in (Days)"]"
+                                 Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" Max="90" Step="1" />
+                <MudCheckBox @bind-Value="_allowPartial" Label="@T["Allow Partial Payments"]" Color="Color.Primary" Dense="true" />
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(_generatedUrl))
+            {
+                <MudPaper Class="pa-3 mt-2" Elevation="0" Style="border: 1px solid var(--mud-palette-success); background: var(--mud-palette-success-hover); border-radius: 8px;">
+                    <div class="d-flex align-center justify-space-between mb-1">
+                        <div class="d-flex align-center gap-2">
+                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                            <span style="font-weight: 600; font-size: 13px;">@T["Payment Link Ready!"]</span>
+                        </div>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">@_createdDto?.LinkNumber</MudChip>
+                    </div>
+                    <div class="d-flex align-center gap-2 mt-2">
+                        <MudTextField Value="@_generatedUrl" ReadOnly="true" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                        <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" Color="Color.Primary" OnClick="CopyLink" Title="@T["Copy Link"]" />
+                        <MudIconButton Icon="@Icons.Material.Filled.OpenInNew" Color="Color.Secondary" OnClick="OpenLink" Title="@T["Open Checkout"]" />
+                    </div>
+                </MudPaper>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert>
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Close" Disabled="_submitting">
+            @(!string.IsNullOrWhiteSpace(_generatedUrl) ? T["Done"] : T["Cancel"])
+        </MudButton>
+        @if (string.IsNullOrWhiteSpace(_generatedUrl))
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="GenerateAsync" Disabled="_submitting">
+                @(_submitting ? T["Generating..."] : T["Generate Link"])
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public Guid? InvoiceId { get; set; }
+    [Parameter] public Guid? QuoteId { get; set; }
+    [Parameter] public string DefaultTitle { get; set; } = string.Empty;
+    [Parameter] public decimal DefaultAmount { get; set; }
+    [Parameter] public string DefaultCurrency { get; set; } = "USD";
+    [Parameter] public string? DefaultCustomerName { get; set; }
+    [Parameter] public string? DefaultCustomerEmail { get; set; }
+
+    private string _title = string.Empty;
+    private decimal _amount;
+    private string _currency = "USD";
+    private string? _customerName;
+    private string? _customerEmail;
+    private int _expiresInDays = 14;
+    private bool _allowPartial;
+
+    private bool _submitting;
+    private string? _error;
+    private string? _generatedUrl;
+    private PaymentLinkDto? _createdDto;
+
+    protected override void OnInitialized()
+    {
+        _title = !string.IsNullOrWhiteSpace(DefaultTitle) ? DefaultTitle : "Payment Request";
+        _amount = DefaultAmount > 0 ? DefaultAmount : 100m;
+        _currency = !string.IsNullOrWhiteSpace(DefaultCurrency) ? DefaultCurrency : "USD";
+        _customerName = DefaultCustomerName;
+        _customerEmail = DefaultCustomerEmail;
+    }
+
+    private async Task GenerateAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_title))
+        {
+            _error = T["Title is required."];
+            return;
+        }
+
+        if (_amount <= 0)
+        {
+            _error = T["Amount must be greater than zero."];
+            return;
+        }
+
+        _submitting = true;
+        _error = null;
+        try
+        {
+            var req = new CreatePaymentLinkRequest
+            {
+                Title = _title.Trim(),
+                Currency = _currency,
+                Amount = _amount,
+                InvoiceId = InvoiceId,
+                QuoteId = QuoteId,
+                CustomerName = _customerName?.Trim(),
+                CustomerEmail = _customerEmail?.Trim(),
+                ExpiresInDays = _expiresInDays,
+                AllowPartial = _allowPartial
+            };
+
+            var res = await Http.PostAsJsonAsync("api/v1/payment-links", req);
+            if (!res.IsSuccessStatusCode)
+            {
+                _error = await res.Content.ReadAsStringAsync();
+                return;
+            }
+
+            _createdDto = await res.Content.ReadFromJsonAsync<PaymentLinkDto>();
+            if (_createdDto?.PaymentToken is not null)
+            {
+                _generatedUrl = $"{Nav.BaseUri.TrimEnd('/')}/pay/{_createdDto.PaymentToken}";
+                Snackbar.Add(T["Payment link generated successfully!"], Severity.Success);
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private async Task CopyLink()
+    {
+        if (!string.IsNullOrWhiteSpace(_generatedUrl))
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", _generatedUrl);
+            Snackbar.Add(T["Payment link copied to clipboard!"], Severity.Success);
+        }
+    }
+
+    private void OpenLink()
+    {
+        if (!string.IsNullOrWhiteSpace(_generatedUrl))
+        {
+            Nav.NavigateTo(_generatedUrl, forceLoad: true);
+        }
+    }
+
+    private void Close() => MudDialog.Close(DialogResult.Ok(_createdDto));
+}
+

@@ -2,6 +2,7 @@
 @using MindLift.Shared.Contracts
 @using MindLift.Shared.Enums
 @using MindLift.UI.Components
+@using MindLift.Web.Components
 @using System.Net.Http.Json
 @inject HttpClient Http
 @inject ISnackbar Snackbar
@@ -145,6 +146,8 @@
                 <MudTd DataLabel="Actions" Style="text-align:right">
                     <MudMenu Icon="@Icons.Material.Outlined.MoreVert" Size="Size.Small" Dense="true">
                         <MudMenuItem Icon="@Icons.Material.Outlined.Visibility" OnClick="@(() => ViewQuoteDetails(context))">@T["View Proposal"]</MudMenuItem>
+                        <MudMenuItem Icon="@Icons.Material.Outlined.Draw" OnClick="@(() => OpenSendESignDialog(context))">@T["Send for E-Signature"]</MudMenuItem>
+                        <MudMenuItem Icon="@Icons.Material.Outlined.Link" OnClick="@(() => OpenPaymentLinkDialogForQuote(context))">@T["Generate Payment Link"]</MudMenuItem>
                         @if (context.Status != QuoteStatus.Accepted)
                         {
                             <MudMenuItem Icon="@Icons.Material.Outlined.CheckCircleOutline" OnClick="@(() => ChangeStatusAsync(context.Id, QuoteStatus.Accepted))">@T["Mark Accepted"]</MudMenuItem>
@@ -292,6 +295,15 @@
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="@(() => _detailsDialogOpen = false)">@T["Close"]</MudButton>
+        @if (_activeQuote is not null)
+        {
+            <MudButton Color="Color.Secondary" Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Draw" OnClick="@(() => OpenSendESignDialog(_activeQuote))">
+                @T["Send E-Sign"]
+            </MudButton>
+            <MudButton Color="Color.Tertiary" Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Link" OnClick="@(() => OpenPaymentLinkDialogForQuote(_activeQuote))">
+                @T["Payment Link"]
+            </MudButton>
+        }
         @if (_activeQuote is not null)
         {
             <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Outlined.ReceiptLong" OnClick="@(() => ConvertToInvoiceAsync(_activeQuote.Id))">
@@ -501,5 +513,38 @@
         {
             Snackbar.Add($"Conversion error: {ex.Message}", Severity.Error);
         }
+    }
+
+    private async Task OpenSendESignDialog(QuoteDto quote)
+    {
+        var parameters = new DialogParameters<SendQuoteESignDialog>
+        {
+            { x => x.QuoteId, quote.Id },
+            { x => x.QuoteNumber, quote.QuoteNumber },
+            { x => x.DefaultSignerName, quote.AccountName ?? "" },
+            { x => x.Currency, quote.Currency },
+            { x => x.TotalAmount, quote.GrandTotal }
+        };
+
+        var dialog = await Dialogs.ShowAsync<SendQuoteESignDialog>(T["Send for E-Signature"], parameters);
+        var res = await dialog.Result;
+        if (!res!.Canceled)
+        {
+            await LoadQuotesAsync();
+        }
+    }
+
+    private async Task OpenPaymentLinkDialogForQuote(QuoteDto quote)
+    {
+        var parameters = new DialogParameters<PaymentLinkDialog>
+        {
+            { x => x.QuoteId, quote.Id },
+            { x => x.DefaultTitle, $"Payment for Proposal {quote.QuoteNumber}" },
+            { x => x.DefaultAmount, quote.GrandTotal },
+            { x => x.DefaultCurrency, quote.Currency },
+            { x => x.DefaultCustomerName, quote.AccountName }
+        };
+
+        await Dialogs.ShowAsync<PaymentLinkDialog>(T["Generate Payment Link"], parameters);
     }
 }

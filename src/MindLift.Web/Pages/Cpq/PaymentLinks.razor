@@ -1,0 +1,291 @@
+@page "/payment-links"
+@using MindLift.Shared.Contracts
+@using MindLift.UI.Components
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+@inject NavigationManager Nav
+@inject Translator T
+@inject IJSRuntime JS
+
+<PageTitle>@T["Payment Links"] · MindLift</PageTitle>
+
+<div class="ml-page">
+    <!-- Header -->
+    <div class="d-flex flex-wrap align-center justify-space-between gap-3 mb-4">
+        <div>
+            <MudText Typo="Typo.h5" Style="font-weight:700">@T["Online Payment Links"]</MudText>
+            <MudText Typo="Typo.body2" Class="ml-muted">@T["Generate direct checkout links for invoices, quotes, or custom requests to collect instant payments."]</MudText>
+        </div>
+
+        <div class="d-flex flex-wrap align-center gap-2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.AddLink" OnClick="OpenCreateDialog" Size="Size.Small">
+                @T["Create Payment Link"]
+            </MudButton>
+        </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <MudGrid Spacing="3" Class="mb-4">
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 d-flex align-center gap-3" Style="border-radius:12px">
+                <MudAvatar Color="Color.Primary" Variant="Variant.Filled" Size="Size.Medium">
+                    <MudIcon Icon="@Icons.Material.Outlined.Link" />
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@T["Total Links"]</MudText>
+                    <MudText Typo="Typo.h6" Style="font-weight:700">@_links.Count</MudText>
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 d-flex align-center gap-3" Style="border-radius:12px">
+                <MudAvatar Color="Color.Info" Variant="Variant.Filled" Size="Size.Medium">
+                    <MudIcon Icon="@Icons.Material.Outlined.HourglassTop" />
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@T["Active Links"]</MudText>
+                    <MudText Typo="Typo.h6" Style="font-weight:700">@_links.Count(l => l.Status == "Active")</MudText>
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 d-flex align-center gap-3" Style="border-radius:12px">
+                <MudAvatar Color="Color.Success" Variant="Variant.Filled" Size="Size.Medium">
+                    <MudIcon Icon="@Icons.Material.Outlined.CheckCircleOutline" />
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@T["Collected Revenue"]</MudText>
+                    <MudText Typo="Typo.h6" Style="font-weight:700">@_links.Sum(l => l.PaidAmount).ToString("N0")</MudText>
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3 d-flex align-center gap-3" Style="border-radius:12px">
+                <MudAvatar Color="Color.Warning" Variant="Variant.Filled" Size="Size.Medium">
+                    <MudIcon Icon="@Icons.Material.Outlined.AccountBalanceWallet" />
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.caption" Class="ml-muted">@T["Outstanding Balance"]</MudText>
+                    <MudText Typo="Typo.h6" Style="font-weight:700">@_links.Where(l => l.Status != "Cancelled").Sum(l => l.Amount - l.PaidAmount).ToString("N0")</MudText>
+                </div>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <!-- Filters & Search -->
+    <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-4 d-flex flex-wrap align-center justify-space-between gap-3" Style="border-radius:12px">
+        <div class="d-flex flex-wrap align-center gap-2">
+            <MudTextField @bind-Value="_searchQuery" Placeholder="@T["Search payment links..."]" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.Search" Immediate="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="min-width:260px" />
+            <MudSelect T="string" @bind-Value="_statusFilter" Placeholder="@T["All Statuses"]" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Style="min-width:160px">
+                <MudSelectItem T="string" Value="@("All")">@T["All Statuses"]</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Active")">@T["Active"]</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Paid")">@T["Paid"]</MudSelectItem>
+                <MudSelectItem T="string" Value="@("PartiallyPaid")">@T["Partially Paid"]</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Cancelled")">@T["Cancelled"]</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Expired")">@T["Expired"]</MudSelectItem>
+            </MudSelect>
+        </div>
+    </MudPaper>
+
+    @if (_loading)
+    {
+        <SkeletonTable Rows="6" Columns="7" />
+    }
+    else if (FilteredLinks.Count == 0)
+    {
+        <EmptyState Title="No payment links found" Subtitle="@T["Create a payment link to send instant online checkout pages to your clients."]" ActionLabel="Create Payment Link" OnAction="OpenCreateDialog" />
+    }
+    else
+    {
+        <MudTable Items="@FilteredLinks" Dense="true" Hover="true" Outlined="true" Style="border-radius:12px; overflow:hidden">
+            <HeaderContent>
+                <MudTh>@T["Link #"]</MudTh>
+                <MudTh>@T["Title"]</MudTh>
+                <MudTh>@T["Customer"]</MudTh>
+                <MudTh>@T["Linked Document"]</MudTh>
+                <MudTh Style="text-align:right">@T["Amount"]</MudTh>
+                <MudTh Style="min-width:140px">@T["Payment Progress"]</MudTh>
+                <MudTh>@T["Status"]</MudTh>
+                <MudTh Style="text-align:right">@T["Actions"]</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Link #">
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary" Style="font-family:monospace; font-weight:600">
+                        @context.LinkNumber
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Title">
+                    <MudText Typo="Typo.body2" Style="font-weight:600">@context.Title</MudText>
+                    @if (context.ExpiresAt.HasValue)
+                    {
+                        <MudText Typo="Typo.caption" Class="ml-muted">@T["Expires: {0}", context.ExpiresAt.Value.ToString("MMM dd, yyyy")]</MudText>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Customer">
+                    <div class="d-flex flex-column">
+                        <MudText Typo="Typo.body2">@(context.CustomerName ?? "—")</MudText>
+                        @if (!string.IsNullOrWhiteSpace(context.CustomerEmail))
+                        {
+                            <MudText Typo="Typo.caption" Class="ml-muted">@context.CustomerEmail</MudText>
+                        }
+                    </div>
+                </MudTd>
+                <MudTd DataLabel="Linked Document">
+                    @if (!string.IsNullOrWhiteSpace(context.InvoiceNumber))
+                    {
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="Color.Default" Icon="@Icons.Material.Filled.Receipt">
+                            @context.InvoiceNumber
+                        </MudChip>
+                    }
+                    else if (!string.IsNullOrWhiteSpace(context.QuoteNumber))
+                    {
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="Color.Default" Icon="@Icons.Material.Filled.Description">
+                            @context.QuoteNumber
+                        </MudChip>
+                    }
+                    else
+                    {
+                        <span class="ml-muted">—</span>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Amount" Style="text-align:right">
+                    <MudText Typo="Typo.body2" Style="font-weight:700">
+                        @context.Currency @context.Amount.ToString("N2")
+                    </MudText>
+                </MudTd>
+                <MudTd DataLabel="Payment Progress">
+                    @{
+                        var pct = context.Amount > 0 ? (double)(context.PaidAmount / context.Amount * 100) : 0;
+                    }
+                    <div class="d-flex flex-column gap-1">
+                        <div class="d-flex justify-space-between text-caption">
+                            <span class="ml-muted">@T["Paid:"] @context.PaidAmount.ToString("N0")</span>
+                            <span style="font-weight:600;">@pct.ToString("F0")%</span>
+                        </div>
+                        <MudProgressLinear Color="@(context.PaidAmount >= context.Amount ? Color.Success : Color.Primary)" Value="@pct" Rounded="true" Size="Size.Small" />
+                    </div>
+                </MudTd>
+                <MudTd DataLabel="Status">
+                    <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)" Variant="Variant.Filled">
+                        @context.Status
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Actions" Style="text-align:right">
+                    <MudMenu Icon="@Icons.Material.Outlined.MoreVert" Size="Size.Small" Dense="true">
+                        <MudMenuItem Icon="@Icons.Material.Outlined.ContentCopy" OnClick="@(() => CopyCheckoutUrl(context.PaymentToken))">@T["Copy Checkout Link"]</MudMenuItem>
+                        <MudMenuItem Icon="@Icons.Material.Outlined.OpenInNew" OnClick="@(() => OpenCheckout(context.PaymentToken))">@T["Open Checkout Page"]</MudMenuItem>
+                        @if (context.Status == "Active")
+                        {
+                            <MudMenuItem Icon="@Icons.Material.Outlined.Cancel" OnClick="@(() => CancelLinkAsync(context.Id))">@T["Cancel Link"]</MudMenuItem>
+                        }
+                    </MudMenu>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</div>
+
+@code {
+    private bool _loading = true;
+    private List<PaymentLinkDto> _links = [];
+    private string _searchQuery = "";
+    private string _statusFilter = "All";
+
+    private List<PaymentLinkDto> FilteredLinks => _links.Where(l =>
+        (string.IsNullOrWhiteSpace(_searchQuery) ||
+         l.Title.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase) ||
+         l.LinkNumber.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase) ||
+         (l.CustomerName != null && l.CustomerName.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase)) ||
+         (l.InvoiceNumber != null && l.InvoiceNumber.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase))) &&
+        (_statusFilter == "All" || l.Status.Equals(_statusFilter, StringComparison.OrdinalIgnoreCase))
+    ).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLinksAsync();
+    }
+
+    private async Task LoadLinksAsync()
+    {
+        _loading = true;
+        try
+        {
+            _links = await Http.GetFromJsonAsync<List<PaymentLinkDto>>("api/v1/payment-links") ?? [];
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load payment links: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private Color GetStatusColor(string status) => status switch
+    {
+        "Paid" => Color.Success,
+        "PartiallyPaid" => Color.Info,
+        "Active" => Color.Primary,
+        "Cancelled" => Color.Error,
+        "Expired" => Color.Warning,
+        _ => Color.Default
+    };
+
+    private async Task OpenCreateDialog()
+    {
+        var parameters = new DialogParameters<PaymentLinkDialog>
+        {
+            { x => x.DefaultTitle, "Direct Payment Request" },
+            { x => x.DefaultAmount, 250m },
+            { x => x.DefaultCurrency, "USD" }
+        };
+
+        var dialog = await Dialogs.ShowAsync<PaymentLinkDialog>(T["Create Payment Link"], parameters);
+        var res = await dialog.Result;
+        if (!res!.Canceled)
+        {
+            await LoadLinksAsync();
+        }
+    }
+
+    private async Task CopyCheckoutUrl(string token)
+    {
+        var url = $"{Nav.BaseUri.TrimEnd('/')}/pay/{token}";
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", url);
+        Snackbar.Add(T["Payment link copied to clipboard!"], Severity.Success);
+    }
+
+    private void OpenCheckout(string token)
+    {
+        var url = $"/pay/{token}";
+        Nav.NavigateTo(url, forceLoad: false);
+    }
+
+    private async Task CancelLinkAsync(Guid id)
+    {
+        var confirmed = await Dialogs.ConfirmAsync(T["Cancel Payment Link"], T["Are you sure you want to cancel this payment link? Customers will no longer be able to pay through it."], T["Yes, Cancel Link"], danger: true);
+        if (!confirmed) return;
+
+        try
+        {
+            var res = await Http.PostAsync($"api/v1/payment-links/{id}/cancel", null);
+            if (res.IsSuccessStatusCode)
+            {
+                Snackbar.Add(T["Payment link cancelled."], Severity.Success);
+                await LoadLinksAsync();
+            }
+            else
+            {
+                var err = await res.Content.ReadAsStringAsync();
+                Snackbar.Add($"Failed to cancel: {err}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error cancelling payment link: {ex.Message}", Severity.Error);
+        }
+    }
+}
+

@@ -1,0 +1,352 @@
+@page "/sign/{Token}"
+@layout AuthLayout
+@using MindLift.Shared.Contracts
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject Translator T
+
+<PageTitle>@(_details is not null ? $"{_details.QuoteNumber} - {T["Sign Document"]}" : T["Review & Sign"]) · MindLift</PageTitle>
+
+<div style="min-height: 100vh; background: var(--mud-palette-background-grey); padding: 32px 16px;">
+    <div style="max-width: 800px; margin: 0 auto;">
+        @if (_loading)
+        {
+            <div class="py-12 text-center">
+                <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+                <div class="mt-3 text-caption ml-muted">@T["Loading document for secure signing..."]</div>
+            </div>
+        }
+        else if (_details is null)
+        {
+            <MudPaper Class="pa-8 text-center" Elevation="1" Style="border-radius: 12px;">
+                <MudIcon Icon="@Icons.Material.Filled.ErrorOutline" Color="Color.Error" Style="font-size: 3rem;" />
+                <MudText Typo="Typo.h5" Class="mt-2" Style="font-weight: 700;">@T["Signing Link Expired or Invalid"]</MudText>
+                <MudText Typo="Typo.body2" Class="ml-muted mt-1">
+                    @(_error ?? T["This document could not be retrieved. Please contact the sender for a new signing link."])
+                </MudText>
+            </MudPaper>
+        }
+        else
+        {
+            <MudPaper Class="pa-6 mb-4" Elevation="1" Style="border-radius: 12px; border: 1px solid var(--mud-palette-divider);">
+                @* Header *@
+                <div class="d-flex justify-space-between align-center flex-wrap gap-3 pb-4" style="border-bottom: 1px solid var(--mud-palette-divider);">
+                    <div>
+                        <MudText Typo="Typo.h5" Style="font-weight: 700;">@_details.Title</MudText>
+                        <MudText Typo="Typo.body2" Class="ml-muted">@T["Quotation"] #@_details.QuoteNumber • @T["Issued:"] @_details.IssueDate.ToString("MMM dd, yyyy")</MudText>
+                    </div>
+                    <div>
+                        <MudChip T="string" Variant="Variant.Filled"
+                                 Color="@(_details.ESignStatus == "Signed" ? Color.Success : _details.ESignStatus == "Declined" ? Color.Error : Color.Primary)">
+                            @_details.ESignStatus
+                        </MudChip>
+                    </div>
+                </div>
+
+                @* Customer Details *@
+                <MudGrid Spacing="3" Class="my-3">
+                    <MudItem xs="12" sm="6">
+                        <div class="text-caption ml-muted">@T["Prepared For:"]</div>
+                        <div style="font-weight: 600;">@(_details.AccountName ?? _details.ContactName ?? T["Valued Client"])</div>
+                        @if (!string.IsNullOrWhiteSpace(_details.SignerEmail))
+                        {
+                            <div class="text-caption ml-muted">@_details.SignerEmail</div>
+                        }
+                    </MudItem>
+                    <MudItem xs="12" sm="6" Style="text-align: right;">
+                        <div class="text-caption ml-muted">@T["Total Amount:"]</div>
+                        <div class="text-h5" style="font-weight: 700; color: var(--mud-palette-primary);">
+                            @_details.Currency @_details.GrandTotal.ToString("N2")
+                        </div>
+                    </MudItem>
+                </MudGrid>
+
+                @* Line Items *@
+                <div class="my-4">
+                    <MudSimpleTable Dense="true" Elevation="0" Style="border: 1px solid var(--mud-palette-divider); border-radius: 8px;">
+                        <thead>
+                            <tr>
+                                <th>@T["Description"]</th>
+                                <th style="text-align: right;">@T["Qty"]</th>
+                                <th style="text-align: right;">@T["Unit Price"]</th>
+                                <th style="text-align: right;">@T["Total"]</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in _details.LineItems)
+                            {
+                                <tr>
+                                    <td>
+                                        <div style="font-weight: 500;">@item.ProductName</div>
+                                        @if (!string.IsNullOrWhiteSpace(item.Description))
+                                        {
+                                            <div class="text-caption ml-muted">@item.Description</div>
+                                        }
+                                    </td>
+                                    <td style="text-align: right;">@item.Quantity.ToString("G29")</td>
+                                    <td style="text-align: right;">@item.UnitPrice.ToString("N2")</td>
+                                    <td style="text-align: right; font-weight: 600;">@item.TotalAmount.ToString("N2")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                </div>
+
+                @* Totals Breakdown *@
+                <div class="d-flex justify-end my-3">
+                    <div style="min-width: 240px;" class="d-flex flex-column gap-1">
+                        <div class="d-flex justify-space-between text-caption">
+                            <span class="ml-muted">@T["Subtotal:"]</span>
+                            <span>@_details.SubTotal.ToString("N2") @_details.Currency</span>
+                        </div>
+                        @if (_details.DiscountAmount > 0)
+                        {
+                            <div class="d-flex justify-space-between text-caption">
+                                <span class="ml-muted">@T["Discount:"]</span>
+                                <span style="color: var(--mud-palette-error);">-@_details.DiscountAmount.ToString("N2") @_details.Currency</span>
+                            </div>
+                        }
+                        @if (_details.TaxAmount > 0)
+                        {
+                            <div class="d-flex justify-space-between text-caption">
+                                <span class="ml-muted">@T["Tax:"]</span>
+                                <span>+@_details.TaxAmount.ToString("N2") @_details.Currency</span>
+                            </div>
+                        }
+                        <div class="d-flex justify-space-between align-center pt-2 mt-1" style="border-top: 1px dashed var(--mud-palette-divider); font-weight: 700;">
+                            <span>@T["Grand Total:"]</span>
+                            <span style="color: var(--mud-palette-primary); font-size: 1.15rem;">
+                                @_details.GrandTotal.ToString("N2") @_details.Currency
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                @* Terms & Notes *@
+                @if (!string.IsNullOrWhiteSpace(_details.TermsAndConditions))
+                {
+                    <div class="pa-3 my-4 rounded" style="background: var(--mud-palette-background-grey); border: 1px solid var(--mud-palette-divider);">
+                        <div class="text-caption" style="font-weight: 600;">@T["Terms & Conditions"]</div>
+                        <div class="text-caption ml-muted mt-1" style="white-space: pre-wrap;">@_details.TermsAndConditions</div>
+                    </div>
+                }
+
+                @* Signature Status or Signing Section *@
+                @if (_details.ESignStatus == "Signed")
+                {
+                    <MudPaper Class="pa-4 mt-4" Elevation="0" Style="border: 1px solid var(--mud-palette-success); background: var(--mud-palette-success-hover); border-radius: 8px;">
+                        <div class="d-flex align-center gap-2 mb-2">
+                            <MudIcon Icon="@Icons.Material.Filled.Verified" Color="Color.Success" />
+                            <span style="font-weight: 700; color: var(--mud-palette-success);">@T["Document Successfully Signed & Accepted"]</span>
+                        </div>
+                        <div class="d-flex flex-column gap-1 text-caption">
+                            <div><strong>@T["Signed By:"]</strong> @_details.SignerName (@_details.SignerTitle)</div>
+                            <div><strong>@T["Email:"]</strong> @_details.SignerEmail</div>
+                            <div><strong>@T["Timestamp:"]</strong> @_details.SignedAt?.ToString("yyyy-MM-dd HH:mm:ss UTC")</div>
+                            @if (!string.IsNullOrWhiteSpace(_details.SecurityHash))
+                            {
+                                <div><strong>@T["Security Fingerprint:"]</strong> <code>@_details.SecurityHash</code></div>
+                            }
+                        </div>
+                    </MudPaper>
+                }
+                else if (_details.ESignStatus == "Declined")
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true" Class="mt-4">
+                        @T["This document was declined on {0}. Reason: {1}", _details.SignedAt?.ToString("MMM dd, yyyy") ?? "", _details.DeclineReason ?? "No reason specified"]
+                    </MudAlert>
+                }
+                else
+                {
+                    @* Digital Signature Box *@
+                    <MudPaper Class="pa-4 mt-6" Elevation="0" Style="border: 1px solid var(--mud-palette-primary); border-radius: 8px; background: var(--mud-palette-surface);">
+                        <div class="d-flex align-center gap-2 mb-3">
+                            <MudIcon Icon="@Icons.Material.Filled.Draw" Color="Color.Primary" />
+                            <MudText Typo="Typo.subtitle1" Style="font-weight: 700;">@T["Sign & Accept Document"]</MudText>
+                        </div>
+
+                        <MudGrid Spacing="2">
+                            <MudItem xs="12" sm="6">
+                                <MudTextField @bind-Value="_signerName" Label="@T["Your Full Name *"]"
+                                              Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" />
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudTextField @bind-Value="_signerTitle" Label="@T["Your Title / Designation"]"
+                                              Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="e.g. Managing Director" />
+                            </MudItem>
+                        </MudGrid>
+
+                        <div class="my-3 pa-4 text-center rounded" style="border: 2px dashed var(--mud-palette-divider); background: var(--mud-palette-background-grey);">
+                            <div class="text-caption ml-muted mb-1">@T["Digital Signature Preview"]</div>
+                            <div style="font-family: 'Brush Script MT', 'cursive', 'Georgia'; font-size: 2rem; color: var(--mud-palette-primary);">
+                                @(!string.IsNullOrWhiteSpace(_signerName) ? _signerName : T["Your Signature"])
+                            </div>
+                        </div>
+
+                        <MudCheckBox @bind-Value="_consentAgreed" Label="@T["I confirm that I am authorized to accept this proposal and agree to be legally bound by this electronic signature."]"
+                                     Color="Color.Primary" Dense="true" Class="my-2" />
+
+                        @if (!string.IsNullOrWhiteSpace(_submitError))
+                        {
+                            <MudAlert Severity="Severity.Error" Dense="true" Class="my-2">@_submitError</MudAlert>
+                        }
+
+                        <div class="d-flex justify-space-between align-center flex-wrap gap-2 mt-4 pt-3" style="border-top: 1px solid var(--mud-palette-divider);">
+                            <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="() => _showDeclineBox = !_showDeclineBox" Disabled="_submitting">
+                                @T["Decline Proposal"]
+                            </MudButton>
+
+                            <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Medium"
+                                       StartIcon="@Icons.Material.Filled.Check" OnClick="SignDocumentAsync"
+                                       Disabled="@(_submitting || !_consentAgreed || string.IsNullOrWhiteSpace(_signerName))">
+                                @(_submitting ? T["Securing Signature..."] : T["Adopt Signature & Sign"])
+                            </MudButton>
+                        </div>
+
+                        @if (_showDeclineBox)
+                        {
+                            <div class="mt-3 pa-3 rounded" style="border: 1px solid var(--mud-palette-error); background: var(--mud-palette-error-hover);">
+                                <MudTextField @bind-Value="_declineReason" Label="@T["Reason for Declining (Optional)"]"
+                                              Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />
+                                <div class="d-flex justify-end mt-2">
+                                    <MudButton Variant="Variant.Filled" Color="Color.Error" Size="Size.Small" OnClick="DeclineDocumentAsync" Disabled="_submitting">
+                                        @T["Confirm Decline"]
+                                    </MudButton>
+                                </div>
+                            </div>
+                        }
+                    </MudPaper>
+                }
+            </MudPaper>
+
+            <div class="text-center text-caption ml-muted">
+                @T["Powered by MindLift CRM Digital Trust & Verification"]
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Token { get; set; } = string.Empty;
+
+    private bool _loading = true;
+    private string? _error;
+    private QuoteESignDetailsDto? _details;
+
+    private string _signerName = string.Empty;
+    private string? _signerTitle;
+    private bool _consentAgreed;
+    private bool _submitting;
+    private string? _submitError;
+
+    private bool _showDeclineBox;
+    private string _declineReason = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDocumentAsync();
+    }
+
+    private async Task LoadDocumentAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _details = await Http.GetFromJsonAsync<QuoteESignDetailsDto>($"api/v1/quotes/public/esign/{Token}");
+            if (_details is not null)
+            {
+                _signerName = _details.SignerName ?? "";
+                _signerTitle = _details.SignerTitle;
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SignDocumentAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_signerName))
+        {
+            _submitError = T["Please enter your full name."];
+            return;
+        }
+
+        if (!_consentAgreed)
+        {
+            _submitError = T["You must consent to the legal terms to sign."];
+            return;
+        }
+
+        _submitting = true;
+        _submitError = null;
+        try
+        {
+            var req = new SignQuoteRequest
+            {
+                SigningToken = Token,
+                SignerName = _signerName.Trim(),
+                SignerTitle = _signerTitle?.Trim(),
+                SignatureData = $"DIGITAL_SIGNATURE:{_signerName.Trim()}:{DateTime.UtcNow:o}",
+                ConsentAgreed = true
+            };
+
+            var res = await Http.PostAsJsonAsync("api/v1/quotes/public/esign/sign", req);
+            if (!res.IsSuccessStatusCode)
+            {
+                _submitError = await res.Content.ReadAsStringAsync();
+                return;
+            }
+
+            Snackbar.Add(T["Document signed and accepted successfully!"], Severity.Success);
+            await LoadDocumentAsync();
+        }
+        catch (Exception ex)
+        {
+            _submitError = ex.Message;
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private async Task DeclineDocumentAsync()
+    {
+        _submitting = true;
+        _submitError = null;
+        try
+        {
+            var req = new DeclineQuoteESignRequest
+            {
+                SigningToken = Token,
+                Reason = string.IsNullOrWhiteSpace(_declineReason) ? "No reason provided" : _declineReason.Trim(),
+                DeclinedBy = _signerName
+            };
+
+            var res = await Http.PostAsJsonAsync("api/v1/quotes/public/esign/decline", req);
+            if (!res.IsSuccessStatusCode)
+            {
+                _submitError = await res.Content.ReadAsStringAsync();
+                return;
+            }
+
+            Snackbar.Add(T["Document marked as declined."], Severity.Info);
+            await LoadDocumentAsync();
+        }
+        catch (Exception ex)
+        {
+            _submitError = ex.Message;
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}
