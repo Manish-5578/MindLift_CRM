@@ -51,6 +51,8 @@
         new("firstName", "First name", TestId: "lead-first", Columns: 6),
         new("lastName", "Last name", Columns: 6),
         new("address", "Address", Required: true, TestId: "lead-address"),
+        new("city", "City", Columns: 6, TestId: "lead-city"),
+        new("state", "State", Columns: 6, TestId: "lead-state"),
         new("email", "Email", FormFieldKind.Email, TestId: "lead-email"),
         new("phone", "Phone"),
         new("status", "Status", FormFieldKind.Picklist, Options: Options("lead_status"), Columns: 6),
@@ -94,7 +96,7 @@
         _leadId = lead.Id;
         _values = new Dictionary<string, string?>
         {
-            ["firstName"] = lead.FirstName, ["lastName"] = lead.LastName, ["address"] = lead.Address, ["email"] = lead.Email, ["phone"] = lead.Phone,
+            ["firstName"] = lead.FirstName, ["lastName"] = lead.LastName, ["address"] = lead.Address, ["city"] = lead.City, ["state"] = lead.State, ["email"] = lead.Email, ["phone"] = lead.Phone,
             ["companyName"] = lead.CompanyName, ["status"] = lead.Status, ["source"] = lead.Source, ["rating"] = lead.Rating, ["description"] = lead.Description,
         };
         Reset(lead.CustomFields.ToDictionary(kv => kv.Key, kv => (JsonElement?)kv.Value));
@@ -150,7 +152,7 @@
                 Value("firstName") ?? string.Empty, Value("lastName") ?? string.Empty, Value("email"), Value("phone"), Value("companyName"),
                 Value("status"), Value("source"), Value("rating"), Value("description"), null, null,
                 _custom.Where(kv => kv.Value is not null).ToDictionary(kv => kv.Key, kv => kv.Value!.Value),
-                Address: Value("address"));
+                Address: Value("address"), City: Value("city"), State: Value("state"));
 
             var response = _leadId is null
                 ? await Http.PostAsJsonAsync("api/v1/leads", request)

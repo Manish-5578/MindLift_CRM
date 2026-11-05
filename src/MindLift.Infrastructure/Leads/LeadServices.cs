@@ -75,7 +75,8 @@ public sealed class LeadService(
         var items = rows.Select(l => new LeadListItemDto(
             l.Id, $"{l.FirstName} {l.LastName}".Trim(), l.Email, l.Phone, l.CompanyName, l.Status, l.Source, l.Rating,
             l.OwnerId, owners.GetValueOrDefault(l.OwnerId), l.CreatedAt, l.FirstContactedAt,
-            l.ConvertedAt is not null, l.Status == "disqualified", l.FirstName, l.LastName, l.Address, l.Description)).ToList();
+            l.ConvertedAt is not null, l.Status == "disqualified", l.FirstName, l.LastName, l.Address, l.Description,
+            l.City, l.State)).ToList();
 
         return new PagedResult<LeadListItemDto>(items, total, page, pageSize);
     }
@@ -157,7 +158,7 @@ public sealed class LeadService(
     /// <summary>The lead's current values as a save request, so a bulk change alters only the one thing it is about.</summary>
     private static SaveLeadRequest ToSave(LeadDto lead) => new(
         lead.FirstName, lead.LastName, lead.Email, lead.Phone, lead.CompanyName, lead.Status, lead.Source, lead.Rating, lead.Description,
-        lead.Tags, lead.OwnerId, lead.CustomFields, lead.Address);
+        lead.Tags, lead.OwnerId, lead.CustomFields, lead.Address, lead.City, lead.State);
 
     public async Task<LeadDto> GetAsync(Guid id, CancellationToken cancellationToken = default)
     {
@@ -1034,7 +1035,7 @@ public sealed class LeadService(
 
         // Sheet 1: Leads
         var sheetLeads = workbook.Worksheets.Add("Leads");
-        var leadHeaders = new[] { "Company", "First Name", "Last Name", "Address", "Email", "Phone", "Status", "Source", "Rating", "Notes" };
+        var leadHeaders = new[] { "Company", "First Name", "Last Name", "Address", "City", "State", "Email", "Phone", "Status", "Source", "Rating", "Notes" };
         for (var col = 0; col < leadHeaders.Length; col++)
         {
             var cell = sheetLeads.Cell(1, col + 1);
@@ -1064,10 +1065,12 @@ public sealed class LeadService(
 
         var helpRows = new (string Field, string Req, string Desc, string Values)[]
         {
-            ("Company", "Optional (Required if contact name blank)", "The company, organization or business name.", "Free text. E.g. Acme Corp"),
-            ("First Name", "Optional (Required if company blank)", "Contact person's first / given name.", "Free text. E.g. Jane"),
+            ("Company", "Mandatory", "The company, organization or business name.", "Free text. E.g. Acme Corp"),
+            ("First Name", "Optional", "Contact person's first / given name.", "Free text. E.g. Jane"),
             ("Last Name", "Optional", "Contact person's last / family name.", "Free text. E.g. Doe"),
-            ("Address", "Mandatory", "Physical or mailing address of the lead or organization.", "Free text. E.g. 100 Main St, New York, NY 10001"),
+            ("Address", "Optional", "Physical or street address of the lead or organization.", "Free text. E.g. 100 Main St"),
+            ("City", "Optional", "City or town of the lead.", "Free text. E.g. New York, London, Dubai"),
+            ("State", "Optional", "State, province, or region of the lead.", "Free text. E.g. NY, California, Ontario"),
             ("Email", "Optional", "Contact's email address. Used for duplicate checking.", "Valid email format. E.g. jane.doe@acme.com"),
             ("Phone", "Optional", "Phone number with country code. Used for duplicate checking.", "E.164 or digits. E.g. +1 555-0199"),
             ("Status", "Optional", "Lifecycle status of the lead. Defaults to 'new' if omitted.", "new, working, qualified, disqualified"),
@@ -1118,7 +1121,7 @@ public sealed class LeadService(
         using var workbook = new XLWorkbook();
         var sheet = workbook.Worksheets.Add("Leads");
 
-        var headers = new[] { "Id", "Company", "First Name", "Last Name", "Address", "Email", "Phone", "Status", "Source", "Rating", "Owner", "Created At" };
+        var headers = new[] { "Id", "Company", "First Name", "Last Name", "Address", "City", "State", "Email", "Phone", "Status", "Source", "Rating", "Owner", "Created At" };
         for (var c = 0; c < headers.Length; c++)
         {
             var cell = sheet.Cell(1, c + 1);
@@ -1137,13 +1140,16 @@ public sealed class LeadService(
             sheet.Cell(rowIdx, 2).Value = item.CompanyName ?? string.Empty;
             sheet.Cell(rowIdx, 3).Value = item.FirstName;
             sheet.Cell(rowIdx, 4).Value = item.LastName;
-            sheet.Cell(rowIdx, 5).Value = item.Email ?? string.Empty;
-            sheet.Cell(rowIdx, 6).Value = item.Phone ?? string.Empty;
-            sheet.Cell(rowIdx, 7).Value = item.Status;
-            sheet.Cell(rowIdx, 8).Value = item.Source ?? string.Empty;
-            sheet.Cell(rowIdx, 9).Value = item.Rating ?? string.Empty;
-            sheet.Cell(rowIdx, 10).Value = item.OwnerName ?? string.Empty;
-            sheet.Cell(rowIdx, 11).Value = item.CreatedAtUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+            sheet.Cell(rowIdx, 5).Value = item.Address ?? string.Empty;
+            sheet.Cell(rowIdx, 6).Value = item.City ?? string.Empty;
+            sheet.Cell(rowIdx, 7).Value = item.State ?? string.Empty;
+            sheet.Cell(rowIdx, 8).Value = item.Email ?? string.Empty;
+            sheet.Cell(rowIdx, 9).Value = item.Phone ?? string.Empty;
+            sheet.Cell(rowIdx, 10).Value = item.Status;
+            sheet.Cell(rowIdx, 11).Value = item.Source ?? string.Empty;
+            sheet.Cell(rowIdx, 12).Value = item.Rating ?? string.Empty;
+            sheet.Cell(rowIdx, 13).Value = item.OwnerName ?? string.Empty;
+            sheet.Cell(rowIdx, 14).Value = item.CreatedAtUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
 
             if (rowIdx % 2 == 1)
             {
@@ -1225,9 +1231,7 @@ public sealed class LeadService(
         var headers = rows[0];
         var matches = LeadImportColumns.Recognize(headers);
         var map = LeadImportColumns.Map(headers);
-        var hasFirstOrComp = (map.TryGetValue("first_name", out var f) && f >= 0) || (map.TryGetValue("company_name", out var c) && c >= 0);
-        var hasAddress = map.TryGetValue("address", out var a) && a >= 0;
-        var hasReq = hasFirstOrComp && hasAddress;
+        var hasReq = map.TryGetValue("company_name", out var c) && c >= 0;
 
         var previewRows = rows.Skip(1).Take(10).Select(r => (IReadOnlyList<string>)r).ToList();
         return new ImportPreviewDto(fileName, headers, previewRows, rows.Count - 1, matches, hasReq, null);
@@ -1257,17 +1261,10 @@ public sealed class LeadService(
         }
 
         var columns = LeadImportColumns.Map(rows[0]);
-        var hasFirst = columns.TryGetValue("first_name", out var fnIdx) && fnIdx >= 0;
         var hasCompany = columns.TryGetValue("company_name", out var compIdx) && compIdx >= 0;
-        if (!hasFirst && !hasCompany)
+        if (!hasCompany)
         {
-            throw new ValidationException(new Dictionary<string, string[]> { ["file"] = ["The file needs a 'Company' or 'First name' column."] });
-        }
-
-        var hasAddress = columns.TryGetValue("address", out var addrIdx) && addrIdx >= 0;
-        if (!hasAddress)
-        {
-            throw new ValidationException(new Dictionary<string, string[]> { ["file"] = ["The file needs an 'Address' column."] });
+            throw new ValidationException(new Dictionary<string, string[]> { ["file"] = ["The file needs a 'Company' column."] });
         }
 
         var created = 0;
@@ -1280,24 +1277,19 @@ public sealed class LeadService(
             var row = rows[i];
             string? Cell(string key) => columns.TryGetValue(key, out var idx) && idx >= 0 && idx < row.Count ? row[idx].Trim() : null;
 
+            var company = Cell("company_name");
+            if (string.IsNullOrWhiteSpace(company))
+            {
+                failed++;
+                if (errors.Count < 20) errors.Add($"Row {i + 1}: Company name is required.");
+                continue;
+            }
+
             var first = Cell("first_name") ?? string.Empty;
             var last = Cell("last_name") ?? string.Empty;
-            var company = Cell("company_name");
-
-            if (string.IsNullOrWhiteSpace(first) && string.IsNullOrWhiteSpace(last) && string.IsNullOrWhiteSpace(company))
-            {
-                failed++;
-                if (errors.Count < 20) errors.Add($"Row {i + 1}: company name or contact name is required.");
-                continue;
-            }
-
             var address = Cell("address");
-            if (string.IsNullOrWhiteSpace(address))
-            {
-                failed++;
-                if (errors.Count < 20) errors.Add($"Row {i + 1}: Address is required.");
-                continue;
-            }
+            var city = Cell("city");
+            var state = Cell("state");
 
             var email = LeadNormalizer.Email(Cell("email"));
             var phone = LeadNormalizer.Phone(Cell("phone"));
@@ -1337,7 +1329,7 @@ public sealed class LeadService(
                 first, last, Cell("email"), Cell("phone"), company,
                 status, string.IsNullOrWhiteSpace(source) ? "import" : source.ToLowerInvariant().Replace(' ', '_'),
                 rating, Cell("description"), null, null, null,
-                Address: address);
+                Address: address, City: city, State: state);
 
             try
             {
@@ -1414,12 +1406,13 @@ public sealed class LeadService(
         }
 
         var builder = new StringBuilder();
-        builder.AppendLine("id,first_name,last_name,address,email,phone,company,status,source,rating,owner,created_at");
+        builder.AppendLine("id,company,first_name,last_name,address,city,state,email,phone,status,source,rating,owner,created_at");
         foreach (var item in items.Take(MaxExportRows))
         {
             var parts = new[]
             {
-                item.Id.ToString(), item.FirstName, item.LastName, item.Address ?? string.Empty, item.Email ?? string.Empty, item.Phone ?? string.Empty, item.CompanyName ?? string.Empty,
+                item.Id.ToString(), item.CompanyName ?? string.Empty, item.FirstName, item.LastName, item.Address ?? string.Empty,
+                item.City ?? string.Empty, item.State ?? string.Empty, item.Email ?? string.Empty, item.Phone ?? string.Empty,
                 item.Status, item.Source ?? string.Empty, item.Rating ?? string.Empty, item.OwnerName ?? string.Empty,
                 item.CreatedAtUtc.ToString("O", CultureInfo.InvariantCulture),
             };
@@ -1467,6 +1460,8 @@ public sealed class LeadService(
         lead.NormalizedPhone = LeadNormalizer.Phone(request.Phone);
         lead.CompanyName = string.IsNullOrWhiteSpace(request.CompanyName) ? null : request.CompanyName.Trim();
         lead.Address = string.IsNullOrWhiteSpace(request.Address) ? null : request.Address.Trim();
+        lead.City = string.IsNullOrWhiteSpace(request.City) ? null : request.City.Trim();
+        lead.State = string.IsNullOrWhiteSpace(request.State) ? null : request.State.Trim();
         lead.Status = status;
         lead.Source = request.Source ?? lead.Source;
         lead.Rating = request.Rating ?? lead.Rating;
@@ -1585,7 +1580,7 @@ public sealed class LeadService(
         return new LeadDto(
             l.Id, l.FirstName, l.LastName, l.Email, l.Phone, l.CompanyName, l.Status, l.Source, l.Rating, l.Description,
             l.Tags, l.OwnerId, l.DisqualifyReason, l.CreatedAt, l.FirstContactedAt, l.ConvertedAt,
-            l.ConvertedContactId, l.ConvertedAccountId, l.ConvertedDealId, custom, l.Address);
+            l.ConvertedContactId, l.ConvertedAccountId, l.ConvertedDealId, custom, l.Address, l.City, l.State);
     }
 }
 

@@ -32,7 +32,9 @@ public sealed record LeadListItemDto(
     string FirstName,
     string LastName,
     string? Address = null,
-    string? Description = null);
+    string? Description = null,
+    string? City = null,
+    string? State = null);
 
 public sealed record LeadDto(
     Guid Id,
@@ -55,7 +57,9 @@ public sealed record LeadDto(
     Guid? ConvertedAccountId,
     Guid? ConvertedDealId,
     IReadOnlyDictionary<string, JsonElement> CustomFields,
-    string? Address = null);
+    string? Address = null,
+    string? City = null,
+    string? State = null);
 
 public sealed record SaveLeadRequest(
     string FirstName,
@@ -70,7 +74,9 @@ public sealed record SaveLeadRequest(
     IReadOnlyList<string>? Tags,
     Guid? OwnerId,
     IReadOnlyDictionary<string, JsonElement>? CustomFields,
-    string? Address = null);
+    string? Address = null,
+    string? City = null,
+    string? State = null);
 
 public sealed record ChangeLeadStatusRequest(string Status);
 

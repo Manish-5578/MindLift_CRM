@@ -69,9 +69,18 @@ public sealed class LeadImportColumnsTests
     }
 
     [Fact]
-    public void First_name_is_the_only_required_field()
+    public void Company_is_the_required_field()
     {
-        LeadImportColumns.RequiredField.ShouldBe("first_name");
+        LeadImportColumns.RequiredField.ShouldBe("company_name");
+    }
+
+    [Fact]
+    public void City_and_state_columns_are_mapped_correctly()
+    {
+        var map = LeadImportColumns.Map(["Company", "City", "State"]);
+        map["company_name"].ShouldBe(0);
+        map["city"].ShouldBe(1);
+        map["state"].ShouldBe(2);
     }
 
     [Fact]

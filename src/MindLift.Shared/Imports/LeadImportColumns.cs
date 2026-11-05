@@ -13,12 +13,14 @@ public static class LeadImportColumns
     /// <summary>The fields the import fills, with the label shown to people and the header names (normalized) that map to each.</summary>
     public static IReadOnlyList<(string Field, string Label, string[] Aliases)> Fields { get; } =
     [
+        ("company_name", "Company", ["company", "companyname", "organization", "organisation"]),
         ("first_name", "First name", ["firstname"]),
         ("last_name", "Last name", ["lastname"]),
+        ("address", "Address", ["address", "street", "streetaddress", "location"]),
+        ("city", "City", ["city", "town"]),
+        ("state", "State", ["state", "province", "region"]),
         ("email", "Email", ["email"]),
         ("phone", "Phone", ["phone"]),
-        ("company_name", "Company", ["company", "companyname", "organization", "organisation"]),
-        ("address", "Address", ["address", "street", "streetaddress", "location"]),
         ("status", "Status", ["status", "leadstatus"]),
         ("source", "Source", ["source", "leadsource"]),
         ("rating", "Rating", ["rating", "leadrating"]),
@@ -26,7 +28,7 @@ public static class LeadImportColumns
     ];
 
     /// <summary>The only field a row cannot be created without.</summary>
-    public const string RequiredField = "first_name";
+    public const string RequiredField = "company_name";
 
     /// <summary>Lower-cases a header and keeps only letters and digits.</summary>
     public static string Normalize(string header)

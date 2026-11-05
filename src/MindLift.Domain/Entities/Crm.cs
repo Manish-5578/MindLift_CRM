@@ -14,6 +14,8 @@ public sealed class Lead : TenantEntity, IOwnedEntity, IHasCustomFields, ISample
     public string? Phone { get; set; }
     public string? CompanyName { get; set; }
     public string? Address { get; set; }
+    public string? City { get; set; }
+    public string? State { get; set; }
 
     /// <summary>Lower-case, trimmed email used for duplicate checks.</summary>
     public string? NormalizedEmail { get; set; }
