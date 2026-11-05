@@ -109,6 +109,26 @@ public sealed class AuthService(
         await users.UpdateAsync(user);
         await AuditPlatformAsync(user, "auth.signin", "Signed in to the platform console", cancellationToken);
 
+        // Record workspace audit log for user sign-in
+        var fullName = $"{user.FirstName} {user.LastName}".Trim();
+        var displayName = !string.IsNullOrEmpty(fullName) ? fullName : user.Email ?? "User";
+        db.AuditLogs.Add(new AuditLog
+        {
+            TenantId = user.TenantId,
+            UserId = user.Id,
+            UserName = displayName,
+            UserEmail = user.Email,
+            EntityType = "User",
+            EntityId = user.Id,
+            Module = "Authentication",
+            RecordTitle = displayName,
+            Action = "Login",
+            Summary = $"User '{displayName}' ({user.Email}) signed in to workspace",
+            IpAddress = tenant.IpAddress,
+            OccurredAt = clock.UtcNow
+        });
+        await db.SaveChangesAsync(cancellationToken);
+
         return await IssueForUserAsync(user, cancellationToken);
     }
 
@@ -279,7 +299,7 @@ public sealed class AuthService(
             user.IsPlatformAdmin,
             user.RoleId,
             role?.Name,
-            role?.IsAdmin ?? false,
+            user.IsTenantOwner || (role?.IsAdmin ?? false),
             tenantRow.Status,
             tenantRow.TrialEndsAt,
             user.MustChangePassword);

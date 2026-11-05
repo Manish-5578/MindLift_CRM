@@ -566,11 +566,44 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("user_id");
 
+                    b.Property<string>("UserName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("user_name");
+
+                    b.Property<string>("UserEmail")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("user_email");
+
+                    b.Property<string>("Module")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("module");
+
+                    b.Property<string>("RecordTitle")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("record_title");
+
+                    b.Property<string>("Summary")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("summary");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("ip_address");
+
                     b.HasKey("Id")
                         .HasName("pk_audit_logs");
 
                     b.HasIndex("TenantId", "EntityType", "EntityId", "OccurredAt")
                         .HasDatabaseName("ix_audit_logs_tenant_id_entity_type_entity_id_occurred_at");
+
+                    b.HasIndex("TenantId", "Module", "OccurredAt")
+                        .HasDatabaseName("ix_audit_logs_tenant_id_module_occurred_at");
 
                     b.ToTable("audit_logs", (string)null);
                 });

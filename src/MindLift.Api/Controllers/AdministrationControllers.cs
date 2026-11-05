@@ -199,8 +199,9 @@ public sealed class AuditLogsController(AuditLogQuery audit) : ControllerBase
         [FromQuery] DateTime? to = null,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50,
+        [FromQuery] string? module = null,
         CancellationToken cancellationToken = default)
-        => Ok(await audit.ListAsync(entityType, entityId, page, pageSize, cancellationToken, action, userId, search, from, to));
+        => Ok(await audit.ListAsync(entityType, entityId, page, pageSize, cancellationToken, action, userId, search, from, to, module));
 
     [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("export")]
@@ -211,9 +212,10 @@ public sealed class AuditLogsController(AuditLogQuery audit) : ControllerBase
         [FromQuery] string? search = null,
         [FromQuery] DateTime? from = null,
         [FromQuery] DateTime? to = null,
+        [FromQuery] string? module = null,
         CancellationToken cancellationToken = default)
     {
-        var csv = await audit.ExportAsync(entityType, action, userId, search, from, to, cancellationToken);
+        var csv = await audit.ExportAsync(entityType, action, userId, search, from, to, cancellationToken, module);
         return File(System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(csv)).ToArray(), "text/csv", "audit-trail.csv");
     }
 }

@@ -170,16 +170,136 @@ public sealed class AuditableEntityInterceptor(ITenantContext tenant, IClock clo
             return;
         }
 
+        var module = ResolveModule(entity);
+        var recordTitle = ExtractRecordTitle(entity);
+        var summary = FormatActionSummary(action, module, entity.GetType().Name, recordTitle, changes);
+
         audits.Add(new AuditLog
         {
             TenantId = entity.TenantId,
             UserId = tenant.UserId,
+            UserName = tenant.UserName,
+            UserEmail = tenant.UserEmail,
             EntityType = entity.GetType().Name,
             EntityId = entity.Id,
+            Module = module,
+            RecordTitle = recordTitle,
             Action = action,
+            Summary = summary,
             Changes = changes,
+            IpAddress = tenant.IpAddress,
             OccurredAt = now,
         });
+    }
+
+    private static string ResolveModule(TenantEntity entity)
+    {
+        var name = entity.GetType().Name;
+        return name switch
+        {
+            "Lead" or "LeadAddress" => "Leads",
+            "Contact" or "ContactAccountLink" => "Contacts",
+            "Account" => "Accounts",
+            "Deal" or "DealLineItem" or "DealSplit" or "DealStageGate" => "Deals",
+            "Activity" => "Activities",
+            "CpqQuote" or "CpqQuoteLineItem" or "CpqInvoice" or "CpqContract" or "PriceBook" or "Product" or "QuoteSignature" => "CPQ & Invoices",
+            "VisualWorkflow" or "WorkflowNode" or "WorkflowEdge" => "Workflows",
+            "AutomationRule" => "Automations",
+            "Cadence" or "CadenceStep" or "CadenceEnrollment" => "Cadences",
+            "Communication" or "EmailMessage" or "EmailThread" or "EmailTemplate" or "SharedInbox" or "WhatsAppMessage" => "Communications",
+            "StoredFile" or "DocumentType" => "Documents",
+            "ModuleSetting" or "PicklistValue" or "CustomField" or "DependentPicklistMap" or "LayoutRule" => "Settings",
+            "Booking" or "MeetingLink" => "Calendar & Bookings",
+            "Territory" or "TerritoryRule" => "Territories",
+            _ => name
+        };
+    }
+
+    private static string? ExtractRecordTitle(object entity)
+    {
+        var type = entity.GetType();
+
+        // 1. Check for specific common composite fields first
+        var companyProp = type.GetProperty("Company") ?? type.GetProperty("CompanyName");
+        var firstNameProp = type.GetProperty("FirstName");
+        var lastNameProp = type.GetProperty("LastName");
+
+        if (companyProp != null)
+        {
+            var company = companyProp.GetValue(entity)?.ToString()?.Trim();
+            if (firstNameProp != null && lastNameProp != null)
+            {
+                var personName = $"{firstNameProp.GetValue(entity)} {lastNameProp.GetValue(entity)}".Trim();
+                if (!string.IsNullOrEmpty(company) && !string.IsNullOrEmpty(personName))
+                    return $"{company} ({personName})";
+            }
+            if (!string.IsNullOrEmpty(company)) return company;
+        }
+
+        if (firstNameProp != null && lastNameProp != null)
+        {
+            var personName = $"{firstNameProp.GetValue(entity)} {lastNameProp.GetValue(entity)}".Trim();
+            if (!string.IsNullOrEmpty(personName)) return personName;
+        }
+
+        // 2. Direct name, title, subject, number properties
+        var prop = type.GetProperty("Title")
+            ?? type.GetProperty("Name")
+            ?? type.GetProperty("Subject")
+            ?? type.GetProperty("QuoteNumber")
+            ?? type.GetProperty("InvoiceNumber")
+            ?? type.GetProperty("Number")
+            ?? type.GetProperty("Email");
+
+        if (prop != null)
+        {
+            var val = prop.GetValue(entity)?.ToString()?.Trim();
+            if (!string.IsNullOrWhiteSpace(val)) return val;
+        }
+
+        return null;
+    }
+
+    private static string FormatActionSummary(string action, string module, string entityType, string? recordTitle, string? changesJson)
+    {
+        var target = !string.IsNullOrWhiteSpace(recordTitle) ? $" '{recordTitle}'" : "";
+
+        if (action == "Create")
+        {
+            return $"Created {module} record{target}";
+        }
+
+        if (action == "Delete")
+        {
+            return $"Deleted {module} record{target}";
+        }
+
+        if (action == "Update" && !string.IsNullOrWhiteSpace(changesJson))
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(changesJson);
+                if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                {
+                    var fieldNames = new List<string>();
+                    foreach (var item in doc.RootElement.EnumerateArray())
+                    {
+                        var field = item.TryGetProperty("Field", out var f) ? f.GetString() : null;
+                        if (!string.IsNullOrEmpty(field)) fieldNames.Add(field);
+                    }
+
+                    if (fieldNames.Count > 0)
+                    {
+                        var fields = string.Join(", ", fieldNames.Take(3));
+                        if (fieldNames.Count > 3) fields += $" (+{fieldNames.Count - 3} more)";
+                        return $"Updated {module}{target}: changed {fields}";
+                    }
+                }
+            }
+            catch { }
+        }
+
+        return $"{action} on {module}{target}";
     }
 
     private static bool HasAttribute<TAttribute>(object entity) where TAttribute : Attribute

@@ -215,8 +215,15 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.HasKey(a => a.Id);
             b.HasQueryFilter(a => a.TenantId == CurrentTenantId);
             b.HasIndex(a => new { a.TenantId, a.EntityType, a.EntityId, a.OccurredAt });
+            b.HasIndex(a => new { a.TenantId, a.Module, a.OccurredAt });
             b.Property(a => a.EntityType).HasMaxLength(100);
             b.Property(a => a.Action).HasMaxLength(30);
+            b.Property(a => a.UserName).HasMaxLength(200);
+            b.Property(a => a.UserEmail).HasMaxLength(200);
+            b.Property(a => a.Module).HasMaxLength(100);
+            b.Property(a => a.RecordTitle).HasMaxLength(300);
+            b.Property(a => a.Summary).HasMaxLength(500);
+            b.Property(a => a.IpAddress).HasMaxLength(50);
             b.Property(a => a.Changes).HasColumnType("jsonb");
         });
 

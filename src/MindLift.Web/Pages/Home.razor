@@ -22,10 +22,10 @@
         <div class="d-flex flex-wrap align-center gap-2">
             @if (_dashboard?.AvailableViews.Count > 1)
             {
-                <MudChipSet T="DashboardView" SelectedValue="_currentView" SelectedValueChanged="OnViewChanged" CheckMark="false">
+                <MudChipSet T="DashboardView" SelectedValue="@(_currentView ?? _dashboard?.View ?? DashboardView.Staff)" SelectedValueChanged="OnViewChanged" CheckMark="false">
                     @foreach (var v in _dashboard.AvailableViews)
                     {
-                        <MudChip T="DashboardView" Value="@v" Color="Color.Primary" Variant="@(_currentView == v ? Variant.Filled : Variant.Outlined)" Size="Size.Small">
+                        <MudChip T="DashboardView" Value="@v" Color="Color.Primary" Variant="@((_currentView ?? _dashboard?.View) == v ? Variant.Filled : Variant.Outlined)" Size="Size.Small">
                             @(v switch
                             {
                                 DashboardView.Staff => "My View",
@@ -178,7 +178,7 @@
 @code {
     private OnboardingDto? _onboarding;
     private DashboardResponse? _dashboard;
-    private DashboardView _currentView = DashboardView.Staff;
+    private DashboardView? _currentView;
     private string _periodPreset = "this_month";
     private bool _loading = true;
     private bool _loadFailed;
@@ -255,7 +255,8 @@
         _loadFailed = false;
         try
         {
-            var url = $"api/v1/dashboard?view={_currentView}&period={_periodPreset}&refresh={refresh}";
+            var viewParam = _currentView.HasValue ? $"view={_currentView.Value}&" : "";
+            var url = $"api/v1/dashboard?{viewParam}period={_periodPreset}&refresh={refresh}";
             var resp = await Http.GetFromJsonAsync<DashboardResponse>(url);
             if (resp is not null)
             {
@@ -294,14 +295,16 @@
                 : new DashboardWidgetLayoutItem(w.Key, w.Order, w.Size, w.IsHidden)
         ).ToList();
 
-        var req = new SaveDashboardLayoutRequest(_currentView, items);
+        var effectiveView = _currentView ?? _dashboard?.View ?? DashboardView.Staff;
+        var req = new SaveDashboardLayoutRequest(effectiveView, items);
         await Http.PutAsJsonAsync("api/v1/dashboard/layout", req);
         await LoadDashboardAsync();
     }
 
     private async Task ResetLayoutAsync()
     {
-        await Http.DeleteAsync($"api/v1/dashboard/layout?view={_currentView}");
+        var effectiveView = _currentView ?? _dashboard?.View ?? DashboardView.Staff;
+        await Http.DeleteAsync($"api/v1/dashboard/layout?view={effectiveView}");
         _customizeOpen = false;
         Snackbar.Add(T["Layout reset to default"], Severity.Info);
         await LoadDashboardAsync();

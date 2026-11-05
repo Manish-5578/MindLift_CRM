@@ -59,7 +59,7 @@ public sealed class DashboardService(
         var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == currentUserId, ct)
             ?? throw new NotFoundException("User", currentUserId);
 
-        var (allowedMaxView, availableViews) = await ResolveAvailableViewsAsync(user.RoleId, ct);
+        var (allowedMaxView, availableViews) = await ResolveAvailableViewsAsync(user, ct);
         var activeView = ResolveActiveView(requestedView, allowedMaxView);
 
         var settings = await db.TenantSettings.AsNoTracking().FirstOrDefaultAsync(ct)
@@ -174,7 +174,7 @@ public sealed class DashboardService(
         var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == currentUserId, ct)
             ?? throw new NotFoundException("User", currentUserId);
 
-        var (allowedMaxView, _) = await ResolveAvailableViewsAsync(user.RoleId, ct);
+        var (allowedMaxView, _) = await ResolveAvailableViewsAsync(user, ct);
         var activeView = ResolveActiveView(requestedView, allowedMaxView);
 
         if (!widget.Views.Contains(activeView))
@@ -260,15 +260,17 @@ public sealed class DashboardService(
         return GetDefaultLayout(view);
     }
 
-    private async Task<(DashboardView MaxView, IReadOnlyList<DashboardView> Available)> ResolveAvailableViewsAsync(Guid? roleId, CancellationToken ct)
+    private async Task<(DashboardView MaxView, IReadOnlyList<DashboardView> Available)> ResolveAvailableViewsAsync(AppUser user, CancellationToken ct)
     {
-        if (roleId is null)
-        {
-            return (DashboardView.Staff, [DashboardView.Staff]);
-        }
+        var role = user.RoleId.HasValue
+            ? await db.Roles.AsNoTracking().FirstOrDefaultAsync(r => r.Id == user.RoleId.Value, ct)
+            : null;
 
-        var role = await db.Roles.AsNoTracking().FirstOrDefaultAsync(r => r.Id == roleId.Value, ct);
-        var maxView = role?.DashboardView ?? DashboardView.Staff;
+        var isAdmin = user.IsPlatformAdmin || user.IsTenantOwner || role?.IsAdmin == true;
+        var dashboardPerm = await permissions.GetModulePermissionAsync(AppModule.Dashboard, ct);
+        var hasAllScope = dashboardPerm != null && dashboardPerm.CanView && dashboardPerm.Scope == DataScope.All;
+
+        var maxView = (isAdmin || hasAllScope) ? DashboardView.Admin : (role?.DashboardView ?? DashboardView.Staff);
 
         var available = new List<DashboardView>();
         if (maxView >= DashboardView.Staff) available.Add(DashboardView.Staff);

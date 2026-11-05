@@ -8,11 +8,14 @@ public interface ITenantContext
 {
     Guid? TenantId { get; }
     Guid? UserId { get; }
+    string? UserName { get; }
+    string? UserEmail { get; }
+    string? IpAddress { get; }
     bool IsPlatformAdmin { get; }
 
     /// <summary>
     /// Sets the tenant (and optionally the user) until the returned scope is disposed.
     /// Used by request middleware, background jobs, webhooks and public endpoints.
     /// </summary>
-    IDisposable Use(Guid tenantId, Guid? userId = null);
+    IDisposable Use(Guid tenantId, Guid? userId = null, string? userName = null, string? userEmail = null, string? ipAddress = null);
 }

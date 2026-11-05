@@ -115,7 +115,10 @@ public sealed record AuditLogDto(
     string? UserName = null,
     string? UserEmail = null,
     string? Summary = null,
-    IReadOnlyList<AuditFieldDiff>? Diff = null);
+    IReadOnlyList<AuditFieldDiff>? Diff = null,
+    string? Module = null,
+    string? RecordTitle = null,
+    string? IpAddress = null);
 
 public sealed record PlatformTenantDto(
     Guid Id,

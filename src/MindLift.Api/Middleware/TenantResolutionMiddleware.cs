@@ -31,13 +31,13 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
             return;
         }
 
-        if (tenant is MindLift.Infrastructure.Tenancy.TenantContext concrete)
-        {
-            concrete.SetPlatformAdmin(context.User.FindFirstValue("plat") == "true");
-        }
-
         var userId = context.User.FindFirstValue("sub") ?? context.User.FindFirstValue(ClaimTypes.NameIdentifier);
         Guid? userGuid = Guid.TryParse(userId, out var parsedUser) ? parsedUser : null;
+
+        var clientIp = context.Request.Headers["X-Forwarded-For"].FirstOrDefault()
+            ?? context.Connection.RemoteIpAddress?.ToString();
+        var userName = context.User.FindFirstValue("name") ?? context.User.FindFirstValue(ClaimTypes.Name);
+        var userEmail = context.User.FindFirstValue("email") ?? context.User.FindFirstValue(ClaimTypes.Email);
 
         // A staff token stays valid only while the person is active and their session stamp is unchanged (password changed, signed out everywhere,
         // or deactivated). Without this a token would keep working until it expires. Portal tokens have no stamp and are checked by the portal.
@@ -57,9 +57,18 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
                 });
                 return;
             }
+
+            if (!string.IsNullOrWhiteSpace(current.FullName)) userName = current.FullName;
+            if (!string.IsNullOrWhiteSpace(current.Email)) userEmail = current.Email;
         }
 
-        using var scope = tenant.Use(tenantGuid, userGuid);
+        if (tenant is MindLift.Infrastructure.Tenancy.TenantContext concrete)
+        {
+            concrete.SetPlatformAdmin(context.User.FindFirstValue("plat") == "true");
+            concrete.SetUserInfo(userName, userEmail, clientIp);
+        }
+
+        using var scope = tenant.Use(tenantGuid, userGuid, userName, userEmail, clientIp);
         await next(context);
     }
 }

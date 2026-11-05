@@ -51,6 +51,67 @@ public sealed class AuditTrailTests
     }
 
     [Fact]
+    public void AuditLogDto_WithModuleRecordTitleAndIp_PopulatesSuccessfully()
+    {
+        var id = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var entityId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        var dto = new AuditLogDto(
+            id,
+            userId,
+            "Lead",
+            entityId,
+            "Update",
+            null,
+            now,
+            "John Doe",
+            "john@example.com",
+            "Updated Leads 'Acme Global': changed Status",
+            null,
+            "Leads",
+            "Acme Global (John Doe)",
+            "192.168.1.100");
+
+        dto.Module.ShouldBe("Leads");
+        dto.RecordTitle.ShouldBe("Acme Global (John Doe)");
+        dto.IpAddress.ShouldBe("192.168.1.100");
+        dto.UserName.ShouldBe("John Doe");
+        dto.UserEmail.ShouldBe("john@example.com");
+        dto.Summary.ShouldBe("Updated Leads 'Acme Global': changed Status");
+    }
+
+    [Fact]
+    public void AuditLog_LoginEvent_HasCorrectAuditSignature()
+    {
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        var loginDto = new AuditLogDto(
+            Guid.NewGuid(),
+            userId,
+            "User",
+            userId,
+            "Login",
+            null,
+            now,
+            "Admin User",
+            "admin@mindlift.com",
+            "User 'Admin User' (admin@mindlift.com) signed in to workspace",
+            null,
+            "Authentication",
+            "Admin User",
+            "127.0.0.1");
+
+        loginDto.Action.ShouldBe("Login");
+        loginDto.Module.ShouldBe("Authentication");
+        loginDto.RecordTitle.ShouldBe("Admin User");
+        loginDto.IpAddress.ShouldBe("127.0.0.1");
+        loginDto.Summary.ShouldContain("signed in to workspace");
+    }
+
+    [Fact]
     public void AuditLog_ChangesJson_ParsesDiffsAccurately()
     {
         var json = "[{\"Field\":\"CompanyName\",\"Old\":\"Old Corp\",\"New\":\"New Corp\"},{\"Field\":\"Rating\",\"Old\":\"cold\",\"New\":\"hot\"}]";

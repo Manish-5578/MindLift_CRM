@@ -40,7 +40,7 @@ public sealed class AuditLogQuery(AppDbContext db)
 {
     private const int MaxPageSize = 200;
 
-    private IQueryable<AuditLog> BuildQuery(string? entityType, Guid? entityId, string? action, Guid? userId, string? search, DateTime? from, DateTime? to)
+    private IQueryable<AuditLog> BuildQuery(string? entityType, Guid? entityId, string? action, Guid? userId, string? search, DateTime? from, DateTime? to, string? module = null)
     {
         var query = db.AuditLogs.AsNoTracking().AsQueryable();
 
@@ -48,6 +48,12 @@ public sealed class AuditLogQuery(AppDbContext db)
         {
             var et = entityType.Trim().ToLowerInvariant();
             query = query.Where(a => a.EntityType.ToLower() == et);
+        }
+
+        if (!string.IsNullOrWhiteSpace(module))
+        {
+            var m = module.Trim().ToLowerInvariant();
+            query = query.Where(a => (a.Module != null && a.Module.ToLower() == m) || a.EntityType.ToLower() == m);
         }
 
         if (entityId is { } id)
@@ -80,6 +86,12 @@ public sealed class AuditLogQuery(AppDbContext db)
         {
             var term = search.Trim().ToLowerInvariant();
             query = query.Where(a => a.EntityType.ToLower().Contains(term)
+                || (a.Module != null && a.Module.ToLower().Contains(term))
+                || (a.RecordTitle != null && a.RecordTitle.ToLower().Contains(term))
+                || (a.Summary != null && a.Summary.ToLower().Contains(term))
+                || (a.UserName != null && a.UserName.ToLower().Contains(term))
+                || (a.UserEmail != null && a.UserEmail.ToLower().Contains(term))
+                || (a.IpAddress != null && a.IpAddress.ToLower().Contains(term))
                 || (a.Changes != null && a.Changes.ToLower().Contains(term))
                 || a.Action.ToLower().Contains(term));
         }
@@ -97,12 +109,13 @@ public sealed class AuditLogQuery(AppDbContext db)
         Guid? userId = null,
         string? search = null,
         DateTime? from = null,
-        DateTime? to = null)
+        DateTime? to = null,
+        string? module = null)
     {
         pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
         page = Math.Max(page, 1);
 
-        var query = BuildQuery(entityType, entityId, action, userId, search, from, to);
+        var query = BuildQuery(entityType, entityId, action, userId, search, from, to, module);
         var total = await query.CountAsync(cancellationToken);
         var rows = await query.OrderByDescending(a => a.OccurredAt)
             .Skip((page - 1) * pageSize).Take(pageSize)
@@ -117,9 +130,12 @@ public sealed class AuditLogQuery(AppDbContext db)
         var items = rows.Select(a =>
         {
             var user = a.UserId.HasValue ? users.GetValueOrDefault(a.UserId.Value) : null;
-            var userName = user?.Name ?? (a.UserId.HasValue ? "Unknown user" : "System / Automated");
-            var userEmail = user?.Email;
-            var (summary, diff) = ParseChanges(a.Action, a.EntityType, a.Changes);
+            var userName = !string.IsNullOrWhiteSpace(a.UserName) ? a.UserName : (user?.Name ?? (a.UserId.HasValue ? "Unknown user" : "System / Automated"));
+            var userEmail = !string.IsNullOrWhiteSpace(a.UserEmail) ? a.UserEmail : user?.Email;
+            var mod = !string.IsNullOrWhiteSpace(a.Module) ? a.Module : FallbackModule(a.EntityType);
+            var recordTitle = !string.IsNullOrWhiteSpace(a.RecordTitle) ? a.RecordTitle : a.EntityType;
+            var (parsedSummary, diff) = ParseChanges(a.Action, mod, a.Changes);
+            var summary = !string.IsNullOrWhiteSpace(a.Summary) ? a.Summary : parsedSummary;
 
             return new AuditLogDto(
                 a.Id,
@@ -132,7 +148,10 @@ public sealed class AuditLogQuery(AppDbContext db)
                 userName,
                 userEmail,
                 summary,
-                diff);
+                diff,
+                mod,
+                recordTitle,
+                a.IpAddress);
         }).ToList();
 
         return new PagedResult<AuditLogDto>(items, total, page, pageSize);
@@ -145,9 +164,10 @@ public sealed class AuditLogQuery(AppDbContext db)
         string? search,
         DateTime? from,
         DateTime? to,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? module = null)
     {
-        var query = BuildQuery(entityType, null, action, userId, search, from, to);
+        var query = BuildQuery(entityType, null, action, userId, search, from, to, module);
         var rows = await query.OrderByDescending(a => a.OccurredAt).Take(5000).ToListAsync(cancellationToken);
 
         var userIds = rows.Where(r => r.UserId.HasValue).Select(r => r.UserId!.Value).Distinct().ToList();
@@ -163,20 +183,26 @@ public sealed class AuditLogQuery(AppDbContext db)
             return "\"" + v.Replace("\"", "\"\"") + "\"";
         }
 
-        var sb = new System.Text.StringBuilder("When (UTC),Who,User Email,Action,Module,Record ID,What changed\r\n");
+        var sb = new System.Text.StringBuilder("When (UTC),Who,User Email,IP Address,Action,Module,Record Name,Record ID,What changed\r\n");
         foreach (var a in rows)
         {
             var user = a.UserId.HasValue ? users.GetValueOrDefault(a.UserId.Value) : null;
-            var userName = user?.Name ?? (a.UserId.HasValue ? "Unknown user" : "System");
-            var userEmail = user?.Email ?? "";
-            var (summary, _) = ParseChanges(a.Action, a.EntityType, a.Changes);
+            var userName = !string.IsNullOrWhiteSpace(a.UserName) ? a.UserName : (user?.Name ?? (a.UserId.HasValue ? "Unknown user" : "System"));
+            var userEmail = !string.IsNullOrWhiteSpace(a.UserEmail) ? a.UserEmail : (user?.Email ?? "");
+            var ip = a.IpAddress ?? "";
+            var mod = !string.IsNullOrWhiteSpace(a.Module) ? a.Module : FallbackModule(a.EntityType);
+            var recordTitle = !string.IsNullOrWhiteSpace(a.RecordTitle) ? a.RecordTitle : a.EntityType;
+            var (parsedSummary, _) = ParseChanges(a.Action, mod, a.Changes);
+            var summary = !string.IsNullOrWhiteSpace(a.Summary) ? a.Summary : parsedSummary;
 
             sb.Append(string.Join(',',
                 Cell(a.OccurredAt.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)),
                 Cell(userName),
                 Cell(userEmail),
+                Cell(ip),
                 Cell(a.Action),
-                Cell(a.EntityType),
+                Cell(mod),
+                Cell(recordTitle),
                 Cell(a.EntityId.ToString()),
                 Cell(summary)
             )).Append("\r\n");
@@ -184,6 +210,24 @@ public sealed class AuditLogQuery(AppDbContext db)
 
         return sb.ToString();
     }
+
+    private static string FallbackModule(string entityType) => entityType switch
+    {
+        "Lead" or "LeadAddress" => "Leads",
+        "Contact" or "ContactAccountLink" => "Contacts",
+        "Account" => "Accounts",
+        "Deal" or "DealLineItem" or "DealSplit" or "DealStageGate" => "Deals",
+        "Activity" => "Activities",
+        "CpqQuote" or "CpqInvoice" or "PriceBook" or "Product" or "QuoteSignature" => "CPQ & Invoices",
+        "VisualWorkflow" or "WorkflowNode" => "Workflows",
+        "AutomationRule" => "Automations",
+        "Cadence" => "Cadences",
+        "Communication" or "EmailMessage" or "EmailTemplate" => "Communications",
+        "StoredFile" or "DocumentType" => "Documents",
+        "ModuleSetting" or "PicklistValue" or "CompanySettings" or "CustomField" => "Settings",
+        "User" or "Role" or "Team" or "Branch" => "Users & Security",
+        _ => entityType
+    };
 
     private static (string Summary, IReadOnlyList<AuditFieldDiff> Diff) ParseChanges(string action, string entityType, string? changesJson)
     {
@@ -193,6 +237,7 @@ public sealed class AuditLogQuery(AppDbContext db)
             {
                 "Create" => $"Created new {entityType}",
                 "Delete" => $"Deleted {entityType}",
+                "Login" => $"User signed in to workspace",
                 _ => $"{action} on {entityType}"
             };
             return (defaultSummary, Array.Empty<AuditFieldDiff>());
@@ -235,7 +280,6 @@ public sealed class AuditLogQuery(AppDbContext db)
     }
 }
 
-/// <summary>Platform-admin operations across tenants (plan 6.10). Only reachable with the platform-admin policy.</summary>
 public sealed class PlatformService(AppDbContext db, IClock clock)
 {
     private static readonly string[] Statuses = ["Trial", "Active", "PastDue", "Suspended", "Cancelled"];
