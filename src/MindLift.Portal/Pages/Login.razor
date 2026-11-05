@@ -3,7 +3,7 @@
 
 <PageTitle>@T["login.title"] · @Session.Branding?.TenantName</PageTitle>
 
-@if (!Ready)
+@if (!Ready || Session.IsSignedIn)
 {
     <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
 }

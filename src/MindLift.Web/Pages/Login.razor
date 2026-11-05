@@ -9,6 +9,14 @@
 
 <PageTitle>@T["Sign in"] · MindLift</PageTitle>
 
+@if (Session.IsSignedIn)
+{
+    <div style="display:flex;min-height:60vh;align-items:center;justify-content:center;">
+        <MudProgressCircular Color="Color.Primary" Size="Size.Medium" Indeterminate="true" />
+    </div>
+}
+else
+{
 <div class="ml-wizard" style="max-width:420px;margin-top:48px">
     <div class="ml-stack">
         <MudText Typo="Typo.h4" data-testid="page-title">@T["Welcome back"]</MudText>
@@ -30,8 +38,18 @@
         <MudText Typo="Typo.body2" Class="ml-muted">@T["New to MindLift?"] <MudLink Href="/signup" Class="ml-link">@T["Create an account"]</MudLink></MudText>
     </div>
 </div>
+}
 
 @code {
+    
+    protected override async Task OnInitializedAsync()
+    {
+        if (Session.IsSignedIn)
+        {
+            await GoHomeAsync();
+        }
+    }
+
     private string _email = string.Empty;
     private string _password = string.Empty;
     private string? _error;

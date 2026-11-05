@@ -19,28 +19,16 @@
 
 <body>
     <div id="app">
-        <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;background:#f8fafc;font-family:'Inter',system-ui,sans-serif;padding:32px 16px;">
-            <div style="margin-top:24px;margin-bottom:28px;display:flex;align-items:center;gap:8px;">
-                <span style="font-size:1.6rem;font-weight:800;color:#2563eb;letter-spacing:-0.5px;">MindLift</span>
-            </div>
-            <div style="width:100%;max-width:420px;background:#ffffff;border-radius:12px;border:1px solid #e2e8f0;padding:32px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.05);">
-                <h1 style="font-size:1.5rem;font-weight:700;color:#0f172a;margin:0 0 6px 0;">Welcome back</h1>
-                <p style="font-size:0.875rem;color:#64748b;margin:0 0 24px 0;">Sign in to your MindLift workspace.</p>
-                <div style="display:flex;flex-direction:column;gap:16px;">
-                    <div>
-                        <label style="display:block;font-size:0.8rem;font-weight:600;color:#475569;margin-bottom:6px;">Email</label>
-                        <input type="email" placeholder="name@company.com" style="width:100%;padding:10px 14px;border:1px solid #cbd5e1;border-radius:8px;font-size:0.9rem;box-sizing:border-box;outline:none;" />
-                    </div>
-                    <div>
-                        <label style="display:block;font-size:0.8rem;font-weight:600;color:#475569;margin-bottom:6px;">Password</label>
-                        <input type="password" placeholder="••••••••" style="width:100%;padding:10px 14px;border:1px solid #cbd5e1;border-radius:8px;font-size:0.9rem;box-sizing:border-box;outline:none;" />
-                    </div>
-                    <button id="initial-signin-btn" onclick="this.textContent='Starting MindLift...';this.disabled=true;this.style.opacity='0.75';" style="margin-top:8px;width:100%;padding:12px;background:#2563eb;color:#ffffff;border:none;border-radius:8px;font-weight:600;font-size:0.95rem;cursor:pointer;transition:all 0.2s;">Sign in</button>
-                    <div style="display:flex;align-items:center;justify-content:center;gap:8px;font-size:0.75rem;color:#94a3b8;margin-top:4px;">
-                        <span style="display:inline-block;width:10px;height:10px;border:2px solid #cbd5e1;border-top-color:#2563eb;border-radius:50%;animation:mlspin 0.8s linear infinite;"></span>
-                        Loading workspace runtime...
-                    </div>
+        <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#f8fafc;font-family:'Inter',system-ui,-apple-system,sans-serif;">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+                <div style="width:42px;height:42px;border-radius:10px;background:linear-gradient(135deg,#2563eb,#4f46e5);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:1.3rem;box-shadow:0 4px 12px rgba(37,99,235,0.25);">
+                    M
                 </div>
+                <span style="font-size:1.6rem;font-weight:700;color:#0f172a;letter-spacing:-0.5px;">MindLift</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;font-size:0.875rem;color:#64748b;font-weight:500;">
+                <span style="display:inline-block;width:18px;height:18px;border:2.5px solid #e2e8f0;border-top-color:#2563eb;border-radius:50%;animation:mlspin 0.75s linear infinite;"></span>
+                <span>Loading...</span>
             </div>
             <style>@keyframes mlspin{to{transform:rotate(360deg)}}</style>
         </div>
