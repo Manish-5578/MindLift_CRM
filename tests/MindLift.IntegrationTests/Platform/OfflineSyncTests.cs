@@ -173,4 +173,68 @@ public sealed class OfflineSyncTests(MindLiftApiFactory factory) : IClassFixture
         bootstrapB.ShouldNotBeNull();
         bootstrapB.Records.Any(r => r.Subtitle == "secret@tenanta.test").ShouldBeFalse();
     }
+    [Fact]
+    public async Task Offline_sync_server_side_idempotency_prevents_duplicate_records_on_replay()
+    {
+        var admin = await Workspaces.SignupAsync(factory);
+        (await admin.Client.PutAsJsonAsync("/api/v1/features/pwa-offline", new SetFeatureRequest(true))).EnsureSuccessStatusCode();
+
+        var leadDoc = JsonDocument.Parse("{\"firstName\": \"Unique\", \"lastName\": \"Lead\", \"email\": \"unique.lead@example.com\"}");
+        var mutationId = "mutation_idemp_" + Guid.NewGuid().ToString("N");
+        var batch = new OfflineSyncBatchRequest("batch_idemp_1", [
+            new OfflineMutationRequest(mutationId, "lead", "create", null, "t_unique", leadDoc, null)
+        ]);
+
+        // First attempt -> applied
+        var resp1 = await admin.Client.PostAsJsonAsync("/api/v1/offline/sync", batch);
+        resp1.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var res1 = await resp1.Content.ReadFromJsonAsync<OfflineSyncBatchResultDto>();
+        res1.ShouldNotBeNull();
+        res1.AppliedCount.ShouldBe(1);
+        var createdLeadId = res1.Results[0].ServerEntityId;
+        createdLeadId.ShouldNotBeNull();
+
+        // Replay attempt with same ClientMutationId -> deduplicated, returns cached result
+        var replayBatch = new OfflineSyncBatchRequest("batch_idemp_2", [
+            new OfflineMutationRequest(mutationId, "lead", "create", null, "t_unique", leadDoc, null)
+        ]);
+
+        var resp2 = await admin.Client.PostAsJsonAsync("/api/v1/offline/sync", replayBatch);
+        resp2.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var res2 = await resp2.Content.ReadFromJsonAsync<OfflineSyncBatchResultDto>();
+        res2.ShouldNotBeNull();
+        res2.AppliedCount.ShouldBe(1);
+        res2.Results[0].ServerEntityId.ShouldBe(createdLeadId);
+        res2.IdMap["t_unique"].ShouldBe(createdLeadId.Value);
+    }
+
+    [Fact]
+    public async Task Offline_sync_creates_open_task_with_due_date_and_priority()
+    {
+        var admin = await Workspaces.SignupAsync(factory);
+        (await admin.Client.PutAsJsonAsync("/api/v1/features/pwa-offline", new SetFeatureRequest(true))).EnsureSuccessStatusCode();
+
+        var taskDoc = JsonDocument.Parse("{\"subject\": \"Call VIP Client\", \"type\": \"Task\", \"priority\": \"High\", \"status\": \"Open\", \"dueAt\": \"2026-12-01T10:00:00Z\", \"description\": \"Urgent follow up\"}");
+        var batch = new OfflineSyncBatchRequest("batch_task_1", [
+            new OfflineMutationRequest("m_task_open", "activity", "create", null, "t_task_1", taskDoc, null)
+        ]);
+
+        var resp = await admin.Client.PostAsJsonAsync("/api/v1/offline/sync", batch);
+        resp.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var res = await resp.Content.ReadFromJsonAsync<OfflineSyncBatchResultDto>();
+        res.ShouldNotBeNull();
+        res.AppliedCount.ShouldBe(1);
+        var createdId = res.Results[0].ServerEntityId;
+        createdId.ShouldNotBeNull();
+
+        // Verify task was created as open task with priority and due date
+        var actDto = await admin.Client.GetFromJsonAsync<ActivityDto>($"/api/v1/activities/{createdId.Value}");
+        actDto.ShouldNotBeNull();
+        actDto.Type.ShouldBe("Task");
+        actDto.Status.ShouldBe("Open");
+        actDto.Priority.ShouldBe("High");
+        actDto.Subject.ShouldBe("Call VIP Client");
+        actDto.Description.ShouldBe("Urgent follow up");
+        actDto.DueAtUtc.ShouldNotBeNull();
+    }
 }

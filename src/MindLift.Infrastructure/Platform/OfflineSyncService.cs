@@ -176,6 +176,32 @@ public sealed class OfflineSyncService(
 
         foreach (var m in request.Mutations)
         {
+            // 1. Server-side idempotency deduplication
+            var existingLog = await db.OfflineMutationLogs
+                .AsNoTracking()
+                .FirstOrDefaultAsync(l => l.TenantId == tenantId && l.ClientMutationId == m.ClientMutationId, ct);
+
+            if (existingLog is not null)
+            {
+                var cachedResult = new OfflineMutationResultDto(
+                    existingLog.ClientMutationId,
+                    existingLog.Status,
+                    existingLog.ServerEntityId,
+                    existingLog.ErrorMessage,
+                    existingLog.NewVersion);
+
+                results.Add(cachedResult);
+                if (existingLog.Status == "applied") applied++;
+                else if (existingLog.Status == "conflict") conflict++;
+                else error++;
+
+                if (!string.IsNullOrWhiteSpace(m.ClientTempId) && existingLog.ServerEntityId.HasValue)
+                {
+                    idMap[m.ClientTempId] = existingLog.ServerEntityId.Value;
+                }
+                continue;
+            }
+
             var op = m.Operation.Trim().ToLowerInvariant();
             var entity = m.EntityType.Trim().ToLowerInvariant();
 
@@ -207,8 +233,22 @@ public sealed class OfflineSyncService(
                         if (!string.IsNullOrWhiteSpace(m.ClientTempId))
                             idMap[m.ClientTempId] = lead.Id;
 
-                        results.Add(new OfflineMutationResultDto(m.ClientMutationId, "applied", lead.Id, null, lead.Version));
+                        var res = new OfflineMutationResultDto(m.ClientMutationId, "applied", lead.Id, null, lead.Version);
+                        results.Add(res);
                         applied++;
+                        db.OfflineMutationLogs.Add(new OfflineMutationLog
+                        {
+                            TenantId = tenantId,
+                            ClientMutationId = m.ClientMutationId,
+                            BatchId = request.BatchId,
+                            EntityType = entity,
+                            Operation = op,
+                            Status = "applied",
+                            ServerEntityId = lead.Id,
+                            NewVersion = lead.Version,
+                            CompletedAtUtc = DateTime.UtcNow
+                        });
+                        await db.SaveChangesAsync(ct);
                     }
                     else if (entity == "deal")
                     {
@@ -253,14 +293,36 @@ public sealed class OfflineSyncService(
                     else if (entity == "activity")
                     {
                         var root = m.Payload.RootElement;
-                        var subject = root.TryGetProperty("subject", out var sb) ? sb.GetString() : "Offline Note";
+                        var subject = root.TryGetProperty("subject", out var sb) ? sb.GetString() : "Offline Activity";
+                        var type = root.TryGetProperty("type", out var tp) ? (tp.GetString() ?? "Note") : "Note";
+                        var status = root.TryGetProperty("status", out var st) 
+                            ? (st.GetString() ?? (type == "Task" ? "Open" : "Completed")) 
+                            : (type == "Task" ? "Open" : "Completed");
+                        var priority = root.TryGetProperty("priority", out var pr) ? (pr.GetString() ?? "Normal") : "Normal";
+                        var description = root.TryGetProperty("description", out var ds) ? ds.GetString() : null;
+                        DateTime? dueAt = root.TryGetProperty("dueAt", out var du) && du.TryGetDateTime(out var dt) ? DateTime.SpecifyKind(dt, DateTimeKind.Utc) : null;
+
+                        Guid? leadId = null;
+                        if (root.TryGetProperty("leadId", out var lid))
+                        {
+                            if (lid.TryGetGuid(out var lg)) leadId = lg;
+                            else if (lid.GetString() is { } tempLead && idMap.TryGetValue(tempLead, out var mappedId)) leadId = mappedId;
+                        }
 
                         var act = new Activity
                         {
-                            Subject = subject ?? "Offline Note",
-                            Type = "Note",
-                            Status = "Completed",
-                            OwnerId = userId
+                            Id = Guid.NewGuid(),
+                            TenantId = tenantId,
+                            Subject = subject ?? "Offline Activity",
+                            Type = type,
+                            Status = status,
+                            Priority = priority,
+                            Description = description,
+                            DueAt = dueAt,
+                            LeadId = leadId,
+                            OwnerId = userId,
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
                         };
 
                         db.Activities.Add(act);
@@ -269,8 +331,24 @@ public sealed class OfflineSyncService(
                         if (!string.IsNullOrWhiteSpace(m.ClientTempId))
                             idMap[m.ClientTempId] = act.Id;
 
-                        results.Add(new OfflineMutationResultDto(m.ClientMutationId, "applied", act.Id, null, act.Version));
+                        var res = new OfflineMutationResultDto(m.ClientMutationId, "applied", act.Id, null, act.Version);
+                        results.Add(res);
                         applied++;
+
+                        db.OfflineMutationLogs.Add(new OfflineMutationLog
+                        {
+                            TenantId = tenantId,
+                            ClientMutationId = m.ClientMutationId,
+                            BatchId = request.BatchId,
+                            EntityType = entity,
+                            Operation = op,
+                            Status = "applied",
+                            ServerEntityId = act.Id,
+                            NewVersion = act.Version,
+                            CompletedAtUtc = DateTime.UtcNow
+                        });
+                        await db.SaveChangesAsync(ct);
+                        continue;
                     }
                     else
                     {

@@ -34,3 +34,15 @@ public sealed class NullNotificationPusher : INotificationPusher
 {
     public Task PushAsync(Guid tenantId, Guid userId, NotificationDto notification, int unread, CancellationToken cancellationToken = default) => Task.CompletedTask;
 }
+
+/// <summary>Delivers push notifications to registered mobile devices via FCM or APNs.</summary>
+public interface IPushNotificationSender
+{
+    Task SendPushAsync(Guid tenantId, Guid userId, string title, string? body, IReadOnlyDictionary<string, string> payload, CancellationToken cancellationToken = default);
+}
+
+/// <summary>Default no-op push sender for development and test environments.</summary>
+public sealed class NullPushNotificationSender : IPushNotificationSender
+{
+    public Task SendPushAsync(Guid tenantId, Guid userId, string title, string? body, IReadOnlyDictionary<string, string> payload, CancellationToken cancellationToken = default) => Task.CompletedTask;
+}

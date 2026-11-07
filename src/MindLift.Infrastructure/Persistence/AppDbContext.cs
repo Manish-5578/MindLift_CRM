@@ -164,6 +164,8 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<CustomDashboardWidget> CustomDashboardWidgets { get; set; } = null!;
     public DbSet<OfflineSyncBatchLog> OfflineSyncBatches { get; set; } = null!;
     public DbSet<ImportHistory> ImportHistories { get; set; } = null!;
+    public DbSet<MobileDevice> MobileDevices { get; set; } = null!;
+    public DbSet<OfflineMutationLog> OfflineMutationLogs { get; set; } = null!;
 
     /// <summary>Tenant used by query filters. Guid.Empty when no tenant is set, so no rows match.</summary>
     protected Guid CurrentTenantId => tenant.TenantId ?? Guid.Empty;
@@ -1582,6 +1584,34 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.HasIndex(x => new { x.TenantId, x.AccountId });
             b.HasIndex(x => new { x.TenantId, x.ContactId });
             b.HasIndex(x => new { x.TenantId, x.Sentiment });
+        });
+
+        builder.Entity<MobileDevice>(b =>
+        {
+            b.ToTable("mobile_devices");
+            b.Property(x => x.InstallationId).HasMaxLength(100);
+            b.Property(x => x.Platform).HasMaxLength(20);
+            b.Property(x => x.Environment).HasMaxLength(20);
+            b.Property(x => x.Provider).HasMaxLength(20);
+            b.Property(x => x.ProviderVersion).HasMaxLength(20);
+            b.Property(x => x.TokenCiphertext).HasMaxLength(4000);
+            b.Property(x => x.TokenHash).HasMaxLength(128);
+            b.Property(x => x.AppVersion).HasMaxLength(50);
+            b.Property(x => x.Locale).HasMaxLength(20);
+            b.Property(x => x.TimeZoneId).HasMaxLength(100);
+            b.HasIndex(x => new { x.TenantId, x.UserId, x.InstallationId }).IsUnique();
+            b.HasIndex(x => x.TokenHash);
+        });
+
+        builder.Entity<OfflineMutationLog>(b =>
+        {
+            b.ToTable("offline_mutation_logs");
+            b.Property(x => x.ClientMutationId).HasMaxLength(100);
+            b.Property(x => x.BatchId).HasMaxLength(100);
+            b.Property(x => x.EntityType).HasMaxLength(50);
+            b.Property(x => x.Operation).HasMaxLength(50);
+            b.Property(x => x.Status).HasMaxLength(30);
+            b.HasIndex(x => new { x.TenantId, x.ClientMutationId }).IsUnique();
         });
 
         builder.Entity<CustomDashboardWidget>(b =>
