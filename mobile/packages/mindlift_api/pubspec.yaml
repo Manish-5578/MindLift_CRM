@@ -1,0 +1,14 @@
+name: mindlift_api
+description: Strongly typed API client and DTOs for MindLift CRM mobile application.
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  dio: ^5.4.0
+  meta: ^1.11.0
+
+dev_dependencies:
+  test: ^1.24.0

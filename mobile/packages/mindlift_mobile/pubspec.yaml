@@ -1,0 +1,33 @@
+name: mindlift_mobile
+description: MindLift CRM Staff-Facing Mobile Application
+version: 1.0.0+1
+publish_to: none
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  mindlift_ui:
+    path: ../mindlift_ui
+  mindlift_api:
+    path: ../mindlift_api
+  flutter_riverpod: ^2.5.1
+  go_router: ^14.0.0
+  flutter_secure_storage: ^9.0.0
+  drift: ^2.16.0
+  sqlite3_flutter_libs: ^0.5.20
+  sqlcipher_flutter_libs: ^0.5.4
+  path_provider: ^2.1.2
+  connectivity_plus: ^5.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  drift_dev: ^2.16.0
+  build_runner: ^2.4.8
+
+flutter:
+  uses-material-design: false
