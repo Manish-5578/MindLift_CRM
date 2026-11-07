@@ -252,3 +252,24 @@ h1[tabindex="-1"]:focus, h1[tabindex="-1"]:focus-visible, [tabindex="-1"]:focus:
   display: inline-block;
   max-width: 100%;
 }
+
+/* Active view / toggle highlighting across all view buttons and button groups */
+.ml-view-active,
+.mud-button-group-root .mud-button-root.ml-view-active,
+.mud-button-group-outlined .mud-button-root.ml-view-active,
+.mud-button-group-root .mud-button-root.mud-button-filled,
+.mud-button-group-outlined .mud-button-root.mud-button-filled {
+    background-color: var(--mud-palette-primary) !important;
+    color: var(--mud-palette-primary-contrast-text) !important;
+    font-weight: 700 !important;
+    border-color: var(--mud-palette-primary) !important;
+}
+
+.ml-view-active:hover,
+.mud-button-group-root .mud-button-root.ml-view-active:hover,
+.mud-button-group-outlined .mud-button-root.ml-view-active:hover,
+.mud-button-group-root .mud-button-root.mud-button-filled:hover,
+.mud-button-group-outlined .mud-button-root.mud-button-filled:hover {
+    background-color: var(--mud-palette-primary-darken) !important;
+    color: var(--mud-palette-primary-contrast-text) !important;
+}

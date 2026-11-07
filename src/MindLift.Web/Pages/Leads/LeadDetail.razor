@@ -196,31 +196,22 @@
             </MudAlert>
         }
 
-        <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" TabPanelsClass="pt-4" Class="mb-4" data-testid="lead-detail-tabs">
-            <MudTabPanel Text="@T["Details"]" Icon="@Icons.Material.Outlined.Info" data-testid="tab-details">
-                <MudGrid Spacing="4">
-                    <MudItem xs="12" md="7">
-                        <MlCard Title="Details">
-                            <KeyValueList Items="@Details()" />
-                        </MlCard>
-                    </MudItem>
-                    <MudItem xs="12" md="5">
-                        <MlCard Title="Custom Fields">
-                            @if (_custom.Count == 0)
-                            {
-                                <MudText Typo="Typo.body2" Class="ml-muted">@T["No extra details yet. Add custom fields in Settings."]</MudText>
-                            }
-                            else
-                            {
-                                <KeyValueList Items="@CustomItems()" />
-                            }
-                        </MlCard>
-                    </MudItem>
-                </MudGrid>
-            </MudTabPanel>
+        <MudGrid Spacing="4" Class="mb-4">
+            <MudItem xs="12" md="6">
+                <MlCard Title="Details">
+                    <KeyValueList Items="@Details()" />
+                    @if (_custom.Count > 0)
+                    {
+                        <div class="mt-4 pt-3" style="border-top:1px solid var(--ml-border)">
+                            <MudText Typo="Typo.subtitle2" Class="mb-2">@T["Custom Fields"]</MudText>
+                            <KeyValueList Items="@CustomItems()" />
+                        </div>
+                    }
+                </MlCard>
+            </MudItem>
 
-            <MudTabPanel Text="@T["Notes"]" Icon="@Icons.Material.Outlined.Notes" BadgeData="@(_notesList.Count > 0 ? _notesList.Count.ToString() : null)" BadgeColor="Color.Primary" data-testid="tab-notes">
-                <MlCard Title="Notes" Subtitle="Chronological record of lead notes and updates." TestId="lead-notes-card">
+            <MudItem xs="12" md="6">
+                <MlCard Title="Notes" Subtitle="@T["Chronological record of lead notes and updates."]" TestId="lead-notes-card">
                     <div class="ml-stack gap-3">
                         <div class="d-flex flex-column gap-2" style="background:var(--mud-palette-background-grey);padding:16px;border-radius:8px">
                             <MudTextField @bind-Value="_newNoteContent" 
@@ -253,7 +244,7 @@
                         }
                         else
                         {
-                            <div class="d-flex flex-column gap-3 mt-2" data-testid="notes-history">
+                            <div class="d-flex flex-column gap-3 mt-2" data-testid="notes-history" style="max-height:480px;overflow-y:auto">
                                 @foreach (var note in _notesList)
                                 {
                                     <div class="pa-3 rounded-lg" style="border:1px solid var(--ml-border);background:var(--mud-palette-surface)" data-testid="note-item">
@@ -283,8 +274,8 @@
                         }
                     </div>
                 </MlCard>
-            </MudTabPanel>
-        </MudTabs>
+            </MudItem>
+        </MudGrid>
 
         <div class="mt-4"><RecordActivities @ref="_activities" LeadId="Id" OnChanged="ReloadTimelineAsync" /></div>
         <div class="mt-4"><RecordTimeline @ref="_timeline" EntityType="leads" EntityId="Id" /></div>

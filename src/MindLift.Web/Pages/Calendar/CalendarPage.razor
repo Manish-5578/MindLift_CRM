@@ -15,9 +15,9 @@
         <Actions>
             <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Filled.SyncAlt" Href="/calendar/connections" data-testid="cal-connect">@T["Connect calendars"]</MudButton>
             <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small" data-testid="cal-views">
-                <MudButton Color='@(_view == "day" ? Color.Primary : Color.Default)' OnClick='() => SetViewAsync("day")' data-testid="cal-view-day">@T["Day"]</MudButton>
-                <MudButton Color='@(_view == "week" ? Color.Primary : Color.Default)' OnClick='() => SetViewAsync("week")' data-testid="cal-view-week">@T["Week"]</MudButton>
-                <MudButton Color='@(_view == "month" ? Color.Primary : Color.Default)' OnClick='() => SetViewAsync("month")' data-testid="cal-view-month">@T["Month"]</MudButton>
+                <MudButton Variant='@(_view == "day" ? Variant.Filled : Variant.Outlined)' Color='@(_view == "day" ? Color.Primary : Color.Default)' Class='@(_view == "day" ? "ml-view-active fw-bold" : null)' OnClick='() => SetViewAsync("day")' data-testid="cal-view-day">@T["Day"]</MudButton>
+                <MudButton Variant='@(_view == "week" ? Variant.Filled : Variant.Outlined)' Color='@(_view == "week" ? Color.Primary : Color.Default)' Class='@(_view == "week" ? "ml-view-active fw-bold" : null)' OnClick='() => SetViewAsync("week")' data-testid="cal-view-week">@T["Week"]</MudButton>
+                <MudButton Variant='@(_view == "month" ? Variant.Filled : Variant.Outlined)' Color='@(_view == "month" ? Color.Primary : Color.Default)' Class='@(_view == "month" ? "ml-view-active fw-bold" : null)' OnClick='() => SetViewAsync("month")' data-testid="cal-view-month">@T["Month"]</MudButton>
             </MudButtonGroup>
             <MudButton Variant="Variant.Outlined" OnClick="Today" data-testid="cal-today">@T["Today"]</MudButton>
             <MudIconButton Icon="@(T.IsArabic ? Icons.Material.Outlined.ChevronRight : Icons.Material.Outlined.ChevronLeft)" OnClick="() => Shift(-1)" aria-label="@T["Previous"]" data-testid="cal-prev" />

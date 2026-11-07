@@ -20,7 +20,7 @@
                 @foreach (var view in AllViews)
                 {
                     var current = view;
-                    var isActive = _state.View == current.Key;
+                    var isActive = IsViewActive(current);
                     <MudButton Variant="@(isActive ? Variant.Filled : Variant.Outlined)"
                                Color="@(isActive ? Color.Primary : Color.Default)"
                                Class="@(isActive ? "ml-view-active fw-bold" : null)"
@@ -708,7 +708,22 @@
         return new FilterGroup { Logic = "and", Groups = [view, user] };
     }
 
-    private Color ViewColor(ListView view) => _state.View == view.Key ? Color.Primary : Color.Default;
+    private bool IsViewActive(ListView view)
+    {
+        if (string.Equals(_state.View, view.Key, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (string.IsNullOrWhiteSpace(_state.View) && string.Equals(DefaultViewKey, view.Key, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private Color ViewColor(ListView view) => IsViewActive(view) ? Color.Primary : Color.Default;
 
     private static string ViewTestId(ListView view) => "view-" + view.Key;
 

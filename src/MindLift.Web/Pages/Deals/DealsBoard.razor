@@ -15,8 +15,8 @@
     <PageHeader Title="@App.ModuleLabel(AppModule.Deals)" Subtitle="@SubtitleText">
         <Actions>
             <MudButtonGroup Variant="Variant.Outlined" Size="Size.Medium" data-testid="layout-toggle">
-                <MudButton Color="Color.Primary" Href="/deals/board">@T["Board"]</MudButton>
-                <MudButton Href="/deals">@T["List"]</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-view-active fw-bold" Href="/deals/board">@T["Board"]</MudButton>
+                <MudButton Variant="Variant.Outlined" Href="/deals">@T["List"]</MudButton>
             </MudButtonGroup>
             @if (CanCreate)
             {

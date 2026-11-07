@@ -24,8 +24,8 @@
                         DefaultSortField="created_at" DefaultSortDir="desc">
             <HeaderActions>
                 <MudButtonGroup Variant="Variant.Outlined" Size="Size.Medium" data-testid="layout-toggle">
-                    <MudButton Href="/deals/board">@T["Board"]</MudButton>
-                    <MudButton Color="Color.Primary" Href="/deals">@T["List"]</MudButton>
+                    <MudButton Variant="Variant.Outlined" Href="/deals/board">@T["Board"]</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-view-active fw-bold" Href="/deals">@T["List"]</MudButton>
                 </MudButtonGroup>
                 @if (Can(p => p.CanImport))
                 {

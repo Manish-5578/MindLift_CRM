@@ -25,10 +25,10 @@
 
     <div class="mb-4">
         <MudButtonGroup Variant="Variant.Outlined" Size="Size.Medium">
-            <MudButton Color="@(_activeTab == 0 ? Color.Primary : Color.Default)" Variant="@(_activeTab == 0 ? Variant.Filled : Variant.Outlined)" StartIcon="@Icons.Material.Outlined.Handshake" OnClick="() => _activeTab = 0">
+            <MudButton Color="@(_activeTab == 0 ? Color.Primary : Color.Default)" Variant="@(_activeTab == 0 ? Variant.Filled : Variant.Outlined)" Class="@(_activeTab == 0 ? "ml-view-active fw-bold" : null)" StartIcon="@Icons.Material.Outlined.Handshake" OnClick="() => _activeTab = 0">
                 @T["Engagements Pipeline"]
             </MudButton>
-            <MudButton Color="@(_activeTab == 1 ? Color.Primary : Color.Default)" Variant="@(_activeTab == 1 ? Variant.Filled : Variant.Outlined)" StartIcon="@Icons.Material.Outlined.PersonSearch" OnClick="() => _activeTab = 1">
+            <MudButton Color="@(_activeTab == 1 ? Color.Primary : Color.Default)" Variant="@(_activeTab == 1 ? Variant.Filled : Variant.Outlined)" Class="@(_activeTab == 1 ? "ml-view-active fw-bold" : null)" StartIcon="@Icons.Material.Outlined.PersonSearch" OnClick="() => _activeTab = 1">
                 @T["Leads Pipeline"]
             </MudButton>
         </MudButtonGroup>
