@@ -155,7 +155,20 @@ public sealed record ImportPreviewDto(
     int TotalRows,
     IReadOnlyList<MindLift.Shared.Imports.ColumnMatch> Matches,
     bool HasRequired,
-    string? Error);
+    string? Error,
+    int ValidRows = 0,
+    int InvalidRows = 0,
+    int DuplicateRows = 0);
+
+public sealed record LeadNoteDto(
+    Guid Id,
+    Guid LeadId,
+    string Content,
+    Guid AuthorId,
+    string AuthorName,
+    DateTime CreatedAtUtc);
+
+public sealed record CreateLeadNoteRequest(string Content);
 
 public sealed record AssignmentRuleDto(Guid Id, string Name, bool IsActive, int Priority, string Method, IReadOnlyList<Guid> UserIds, FilterGroup? Conditions);
 

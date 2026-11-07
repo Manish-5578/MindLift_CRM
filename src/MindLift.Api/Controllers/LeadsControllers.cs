@@ -209,7 +209,23 @@ public sealed class LeadsController(LeadService leads, ImportNotifier imports) :
     public async Task<ActionResult<ImportHistorySummaryDto>> GetImportHistory(CancellationToken cancellationToken)
         => Ok(await leads.GetImportHistoryAsync(cancellationToken));
 
+    [HasPermission(AppModule.Leads, PermissionAction.View)]
+    [HttpGet("{id:guid}/notes")]
+    public async Task<ActionResult<IReadOnlyList<LeadNoteDto>>> GetNotes(Guid id, CancellationToken cancellationToken)
+        => Ok(await leads.GetNotesAsync(id, cancellationToken));
 
+    [HasPermission(AppModule.Leads, PermissionAction.Edit)]
+    [HttpPost("{id:guid}/notes")]
+    public async Task<ActionResult<LeadNoteDto>> AddNote(Guid id, [FromBody] CreateLeadNoteRequest request, CancellationToken cancellationToken)
+        => Ok(await leads.AddNoteAsync(id, request, cancellationToken));
+
+    [HasPermission(AppModule.Leads, PermissionAction.Edit)]
+    [HttpDelete("{id:guid}/notes/{noteId:guid}")]
+    public async Task<IActionResult> DeleteNote(Guid id, Guid noteId, CancellationToken cancellationToken)
+    {
+        await leads.DeleteNoteAsync(id, noteId, cancellationToken);
+        return NoContent();
+    }
 }
 
 /// <summary>Assignment rules and web forms (settings, Admin by default).</summary>

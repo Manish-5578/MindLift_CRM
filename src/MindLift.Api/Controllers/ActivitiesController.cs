@@ -41,6 +41,16 @@ public sealed class ActivitiesController(ActivityService activities) : Controlle
         => Ok(await activities.CompleteAsync(id, request, cancellationToken));
 
     [HasPermission(AppModule.Activities, PermissionAction.Edit)]
+    [HttpPost("{id:guid}/reschedule")]
+    public async Task<ActionResult<ActivityDto>> Reschedule(Guid id, [FromBody] RescheduleActivityRequest request, CancellationToken cancellationToken)
+        => Ok(await activities.RescheduleAsync(id, request, cancellationToken));
+
+    [HasPermission(AppModule.Activities, PermissionAction.Edit)]
+    [HttpPost("{id:guid}/outcome")]
+    public async Task<ActionResult<ActivityDto>> RecordOutcome(Guid id, [FromBody] RecordOutcomeRequest request, CancellationToken cancellationToken)
+        => Ok(await activities.RecordOutcomeAsync(id, request, cancellationToken));
+
+    [HasPermission(AppModule.Activities, PermissionAction.Edit)]
     [HttpPatch("{id:guid}/schedule")]
     public async Task<ActionResult<ActivityDto>> Schedule(Guid id, [FromBody] ScheduleActivityRequest request, CancellationToken cancellationToken)
         => Ok(await activities.ScheduleAsync(id, request, cancellationToken));

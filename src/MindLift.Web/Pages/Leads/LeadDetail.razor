@@ -73,6 +73,30 @@
             <MudText Typo="Typo.body2" Class="ml-muted">@T["Created"] <DateText Value="@_lead.CreatedAtUtc" /></MudText>
         </div>
 
+        @if (NextCallback is { } cb)
+        {
+            <MudAlert Severity="@(cb.IsOverdue ? Severity.Error : Severity.Info)" Dense="true" Class="mb-4" Icon="@Icons.Material.Filled.PhoneCallback" data-testid="lead-callback-alert">
+                <div class="d-flex align-center justify-space-between flex-wrap gap-2">
+                    <div>
+                        <strong>@(cb.IsOverdue ? T["Overdue Callback:"] : T["Upcoming Callback:"])</strong>
+                        <span class="ml-2">@cb.Subject</span> · <DateText Value="@cb.DueAtUtc" Danger="@cb.IsOverdue" />
+                        @if (!string.IsNullOrWhiteSpace(cb.Description))
+                        {
+                            <span class="ml-2 ml-muted">(@cb.Description)</span>
+                        }
+                    </div>
+                    <div class="d-flex align-center gap-1">
+                        <MudButton Variant="Variant.Filled" Color="@(cb.IsOverdue ? Color.Error : Color.Primary)" Size="Size.Small" StartIcon="@Icons.Material.Filled.Check" OnClick="() => OpenOutcomeDialogAsync(cb)" data-testid="complete-callback-btn">
+                            @T["Complete"]
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Default" Size="Size.Small" StartIcon="@Icons.Material.Filled.Update" OnClick="() => OpenRescheduleDialogAsync(cb)" data-testid="reschedule-callback-btn">
+                            @T["Reschedule"]
+                        </MudButton>
+                    </div>
+                </div>
+            </MudAlert>
+        }
+
         @if (_converted)
         {
             <MudAlert Severity="Severity.Success" Class="mb-4" data-testid="converted-banner">
@@ -172,27 +196,95 @@
             </MudAlert>
         }
 
-        <LeadStickyNote LeadId="Id" InitialNote="_lead.Description" OnSaved="OnNoteSavedAsync" />
+        <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" TabPanelsClass="pt-4" Class="mb-4" data-testid="lead-detail-tabs">
+            <MudTabPanel Text="@T["Details"]" Icon="@Icons.Material.Outlined.Info" data-testid="tab-details">
+                <MudGrid Spacing="4">
+                    <MudItem xs="12" md="7">
+                        <MlCard Title="Details">
+                            <KeyValueList Items="@Details()" />
+                        </MlCard>
+                    </MudItem>
+                    <MudItem xs="12" md="5">
+                        <MlCard Title="Custom Fields">
+                            @if (_custom.Count == 0)
+                            {
+                                <MudText Typo="Typo.body2" Class="ml-muted">@T["No extra details yet. Add custom fields in Settings."]</MudText>
+                            }
+                            else
+                            {
+                                <KeyValueList Items="@CustomItems()" />
+                            }
+                        </MlCard>
+                    </MudItem>
+                </MudGrid>
+            </MudTabPanel>
 
-        <MudGrid Spacing="4">
-            <MudItem xs="12" md="6">
-                <MlCard Title="Details">
-                    <KeyValueList Items="@Details()" />
+            <MudTabPanel Text="@T["Notes"]" Icon="@Icons.Material.Outlined.Notes" BadgeData="@(_notesList.Count > 0 ? _notesList.Count.ToString() : null)" BadgeColor="Color.Primary" data-testid="tab-notes">
+                <MlCard Title="Notes" Subtitle="Chronological record of lead notes and updates." TestId="lead-notes-card">
+                    <div class="ml-stack gap-3">
+                        <div class="d-flex flex-column gap-2" style="background:var(--mud-palette-background-grey);padding:16px;border-radius:8px">
+                            <MudTextField @bind-Value="_newNoteContent" 
+                                          Placeholder="Lead Description" 
+                                          Lines="3" 
+                                          Variant="Variant.Outlined" 
+                                          Margin="Margin.Dense" 
+                                          data-testid="lead-note-input" />
+                            <div class="d-flex justify-end gap-2">
+                                <MudButton Variant="Variant.Filled" 
+                                           Color="Color.Primary" 
+                                           Size="Size.Small" 
+                                           StartIcon="@Icons.Material.Filled.AddComment" 
+                                           Disabled="@(string.IsNullOrWhiteSpace(_newNoteContent) || _savingNote)" 
+                                           OnClick="AddNoteAsync" 
+                                           data-testid="add-note-btn">
+                                    @if (_savingNote) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }
+                                    else { @T["Add note"] }
+                                </MudButton>
+                            </div>
+                        </div>
+
+                        @if (_loadingNotes)
+                        {
+                            <MudProgressLinear Indeterminate="true" />
+                        }
+                        else if (_notesList.Count == 0)
+                        {
+                            <MudText Typo="Typo.body2" Class="ml-muted pa-3" data-testid="no-notes">@T["No notes yet. Add the first note above."]</MudText>
+                        }
+                        else
+                        {
+                            <div class="d-flex flex-column gap-3 mt-2" data-testid="notes-history">
+                                @foreach (var note in _notesList)
+                                {
+                                    <div class="pa-3 rounded-lg" style="border:1px solid var(--ml-border);background:var(--mud-palette-surface)" data-testid="note-item">
+                                        <div class="d-flex align-center justify-space-between mb-2">
+                                            <div class="d-flex align-center gap-2">
+                                                <MudAvatar Size="Size.Small" Color="Color.Primary">
+                                                    @(string.IsNullOrWhiteSpace(note.AuthorName) ? "U" : note.AuthorName[0].ToString().ToUpper())
+                                                </MudAvatar>
+                                                <MudText Typo="Typo.subtitle2" Style="font-weight:600" data-testid="note-author">
+                                                    @note.AuthorName
+                                                </MudText>
+                                                <MudText Typo="Typo.caption" Class="ml-muted" data-testid="note-date">
+                                                    · <DateText Value="@note.CreatedAtUtc" />
+                                                </MudText>
+                                            </div>
+                                            @if (note.Id != Guid.Empty)
+                                            {
+                                                <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Color="Color.Default" OnClick="() => DeleteNoteAsync(note.Id)" aria-label="@T["Delete"]" data-testid="delete-note-btn" />
+                                            }
+                                        </div>
+                                        <MudText Typo="Typo.body2" Style="white-space:pre-wrap;overflow-wrap:anywhere" data-testid="note-content">
+                                            @note.Content
+                                        </MudText>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
                 </MlCard>
-            </MudItem>
-            <MudItem xs="12" md="6">
-                <MlCard Title="More">
-                    @if (_custom.Count == 0)
-                    {
-                        <MudText Typo="Typo.body2" Class="ml-muted">@T["No extra details yet. Add custom fields in Settings."]</MudText>
-                    }
-                    else
-                    {
-                        <KeyValueList Items="@CustomItems()" />
-                    }
-                </MlCard>
-            </MudItem>
-        </MudGrid>
+            </MudTabPanel>
+        </MudTabs>
 
         <div class="mt-4"><RecordActivities @ref="_activities" LeadId="Id" OnChanged="ReloadTimelineAsync" /></div>
         <div class="mt-4"><RecordTimeline @ref="_timeline" EntityType="leads" EntityId="Id" /></div>
@@ -205,6 +297,96 @@
 @code {
     private RecordTimeline? _timeline;
     private RecordActivities? _activities;
+    private List<LeadNoteDto> _notesList = [];
+    private bool _loadingNotes;
+    private bool _savingNote;
+    private string? _newNoteContent;
+
+    private ActivityDto? NextCallback => _activities?.Items?
+        .Where(a => a.Type == ActivityTypes.Call && a.Status == "Open" && a.DueAtUtc.HasValue)
+        .OrderBy(a => a.DueAtUtc)
+        .FirstOrDefault();
+
+    private async Task LoadNotesAsync()
+    {
+        _loadingNotes = true;
+        try
+        {
+            _notesList = await Http.GetFromJsonAsync<List<LeadNoteDto>>($"api/v1/leads/{Id}/notes") ?? [];
+        }
+        catch
+        {
+            _notesList = [];
+        }
+        finally
+        {
+            _loadingNotes = false;
+        }
+    }
+
+    private async Task AddNoteAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newNoteContent)) return;
+        _savingNote = true;
+        try
+        {
+            var res = await Http.PostAsJsonAsync($"api/v1/leads/{Id}/notes", new CreateLeadNoteRequest(_newNoteContent));
+            if (res.IsSuccessStatusCode)
+            {
+                var note = await res.Content.ReadFromJsonAsync<LeadNoteDto>();
+                if (note is not null)
+                {
+                    _notesList.Insert(0, note);
+                }
+                _newNoteContent = string.Empty;
+                Snackbar.Add(T["Note added successfully"], Severity.Success);
+                await ReloadTimelineAsync();
+                if (_activities is not null) await _activities.LoadAsync();
+            }
+            else
+            {
+                Snackbar.Add(await ProblemText.FromAsync(res, T["Could not add note."]), Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _savingNote = false;
+        }
+    }
+
+    private async Task DeleteNoteAsync(Guid noteId)
+    {
+        var res = await Http.DeleteAsync($"api/v1/leads/{Id}/notes/{noteId}");
+        if (res.IsSuccessStatusCode)
+        {
+            _notesList.RemoveAll(n => n.Id == noteId);
+            Snackbar.Add(T["Note deleted"], Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add(await ProblemText.FromAsync(res, T["Could not delete note."]), Severity.Error);
+        }
+    }
+
+    private async Task OpenOutcomeDialogAsync(ActivityDto act)
+    {
+        if (_activities is not null)
+        {
+            await _activities.RecordOutcomeAsync(act);
+        }
+    }
+
+    private async Task OpenRescheduleDialogAsync(ActivityDto act)
+    {
+        if (_activities is not null)
+        {
+            await _activities.RescheduleAsync(act);
+        }
+    }
 
     private async Task ReloadTimelineAsync()
     {
@@ -394,6 +576,7 @@
             {
                 _lead = await response.Content.ReadFromJsonAsync<LeadDto>();
                 _accountName ??= _lead?.CompanyName;
+                await LoadNotesAsync();
 
                 try
                 {
@@ -540,7 +723,6 @@
             ("Source", SourceLabel(_lead.Source)),
             ("Rating", RatingLabel(_lead.Rating)),
             ("Status", StatusLabel(_lead.Status)),
-            ("Notes", _lead.Description),
         };
 
         // The reason only applies to disqualified leads; showing an empty one on other leads is noise.

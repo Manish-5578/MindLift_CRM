@@ -6,60 +6,68 @@
 @inject Translator T
 
 <div style="position:relative;display:inline-flex" data-testid="notification-bell" data-connected="@ConnectedText">
-    <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" Dense="true" PopoverClass="ml-notifications" Style="display:inline-flex;">
-        <ActivatorContent>
-            <MudBadge Content="@Notifications.Unread" Visible="@(Notifications.Unread > 0)" Max="99" Color="Color.Error" Overlap="true" data-testid="notification-badge">
-                <MudIconButton Icon="@Icons.Material.Outlined.Notifications" Color="Color.Inherit" aria-label="@T["Notifications"]" data-testid="notification-bell-button" OnClick="LoadAsync" />
-            </MudBadge>
-        </ActivatorContent>
-        <ChildContent>
-            <div data-testid="notification-panel" style="min-width:320px;max-width:min(380px, 96vw)">
-                <div class="ml-row ml-row--between" style="padding:12px 16px">
-                    <MudText Typo="Typo.subtitle2">@T["Notifications"]</MudText>
-                    @if (Notifications.Unread > 0)
-                    {
-                        <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="MarkAllAsync" data-testid="mark-all-read">@T["Mark all as read"]</MudButton>
-                    }
-                </div>
-                <MudDivider />
+    <MudBadge Content="@Notifications.Unread" Visible="@(Notifications.Unread > 0)" Max="99" Color="Color.Error" Overlap="true" data-testid="notification-badge">
+        <MudIconButton Icon="@Icons.Material.Outlined.Notifications" Color="Color.Inherit" aria-label="@T["Notifications"]" data-testid="notification-bell-button" OnClick="ToggleAsync" />
+    </MudBadge>
 
-                @if (_loading)
-                {
-                    <MudProgressLinear Indeterminate="true" />
-                }
-                else if (_items.Count == 0)
-                {
-                    <div style="padding:16px 20px" data-testid="notifications-empty">
-                        <MudText Typo="Typo.body2" Class="ml-muted">@T["Nothing new. Assignments, mentions and reminders will show up here."]</MudText>
-                    </div>
-                }
+    @if (_open)
+    {
+        @* Outside click backdrop to dismiss notification panel when clicking anywhere outside *@
+        <div style="position:fixed;inset:0;z-index:1290;background:transparent" @onclick="Close" data-testid="notification-backdrop"></div>
 
-                @foreach (var item in _items)
+        <div data-testid="notification-panel" 
+             class="mud-paper mud-elevation-8 rounded-lg"
+             style="position:absolute;top:calc(100% + 4px);right:0;z-index:1300;min-width:320px;max-width:min(380px, 96vw);background:var(--mud-palette-surface);"
+             @onmousemove="ResetInactivityTimer"
+             @onkeydown="ResetInactivityTimer"
+             @onmouseenter="ResetInactivityTimer"
+             @onclick:stopPropagation="true">
+            <div class="ml-row ml-row--between" style="padding:12px 16px">
+                <MudText Typo="Typo.subtitle2">@T["Notifications"]</MudText>
+                @if (Notifications.Unread > 0)
                 {
-                    var current = item;
-                    <div class="@RowClass(current)" @onclick="() => OpenAsync(current)" role="button" tabindex="0" data-testid="notification-item">
-                        <MudText Typo="Typo.body2" Style="@(current.IsRead ? null : "font-weight:600")">@current.Title</MudText>
-                        @if (!string.IsNullOrWhiteSpace(current.Body))
-                        {
-                            <MudText Typo="Typo.caption" Class="ml-muted ml-truncate">@current.Body</MudText>
-                        }
-                        <MudText Typo="Typo.caption" Class="ml-faint"><DateText Value="@current.CreatedAtUtc" /></MudText>
-                    </div>
+                    <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="MarkAllAsync" data-testid="mark-all-read">@T["Mark all as read"]</MudButton>
                 }
-
-                <MudDivider />
-                <div style="padding:8px 16px">
-                    <MudButton Href="/notifications" Size="Size.Small" Variant="Variant.Text" data-testid="see-all-notifications">@T["See all"]</MudButton>
-                </div>
             </div>
-        </ChildContent>
-    </MudMenu>
+            <MudDivider />
+
+            @if (_loading)
+            {
+                <MudProgressLinear Indeterminate="true" />
+            }
+            else if (_items.Count == 0)
+            {
+                <div style="padding:16px 20px" data-testid="notifications-empty">
+                    <MudText Typo="Typo.body2" Class="ml-muted">@T["Nothing new. Assignments, mentions and reminders will show up here."]</MudText>
+                </div>
+            }
+
+            @foreach (var item in _items)
+            {
+                var current = item;
+                <div class="@RowClass(current)" @onclick="() => OpenAsync(current)" role="button" tabindex="0" data-testid="notification-item">
+                    <MudText Typo="Typo.body2" Style="@(current.IsRead ? null : "font-weight:600")">@current.Title</MudText>
+                    @if (!string.IsNullOrWhiteSpace(current.Body))
+                    {
+                        <MudText Typo="Typo.caption" Class="ml-muted ml-truncate">@current.Body</MudText>
+                    }
+                    <MudText Typo="Typo.caption" Class="ml-faint"><DateText Value="@current.CreatedAtUtc" /></MudText>
+                </div>
+            }
+
+            <MudDivider />
+            <div style="padding:8px 16px">
+                <MudButton Href="/notifications" Size="Size.Small" Variant="Variant.Text" data-testid="see-all-notifications">@T["See all"]</MudButton>
+            </div>
+        </div>
+    }
 </div>
 
 @code {
     private List<NotificationDto> _items = [];
     private bool _loading;
     private bool _open;
+    private System.Threading.Timer? _inactivityTimer;
 
     protected override void OnInitialized()
     {
@@ -73,7 +81,6 @@
 
     private void OnChanged() => _ = InvokeAsync(StateHasChanged);
 
-    /// <summary>A notification arrived while the page is open: show it as a toast and, if the list is open, at the top of it.</summary>
     private void OnReceived(NotificationDto notification) => _ = InvokeAsync(() =>
     {
         Snackbar.Add(notification.Title, Severity.Info, config =>
@@ -90,6 +97,7 @@
         if (_open)
         {
             _items.Insert(0, notification);
+            ResetInactivityTimer();
         }
 
         StateHasChanged();
@@ -100,11 +108,48 @@
         _open = !_open;
         if (_open)
         {
+            StartInactivityTimer();
             await LoadAsync();
+        }
+        else
+        {
+            StopInactivityTimer();
         }
     }
 
-    private void Close() => _open = false;
+    private void Close()
+    {
+        _open = false;
+        StopInactivityTimer();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void StartInactivityTimer()
+    {
+        StopInactivityTimer();
+        _inactivityTimer = new System.Threading.Timer(_ =>
+        {
+            _ = InvokeAsync(() =>
+            {
+                if (_open)
+                {
+                    _open = false;
+                    StateHasChanged();
+                }
+            });
+        }, null, 5000, Timeout.Infinite);
+    }
+
+    private void ResetInactivityTimer()
+    {
+        _inactivityTimer?.Change(5000, Timeout.Infinite);
+    }
+
+    private void StopInactivityTimer()
+    {
+        _inactivityTimer?.Dispose();
+        _inactivityTimer = null;
+    }
 
     private async Task LoadAsync()
     {
@@ -136,7 +181,7 @@
             await Notifications.RefreshCountAsync();
         }
 
-        _open = false;
+        Close();
         if (item.Url is not null)
         {
             Nav.NavigateTo(item.Url);
@@ -148,10 +193,12 @@
         await Http.PostAsync("api/v1/notifications/read-all", null);
         _items = _items.Select(i => i with { IsRead = true }).ToList();
         Notifications.SetUnread(0);
+        ResetInactivityTimer();
     }
 
     public void Dispose()
     {
+        StopInactivityTimer();
         Notifications.Changed -= OnChanged;
         Notifications.Received -= OnReceived;
     }

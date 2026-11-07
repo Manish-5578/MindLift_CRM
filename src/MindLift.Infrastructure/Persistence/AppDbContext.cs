@@ -48,6 +48,7 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<Invitation> Invitations { get; set; } = null!;
     public DbSet<PicklistValue> PicklistValues { get; set; } = null!;
     public DbSet<Lead> Leads { get; set; } = null!;
+    public DbSet<LeadNote> LeadNotes { get; set; } = null!;
     public DbSet<Contact> Contacts { get; set; } = null!;
     public DbSet<Account> Accounts { get; set; } = null!;
     public DbSet<Deal> Deals { get; set; } = null!;
@@ -498,7 +499,8 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
         builder.Entity<Notification>(b => { b.ToTable("notifications"); b.HasIndex(x => new { x.TenantId, x.UserId, x.IsRead, x.CreatedAt }).IsDescending(false, false, false, true); b.HasIndex(x => new { x.UserId, x.GroupKey, x.EmailedAt }); b.Property(x => x.Type).HasMaxLength(40); b.Property(x => x.Title).HasMaxLength(250); b.Property(x => x.Body).HasMaxLength(2000); b.Property(x => x.Url).HasMaxLength(300); b.Property(x => x.GroupKey).HasMaxLength(200); b.Property(x => x.EntityType).HasMaxLength(40); });
         builder.Entity<NotificationPreference>(b => { b.ToTable("notification_preferences"); b.HasIndex(x => new { x.UserId, x.Type }).IsUnique().HasFilter("is_deleted = false"); b.Property(x => x.Type).HasMaxLength(40); });
         builder.Entity<ChecklistTemplate>(b => { b.ToTable("checklist_templates"); b.HasIndex(x => new { x.TenantId, x.Trigger }); b.Property(x => x.Name).HasMaxLength(150); b.Property(x => x.Items).HasColumnType("jsonb"); });
-        builder.Entity<Activity>(b => { b.ToTable("activities"); b.HasIndex(x => new { x.TenantId, x.DealId }); b.HasIndex(x => new { x.TenantId, x.ContactId }); b.HasIndex(x => new { x.TenantId, x.AccountId }); b.HasIndex(x => new { x.TenantId, x.LeadId }); b.Property(x => x.Subject).HasMaxLength(250); b.Property(x => x.Type).HasMaxLength(20); b.Property(x => x.Status).HasMaxLength(20); b.Property(x => x.Priority).HasMaxLength(10); b.Property(x => x.Attendees).HasColumnType("jsonb"); b.HasIndex(x => new { x.TenantId, x.OwnerId, x.Status, x.DueAt }); });
+        builder.Entity<LeadNote>(b => { b.ToTable("lead_notes"); b.HasIndex(x => new { x.TenantId, x.LeadId, x.CreatedAt }).IsDescending(false, false, true); b.Property(x => x.AuthorName).HasMaxLength(200); });
+        builder.Entity<Activity>(b => { b.ToTable("activities"); b.Property(x => x.RescheduleReason).HasMaxLength(200); b.HasIndex(x => new { x.TenantId, x.DealId }); b.HasIndex(x => new { x.TenantId, x.ContactId }); b.HasIndex(x => new { x.TenantId, x.AccountId }); b.HasIndex(x => new { x.TenantId, x.LeadId }); b.Property(x => x.Subject).HasMaxLength(250); b.Property(x => x.Type).HasMaxLength(20); b.Property(x => x.Status).HasMaxLength(20); b.Property(x => x.Priority).HasMaxLength(10); b.Property(x => x.Attendees).HasColumnType("jsonb"); b.HasIndex(x => new { x.TenantId, x.OwnerId, x.Status, x.DueAt }); });
 
         builder.Entity<Pipeline>(b => { b.ToTable("pipelines"); b.HasIndex(x => new { x.TenantId, x.Name }).IsUnique().HasFilter("is_deleted = false"); });
         builder.Entity<PipelineStage>(b => { b.ToTable("pipeline_stages"); b.HasIndex(x => new { x.TenantId, x.PipelineId, x.SortOrder }); });

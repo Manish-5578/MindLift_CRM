@@ -42,8 +42,19 @@
     }
     else if (_step == 2)
     {
-        <MlCard Title="@_fileName" Subtitle="@($"{_rows.Count - 1:N0} rows found")" Class="mb-4" TestId="import-step-check">
+        <MlCard Title="@_fileName" Subtitle="@($"{_totalRows:N0} rows found")" Class="mb-4" TestId="import-step-check">
             <div class="ml-stack">
+                <div class="d-flex align-center gap-2 flex-wrap mb-2">
+                    <StatusChip Text="@($"{_validRows:N0} valid")" Color="@StatusColors.For("Won")" Dot="false" />
+                    @if (_duplicateRows > 0)
+                    {
+                        <StatusChip Text="@($"{_duplicateRows:N0} duplicate(s)")" Color="@StatusColors.For("Active")" Dot="false" />
+                    }
+                    @if (_invalidRows > 0)
+                    {
+                        <StatusChip Text="@($"{_invalidRows:N0} invalid")" Color="@StatusColors.For("Lost")" Dot="false" />
+                    }
+                </div>
                 <MudText Typo="Typo.subtitle2">@T["How we read your columns"]</MudText>
                 @foreach (var match in _matches)
                 {
@@ -69,7 +80,7 @@
                 {
                     <MudAlert Severity="Severity.Error" Dense="true" data-testid="import-too-many">@T["This file has more than 5,000 rows. Split it into smaller files."]</MudAlert>
                 }
-                else if (HasRequired && _rows.Count - 1 > 0)
+                else if (HasRequired && _totalRows > 0)
                 {
                     <MudAlert Severity="Severity.Info" Dense="true">@T["Rows with an email or phone that already exists are skipped. Rows without a first name are reported."]</MudAlert>
                 }
@@ -106,7 +117,7 @@
             <MudButton Variant="Variant.Outlined" OnClick="Back" Disabled="_busy">@T["Back"]</MudButton>
             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ImportAsync" Disabled="_busy" data-testid="import-submit">
                 @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }
-                else { @("Import " + (_rows.Count - 1).ToString("N0") + " " + ItemLabel) }
+                else { @("Import " + _totalRows.ToString("N0") + " " + ItemLabel) }
             </MudButton>
         </div>
     }
@@ -170,6 +181,10 @@
     private List<List<string>> _rows = [];
     private IReadOnlyList<ColumnMatch> _matches = [];
     private ImportResultDto? _result;
+    private int _totalRows;
+    private int _validRows;
+    private int _duplicateRows;
+    private int _invalidRows;
 
     private string ItemLabel => App.ModuleLabel(Module).ToLowerInvariant();
 
@@ -177,7 +192,7 @@
         ? RequiredFields.All(rf => _matches.Any(m => m.Field == rf))
         : _matches.Any(m => m.Field == RequiredField);
 
-    private bool TooManyRows => _rows.Count - 1 > MaxRows;
+    private bool TooManyRows => _totalRows > MaxRows;
 
     private string TemplateFileName => Module == AppModule.Leads ? ItemLabel + "-template.xlsx" : ItemLabel + "-template.csv";
 
@@ -241,6 +256,10 @@
 
                 _rows = preview.Headers.Count > 0 ? [preview.Headers.ToList(), ..preview.Rows.Select(r => r.ToList())] : [];
                 _matches = preview.Matches;
+                _totalRows = preview.TotalRows > 0 ? preview.TotalRows : (_rows.Count > 0 ? _rows.Count - 1 : 0);
+                _validRows = preview.ValidRows > 0 ? preview.ValidRows : _totalRows;
+                _invalidRows = preview.InvalidRows;
+                _duplicateRows = preview.DuplicateRows;
                 _step = 2;
             }
             else
@@ -256,6 +275,31 @@
                 _csv = text;
                 _rows = rows;
                 _matches = ImportColumns.Recognize(rows[0], Fields);
+                _totalRows = rows.Count - 1;
+                var seenEmails = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var seenPhones = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var emailCol = -1;
+                var phoneCol = -1;
+                for (var i = 0; i < rows[0].Count; i++)
+                {
+                    var h = rows[0][i].Trim().ToLowerInvariant();
+                    if (h.Contains("email")) emailCol = i;
+                    else if (h.Contains("phone")) phoneCol = i;
+                }
+                var valid = 0;
+                var dups = 0;
+                foreach (var r in rows.Skip(1))
+                {
+                    var em = emailCol >= 0 && emailCol < r.Count ? r[emailCol]?.Trim() : null;
+                    var ph = phoneCol >= 0 && phoneCol < r.Count ? r[phoneCol]?.Trim() : null;
+                    bool isDup = (!string.IsNullOrWhiteSpace(em) && !seenEmails.Add(em)) ||
+                                 (!string.IsNullOrWhiteSpace(ph) && !seenPhones.Add(ph));
+                    if (isDup) dups++;
+                    valid++;
+                }
+                _validRows = valid;
+                _duplicateRows = dups;
+                _invalidRows = 0;
                 _step = 2;
             }
         }
@@ -271,6 +315,10 @@
         _rows = [];
         _csv = string.Empty;
         _fileBytes = null;
+        _totalRows = 0;
+        _validRows = 0;
+        _duplicateRows = 0;
+        _invalidRows = 0;
     }
 
     private async Task ImportAsync()

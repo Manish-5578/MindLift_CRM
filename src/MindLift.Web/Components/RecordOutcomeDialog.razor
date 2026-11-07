@@ -1,0 +1,125 @@
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject Translator T
+
+<MudDialog>
+    <DialogContent>
+        <div class="ml-stack gap-3 pt-2">
+            <MudSelect T="string" @bind-Value="_outcome" Label="@T["Call / Meeting Outcome *"]" Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" data-testid="outcome-select">
+                <MudSelectItem Value="@("Connected")">@T["Connected"]</MudSelectItem>
+                <MudSelectItem Value="@("Left Voicemail")">@T["Left Voicemail"]</MudSelectItem>
+                <MudSelectItem Value="@("Busy")">@T["Busy"]</MudSelectItem>
+                <MudSelectItem Value="@("No Answer")">@T["No Answer"]</MudSelectItem>
+                <MudSelectItem Value="@("Wrong Number")">@T["Wrong Number"]</MudSelectItem>
+                <MudSelectItem Value="@("Callback Requested")">@T["Callback Requested"]</MudSelectItem>
+                <MudSelectItem Value="@("Meeting Completed")">@T["Meeting Completed"]</MudSelectItem>
+                <MudSelectItem Value="@("Other")">@T["Other"]</MudSelectItem>
+            </MudSelect>
+
+            <MudNumericField T="int?" @bind-Value="_duration" Label="@T["Actual Duration (minutes)"]" Min="1" Max="480" Margin="Margin.Dense" Variant="Variant.Outlined" data-testid="outcome-duration" />
+
+            <MudTextField @bind-Value="_notes" Label="@T["Outcome Notes / Remarks"]" Placeholder="@T["Key takeaways, next steps, customer requirements..."]" Lines="3" Margin="Margin.Dense" Variant="Variant.Outlined" data-testid="outcome-notes" />
+
+            <MudCheckBox T="bool" @bind-Value="_scheduleFollowUp" Color="Color.Primary" Label="@T["Schedule a next follow-up action"]" data-testid="schedule-followup-check" />
+
+            @if (_scheduleFollowUp)
+            {
+                <div class="ml-stack gap-2 pa-3 rounded-lg" style="background:var(--mud-palette-background-grey)">
+                    <MudTextField @bind-Value="_followUpSubject" Label="@T["Follow-up Subject"]" Margin="Margin.Dense" Variant="Variant.Outlined" Placeholder="@($"Follow-up: {Activity.Subject}")" />
+                    <div class="d-flex gap-2">
+                        <MudDatePicker @bind-Date="_followUpDate" Label="@T["Date *"]" Margin="Margin.Dense" Variant="Variant.Outlined" MinDate="DateTime.Today" />
+                        <MudTimePicker @bind-Time="_followUpTime" Label="@T["Time *"]" Margin="Margin.Dense" Variant="Variant.Outlined" />
+                    </div>
+                </div>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert>
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">@T["Cancel"]</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="SubmitAsync" Disabled="_busy" data-testid="outcome-submit-btn">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }
+            else { @T["Save Outcome & Complete"] }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public ActivityDto Activity { get; set; } = default!;
+
+    private string _outcome = "Connected";
+    private int? _duration = 15;
+    private string? _notes;
+    private bool _scheduleFollowUp;
+    private string? _followUpSubject;
+    private DateTime? _followUpDate = DateTime.Today.AddDays(2);
+    private TimeSpan? _followUpTime = new TimeSpan(11, 0, 0);
+    private string? _error;
+    private bool _busy;
+
+    protected override void OnInitialized()
+    {
+        if (!string.IsNullOrWhiteSpace(Activity.CallOutcome))
+        {
+            _outcome = Activity.CallOutcome;
+        }
+        else if (Activity.Type == ActivityTypes.Meeting)
+        {
+            _outcome = "Meeting Completed";
+        }
+        _duration = Activity.DurationMinutes ?? 15;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task SubmitAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_outcome))
+        {
+            _error = T["Please select an outcome."];
+            return;
+        }
+
+        DateTime? followUpDueAt = null;
+        if (_scheduleFollowUp)
+        {
+            if (!_followUpDate.HasValue || !_followUpTime.HasValue)
+            {
+                _error = T["Please choose date and time for the follow-up."];
+                return;
+            }
+            followUpDueAt = _followUpDate.Value.Date + _followUpTime.Value;
+        }
+
+        _busy = true;
+        _error = null;
+
+        try
+        {
+            var req = new RecordOutcomeRequest(_outcome, _notes, _duration, _scheduleFollowUp, followUpDueAt, _followUpSubject);
+            var response = await Http.PostAsJsonAsync($"api/v1/activities/{Activity.Id}/outcome", req);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await ProblemText.FromAsync(response, T["Could not record activity outcome."]);
+                return;
+            }
+
+            Snackbar.Add(T["Activity outcome recorded successfully."], Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}
+

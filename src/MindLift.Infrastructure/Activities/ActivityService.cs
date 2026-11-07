@@ -197,12 +197,10 @@ public sealed class ActivityService(AppDbContext db, ITenantContext tenant, IClo
 
         if (!string.IsNullOrWhiteSpace(request.Outcome))
         {
-            if (activity.Type != ActivityTypes.Call)
+            if (activity.Type == ActivityTypes.Call)
             {
-                throw RecordHelpers.Invalid("outcome", "Only calls have an outcome.");
+                await ValidateOutcomeAsync(request.Outcome, cancellationToken);
             }
-
-            await ValidateOutcomeAsync(request.Outcome, cancellationToken);
             activity.CallOutcome = request.Outcome;
         }
 
@@ -234,6 +232,114 @@ public sealed class ActivityService(AppDbContext db, ITenantContext tenant, IClo
 
         await db.SaveChangesAsync(cancellationToken);
         await RefreshDealTimingAsync(activity.DealId, cancellationToken);
+        return await GetAsync(id, cancellationToken);
+    }
+
+    /// <summary>Reschedules a call or meeting, marking the original as Rescheduled and creating a follow-up activity.</summary>
+    public async Task<ActivityDto> RescheduleAsync(Guid id, RescheduleActivityRequest request, CancellationToken cancellationToken = default)
+    {
+        var original = await LoadScopedAsync(id, cancellationToken);
+        if (string.IsNullOrWhiteSpace(request.RescheduleReason))
+        {
+            throw RecordHelpers.Invalid("rescheduleReason", "Provide a reason for rescheduling.");
+        }
+
+        var now = clock.UtcNow;
+
+        // Mark original activity as Rescheduled
+        original.Status = "Rescheduled";
+        original.RescheduleReason = request.RescheduleReason.Trim();
+        original.Remarks = request.Remarks?.Trim();
+        original.CompletedAt = now;
+        original.CompletedById = tenant.UserId;
+        original.UpdatedAt = now;
+
+        // Create new follow-up activity scheduled for next date/time
+        var followUp = new Activity
+        {
+            Id = Guid.NewGuid(),
+            Type = original.Type, // Call or Meeting
+            Subject = original.Subject.StartsWith("Follow-up", StringComparison.OrdinalIgnoreCase) 
+                ? original.Subject 
+                : $"Follow-up {original.Type}: {original.Subject}",
+            Description = request.Remarks?.Trim(),
+            Status = "Open",
+            Priority = original.Priority,
+            DueAt = request.NextDueAt,
+            EndAt = request.DurationMinutes.HasValue ? request.NextDueAt.AddMinutes(request.DurationMinutes.Value) : original.EndAt,
+            DurationMinutes = request.DurationMinutes ?? original.DurationMinutes,
+            Direction = original.Direction,
+            Location = original.Location,
+            LeadId = original.LeadId,
+            ContactId = original.ContactId,
+            AccountId = original.AccountId,
+            DealId = original.DealId,
+            OwnerId = original.OwnerId,
+            ParentActivityId = original.Id,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        original.NextActivityId = followUp.Id;
+
+        db.Activities.Add(followUp);
+        await db.SaveChangesAsync(cancellationToken);
+
+        return await GetAsync(followUp.Id, cancellationToken);
+    }
+
+    /// <summary>Records the outcome, remarks and duration for a completed call or meeting, optionally scheduling the next action.</summary>
+    public async Task<ActivityDto> RecordOutcomeAsync(Guid id, RecordOutcomeRequest request, CancellationToken cancellationToken = default)
+    {
+        var activity = await LoadScopedAsync(id, cancellationToken);
+        var now = clock.UtcNow;
+
+        activity.CallOutcome = request.Outcome.Trim();
+        activity.Remarks = request.Notes?.Trim();
+        if (!string.IsNullOrWhiteSpace(request.Notes))
+        {
+            activity.Description = string.IsNullOrWhiteSpace(activity.Description)
+                ? request.Notes.Trim()
+                : activity.Description + "\n\n" + request.Notes.Trim();
+        }
+
+        if (request.DurationMinutes.HasValue && request.DurationMinutes > 0)
+        {
+            activity.DurationMinutes = request.DurationMinutes.Value;
+        }
+
+        activity.Status = "Completed";
+        activity.CompletedAt = now;
+        activity.CompletedById = tenant.UserId;
+        activity.UpdatedAt = now;
+
+        if (request.ScheduleFollowUp && request.FollowUpDueAt.HasValue)
+        {
+            var followUp = new Activity
+            {
+                Id = Guid.NewGuid(),
+                Type = activity.Type,
+                Subject = !string.IsNullOrWhiteSpace(request.FollowUpSubject) ? request.FollowUpSubject.Trim() : $"Follow-up {activity.Type}: {activity.Subject}",
+                Description = request.Notes?.Trim(),
+                Status = "Open",
+                Priority = activity.Priority,
+                DueAt = request.FollowUpDueAt.Value,
+                DurationMinutes = activity.DurationMinutes,
+                Direction = activity.Direction,
+                LeadId = activity.LeadId,
+                ContactId = activity.ContactId,
+                AccountId = activity.AccountId,
+                DealId = activity.DealId,
+                OwnerId = activity.OwnerId,
+                ParentActivityId = activity.Id,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+            activity.NextActivityId = followUp.Id;
+            db.Activities.Add(followUp);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
         return await GetAsync(id, cancellationToken);
     }
 
@@ -689,7 +795,8 @@ public sealed class ActivityService(AppDbContext db, ITenantContext tenant, IClo
                 a.ParentActivityId, a.ChecklistTemplateId, a.Status == "Open" && a.DueAt != null && a.DueAt < todayStart, a.CreatedAt,
                 ParseAttendees(a.Attendees),
                 mentionRows.Where(m => m.ActivityId == a.Id).Select(m => new MentionDto(m.UserId, mentionNames.GetValueOrDefault(m.UserId) ?? "—")).ToList(),
-                a.InvitationsSentAt);
+                a.InvitationsSentAt,
+                a.RescheduleReason, a.Remarks, a.NextActivityId);
         }).ToList();
     }
 

@@ -175,6 +175,15 @@ public sealed class Activity : TenantEntity, IOwnedEntity, IHasCustomFields, ISa
     /// <summary>The task this one was created from by Complete and follow up.</summary>
     public Guid? ParentActivityId { get; set; }
 
+    /// <summary>Reason if this call or meeting was rescheduled.</summary>
+    public string? RescheduleReason { get; set; }
+
+    /// <summary>Outcome notes or remarks recorded on completion or rescheduling.</summary>
+    public string? Remarks { get; set; }
+
+    /// <summary>Link to the newly scheduled follow-up activity if rescheduled.</summary>
+    public Guid? NextActivityId { get; set; }
+
     /// <summary>Set on tasks created by an onboarding checklist.</summary>
     public Guid? ChecklistTemplateId { get; set; }
 

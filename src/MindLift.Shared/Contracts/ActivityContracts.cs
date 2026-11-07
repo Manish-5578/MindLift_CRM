@@ -40,7 +40,10 @@ public sealed record ActivityDto(
     DateTime CreatedAtUtc,
     IReadOnlyList<string> Attendees,
     IReadOnlyList<MentionDto> Mentions,
-    DateTime? InvitationsSentAtUtc);
+    DateTime? InvitationsSentAtUtc,
+    string? RescheduleReason = null,
+    string? Remarks = null,
+    Guid? NextActivityId = null);
 
 public sealed record MentionDto(Guid UserId, string Name);
 
@@ -66,6 +69,20 @@ public sealed record SaveActivityRequest(
     IReadOnlyList<Guid>? MentionUserIds = null);
 
 public sealed record CompleteActivityRequest(string? Outcome, string? Notes, SaveActivityRequest? FollowUp);
+
+public sealed record RescheduleActivityRequest(
+    DateTime NextDueAt,
+    string RescheduleReason,
+    string? Remarks = null,
+    int? DurationMinutes = null);
+
+public sealed record RecordOutcomeRequest(
+    string Outcome,
+    string? Notes = null,
+    int? DurationMinutes = null,
+    bool ScheduleFollowUp = false,
+    DateTime? FollowUpDueAt = null,
+    string? FollowUpSubject = null);
 
 /// <summary>Which activities to list. Tab is Today, Overdue, Upcoming, Completed or All.</summary>
 public sealed record ActivityQuery(

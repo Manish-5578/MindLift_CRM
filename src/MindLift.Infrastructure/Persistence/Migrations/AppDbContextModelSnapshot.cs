@@ -132,6 +132,19 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("description");
 
+                    b.Property<Guid?>("NextActivityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("next_activity_id");
+
+                    b.Property<string>("Remarks")
+                        .HasColumnType("text")
+                        .HasColumnName("remarks");
+
+                    b.Property<string>("RescheduleReason")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("reschedule_reason");
+
                     b.Property<string>("Industry")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
@@ -7198,6 +7211,66 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_layout_rules_tenant_id_entity_type_is_active_priority");
 
                     b.ToTable("layout_rules", (string)null);
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.LeadNote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AuthorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("author_id");
+
+                    b.Property<string>("AuthorName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("author_name");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("content");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<Guid>("LeadId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lead_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_lead_notes");
+
+                    b.HasIndex("TenantId", "LeadId", "CreatedAt")
+                        .IsDescending(false, false, true)
+                        .HasDatabaseName("ix_lead_notes_tenant_id_lead_id_created_at");
+
+                    b.ToTable("lead_notes", (string)null);
                 });
 
             modelBuilder.Entity("MindLift.Domain.Entities.Lead", b =>

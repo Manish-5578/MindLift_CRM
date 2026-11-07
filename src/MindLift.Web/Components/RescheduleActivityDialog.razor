@@ -1,0 +1,111 @@
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+@inject Translator T
+
+<MudDialog>
+    <DialogContent>
+        <div class="ml-stack gap-3 pt-2">
+            <MudText Typo="Typo.body2" Class="ml-muted">
+                @T["Rescheduling will preserve this activity as 'Rescheduled' and automatically create a new follow-up activity scheduled for your selected date/time."]
+            </MudText>
+
+            <MudSelect T="string" @bind-Value="_reason" Label="@T["Reason for rescheduling *"]" Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" data-testid="reschedule-reason-select">
+                <MudSelectItem Value="@("Lead unreachable / No answer")">@T["Lead unreachable / No answer"]</MudSelectItem>
+                <MudSelectItem Value="@("Customer requested callback")">@T["Customer requested callback"]</MudSelectItem>
+                <MudSelectItem Value="@("Continue conversation later")">@T["Continue conversation later"]</MudSelectItem>
+                <MudSelectItem Value="@("Additional follow-up attempt")">@T["Additional follow-up attempt"]</MudSelectItem>
+                <MudSelectItem Value="@("Meeting postponed by client")">@T["Meeting postponed by client"]</MudSelectItem>
+                <MudSelectItem Value="@("Internal reschedule")">@T["Internal reschedule"]</MudSelectItem>
+            </MudSelect>
+
+            <MudDatePicker @bind-Date="_nextDate" Label="@T["Next Follow-up Date *"]" Margin="Margin.Dense" Variant="Variant.Outlined" MinDate="DateTime.Today" data-testid="reschedule-date" />
+            <MudTimePicker @bind-Time="_nextTime" Label="@T["Next Follow-up Time *"]" Margin="Margin.Dense" Variant="Variant.Outlined" data-testid="reschedule-time" />
+
+            <MudNumericField T="int?" @bind-Value="_duration" Label="@T["Duration (minutes)"]" Min="5" Max="480" Margin="Margin.Dense" Variant="Variant.Outlined" />
+
+            <MudTextField @bind-Value="_remarks" Label="@T["Remarks / Notes"]" Placeholder="@T["Reason details, specific callback instructions, or talking points..."]" Lines="3" Margin="Margin.Dense" Variant="Variant.Outlined" data-testid="reschedule-remarks" />
+
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert>
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">@T["Cancel"]</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_busy" data-testid="reschedule-submit-btn">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> }
+            else { @T["Reschedule & Create Follow-up"] }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public ActivityDto Activity { get; set; } = default!;
+
+    private string _reason = "Lead unreachable / No answer";
+    private DateTime? _nextDate = DateTime.Today.AddDays(1);
+    private TimeSpan? _nextTime = new TimeSpan(10, 0, 0);
+    private int? _duration = 15;
+    private string? _remarks;
+    private string? _error;
+    private bool _busy;
+
+    protected override void OnInitialized()
+    {
+        if (Activity.DurationMinutes.HasValue)
+        {
+            _duration = Activity.DurationMinutes;
+        }
+        if (Activity.DueAtUtc.HasValue && Activity.DueAtUtc.Value > DateTime.UtcNow)
+        {
+            _nextDate = Activity.DueAtUtc.Value.Date.AddDays(1);
+            _nextTime = Activity.DueAtUtc.Value.TimeOfDay;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task SubmitAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_reason))
+        {
+            _error = T["Please select a reason for rescheduling."];
+            return;
+        }
+
+        if (!_nextDate.HasValue || !_nextTime.HasValue)
+        {
+            _error = T["Please select both date and time for the next follow-up."];
+            return;
+        }
+
+        var nextDueAt = _nextDate.Value.Date + _nextTime.Value;
+        _busy = true;
+        _error = null;
+
+        try
+        {
+            var req = new RescheduleActivityRequest(nextDueAt, _reason, _remarks, _duration);
+            var response = await Http.PostAsJsonAsync($"api/v1/activities/{Activity.Id}/reschedule", req);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await ProblemText.FromAsync(response, T["Could not reschedule activity."]);
+                return;
+            }
+
+            Snackbar.Add(T["Activity rescheduled and next follow-up scheduled for {0:g}.", nextDueAt], Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}
+

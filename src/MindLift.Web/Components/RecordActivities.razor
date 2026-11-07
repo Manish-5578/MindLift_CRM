@@ -54,13 +54,36 @@
                     {
                         <MudText Typo="Typo.caption" Class="ml-muted" data-testid="activity-guests">@T["Guests: {0}", string.Join(", ", current.Attendees)]@(current.InvitationsSentAtUtc is null ? "" : " · " + T["invitations sent"])</MudText>
                     }
-                    <MudText Typo="Typo.caption" Class="ml-muted">
-                        @current.Type@(current.Direction is null ? "" : " · " + current.Direction)
-                        @if (current.DueAtUtc is not null) { <text> · </text><DateText Value="@current.DueAtUtc" Danger="@current.IsOverdue" /> }
-                        @if (current.OwnerName is not null) { <text> · @current.OwnerName</text> }
-                    </MudText>
+                    <div class="d-flex align-center gap-2 flex-wrap mt-1">
+                        <MudText Typo="Typo.caption" Class="ml-muted">
+                            @current.Type@(current.Direction is null ? "" : " · " + current.Direction)
+                            @if (current.DueAtUtc is not null) { <text> · </text><DateText Value="@current.DueAtUtc" Danger="@current.IsOverdue" /> }
+                            @if (current.OwnerName is not null) { <text> · @current.OwnerName</text> }
+                        </MudText>
+                        @if (current.Status == "Rescheduled")
+                        {
+                            <StatusChip Text="@T["Rescheduled"]" Color="@StatusColors.For("Active")" Dot="false" />
+                            @if (!string.IsNullOrWhiteSpace(current.RescheduleReason))
+                            {
+                                <MudText Typo="Typo.caption" Class="ml-muted">(@current.RescheduleReason)</MudText>
+                            }
+                        }
+                        else if (current.Status == "Completed" && !string.IsNullOrWhiteSpace(current.CallOutcome))
+                        {
+                            <StatusChip Text="@current.CallOutcome" Color="@StatusColors.For("Won")" Dot="false" />
+                            @if (current.DurationMinutes.HasValue)
+                            {
+                                <MudText Typo="Typo.caption" Class="ml-muted">@current.DurationMinutes min</MudText>
+                            }
+                        }
+                    </div>
                 </div>
 
+                @if (CanEdit && current.Status == "Open" && current.Type is "Call" or "Meeting")
+                {
+                    <MudIconButton Icon="@Icons.Material.Outlined.CheckCircleOutline" Size="Size.Small" Color="Color.Success" OnClick="() => RecordOutcomeAsync(current)" aria-label="@T["Log Outcome"]" data-testid="activity-outcome" />
+                    <MudIconButton Icon="@Icons.Material.Outlined.Update" Size="Size.Small" Color="Color.Warning" OnClick="() => RescheduleAsync(current)" aria-label="@T["Reschedule"]" data-testid="activity-reschedule" />
+                }
                 @if (CanEdit)
                 {
                     <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" OnClick="() => EditAsync(current)" aria-label="@T["Edit"]" />
@@ -156,6 +179,40 @@
     {
         _form?.OpenNew(type);
         _drawer = true;
+    }
+
+    public IReadOnlyList<ActivityDto> Items => _items;
+
+    public async Task RescheduleAsync(ActivityDto item)
+    {
+        var parameters = new DialogParameters<RescheduleActivityDialog>
+        {
+            { x => x.Activity, item }
+        };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true };
+        var dialog = await Dialogs.ShowAsync<RescheduleActivityDialog>(T["Reschedule Activity"], parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            await LoadAsync();
+            await OnChanged.InvokeAsync();
+        }
+    }
+
+    public async Task RecordOutcomeAsync(ActivityDto item)
+    {
+        var parameters = new DialogParameters<RecordOutcomeDialog>
+        {
+            { x => x.Activity, item }
+        };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true };
+        var dialog = await Dialogs.ShowAsync<RecordOutcomeDialog>(T["Record Outcome"], parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            await LoadAsync();
+            await OnChanged.InvokeAsync();
+        }
     }
 
     private void EditAsync(ActivityDto item)

@@ -278,6 +278,8 @@ public sealed class LeadService(
             lead.AssignedAt = clock.UtcNow;
         }
 
+        lead.CreatedById = (tenant.UserId.HasValue && tenant.UserId.Value != Guid.Empty) ? tenant.UserId.Value : (lead.OwnerId != Guid.Empty ? lead.OwnerId : null);
+
         lead = await savePipeline.ExecuteCreateAsync("leads", lead, async () =>
         {
             db.Leads.Add(lead);
@@ -695,6 +697,102 @@ public sealed class LeadService(
         await tx.CommitAsync(cancellationToken);
 
         return new ConvertLeadResult(contact.Id, account?.Id, deal?.Id);
+    }
+
+    public async Task<IReadOnlyList<LeadNoteDto>> GetNotesAsync(Guid leadId, CancellationToken cancellationToken = default)
+    {
+        var lead = await LoadScopedAsync(leadId, cancellationToken);
+        var notes = await db.LeadNotes
+            .AsNoTracking()
+            .Where(n => n.LeadId == leadId)
+            .OrderByDescending(n => n.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        var userIds = notes.Select(n => n.AuthorId).Distinct().ToList();
+        var userDict = await db.Users
+            .AsNoTracking()
+            .Where(u => userIds.Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id, u => $"{u.FirstName} {u.LastName}".Trim(), cancellationToken);
+
+        var result = new List<LeadNoteDto>();
+
+        foreach (var n in notes)
+        {
+            var authorName = !string.IsNullOrWhiteSpace(n.AuthorName) 
+                ? n.AuthorName 
+                : (userDict.TryGetValue(n.AuthorId, out var name) && !string.IsNullOrWhiteSpace(name) ? name : "User");
+            result.Add(new LeadNoteDto(n.Id, n.LeadId, n.Content, n.AuthorId, authorName, n.CreatedAt));
+        }
+
+        if (result.Count == 0 && !string.IsNullOrWhiteSpace(lead.Description))
+        {
+            var creator = lead.CreatedById.HasValue 
+                ? await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == lead.CreatedById.Value, cancellationToken)
+                : null;
+            var creatorName = creator is not null ? $"{creator.FirstName} {creator.LastName}".Trim() : "System";
+            result.Add(new LeadNoteDto(Guid.Empty, lead.Id, lead.Description, lead.CreatedById ?? Guid.Empty, creatorName, lead.CreatedAt));
+        }
+
+        return result;
+    }
+
+    public async Task<LeadNoteDto> AddNoteAsync(Guid leadId, CreateLeadNoteRequest request, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.Content))
+        {
+            throw RecordHelpers.Invalid("content", "Note content cannot be empty.");
+        }
+
+        var lead = await LoadScopedAsync(leadId, cancellationToken);
+        var now = clock.UtcNow;
+        var authorId = (tenant.UserId.HasValue && tenant.UserId.Value != Guid.Empty) ? tenant.UserId.Value : (lead.OwnerId != Guid.Empty ? lead.OwnerId : Guid.NewGuid());
+        var author = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == authorId, cancellationToken);
+        var authorName = author is not null ? $"{author.FirstName} {author.LastName}".Trim() : "User";
+
+        var note = new LeadNote
+        {
+            Id = Guid.NewGuid(),
+            TenantId = lead.TenantId,
+            LeadId = leadId,
+            Content = request.Content.Trim(),
+            AuthorId = authorId,
+            AuthorName = authorName,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        db.LeadNotes.Add(note);
+
+        db.Activities.Add(new Activity
+        {
+            Id = Guid.NewGuid(),
+            Type = "Note",
+            Subject = $"Note added by {authorName}",
+            Description = note.Content,
+            Status = "Completed",
+            Priority = "Normal",
+            DueAt = now,
+            CompletedAt = now,
+            CompletedById = authorId,
+            LeadId = leadId,
+            OwnerId = authorId,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        return new LeadNoteDto(note.Id, note.LeadId, note.Content, note.AuthorId, note.AuthorName, note.CreatedAt);
+    }
+
+    public async Task DeleteNoteAsync(Guid leadId, Guid noteId, CancellationToken cancellationToken = default)
+    {
+        var note = await db.LeadNotes.FirstOrDefaultAsync(n => n.LeadId == leadId && n.Id == noteId, cancellationToken);
+        if (note != null)
+        {
+            db.LeadNotes.Remove(note);
+            await db.SaveChangesAsync(cancellationToken);
+        }
     }
 
     public async Task<LeadDto> UpdateStickyNoteAsync(Guid id, string? note, CancellationToken cancellationToken = default)
@@ -1335,8 +1433,46 @@ public sealed class LeadService(
         var hasAddress = map.TryGetValue("address", out var a) && a >= 0;
         var hasReq = hasCompany && hasAddress;
 
-        var previewRows = rows.Skip(1).Take(10).Select(r => (IReadOnlyList<string>)r).ToList();
-        return new ImportPreviewDto(fileName, headers, previewRows, rows.Count - 1, matches, hasReq, null);
+        var dataRows = rows.Skip(1).ToList();
+        var totalRows = dataRows.Count;
+        var validRows = 0;
+        var invalidRows = 0;
+        var seenEmails = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var seenPhones = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var duplicateRows = 0;
+
+        map.TryGetValue("first_name", out var fnIdx);
+        map.TryGetValue("last_name", out var lnIdx);
+        map.TryGetValue("email", out var emailIdx);
+        map.TryGetValue("phone", out var phoneIdx);
+
+        foreach (var row in dataRows)
+        {
+            var company = c >= 0 && c < row.Count ? row[c]?.Trim() : null;
+            var address = a >= 0 && a < row.Count ? row[a]?.Trim() : null;
+            var fn = fnIdx >= 0 && fnIdx < row.Count ? row[fnIdx]?.Trim() : null;
+            var ln = lnIdx >= 0 && lnIdx < row.Count ? row[lnIdx]?.Trim() : null;
+            var em = emailIdx >= 0 && emailIdx < row.Count ? row[emailIdx]?.Trim() : null;
+            var ph = phoneIdx >= 0 && phoneIdx < row.Count ? row[phoneIdx]?.Trim() : null;
+
+            bool hasName = !string.IsNullOrWhiteSpace(fn) || !string.IsNullOrWhiteSpace(ln);
+            bool hasContact = !string.IsNullOrWhiteSpace(em) || !string.IsNullOrWhiteSpace(ph);
+
+            if (string.IsNullOrWhiteSpace(company) || string.IsNullOrWhiteSpace(address) || !hasName || !hasContact)
+            {
+                invalidRows++;
+            }
+            else
+            {
+                bool isDup = (!string.IsNullOrWhiteSpace(em) && !seenEmails.Add(em)) ||
+                             (!string.IsNullOrWhiteSpace(ph) && !seenPhones.Add(ph));
+                if (isDup) duplicateRows++;
+                validRows++;
+            }
+        }
+
+        var previewRows = dataRows.Take(10).Select(r => (IReadOnlyList<string>)r).ToList();
+        return new ImportPreviewDto(fileName, headers, previewRows, totalRows, matches, hasReq, null, validRows, invalidRows, duplicateRows);
     }
 
     public async Task<ImportResultDto> ImportCsvAsync(string csv, CancellationToken cancellationToken = default)

@@ -40,3 +40,13 @@ public sealed class WebForm : TenantEntity
     public bool IsActive { get; set; } = true;
     public int SubmissionCount { get; set; }
 }
+
+/// <summary>A chronological note recorded against a lead with author and server timestamp.</summary>
+[Audited]
+public sealed class LeadNote : TenantEntity
+{
+    public Guid LeadId { get; set; }
+    public string Content { get; set; } = string.Empty;
+    public Guid AuthorId { get; set; }
+    public string AuthorName { get; set; } = string.Empty;
+}
