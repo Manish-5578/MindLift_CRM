@@ -83,7 +83,7 @@
             }
 
             fields.Add(new("description", "Details", FormFieldKind.Multiline, TestId: "activity-description"));
-            fields.Add(new("ownerId", "Assigned to", FormFieldKind.User));
+            fields.Add(new("ownerId", "Assigned to", FormFieldKind.Users));
 
             return fields;
         }
@@ -115,7 +115,7 @@
         {
             ["subject"] = activity.Subject, ["description"] = activity.Description, ["priority"] = activity.Priority,
             ["dueAt"] = ToLocalInput(activity.DueAtUtc), ["endAt"] = ToLocalInput(activity.EndAtUtc), ["direction"] = activity.Direction,
-            ["callOutcome"] = activity.CallOutcome, ["location"] = activity.Location, ["ownerId"] = activity.OwnerId.ToString(),
+            ["callOutcome"] = activity.CallOutcome, ["location"] = activity.Location, ["ownerId"] = string.Join(',', new[] { activity.OwnerId != Guid.Empty ? activity.OwnerId.ToString() : null }.Concat(activity.Mentions.Select(m => m.UserId.ToString())).Where(s => !string.IsNullOrEmpty(s)).Distinct()),
             ["durationMinutes"] = activity.DurationMinutes?.ToString(CultureInfo.InvariantCulture),
             ["reminderMinutes"] = activity.ReminderMinutes?.ToString(CultureInfo.InvariantCulture),
             ["attendees"] = string.Join(", ", activity.Attendees),

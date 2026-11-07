@@ -66,7 +66,8 @@ public sealed record SaveActivityRequest(
     Guid? OwnerId,
     IReadOnlyList<string>? AttendeeEmails = null,
     bool SendInvitations = false,
-    IReadOnlyList<Guid>? MentionUserIds = null);
+    IReadOnlyList<Guid>? MentionUserIds = null,
+    IReadOnlyList<Guid>? AssigneeIds = null);
 
 public sealed record CompleteActivityRequest(string? Outcome, string? Notes, SaveActivityRequest? FollowUp);
 

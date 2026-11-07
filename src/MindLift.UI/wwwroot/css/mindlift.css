@@ -253,16 +253,16 @@ h1[tabindex="-1"]:focus, h1[tabindex="-1"]:focus-visible, [tabindex="-1"]:focus:
   max-width: 100%;
 }
 
-/* Active view / toggle highlighting across all view buttons and button groups */
+/* Light, elegant active view / toggle highlighting across all view buttons and button groups */
 .ml-view-active,
 .mud-button-group-root .mud-button-root.ml-view-active,
 .mud-button-group-outlined .mud-button-root.ml-view-active,
 .mud-button-group-root .mud-button-root.mud-button-filled,
 .mud-button-group-outlined .mud-button-root.mud-button-filled {
-    background-color: var(--mud-palette-primary) !important;
-    color: var(--mud-palette-primary-contrast-text) !important;
+    background-color: var(--ml-primary-soft, #EEF2FF) !important;
+    color: var(--ml-primary, #4F46E5) !important;
     font-weight: 700 !important;
-    border-color: var(--mud-palette-primary) !important;
+    border-color: var(--ml-primary, #4F46E5) !important;
 }
 
 .ml-view-active:hover,
@@ -270,6 +270,16 @@ h1[tabindex="-1"]:focus, h1[tabindex="-1"]:focus-visible, [tabindex="-1"]:focus:
 .mud-button-group-outlined .mud-button-root.ml-view-active:hover,
 .mud-button-group-root .mud-button-root.mud-button-filled:hover,
 .mud-button-group-outlined .mud-button-root.mud-button-filled:hover {
-    background-color: var(--mud-palette-primary-darken) !important;
-    color: var(--mud-palette-primary-contrast-text) !important;
+    background-color: color-mix(in srgb, var(--ml-primary, #4F46E5) 18%, transparent) !important;
+    color: var(--ml-primary-hover, #4338CA) !important;
+}
+
+/* Position notification badge directly adjacent to the bell icon symbol */
+.ml-notification-badge .mud-badge.mud-badge-top.right {
+    top: 6px !important;
+    inset-inline-end: 6px !important;
+    font-size: 11px !important;
+    height: 18px !important;
+    min-width: 18px !important;
+    padding: 0 4px !important;
 }

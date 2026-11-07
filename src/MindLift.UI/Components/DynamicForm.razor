@@ -40,7 +40,7 @@
                         <MudCheckBox T="bool" Value="IsChecked(current.Key)" ValueChanged="v => SetAsync(current.Key, FlagText(v))" Label="@LabelOf(current)" Color="Color.Primary" Disabled="@isReadOnly" data-testid="@TestIdOf(current)" />
                         break;
                     case FormFieldKind.Users:
-                        <MudSelect T="string" MultiSelection="true" SelectedValues="SelectedIds(current.Key)" SelectedValuesChanged="values => SetAsync(current.Key, string.Join(',', values))" Label="@LabelOf(current)"
+                        <MudSelect T="string" MultiSelection="true" SelectedValues="SelectedIds(current.Key)" SelectedValuesChanged="values => SetAsync(current.Key, string.Join(',', values))" MultiSelectionTextFunc="@FormatUserNames" Label="@LabelOf(current)"
                                    Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" Disabled="@isReadOnly" data-testid="@TestIdOf(current)">
                             @foreach (var user in Users)
                             {
@@ -147,6 +147,7 @@
         if (value.HasValue && value.Value < 0m) value = 0m;
         await SetAsync(key, value?.ToString(System.Globalization.CultureInfo.InvariantCulture));
     }
+    private string FormatUserNames(IReadOnlyList<string> ids) => (ids == null || ids.Count == 0) ? string.Empty : string.Join(", ", ids.Select(id => Users.FirstOrDefault(u => u.Id.ToString() == id)?.FullName ?? id));
     private IReadOnlyCollection<string> SelectedIds(string key) => (Get(key) ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
     private bool IsChecked(string key) => Get(key) == "true";
     private static string FlagText(bool value) => value ? "true" : "false";

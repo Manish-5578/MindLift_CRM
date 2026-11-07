@@ -42,11 +42,11 @@ public sealed class ActivityService(AppDbContext db, ITenantContext tenant, IClo
 
         if (query.OwnerId is { } owner)
         {
-            source = source.Where(a => a.OwnerId == owner);
+            source = source.Where(a => a.OwnerId == owner || db.ActivityMentions.Any(m => m.ActivityId == a.Id && m.UserId == owner));
         }
         else if (query.MineOnly && tenant.UserId is { } me)
         {
-            source = source.Where(a => a.OwnerId == me);
+            source = source.Where(a => a.OwnerId == me || db.ActivityMentions.Any(m => m.ActivityId == a.Id && m.UserId == me));
         }
 
         if (query.LeadId is { } lead) source = source.Where(a => a.LeadId == lead);
@@ -71,7 +71,7 @@ public sealed class ActivityService(AppDbContext db, ITenantContext tenant, IClo
     {
         var me = tenant.UserId ?? throw new ForbiddenException("Sign in first.", "no_user");
         var (todayStart, todayEnd) = await TodayAsync(cancellationToken);
-        var open = (await ScopedAsync(cancellationToken)).Where(a => a.OwnerId == me && a.Status == "Open" && a.DueAt != null);
+        var open = (await ScopedAsync(cancellationToken)).Where(a => (a.OwnerId == me || db.ActivityMentions.Any(m => m.ActivityId == a.Id && m.UserId == me)) && a.Status == "Open" && a.DueAt != null);
         var overdue = await open.CountAsync(a => a.DueAt < todayStart, cancellationToken);
         var today = await open.CountAsync(a => a.DueAt >= todayStart && a.DueAt < todayEnd, cancellationToken);
         var upcoming = await open.CountAsync(a => a.DueAt >= todayEnd, cancellationToken);
@@ -110,8 +110,8 @@ public sealed class ActivityService(AppDbContext db, ITenantContext tenant, IClo
             await db.SaveChangesAsync(cancellationToken);
             return activity;
         }, cancellationToken);
-        await SaveMentionsAsync(activity, request, cancellationToken);
-        await NotifyTaskAssignedAsync(activity, cancellationToken);
+        await SaveMentionsAndAssigneesAsync(activity, request, cancellationToken);
+        await NotifyTaskAssignedAsync(activity, request.AssigneeIds, cancellationToken);
         await RefreshDealTimingAsync(activity.DealId, cancellationToken);
         await SendInvitationsAsync(activity, request.SendInvitations, cancelled: false, cancellationToken);
         return await GetAsync(activity.Id, cancellationToken);
@@ -150,10 +150,10 @@ public sealed class ActivityService(AppDbContext db, ITenantContext tenant, IClo
             return activity;
         }, cancellationToken);
 
-        await SaveMentionsAsync(activity, request, cancellationToken);
-        if (activity.OwnerId != previousOwner)
+        await SaveMentionsAndAssigneesAsync(activity, request, cancellationToken);
+        if (activity.OwnerId != previousOwner || (request.AssigneeIds is { Count: > 0 }))
         {
-            await NotifyTaskAssignedAsync(activity, cancellationToken);
+            await NotifyTaskAssignedAsync(activity, request.AssigneeIds, cancellationToken);
         }
 
         await SendInvitationsAsync(activity, request.SendInvitations, cancelled: false, cancellationToken);
@@ -167,12 +167,33 @@ public sealed class ActivityService(AppDbContext db, ITenantContext tenant, IClo
     }
 
     /// <summary>Someone else's task: they are told when it is created for them or handed to them.</summary>
-    private Task NotifyTaskAssignedAsync(Activity activity, CancellationToken cancellationToken)
-        => activity.Type != ActivityTypes.Task
-            ? Task.CompletedTask
-            : notifications.NotifyAsync(new NotificationRequest(
-                [activity.OwnerId], NotificationTypes.TaskAssigned, $"Task assigned to you: {activity.Subject}",
-                activity.DueAt is { } due ? $"Due {due:d MMM yyyy HH:mm} UTC." : null, "activities", activity.Id, ActivityLink(activity)), cancellationToken);
+    private Task NotifyTaskAssignedAsync(Activity activity, IReadOnlyList<Guid>? allAssigneeIds, CancellationToken cancellationToken)
+    {
+        if (activity.Type != ActivityTypes.Task && activity.Type != ActivityTypes.Call && activity.Type != ActivityTypes.Meeting)
+        {
+            return Task.CompletedTask;
+        }
+
+        var recipients = new HashSet<Guid> { activity.OwnerId };
+        if (allAssigneeIds is { Count: > 0 })
+        {
+            foreach (var a in allAssigneeIds) recipients.Add(a);
+        }
+
+        if (tenant.UserId is { } me)
+        {
+            recipients.Remove(me);
+        }
+
+        if (recipients.Count == 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        return notifications.NotifyAsync(new NotificationRequest(
+            recipients.ToList(), NotificationTypes.TaskAssigned, $"{activity.Type} assigned to you: {activity.Subject}",
+            activity.DueAt is { } due ? $"Due {due:d MMM yyyy HH:mm} UTC." : null, "activities", activity.Id, ActivityLink(activity)), cancellationToken);
+    }
 
     private static string ActivityLink(Activity a)
         => a.DealId is { } d ? $"/deals/{d}" : a.ContactId is { } c ? $"/contacts/{c}" : a.AccountId is { } ac ? $"/accounts/{ac}" : a.LeadId is { } l ? $"/leads/{l}" : "/activities";
@@ -584,7 +605,18 @@ public sealed class ActivityService(AppDbContext db, ITenantContext tenant, IClo
         activity.ContactId = contactId;
         activity.AccountId = accountId;
         activity.DealId = dealId;
-        if (request.OwnerId is { } owner)
+        if (request.AssigneeIds is { Count: > 0 } assignees)
+        {
+            var ids = assignees.Distinct().ToList();
+            if (await db.Users.CountAsync(u => ids.Contains(u.Id) && u.IsActive, cancellationToken) != ids.Count)
+            {
+                throw RecordHelpers.Invalid("assigneeIds", "One of the assigned users is not active or does not exist.");
+            }
+            var primary = ids[0];
+            await RecordHelpers.EnsureOwnerAsync(db, scope, AppModule.Activities, primary, cancellationToken);
+            activity.OwnerId = primary;
+        }
+        else if (request.OwnerId is { } owner)
         {
             await RecordHelpers.EnsureOwnerAsync(db, scope, AppModule.Activities, owner, cancellationToken);
             activity.OwnerId = owner;
@@ -646,15 +678,24 @@ public sealed class ActivityService(AppDbContext db, ITenantContext tenant, IClo
     private static List<string> ParseAttendees(string json)
         => string.IsNullOrWhiteSpace(json) ? [] : JsonSerializer.Deserialize<List<string>>(json) ?? [];
 
-    /// <summary>Replaces the people mentioned in a note. Null leaves them as they are.</summary>
-    private async Task SaveMentionsAsync(Activity activity, SaveActivityRequest request, CancellationToken cancellationToken)
+    /// <summary>Replaces the people assigned or mentioned in an activity.</summary>
+    private async Task SaveMentionsAndAssigneesAsync(Activity activity, SaveActivityRequest request, CancellationToken cancellationToken)
     {
-        if (request.MentionUserIds is null || activity.Type != ActivityTypes.Note)
+        var wanted = new HashSet<Guid>();
+        if (request.AssigneeIds is { Count: > 0 })
+        {
+            foreach (var a in request.AssigneeIds) wanted.Add(a);
+        }
+        if (request.MentionUserIds is { Count: > 0 } && activity.Type == ActivityTypes.Note)
+        {
+            foreach (var m in request.MentionUserIds) wanted.Add(m);
+        }
+
+        if (wanted.Count == 0 && request.AssigneeIds == null && request.MentionUserIds == null)
         {
             return;
         }
 
-        var wanted = request.MentionUserIds.Distinct().ToList();
         var existing = await db.ActivityMentions.Where(m => m.ActivityId == activity.Id).ToListAsync(cancellationToken);
         db.ActivityMentions.RemoveRange(existing.Where(m => !wanted.Contains(m.UserId)));
         var added = wanted.Where(w => existing.All(m => m.UserId != w)).ToList();
@@ -665,8 +706,7 @@ public sealed class ActivityService(AppDbContext db, ITenantContext tenant, IClo
 
         await db.SaveChangesAsync(cancellationToken);
 
-        // Only people newly mentioned are told, so editing a note does not repeat the message.
-        if (added.Count > 0)
+        if (activity.Type == ActivityTypes.Note && added.Count > 0)
         {
             var author = tenant.UserId is { } me ? await db.Users.AsNoTracking().Where(u => u.Id == me).Select(u => (u.FirstName + " " + u.LastName).Trim()).FirstOrDefaultAsync(cancellationToken) : null;
             await notifications.NotifyAsync(new NotificationRequest(
@@ -804,7 +844,7 @@ public sealed class ActivityService(AppDbContext db, ITenantContext tenant, IClo
     {
         var ids = await scope.GetScopeUserIdsAsync(AppModule.Activities, cancellationToken);
         var query = db.Activities.AsQueryable();
-        return ids is null ? query : query.Where(a => ids.Contains(a.OwnerId));
+        return ids is null ? query : query.Where(a => ids.Contains(a.OwnerId) || db.ActivityMentions.Any(m => m.ActivityId == a.Id && ids.Contains(m.UserId)));
     }
 
     private async Task<Activity> LoadScopedAsync(Guid id, CancellationToken cancellationToken)

@@ -213,8 +213,9 @@
             <MudItem xs="12" md="6">
                 <MlCard Title="Notes" Subtitle="@T["Chronological record of lead notes and updates."]" TestId="lead-notes-card">
                     <div class="ml-stack gap-3">
-                        <div class="d-flex flex-column gap-2" style="background:var(--mud-palette-background-grey);padding:16px;border-radius:8px">
+                        <div class="d-flex flex-column gap-2" style="border:1px solid var(--ml-border);padding:16px;border-radius:8px;background:var(--mud-palette-surface)">
                             <MudTextField @bind-Value="_newNoteContent" 
+                                          Immediate="true"
                                           Placeholder="Lead Description" 
                                           Lines="3" 
                                           Variant="Variant.Outlined" 
@@ -312,6 +313,11 @@
         finally
         {
             _loadingNotes = false;
+        }
+
+        if (_notesList.Count == 0 && !string.IsNullOrWhiteSpace(_lead?.Description))
+        {
+            _notesList.Add(new LeadNoteDto(Guid.Empty, Id, _lead.Description, _lead.OwnerId, "System", _lead.CreatedAtUtc));
         }
     }
 

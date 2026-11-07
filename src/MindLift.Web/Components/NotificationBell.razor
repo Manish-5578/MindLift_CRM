@@ -6,7 +6,7 @@
 @inject Translator T
 
 <div style="position:relative;display:inline-flex" data-testid="notification-bell" data-connected="@ConnectedText">
-    <MudBadge Content="@Notifications.Unread" Visible="@(Notifications.Unread > 0)" Max="99" Color="Color.Error" Overlap="true" data-testid="notification-badge">
+    <MudBadge Content="@Notifications.Unread" Visible="@(Notifications.Unread > 0)" Max="99" Color="Color.Error" Overlap="true" Class="ml-notification-badge" data-testid="notification-badge">
         <MudIconButton Icon="@Icons.Material.Outlined.Notifications" Color="Color.Inherit" aria-label="@T["Notifications"]" data-testid="notification-bell-button" OnClick="ToggleAsync" />
     </MudBadge>
 

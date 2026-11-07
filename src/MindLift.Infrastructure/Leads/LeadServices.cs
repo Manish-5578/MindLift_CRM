@@ -702,29 +702,70 @@ public sealed class LeadService(
     public async Task<IReadOnlyList<LeadNoteDto>> GetNotesAsync(Guid leadId, CancellationToken cancellationToken = default)
     {
         var lead = await LoadScopedAsync(leadId, cancellationToken);
-        var notes = await db.LeadNotes
-            .AsNoTracking()
-            .Where(n => n.LeadId == leadId)
-            .OrderByDescending(n => n.CreatedAt)
-            .ToListAsync(cancellationToken);
-
-        var userIds = notes.Select(n => n.AuthorId).Distinct().ToList();
-        var userDict = await db.Users
-            .AsNoTracking()
-            .Where(u => userIds.Contains(u.Id))
-            .ToDictionaryAsync(u => u.Id, u => $"{u.FirstName} {u.LastName}".Trim(), cancellationToken);
-
         var result = new List<LeadNoteDto>();
+        var seenContent = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var n in notes)
+        // 1. Load from LeadNotes if available
+        try
         {
-            var authorName = !string.IsNullOrWhiteSpace(n.AuthorName) 
-                ? n.AuthorName 
-                : (userDict.TryGetValue(n.AuthorId, out var name) && !string.IsNullOrWhiteSpace(name) ? name : "User");
-            result.Add(new LeadNoteDto(n.Id, n.LeadId, n.Content, n.AuthorId, authorName, n.CreatedAt));
+            var notes = await db.LeadNotes
+                .AsNoTracking()
+                .Where(n => n.LeadId == leadId)
+                .OrderByDescending(n => n.CreatedAt)
+                .ToListAsync(cancellationToken);
+
+            var userIds = notes.Select(n => n.AuthorId).Distinct().ToList();
+            var userDict = await db.Users
+                .AsNoTracking()
+                .Where(u => userIds.Contains(u.Id))
+                .ToDictionaryAsync(u => u.Id, u => $"{u.FirstName} {u.LastName}".Trim(), cancellationToken);
+
+            foreach (var n in notes)
+            {
+                var authorName = !string.IsNullOrWhiteSpace(n.AuthorName) 
+                    ? n.AuthorName 
+                    : (userDict.TryGetValue(n.AuthorId, out var name) && !string.IsNullOrWhiteSpace(name) ? name : "User");
+                result.Add(new LeadNoteDto(n.Id, n.LeadId, n.Content, n.AuthorId, authorName, n.CreatedAt));
+                if (!string.IsNullOrWhiteSpace(n.Content)) seenContent.Add(n.Content.Trim());
+            }
+        }
+        catch
+        {
+            // Table may not exist yet or failed
         }
 
-        if (result.Count == 0 && !string.IsNullOrWhiteSpace(lead.Description))
+        // 2. Also check Activities with Type == "Note" for this lead
+        try
+        {
+            var noteActivities = await db.Activities
+                .AsNoTracking()
+                .Where(a => a.LeadId == leadId && a.Type == "Note")
+                .OrderByDescending(a => a.CreatedAt)
+                .ToListAsync(cancellationToken);
+
+            var actOwnerIds = noteActivities.Select(a => a.OwnerId).Distinct().ToList();
+            var actUserDict = await db.Users
+                .AsNoTracking()
+                .Where(u => actOwnerIds.Contains(u.Id))
+                .ToDictionaryAsync(u => u.Id, u => $"{u.FirstName} {u.LastName}".Trim(), cancellationToken);
+
+            foreach (var a in noteActivities)
+            {
+                var content = a.Description ?? a.Subject;
+                if (!string.IsNullOrWhiteSpace(content) && !seenContent.Contains(content.Trim()))
+                {
+                    seenContent.Add(content.Trim());
+                    var authorName = actUserDict.TryGetValue(a.OwnerId, out var name) && !string.IsNullOrWhiteSpace(name) ? name : "User";
+                    result.Add(new LeadNoteDto(a.Id, leadId, content, a.OwnerId, authorName, a.CreatedAt));
+                }
+            }
+        }
+        catch
+        {
+        }
+
+        // 3. Fallback to lead.Description if present
+        if (!string.IsNullOrWhiteSpace(lead.Description) && !seenContent.Contains(lead.Description.Trim()))
         {
             var creator = lead.CreatedById.HasValue 
                 ? await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == lead.CreatedById.Value, cancellationToken)
@@ -733,7 +774,7 @@ public sealed class LeadService(
             result.Add(new LeadNoteDto(Guid.Empty, lead.Id, lead.Description, lead.CreatedById ?? Guid.Empty, creatorName, lead.CreatedAt));
         }
 
-        return result;
+        return result.OrderByDescending(n => n.CreatedAtUtc).ToList();
     }
 
     public async Task<LeadNoteDto> AddNoteAsync(Guid leadId, CreateLeadNoteRequest request, CancellationToken cancellationToken = default)
@@ -761,26 +802,59 @@ public sealed class LeadService(
             UpdatedAt = now
         };
 
-        db.LeadNotes.Add(note);
+        lead.Description = note.Content;
 
-        db.Activities.Add(new Activity
+        try
         {
-            Id = Guid.NewGuid(),
-            Type = "Note",
-            Subject = $"Note added by {authorName}",
-            Description = note.Content,
-            Status = "Completed",
-            Priority = "Normal",
-            DueAt = now,
-            CompletedAt = now,
-            CompletedById = authorId,
-            LeadId = leadId,
-            OwnerId = authorId,
-            CreatedAt = now,
-            UpdatedAt = now
-        });
-
-        await db.SaveChangesAsync(cancellationToken);
+            db.LeadNotes.Add(note);
+            db.Activities.Add(new Activity
+            {
+                Id = Guid.NewGuid(),
+                TenantId = lead.TenantId,
+                Type = "Note",
+                Subject = $"Note added by {authorName}",
+                Description = note.Content,
+                Status = "Completed",
+                Priority = "Normal",
+                DueAt = now,
+                CompletedAt = now,
+                CompletedById = authorId,
+                LeadId = leadId,
+                OwnerId = authorId,
+                CreatedAt = now,
+                UpdatedAt = now
+            });
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            db.Entry(note).State = EntityState.Detached;
+            try
+            {
+                db.Activities.Add(new Activity
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = lead.TenantId,
+                    Type = "Note",
+                    Subject = $"Note added by {authorName}",
+                    Description = note.Content,
+                    Status = "Completed",
+                    Priority = "Normal",
+                    DueAt = now,
+                    CompletedAt = now,
+                    CompletedById = authorId,
+                    LeadId = leadId,
+                    OwnerId = authorId,
+                    CreatedAt = now,
+                    UpdatedAt = now
+                });
+                await db.SaveChangesAsync(cancellationToken);
+            }
+            catch
+            {
+                try { await db.SaveChangesAsync(cancellationToken); } catch { }
+            }
+        }
 
         return new LeadNoteDto(note.Id, note.LeadId, note.Content, note.AuthorId, note.AuthorName, note.CreatedAt);
     }
