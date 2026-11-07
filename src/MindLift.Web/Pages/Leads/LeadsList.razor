@@ -444,8 +444,8 @@
         },
         new()
         {
-            Header = "Owner", HideOnTablet = false,
-            Cell = lead => @<span>@(lead.OwnerName ?? "—")</span>,
+            Header = "User", HideOnTablet = false,
+            Cell = lead => @<span>@(lead.CreatedByName ?? lead.OwnerName ?? "—")</span>,
         },
         new()
         {
@@ -550,7 +550,7 @@
 
     private async Task DeleteViewAsync(Guid id)
     {
-        if (!await Dialogs.ConfirmAsync(T["Are you sure you want to delete?"], T["Are you sure you want to delete this view? The tab is removed for everyone it was shared with."], T["Yes"], danger: true))
+        if (!await Dialogs.ConfirmAsync(T["Are you sure you want to delete?"], T["Are you sure you want to delete this view? The tab is removed for everyone it was shared with."], T["Yes"], danger: true, cancelText: T["No"]))
         {
             return;
         }

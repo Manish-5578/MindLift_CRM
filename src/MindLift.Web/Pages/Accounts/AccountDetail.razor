@@ -314,7 +314,7 @@
 
     private async Task DeleteAsync()
     {
-        if (!await Dialogs.ConfirmAsync($"Delete {_summary!.Account.Name}?", T["Its contacts stay, but they will no longer belong to a company."], T["Delete"], danger: true))
+        if (!await Dialogs.ConfirmAsync(T["Are you sure you want to delete?"], T["Are you sure you want to delete {0}? Its contacts stay, but they will no longer belong to a company.", _summary!.Account.Name], T["Yes"], danger: true, cancelText: T["No"]))
         {
             return;
         }

@@ -71,12 +71,14 @@ public sealed class LeadService(
         source = Sort(source, query.SortField, query.SortDir);
         var rows = await source.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
 
-        var owners = await OwnerNamesAsync(rows.Select(r => r.OwnerId).Distinct(), cancellationToken);
+        var allUserIds = rows.Select(r => r.CreatedById ?? r.OwnerId).Concat(rows.Select(r => r.OwnerId)).Distinct();
+        var owners = await OwnerNamesAsync(allUserIds, cancellationToken);
         var items = rows.Select(l => new LeadListItemDto(
             l.Id, $"{l.FirstName} {l.LastName}".Trim(), l.Email, l.Phone, l.CompanyName, l.Status, l.Source, l.Rating,
             l.OwnerId, owners.GetValueOrDefault(l.OwnerId), l.CreatedAt, l.FirstContactedAt,
             l.ConvertedAt is not null, l.Status == "disqualified", l.FirstName, l.LastName, l.Address, l.Description,
-            l.City, l.State)).ToList();
+            l.City, l.State,
+            l.CreatedById, l.CreatedById.HasValue ? owners.GetValueOrDefault(l.CreatedById.Value) : (l.OwnerId != Guid.Empty ? owners.GetValueOrDefault(l.OwnerId) : null))).ToList();
 
         return new PagedResult<LeadListItemDto>(items, total, page, pageSize);
     }
@@ -106,29 +108,93 @@ public sealed class LeadService(
                 clean = clean[6..];
             if (Guid.TryParse(clean, out var currentViewId))
             {
-                var otherViewDocs = await db.SavedViews.AsNoTracking()
-                    .Where(v => v.EntityType == "leads" && v.Id != currentViewId && v.Filter != null)
-                    .Select(v => v.Filter)
+                var allLeadViews = await db.SavedViews.AsNoTracking()
+                    .Where(v => v.EntityType == "leads")
+                    .OrderBy(v => v.CreatedAt)
+                    .ThenBy(v => v.Id)
                     .ToListAsync(cancellationToken);
 
-                var excludeOtherIds = new HashSet<Guid>();
-                foreach (var fDoc in otherViewDocs)
+                var currentView = allLeadViews.FirstOrDefault(v => v.Id == currentViewId);
+                if (currentView is not null)
                 {
-                    if (fDoc == null) continue;
-                    var fg = System.Text.Json.JsonSerializer.Deserialize<FilterGroup>(fDoc.RootElement.GetRawText());
-                    var inCond = fg?.Conditions.FirstOrDefault(c => c.Field == "id" && c.Op == FilterOperator.In);
-                    if (inCond?.Value is { ValueKind: System.Text.Json.JsonValueKind.Array } arr)
+                    var currentExplicitIn = new HashSet<Guid>();
+                    var currentExplicitNotIn = new HashSet<Guid>();
+                    if (currentView.Filter != null)
                     {
-                        foreach (var item in arr.EnumerateArray())
+                        var curFg = System.Text.Json.JsonSerializer.Deserialize<FilterGroup>(currentView.Filter.RootElement.GetRawText());
+                        var inCond = curFg?.Conditions.FirstOrDefault(c => c.Field == "id" && c.Op == FilterOperator.In);
+                        if (inCond?.Value is { ValueKind: System.Text.Json.JsonValueKind.Array } inArr)
                         {
-                            if (item.TryGetGuid(out var g) && g != Guid.Empty) excludeOtherIds.Add(g);
+                            foreach (var el in inArr.EnumerateArray())
+                                if (el.TryGetGuid(out var g) && g != Guid.Empty) currentExplicitIn.Add(g);
+                        }
+                        var notInCond = curFg?.Conditions.FirstOrDefault(c => c.Field == "id" && c.Op == FilterOperator.NotIn);
+                        if (notInCond?.Value is { ValueKind: System.Text.Json.JsonValueKind.Array } notInArr)
+                        {
+                            foreach (var el in notInArr.EnumerateArray())
+                                if (el.TryGetGuid(out var g) && g != Guid.Empty) currentExplicitNotIn.Add(g);
                         }
                     }
-                }
 
-                if (excludeOtherIds.Count > 0)
-                {
-                    source = source.Where(l => !excludeOtherIds.Contains(l.Id));
+                    var excludeOtherIds = new HashSet<Guid>(currentExplicitNotIn);
+                    foreach (var other in allLeadViews.Where(v => v.Id != currentViewId))
+                    {
+                        if (other.Filter == null) continue;
+                        var otherFg = System.Text.Json.JsonSerializer.Deserialize<FilterGroup>(other.Filter.RootElement.GetRawText());
+                        var otherIn = otherFg?.Conditions.FirstOrDefault(c => c.Field == "id" && c.Op == FilterOperator.In);
+                        if (otherIn?.Value is { ValueKind: System.Text.Json.JsonValueKind.Array } otherArr)
+                        {
+                            foreach (var el in otherArr.EnumerateArray())
+                            {
+                                if (el.TryGetGuid(out var g) && g != Guid.Empty && !currentExplicitIn.Contains(g))
+                                {
+                                    excludeOtherIds.Add(g);
+                                }
+                            }
+                        }
+                    }
+
+                    var earlierViews = allLeadViews
+                        .Where(v => v.Id != currentViewId && (v.CreatedAt < currentView.CreatedAt || (v.CreatedAt == currentView.CreatedAt && v.Id.CompareTo(currentView.Id) < 0)))
+                        .ToList();
+
+                    if (earlierViews.Count > 0)
+                    {
+                        var registry = await fields.RegistryAsync("leads", cancellationToken);
+                        var filterContext = await FilterContextAsync(cancellationToken);
+
+                        foreach (var earlierView in earlierViews)
+                        {
+                            if (earlierView.Filter == null) continue;
+                            var earlierFg = System.Text.Json.JsonSerializer.Deserialize<FilterGroup>(earlierView.Filter.RootElement.GetRawText());
+                            if (earlierFg == null || earlierFg.Conditions.Count == 0) continue;
+
+                            var ruleOnlyConditions = earlierFg.Conditions.Where(c => c.Field != "id").ToList();
+                            if (ruleOnlyConditions.Count > 0)
+                            {
+                                var ruleGroup = new FilterGroup { Logic = earlierFg.Logic, Conditions = ruleOnlyConditions };
+                                var predicate = FilterCompiler.Compile<Lead>(ruleGroup, registry, filterContext);
+                                var matchedInEarlier = await db.Leads.AsNoTracking()
+                                    .Where(l => l.ConvertedAt == null)
+                                    .Where(predicate)
+                                    .Select(l => l.Id)
+                                    .ToListAsync(cancellationToken);
+
+                                foreach (var g in matchedInEarlier)
+                                {
+                                    if (!currentExplicitIn.Contains(g))
+                                    {
+                                        excludeOtherIds.Add(g);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (excludeOtherIds.Count > 0)
+                    {
+                        source = source.Where(l => !excludeOtherIds.Contains(l.Id));
+                    }
                 }
             }
         }
@@ -1314,6 +1380,23 @@ public sealed class LeadService(
         var failed = 0;
         var errors = new List<string>();
 
+        // Pre-fetch existing emails and phones into memory for fast batch duplicate checking
+        var existingEmails = (await db.Leads.AsNoTracking()
+            .Where(l => l.NormalizedEmail != null && l.ConvertedAt == null)
+            .Select(l => l.NormalizedEmail!)
+            .ToListAsync(cancellationToken)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var existingPhones = (await db.Leads.AsNoTracking()
+            .Where(l => l.NormalizedPhone != null && l.ConvertedAt == null)
+            .Select(l => l.NormalizedPhone!)
+            .ToListAsync(cancellationToken)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var defaultOwnerId = (tenant.UserId.HasValue && tenant.UserId.Value != Guid.Empty)
+            ? tenant.UserId.Value
+            : (await db.Users.AsNoTracking().Select(u => u.Id).FirstOrDefaultAsync(cancellationToken));
+        var leadsToInsert = new List<Lead>();
+        var now = clock.UtcNow;
+
         for (var i = 1; i < rows.Count; i++)
         {
             var row = rows[i];
@@ -1342,8 +1425,8 @@ public sealed class LeadService(
 
             var email = LeadNormalizer.Email(Cell("email"));
             var phone = LeadNormalizer.Phone(Cell("phone"));
-            if ((email is not null && await db.Leads.AnyAsync(l => l.NormalizedEmail == email && l.ConvertedAt == null, cancellationToken))
-                || (phone is not null && await db.Leads.AnyAsync(l => l.NormalizedPhone == phone && l.ConvertedAt == null, cancellationToken)))
+            if ((email is not null && existingEmails.Contains(email))
+                || (phone is not null && existingPhones.Contains(phone)))
             {
                 skipped++;
                 continue;
@@ -1374,22 +1457,40 @@ public sealed class LeadService(
             }
 
             var source = Cell("source");
-            var request = new SaveLeadRequest(
-                first, last, Cell("email"), Cell("phone"), company,
-                status, string.IsNullOrWhiteSpace(source) ? "import" : source.ToLowerInvariant().Replace(' ', '_'),
-                rating, Cell("description"), null, null, null,
-                Address: address, City: city, State: state);
+            var lead = new Lead
+            {
+                Id = Guid.NewGuid(),
+                FirstName = first,
+                LastName = last,
+                Email = Cell("email"),
+                NormalizedEmail = email,
+                Phone = Cell("phone"),
+                NormalizedPhone = phone,
+                CompanyName = company,
+                Address = address,
+                City = city,
+                State = state,
+                Status = status,
+                Source = string.IsNullOrWhiteSpace(source) ? "import" : source.ToLowerInvariant().Replace(' ', '_'),
+                Rating = rating,
+                Description = Cell("description"),
+                OwnerId = defaultOwnerId,
+                CreatedById = (tenant.UserId.HasValue && tenant.UserId.Value != Guid.Empty) ? tenant.UserId.Value : defaultOwnerId,
+                CreatedAt = now,
+                UpdatedAt = now,
+            };
 
-            try
-            {
-                await CreateAsync(request, cancellationToken);
-                created++;
-            }
-            catch (ValidationException ex)
-            {
-                failed++;
-                if (errors.Count < 20) errors.Add($"Row {i + 1}: {string.Join(" ", ex.Errors.Values.SelectMany(v => v))}");
-            }
+            leadsToInsert.Add(lead);
+            if (email is not null) existingEmails.Add(email);
+            if (phone is not null) existingPhones.Add(phone);
+        }
+
+        // Batch upload all leads at once atomically
+        if (leadsToInsert.Count > 0)
+        {
+            db.Leads.AddRange(leadsToInsert);
+            await db.SaveChangesAsync(cancellationToken);
+            created = leadsToInsert.Count;
         }
 
         var statusStr = failed == 0 ? "completed" : (created > 0 ? "completed_with_errors" : "failed");
@@ -1406,7 +1507,7 @@ public sealed class LeadService(
             FailedCount = failed,
             Status = statusStr,
             Errors = errors.ToArray(),
-            ImportedById = tenant.UserId,
+            ImportedById = tenant.UserId ?? defaultOwnerId,
             ImportedByName = actorName,
             CreatedAt = clock.UtcNow
         };

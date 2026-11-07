@@ -381,7 +381,7 @@
 
     private async Task DeleteAsync()
     {
-        if (!await Dialogs.ConfirmAsync($"Delete {FullName}?", T["The contact is removed from your lists. This cannot be undone from here."], T["Delete"], danger: true))
+        if (!await Dialogs.ConfirmAsync(T["Are you sure you want to delete?"], T["Are you sure you want to delete {0}? This cannot be undone from here.", FullName], T["Yes"], danger: true, cancelText: T["No"]))
         {
             return;
         }

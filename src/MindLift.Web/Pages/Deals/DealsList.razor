@@ -216,7 +216,7 @@
 
     private async Task DeleteViewAsync(Guid id)
     {
-        if (!await Dialogs.ConfirmAsync(T["Delete this view?"], T["The tab is removed for everyone it was shared with."], T["Delete"], danger: true))
+        if (!await Dialogs.ConfirmAsync(T["Are you sure you want to delete?"], T["Are you sure you want to delete this view? The tab is removed for everyone it was shared with."], T["Yes"], danger: true, cancelText: T["No"]))
         {
             return;
         }
@@ -246,7 +246,7 @@
 
     private async Task DeleteRowAsync(Guid id, string? name)
     {
-        if (!await Dialogs.ConfirmAsync(T["Delete {0}?", name ?? T["this record"]], T["This cannot be undone."], T["Delete"], danger: true))
+        if (!await Dialogs.ConfirmAsync(T["Are you sure you want to delete?"], T["Are you sure you want to delete {0}? This cannot be undone.", name ?? T["this record"]], T["Yes"], danger: true, cancelText: T["No"]))
         {
             return;
         }

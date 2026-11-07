@@ -187,7 +187,7 @@
 
     private async Task DeleteAsync(ActivityDto item)
     {
-        if (!await Dialogs.ConfirmAsync(T["Are you sure you want to delete?"], T["Are you sure you want to delete {0}? This cannot be undone.", item.Subject], T["Yes"], danger: true))
+        if (!await Dialogs.ConfirmAsync(T["Are you sure you want to delete?"], T["Are you sure you want to delete {0}? This cannot be undone.", item.Subject], T["Yes"], danger: true, cancelText: T["No"]))
         {
             return;
         }

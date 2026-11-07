@@ -67,17 +67,45 @@ public static class RecordLookups
         }
     }
 
-    /// <summary>Active people for owner pickers. Staff without access to the user list get an empty list.</summary>
-    public static async Task<List<UserListItem>> UsersAsync(HttpClient http)
+    private static List<UserListItem>? _cachedUsers;
+    private static DateTime _cacheExpiry = DateTime.MinValue;
+    private static readonly SemaphoreSlim _userLock = new(1, 1);
+
+    /// <summary>Invalidates the user cache so the next UsersAsync call pulls fresh data.</summary>
+    public static void InvalidateUsersCache()
     {
+        _cachedUsers = null;
+    }
+
+    /// <summary>Active people for owner pickers. Cached for 2 minutes across views to optimize load time.</summary>
+    public static async Task<List<UserListItem>> UsersAsync(HttpClient http, bool forceRefresh = false)
+    {
+        if (!forceRefresh && _cachedUsers is not null && DateTime.UtcNow < _cacheExpiry)
+        {
+            return _cachedUsers;
+        }
+
+        await _userLock.WaitAsync();
         try
         {
+            if (!forceRefresh && _cachedUsers is not null && DateTime.UtcNow < _cacheExpiry)
+            {
+                return _cachedUsers;
+            }
+
             var page = await http.GetFromJsonAsync<PagedResult<UserListItem>>("api/v1/users?pageSize=200");
-            return page?.Items.Where(u => u.IsActive).ToList() ?? [];
+            var items = page?.Items.Where(u => u.IsActive).ToList() ?? [];
+            _cachedUsers = items;
+            _cacheExpiry = DateTime.UtcNow.AddMinutes(2);
+            return items;
         }
         catch (HttpRequestException)
         {
-            return [];
+            return _cachedUsers ?? [];
+        }
+        finally
+        {
+            _userLock.Release();
         }
     }
 }

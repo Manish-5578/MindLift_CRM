@@ -60,14 +60,31 @@
                         }
                         else if (current.Kind == FormFieldKind.Number)
                         {
-                            <MudNumericField T="int?" Value="@GetInt(current.Key)" ValueChanged="@(v => SetIntAsync(current.Key, v))"
-                                             Label="@LabelOf(current)" Variant="Variant.Outlined" Margin="Margin.Dense"
-                                             Min="0"
-                                             Validation="@(new Func<int?, string?>(val => val < 0 ? T["Cannot be negative."] : null))"
-                                             Disabled="@isReadOnly"
-                                             Error="@(HasError(current.Key) || (GetInt(current.Key) < 0))"
-                                             ErrorText="@(ErrorOf(current.Key) ?? (GetInt(current.Key) < 0 ? T["Cannot be negative."] : null))"
-                                             data-testid="@TestIdOf(current)" />
+                            var isMinutes = current.Key.Contains("minute", StringComparison.OrdinalIgnoreCase) ||
+                                            current.Key.Contains("duration", StringComparison.OrdinalIgnoreCase) ||
+                                            current.Key.Contains("reminder", StringComparison.OrdinalIgnoreCase);
+                            if (isMinutes)
+                            {
+                                <MudNumericField T="int?" Value="@GetInt(current.Key)" ValueChanged="@(v => SetIntAsync(current.Key, v))"
+                                                 Label="@LabelOf(current)" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                                 Min="0" Max="43200" Immediate="true"
+                                                 Disabled="@isReadOnly"
+                                                 Error="@(HasError(current.Key) || IsNegative(current.Key))"
+                                                 ErrorText="@(ErrorOf(current.Key) ?? (IsNegative(current.Key) ? T["Minutes cannot be negative."] : null))"
+                                                 Validation="@(new Func<int?, string?>(val => val.HasValue && val.Value < 0 ? T["Minutes cannot be negative."] : null))"
+                                                 data-testid="@TestIdOf(current)" />
+                            }
+                            else
+                            {
+                                <MudNumericField T="decimal?" Value="@GetDecimal(current.Key)" ValueChanged="@(v => SetDecimalAsync(current.Key, v))"
+                                                 Label="@LabelOf(current)" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                                 Min="0m" Immediate="true"
+                                                 Disabled="@isReadOnly"
+                                                 Error="@(HasError(current.Key) || IsNegative(current.Key))"
+                                                 ErrorText="@(ErrorOf(current.Key) ?? (IsNegative(current.Key) ? T["Value cannot be negative."] : null))"
+                                                 Validation="@(new Func<decimal?, string?>(val => val.HasValue && val.Value < 0 ? T["Value cannot be negative."] : null))"
+                                                 data-testid="@TestIdOf(current)" />
+                            }
                         }
                         else
                         {
@@ -116,10 +133,18 @@
 
     private string? Get(string key) => Values.GetValueOrDefault(key);
     private Guid? GetGuid(string key) => Guid.TryParse(Get(key), out var id) ? id : null;
-    private int? GetInt(string key) => int.TryParse(Get(key), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var n) ? Math.Max(0, n) : null;
+    private int? GetInt(string key) => int.TryParse(Get(key), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var n) ? n : null;
+    private decimal? GetDecimal(string key) => decimal.TryParse(Get(key), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : null;
+
     private async Task SetIntAsync(string key, int? value)
     {
         if (value.HasValue && value.Value < 0) value = 0;
+        await SetAsync(key, value?.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    private async Task SetDecimalAsync(string key, decimal? value)
+    {
+        if (value.HasValue && value.Value < 0m) value = 0m;
         await SetAsync(key, value?.ToString(System.Globalization.CultureInfo.InvariantCulture));
     }
     private IReadOnlyCollection<string> SelectedIds(string key) => (Get(key) ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
@@ -144,17 +169,31 @@
     private static readonly Dictionary<string, object> NumberAttributes = new()
     {
         ["min"] = "0",
-        ["onkeydown"] = "if(event.key==='-'||event.key==='e'||event.key==='E'||event.keyCode===189||event.keyCode===109){event.preventDefault();}",
-        ["oninput"] = "if(this.value && this.value.includes('-')){this.value=this.value.replace(/-/g,'');}"
+        ["onkeydown"] = "if(event.key==='-'||event.key==='Subtract'||event.key==='e'||event.key==='E'||event.key==='+'||event.keyCode===189||event.keyCode===109){event.preventDefault();}",
+        ["oninput"] = "if(this.value && (this.value.includes('-') || Number(this.value) < 0)){this.value=this.value.replace(/[^0-9]/g,'');}"
     };
 
-    private static string? SanitizeNumber(string? v)
+    private bool IsNegative(string key)
+    {
+        var raw = Get(key);
+        return !string.IsNullOrWhiteSpace(raw) && int.TryParse(raw, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var n) && n < 0;
+    }
+
+    private async Task SetNumberAsync(string key, string? value)
+    {
+        if (!string.IsNullOrEmpty(value) && value.Contains('-'))
+        {
+            value = value.Replace("-", "").Trim();
+        }
+        await SetAsync(key, value);
+    }
+private static string? SanitizeNumber(string? v)
     {
         if (string.IsNullOrWhiteSpace(v)) return v;
         var clean = v.Replace("-", "").Trim();
-        if (int.TryParse(clean, out var n))
+        if (decimal.TryParse(clean, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var n))
         {
-            return Math.Max(0, n).ToString();
+            return Math.Max(0m, n).ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
         return clean;
     }

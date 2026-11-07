@@ -34,7 +34,9 @@ public sealed record LeadListItemDto(
     string? Address = null,
     string? Description = null,
     string? City = null,
-    string? State = null);
+    string? State = null,
+    Guid? CreatedById = null,
+    string? CreatedByName = null);
 
 public sealed record LeadDto(
     Guid Id,
