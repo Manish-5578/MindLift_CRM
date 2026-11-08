@@ -11,6 +11,7 @@ Widget _host(Widget child) => Directionality(
     );
 
 void main() {
+  toastTests();
   testWidgets('bottom navigation switches tab and shows the quick-add button', (tester) async {
     var index = 0;
     var added = false;
@@ -50,5 +51,22 @@ void main() {
     await tester.tap(find.byType(EditableText));
     await tester.enterText(find.byType(EditableText), 'hello');
     expect(c.text, 'hello');
+  });
+}
+
+void toastTests() {
+  testWidgets('an info toast is readable: light text on a dark surface', (tester) async {
+    late BuildContext ctx;
+    await tester.pumpWidget(_host(Builder(builder: (c) {
+      ctx = c;
+      return const SizedBox();
+    })));
+    MlToast.show(ctx, message: 'Please provide a subject.');
+    await tester.pump(const Duration(milliseconds: 400));
+    final text = tester.widget<Text>(find.text('Please provide a subject.'));
+    final box = tester.widget<Container>(find.ancestor(of: find.text('Please provide a subject.'), matching: find.byType(Container)).first);
+    final bg = (box.decoration as BoxDecoration).color!;
+    expect(text.style!.color!.computeLuminance() - bg.computeLuminance(), greaterThan(0.5));
+    await tester.pump(const Duration(seconds: 4));
   });
 }

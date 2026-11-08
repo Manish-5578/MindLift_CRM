@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mindlift_api/mindlift_api.dart';
 import 'package:mindlift_ui/mindlift_ui.dart';
 import '../../../core/network_provider.dart';
+import '../../leads/presentation/lead_actions.dart';
 import '../../leads/presentation/ocr_lead_scan_sheet.dart';
 
 enum QuickAddType { lead, task, call, note }
@@ -91,10 +92,10 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
           MlToast.show(context, message: '$typeStr saved!');
         }
       }
-    } catch (_) {
+    } catch (e) {
+      // Keep the sheet open so nothing typed is lost, and say what actually went wrong.
       if (mounted) {
-        Navigator.of(context).pop();
-        MlToast.show(context, message: 'Saved to offline outbox.');
+        MlToast.show(context, message: LeadActions.errorText(e, 'Could not save. Please try again.'), type: MlToastType.error);
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);

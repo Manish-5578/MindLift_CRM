@@ -6,7 +6,7 @@ class ActivityDto {
     this.description,
     this.dueAtUtc,
     this.status = 'Open',
-    this.priority = 'Medium',
+    this.priority = 'Normal',
     this.leadId,
     this.dealId,
     this.contactId,
@@ -23,7 +23,7 @@ class ActivityDto {
   final String? description;
   final DateTime? dueAtUtc;
   final String status; // Open, Completed, Cancelled
-  final String priority; // High, Medium, Low
+  final String priority; // High, Normal, Low
   final String? leadId;
   final String? dealId;
   final String? contactId;
@@ -41,7 +41,7 @@ class ActivityDto {
       description: json['description'] as String?,
       dueAtUtc: json['dueAtUtc'] != null ? DateTime.tryParse(json['dueAtUtc'] as String) : null,
       status: json['status'] as String? ?? 'Open',
-      priority: json['priority'] as String? ?? 'Medium',
+      priority: json['priority'] as String? ?? 'Normal',
       leadId: json['leadId'] as String?,
       dealId: json['dealId'] as String?,
       contactId: json['contactId'] as String?,
@@ -78,7 +78,7 @@ class CreateActivityRequest {
     required this.subject,
     this.description,
     this.dueAtUtc,
-    this.priority = 'Medium',
+    this.priority = 'Normal',
     this.leadId,
     this.dealId,
     this.contactId,
@@ -101,12 +101,13 @@ class CreateActivityRequest {
         'type': type,
         'subject': subject,
         if (description != null) 'description': description,
-        if (dueAtUtc != null) 'dueAtUtc': dueAtUtc!.toIso8601String(),
+        // The server reads dueAt and ownerId (the response uses dueAtUtc).
+        if (dueAtUtc != null) 'dueAt': dueAtUtc!.toUtc().toIso8601String(),
         'priority': priority,
         if (leadId != null) 'leadId': leadId,
         if (dealId != null) 'dealId': dealId,
         if (contactId != null) 'contactId': contactId,
-        if (assignedToUserId != null) 'assignedToUserId': assignedToUserId,
+        if (assignedToUserId != null) 'ownerId': assignedToUserId,
         if (durationMinutes != null) 'durationMinutes': durationMinutes,
       };
 }

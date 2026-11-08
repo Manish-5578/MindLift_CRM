@@ -447,7 +447,7 @@ public sealed class ActivityService(AppDbContext db, ITenantContext tenant, IClo
 
     private async Task ApplyAsync(Activity activity, SaveActivityRequest request, bool isNew, CancellationToken cancellationToken)
     {
-        if (!ActivityTypes.All.Contains(request.Type))
+        if (request.Type != ActivityTypes.Note && !ActivityTypes.All.Contains(request.Type))
         {
             throw RecordHelpers.Invalid("type", "Choose task, call, meeting or note.");
         }

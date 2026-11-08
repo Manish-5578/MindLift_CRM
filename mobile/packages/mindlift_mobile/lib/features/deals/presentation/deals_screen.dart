@@ -144,6 +144,7 @@ class _DealsScreenState extends ConsumerState<DealsScreen> {
                   : _deals.isEmpty
                       ? MlEmptyState(
                           title: 'No deals found',
+          icon: MlIcon(MlIcons.handshake, size: 30, color: MlColors.primary),
                           subtitle: 'No opportunities currently in this stage.',
                           actionLabel: 'Reset Stage Filter',
                           onAction: () {

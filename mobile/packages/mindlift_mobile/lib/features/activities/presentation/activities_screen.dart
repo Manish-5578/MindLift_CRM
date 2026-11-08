@@ -109,6 +109,7 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                   : _activities.isEmpty
                       ? MlEmptyState(
                           title: 'No activities found',
+          icon: MlIcon(MlIcons.checkCircle, size: 30, color: MlColors.primary),
                           subtitle: 'You are all caught up on scheduled follow-ups.',
                         )
                       : ListView.builder(

@@ -80,6 +80,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             : _notifications.isEmpty
                 ? MlEmptyState(
                     title: 'No notifications',
+          icon: MlIcon(MlIcons.bell, size: 30, color: MlColors.primary),
                     subtitle: 'You are completely caught up on CRM updates.',
                   )
                 : ListView.builder(

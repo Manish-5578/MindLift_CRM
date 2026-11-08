@@ -7,6 +7,8 @@ import 'package:mindlift_ui/mindlift_ui.dart';
 import '../../../core/network_provider.dart';
 import 'lead_actions.dart';
 import '../../../core/top_bar_actions.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
+import 'package:url_launcher/url_launcher.dart';
 import 'ocr_lead_scan_sheet.dart';
 
 /// The leads workspace. It mirrors the web list: the same views (My open leads, All open, New, Not interested,
@@ -286,6 +288,7 @@ class _LeadsScreenState extends ConsumerState<LeadsScreen> {
         const SizedBox(height: 60),
         MlEmptyState(
           title: _error ?? 'No leads here',
+          icon: MlIcon(_error != null ? MlIcons.warning : MlIcons.leadsOutline, size: 30, color: MlColors.primary),
           subtitle: _error != null ? 'Check your connection and try again.' : 'Leads from web forms, WhatsApp, email, imports and card scans appear here.',
           actionLabel: _cfg.canCreate && _error == null ? 'New lead' : 'Retry',
           onAction: () => _error == null && _cfg.canCreate ? _actions.editLead(null) : _load(),
@@ -312,18 +315,40 @@ class _LeadsScreenState extends ConsumerState<LeadsScreen> {
                   itemCount: _items.length + (_loadingMore ? 1 : 0),
                   itemBuilder: (context, i) {
                     if (i >= _items.length) {
-                      return const Padding(padding: EdgeInsets.all(MlSpacing.md), child: Center(child: Text('Loading more…')));
+                      return const Padding(padding: EdgeInsets.all(MlSpacing.md), child: Center(child: MlSpinner(size: 22)));
                     }
                     final lead = _items[i];
+                    final card = _LeadCard(
+                      lead: lead,
+                      cfg: _cfg,
+                      selected: _selected.contains(lead.id),
+                      selecting: _selecting,
+                      onTap: () => _open(lead),
+                      onLongPress: () => _toggleSelect(lead),
+                      onMenu: () => _actions.rowMenu(lead),
+                    );
+                    final hasPhone = (lead.phone ?? '').trim().isNotEmpty;
+                    if (_selecting || (!hasPhone && !_cfg.canEdit)) return RepaintBoundary(child: card);
+                    // Swipe right to call, swipe left to change status. The row always springs back.
                     return RepaintBoundary(
-                      child: _LeadCard(
-                        lead: lead,
-                        cfg: _cfg,
-                        selected: _selected.contains(lead.id),
-                        selecting: _selecting,
-                        onTap: () => _open(lead),
-                        onLongPress: () => _toggleSelect(lead),
-                        onMenu: () => _actions.rowMenu(lead),
+                      child: Dismissible(
+                        key: ValueKey('swipe-${lead.id}'),
+                        direction: hasPhone && _cfg.canEdit
+                            ? DismissDirection.horizontal
+                            : (hasPhone ? DismissDirection.startToEnd : DismissDirection.endToStart),
+                        dismissThresholds: const {DismissDirection.startToEnd: 0.28, DismissDirection.endToStart: 0.28},
+                        confirmDismiss: (dir) async {
+                          HapticFeedback.mediumImpact();
+                          if (dir == DismissDirection.startToEnd) {
+                            launchUrl(Uri(scheme: 'tel', path: lead.phone!.trim()), mode: LaunchMode.externalApplication).catchError((_) => false);
+                          } else {
+                            _actions.changeStatus(lead);
+                          }
+                          return false;
+                        },
+                        background: _swipeBackground(MlIcons.call, 'Call', MlColors.success, Alignment.centerLeft),
+                        secondaryBackground: _swipeBackground(MlIcons.swap, 'Status', MlColors.primary, Alignment.centerRight),
+                        child: card,
                       ),
                     );
                   },
@@ -437,6 +462,24 @@ String shortDate(DateTime utc) {
   final t = utc.toLocal();
   const m = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return '${t.day} ${m[t.month - 1]} ${t.year}';
+}
+
+Widget _swipeBackground(IconData icon, String label, Color color, Alignment align) {
+  return Container(
+    margin: const EdgeInsets.only(bottom: MlSpacing.sm),
+    padding: const EdgeInsets.symmetric(horizontal: 22),
+    alignment: align,
+    decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(MlRadii.lg)),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(icon, color: MlColors.white, size: 26),
+        const SizedBox(height: 2),
+        Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: MlColors.white, decoration: TextDecoration.none)),
+      ],
+    ),
+  );
 }
 
 class _LeadCard extends StatelessWidget {

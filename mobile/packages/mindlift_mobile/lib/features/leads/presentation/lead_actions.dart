@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mindlift_api/mindlift_api.dart';
 import 'package:mindlift_ui/mindlift_ui.dart';
+import '../../../core/auth_provider.dart' show connectionProblem;
 import '../../../core/network_provider.dart';
 
 /// The things the web leads list can do to a lead (row menu and bulk bar), as bottom sheets.
@@ -33,9 +34,17 @@ class LeadActions {
     if (e is DioException) {
       final d = e.response?.data;
       if (d is Map) {
+        // Validation failures list the exact field problems; show the first one.
+        final errs = d['errors'];
+        if (errs is Map && errs.isNotEmpty) {
+          final first = errs.values.first;
+          if (first is List && first.isNotEmpty && first.first is String) return first.first as String;
+        }
         final m = d['detail'] ?? d['title'] ?? d['message'];
         if (m is String && m.isNotEmpty) return m;
       }
+      final net = connectionProblem(e);
+      if (net != null) return net;
     }
     return fallback;
   }
