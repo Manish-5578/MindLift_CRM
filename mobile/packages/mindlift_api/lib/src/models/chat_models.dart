@@ -111,6 +111,35 @@ class LeadDuplicateCandidateDto {
   }
 }
 
+class CardEvidenceBoxDto {
+  const CardEvidenceBoxDto({
+    required this.text,
+    required this.confidence,
+    required this.x,
+    required this.y,
+    required this.width,
+    required this.height,
+  });
+
+  final String text;
+  final double confidence;
+  final double x;
+  final double y;
+  final double width;
+  final double height;
+
+  factory CardEvidenceBoxDto.fromJson(Map<String, dynamic> json) {
+    return CardEvidenceBoxDto(
+      text: json['text'] as String? ?? '',
+      confidence: (json['confidence'] as num?)?.toDouble() ?? 0.0,
+      x: (json['x'] as num?)?.toDouble() ?? 0.0,
+      y: (json['y'] as num?)?.toDouble() ?? 0.0,
+      width: (json['width'] as num?)?.toDouble() ?? 0.0,
+      height: (json['height'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
+}
+
 class ExtractedLeadCardDto {
   const ExtractedLeadCardDto({
     this.companyName,
@@ -131,6 +160,8 @@ class ExtractedLeadCardDto {
     this.titleConfidence,
     this.detectedScript = 'Latin',
     this.duplicate,
+    this.engineConfidence,
+    this.evidence,
   });
 
   final String? companyName;
@@ -151,8 +182,18 @@ class ExtractedLeadCardDto {
   final double? titleConfidence;
   final String detectedScript;
   final LeadDuplicateCandidateDto? duplicate;
+  final double? engineConfidence;
+  final List<CardEvidenceBoxDto>? evidence;
 
   factory ExtractedLeadCardDto.fromJson(Map<String, dynamic> json) {
+    final evidenceRaw = json['evidence'];
+    List<CardEvidenceBoxDto>? evidenceList;
+    if (evidenceRaw is List) {
+      evidenceList = evidenceRaw
+          .map((e) => CardEvidenceBoxDto.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+
     return ExtractedLeadCardDto(
       companyName: json['companyName'] as String?,
       firstName: json['firstName'] as String?,
@@ -174,6 +215,8 @@ class ExtractedLeadCardDto {
       duplicate: json['duplicate'] != null
           ? LeadDuplicateCandidateDto.fromJson(json['duplicate'] as Map<String, dynamic>)
           : null,
+      engineConfidence: (json['engineConfidence'] as num?)?.toDouble(),
+      evidence: evidenceList,
     );
   }
 }

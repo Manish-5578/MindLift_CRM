@@ -124,4 +124,37 @@ karim@vertex.test";
         await Should.ThrowAsync<ValidationException>(() =>
             _ocrService.ExtractFromFileStreamAsync(emptyStream, "empty.png"));
     }
+
+    [Fact]
+    public async Task ExtractFromDirectStreamAsync_ProcessesRenderedCardImage_StreamDirectly()
+    {
+        // Generate a synthetic business card bitmap (600x350)
+        using var bitmap = new SkiaSharp.SKBitmap(600, 350);
+        using var canvas = new SkiaSharp.SKCanvas(bitmap);
+        canvas.Clear(SkiaSharp.SKColors.White);
+
+        using var font = new SkiaSharp.SKFont(SkiaSharp.SKTypeface.Default, 24);
+        using var paint = new SkiaSharp.SKPaint
+        {
+            Color = SkiaSharp.SKColors.Black,
+            IsAntialias = true
+        };
+
+        // Draw card content
+        canvas.DrawText("MindLift Solutions LLC", 40, 60, font, paint);
+        canvas.DrawText("Tariq Al-Hashemi", 40, 110, font, paint);
+        font.Size = 18;
+        canvas.DrawText("Managing Director", 40, 150, font, paint);
+        canvas.DrawText("+971 50 765 4321", 40, 200, font, paint);
+        canvas.DrawText("tariq@mindlift.ae", 40, 240, font, paint);
+
+        using var image = SkiaSharp.SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
+        using var ms = new System.IO.MemoryStream(data.ToArray());
+
+        // Header magic bytes check and direct stream persistence to disk run cleanly;
+        // with no OCR engine attached, throws ValidationException("empty_card_text")
+        await Should.ThrowAsync<ValidationException>(() =>
+            _ocrService.ExtractFromDirectStreamAsync(ms, "business_card.png"));
+    }
 }

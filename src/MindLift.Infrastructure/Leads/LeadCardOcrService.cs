@@ -54,15 +54,53 @@ public sealed class LeadCardOcrService(
         "شارع", "برج", "بناية", "صندوق بريد", "طابق", "مكتب", "دبي", "أبوظبي", "الرياض", "جدة", "الدوحة", "المنامة", "الكويت", "مسقط"
     ];
 
+    public async Task<ExtractedLeadCardDto> ExtractFromDirectStreamAsync(
+        Stream inputStream,
+        string fileName,
+        CancellationToken ct = default)
+    {
+        var tempFile = Path.Combine(Path.GetTempPath(), $"stream_{Guid.NewGuid():N}_{Path.GetFileName(fileName)}");
+        try
+        {
+            // Direct streaming from HTTP request to temporary file on disk (zero RAM memory pressure)
+            await using (var fileStream = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true))
+            {
+                await inputStream.CopyToAsync(fileStream, ct);
+            }
+
+            var header = new byte[16];
+            await using (var fs = new FileStream(tempFile, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                var bytesRead = await fs.ReadAsync(header, 0, 16, ct);
+                if (bytesRead < 8)
+                {
+                    throw new ValidationException("invalid_image", "The uploaded file is empty or too small to be a valid image.");
+                }
+            }
+            ValidateImageHeader(header);
+
+            var ext = DetectExtension(header, Path.GetExtension(fileName));
+            return await ProcessImageFileAsync(tempFile, ext, null, ct);
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(tempFile)) File.Delete(tempFile);
+            }
+            catch
+            {
+                // cleanup
+            }
+        }
+    }
+
     public async Task<ExtractedLeadCardDto> ExtractFromFileStreamAsync(
         Stream stream,
         string fileName,
         CancellationToken ct = default)
     {
-        using var ms = new MemoryStream();
-        await stream.CopyToAsync(ms, ct);
-        var bytes = ms.ToArray();
-        return await ExtractFromBytesAsync(bytes, Path.GetExtension(fileName), null, ct);
+        return await ExtractFromDirectStreamAsync(stream, fileName, ct);
     }
 
     public async Task<ExtractedLeadCardDto> ExtractAsync(
@@ -103,7 +141,7 @@ public sealed class LeadCardOcrService(
             throw new ValidationException("empty_card_text", "No readable text or image was provided.");
         }
 
-        return await ParseTextAndCheckDuplicatesAsync(clientText, ct);
+        return await ParseTextAndCheckDuplicatesAsync(clientText, null, null, ct);
     }
 
     private async Task<ExtractedLeadCardDto> ExtractFromBytesAsync(
@@ -114,40 +152,75 @@ public sealed class LeadCardOcrService(
     {
         ValidateImageHeader(bytes);
 
-        string? serverText = null;
-        if (pageReader != null)
+        var ext = DetectExtension(bytes, extension);
+        var tempFile = Path.Combine(Path.GetTempPath(), $"card_{Guid.NewGuid():N}{ext}");
+        try
         {
-            var ext = DetectExtension(bytes, extension);
-            var tempFile = Path.Combine(Path.GetTempPath(), $"card_{Guid.NewGuid():N}{ext}");
+            await File.WriteAllBytesAsync(tempFile, bytes, ct);
+            return await ProcessImageFileAsync(tempFile, ext, clientText, ct);
+        }
+        finally
+        {
             try
             {
-                await File.WriteAllBytesAsync(tempFile, bytes, ct);
-                var pages = await pageReader.ReadAsync(tempFile, ct);
-                var ocrLines = pages
-                    .SelectMany(p => (p.Text ?? string.Empty).Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
-                    .Select(l => l.Trim())
-                    .Where(l => l.Length > 0);
+                if (File.Exists(tempFile)) File.Delete(tempFile);
+            }
+            catch
+            {
+                // cleanup
+            }
+        }
+    }
 
-                serverText = string.Join("\n", ocrLines).Trim();
+    private async Task<ExtractedLeadCardDto> ProcessImageFileAsync(
+        string filePath,
+        string? extension,
+        string? clientText,
+        CancellationToken ct)
+    {
+        string? serverText = null;
+        double? engineConfidence = null;
+        List<CardEvidenceBoxDto>? evidence = null;
+
+        if (pageReader != null)
+        {
+            try
+            {
+                var pages = await pageReader.ReadAsync(filePath, ct);
+                if (pages.Count > 0)
+                {
+                    var p0 = pages[0];
+                    if (p0.Confidence.HasValue)
+                    {
+                        engineConfidence = Math.Round(p0.Confidence.Value / 100.0, 2);
+                    }
+
+                    if (p0.Words != null && p0.Words.Count > 0)
+                    {
+                        evidence = p0.Words.Select(w => new CardEvidenceBoxDto(
+                            Text: w.Text,
+                            Confidence: Math.Round(w.Confidence / 100.0, 2),
+                            X: Math.Round(w.X, 3),
+                            Y: Math.Round(w.Y, 3),
+                            Width: Math.Round(w.Width, 3),
+                            Height: Math.Round(w.Height, 3)
+                        )).ToList();
+                    }
+
+                    var ocrLines = pages
+                        .SelectMany(p => (p.Text ?? string.Empty).Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+                        .Select(l => l.Trim())
+                        .Where(l => l.Length > 0);
+
+                    serverText = string.Join("\n", ocrLines).Trim();
+                }
             }
             catch (Exception ex)
             {
-                logger?.LogWarning(ex, "Server OCR engine failed to process image bytes.");
-            }
-            finally
-            {
-                try
-                {
-                    if (File.Exists(tempFile)) File.Delete(tempFile);
-                }
-                catch
-                {
-                    // cleanup ignore
-                }
+                logger?.LogWarning(ex, "Server OCR engine failed to process image file.");
             }
         }
 
-        // Server OCR is authoritative; fallback to clientText if server OCR produced nothing
         var chosenText = !string.IsNullOrWhiteSpace(serverText) ? serverText : (clientText ?? string.Empty);
 
         if (string.IsNullOrWhiteSpace(chosenText))
@@ -155,11 +228,13 @@ public sealed class LeadCardOcrService(
             throw new ValidationException("empty_card_text", "No readable text could be recognized from the card. Please ensure the card is clear, well lit, and in focus.");
         }
 
-        return await ParseTextAndCheckDuplicatesAsync(chosenText, ct);
+        return await ParseTextAndCheckDuplicatesAsync(chosenText, engineConfidence, evidence, ct);
     }
 
     private async Task<ExtractedLeadCardDto> ParseTextAndCheckDuplicatesAsync(
         string rawText,
+        double? engineConfidence,
+        IReadOnlyList<CardEvidenceBoxDto>? evidence,
         CancellationToken ct)
     {
         var normalizedText = NormalizeArabicIndicDigits(rawText);
@@ -283,7 +358,10 @@ public sealed class LeadCardOcrService(
         var titleConf = !string.IsNullOrWhiteSpace(jobTitle) ? 0.88 : (double?)null;
 
         var scores = new[] { emailConf, phoneConf, companyConf, nameConf, titleConf }.Where(s => s.HasValue).Select(s => s!.Value).ToList();
-        var overallConfidence = scores.Count > 0 ? Math.Round(scores.Average(), 2) : 0.70;
+        var extractionAvg = scores.Count > 0 ? Math.Round(scores.Average(), 2) : 0.70;
+        var overallConfidence = engineConfidence.HasValue
+            ? Math.Round((engineConfidence.Value * 0.5) + (extractionAvg * 0.5), 2)
+            : extractionAvg;
 
         // Duplicate Candidate Check in CRM Database
         LeadDuplicateCandidateDto? duplicate = null;
@@ -310,7 +388,9 @@ public sealed class LeadCardOcrService(
             PhoneConfidence: phoneConf,
             TitleConfidence: titleConf,
             DetectedScript: script,
-            Duplicate: duplicate
+            Duplicate: duplicate,
+            EngineConfidence: engineConfidence,
+            Evidence: evidence
         );
     }
 

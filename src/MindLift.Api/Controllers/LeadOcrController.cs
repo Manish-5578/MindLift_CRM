@@ -46,7 +46,7 @@ public sealed class LeadOcrController(LeadCardOcrService ocrService) : Controlle
         }
 
         await using var stream = file.OpenReadStream();
-        var result = await ocrService.ExtractFromFileStreamAsync(stream, file.FileName, ct);
+        var result = await ocrService.ExtractFromDirectStreamAsync(stream, file.FileName, ct);
         return Ok(result);
     }
 }

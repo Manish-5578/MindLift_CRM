@@ -43,6 +43,7 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
 
   LeadDuplicateCandidateDto? _duplicateCandidate;
   double? _overallConfidence;
+  double? _engineConfidence;
   String _detectedScript = 'Latin';
 
   @override
@@ -133,6 +134,7 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
             _titleController.text = card.jobTitle ?? '';
             _textController.text = card.rawText;
             _overallConfidence = card.overallConfidence;
+            _engineConfidence = card.engineConfidence;
             _detectedScript = card.detectedScript;
             _duplicateCandidate = card.duplicate;
             _hasExtracted = true;
@@ -627,7 +629,9 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
                           borderRadius: BorderRadius.circular(MlRadii.sm),
                         ),
                         child: Text(
-                          '$_detectedScript • Extraction Confidence: ${((_overallConfidence ?? 0.8) * 100).toInt()}%',
+                          _engineConfidence != null
+                              ? '$_detectedScript • OCR: ${((_engineConfidence!) * 100).toInt()}% • Extraction: ${((_overallConfidence ?? 0.8) * 100).toInt()}%'
+                              : '$_detectedScript • Extraction Confidence: ${((_overallConfidence ?? 0.8) * 100).toInt()}%',
                           style: MlTypography.caption.copyWith(color: MlColors.primary, fontWeight: FontWeight.w600),
                         ),
                       ),

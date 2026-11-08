@@ -39,6 +39,15 @@ public sealed record LeadDuplicateCandidateDto(
     string RecordType
 );
 
+public sealed record CardEvidenceBoxDto(
+    string Text,
+    double Confidence,
+    double X,
+    double Y,
+    double Width,
+    double Height
+);
+
 public sealed record ExtractedLeadCardDto(
     string? CompanyName,
     string? FirstName,
@@ -57,7 +66,9 @@ public sealed record ExtractedLeadCardDto(
     double? PhoneConfidence = null,
     double? TitleConfidence = null,
     string DetectedScript = "Latin",
-    LeadDuplicateCandidateDto? Duplicate = null
+    LeadDuplicateCandidateDto? Duplicate = null,
+    double? EngineConfidence = null,
+    IReadOnlyList<CardEvidenceBoxDto>? Evidence = null
 );
 
 public sealed record ParseCardOcrRequest(
