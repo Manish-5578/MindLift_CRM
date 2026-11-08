@@ -19,6 +19,7 @@ namespace MindLift.Infrastructure.Mobile;
 public sealed class FcmPushNotificationSender(
     AppDbContext db,
     IDataProtectionProvider dataProtectionProvider,
+    MindLift.Infrastructure.Communication.ISecretProtector secretProtector,
     IMobileDeviceService devices,
     IConfiguration config,
     IHttpClientFactory httpFactory,
@@ -57,15 +58,29 @@ public sealed class FcmPushNotificationSender(
 
     public async Task SendPushAsync(Guid tenantId, Guid userId, string title, string? body,
         IReadOnlyDictionary<string, string> payload, CancellationToken cancellationToken = default)
+        => await SendAsync(tenantId, userId, title, body, payload, cancellationToken);
+
+    /// <summary>Sends and reports what happened to each device, so a missing push can be diagnosed instead of guessed at.</summary>
+    public async Task<IReadOnlyList<string>> SendAsync(Guid tenantId, Guid userId, string title, string? body,
+        IReadOnlyDictionary<string, string> payload, CancellationToken cancellationToken = default)
     {
+        var report = new List<string>();
         var account = LoadAccount();
-        if (account is null) return;
+        if (account is null)
+        {
+            report.Add("FCM is not configured on the server (Fcm__ServiceAccountJson missing or unreadable).");
+            return report;
+        }
 
         var rows = await db.MobileDevices.IgnoreQueryFilters()
             .Where(d => d.TenantId == tenantId && d.UserId == userId && d.RevokedAtUtc == null
                         && d.NotificationsAllowed && d.Provider == "fcm")
             .ToListAsync(cancellationToken);
-        if (rows.Count == 0) return;
+        if (rows.Count == 0)
+        {
+            report.Add("No registered device for this user. The app has not registered its push token.");
+            return report;
+        }
 
         string accessToken;
         try
@@ -75,7 +90,8 @@ public sealed class FcmPushNotificationSender(
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Could not obtain an FCM access token.");
-            return;
+            report.Add("Could not obtain an FCM access token: " + ex.Message);
+            return report;
         }
 
         var protector = dataProtectionProvider.CreateProtector("MindLift.Mobile.DeviceTokens");
@@ -86,7 +102,16 @@ public sealed class FcmPushNotificationSender(
         {
             try
             {
-                var token = protector.Unprotect(device.TokenCiphertext);
+                var token = secretProtector.Unprotect(device.TokenCiphertext);
+                if (token is null)
+                {
+                    try { token = protector.Unprotect(device.TokenCiphertext); } catch { /* an older, restart-bound value */ }
+                }
+                if (token is null)
+                {
+                    report.Add($"Device {device.InstallationId}: stored token cannot be read; the app must register again (open the app).");
+                    continue;
+                }
                 var message = new Dictionary<string, object>
                 {
                     ["message"] = new Dictionary<string, object>
@@ -110,13 +135,16 @@ public sealed class FcmPushNotificationSender(
                 if (res.IsSuccessStatusCode)
                 {
                     await devices.RecordPushSuccessAsync(device.Id, cancellationToken);
+                    report.Add($"Device {device.InstallationId}: delivered to FCM.");
                 }
                 else
                 {
                     var text = await res.Content.ReadAsStringAsync(cancellationToken);
+                    // Only a dead token revokes the device; a bad payload must not unregister a healthy phone.
                     var code = text.Contains("UNREGISTERED") ? "UNREGISTERED"
-                        : text.Contains("INVALID_ARGUMENT") ? "INVALID_ARGUMENT"
+                        : text.Contains("not a valid FCM registration token") ? "INVALID_ARGUMENT"
                         : ((int)res.StatusCode).ToString();
+                    report.Add($"Device {device.InstallationId}: FCM answered {(int)res.StatusCode} {code}.");
                     logger.LogWarning("FCM rejected push for device {DeviceId}: {Status} {Body}", device.Id, (int)res.StatusCode, text);
                     await devices.RecordPushFailureAsync(device.Id, code, cancellationToken);
                 }
@@ -124,8 +152,10 @@ public sealed class FcmPushNotificationSender(
             catch (Exception ex)
             {
                 logger.LogWarning(ex, "FCM push failed for device {DeviceId}", device.Id);
+                report.Add($"Device {device.InstallationId}: {ex.GetType().Name}: {ex.Message}");
             }
         }
+        return report;
     }
 
     private async Task<string> GetAccessTokenAsync(ServiceAccount account, CancellationToken ct)

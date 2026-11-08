@@ -16,11 +16,9 @@ public sealed class MobileDeviceService(
     AppDbContext db,
     ITenantContext tenant,
     IClock clock,
-    IDataProtectionProvider dataProtectionProvider,
+    MindLift.Infrastructure.Communication.ISecretProtector secretProtector,
     ILogger<MobileDeviceService> logger) : IMobileDeviceService
 {
-    private readonly IDataProtector _protector = dataProtectionProvider.CreateProtector("MindLift.Mobile.DeviceTokens");
-
     public async Task<MobileDeviceDto> RegisterOrUpdateCurrentAsync(RegisterMobileDeviceRequest request, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(request.InstallationId))
@@ -36,7 +34,7 @@ public sealed class MobileDeviceService(
         var userId = tenant.UserId ?? throw new ForbiddenException("User context required.", "no_user");
         var now = clock.UtcNow;
 
-        var tokenCiphertext = _protector.Protect(request.DeviceToken.Trim());
+        var tokenCiphertext = secretProtector.Protect(request.DeviceToken.Trim()) ?? throw new InvalidOperationException("Device token could not be protected.");
         var tokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(request.DeviceToken.Trim()))).ToLowerInvariant();
 
         var existing = await db.MobileDevices

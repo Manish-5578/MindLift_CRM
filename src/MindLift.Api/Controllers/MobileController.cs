@@ -8,8 +8,17 @@ namespace MindLift.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/v1/mobile")]
-public sealed class MobileController(IMobileDeviceService deviceService) : ControllerBase
+public sealed class MobileController(IMobileDeviceService deviceService, MindLift.Infrastructure.Mobile.FcmPushNotificationSender push, ITenantContext tenant) : ControllerBase
 {
+    /// <summary>Sends a test push to the signed-in user's devices and says what happened to each one.</summary>
+    [HttpPost("devices/current/test-push")]
+    public async Task<IActionResult> TestPush(CancellationToken ct)
+    {
+        var report = await push.SendAsync(tenant.TenantId!.Value, tenant.UserId!.Value, "MindLift test", "If you can read this, push works.",
+            new Dictionary<string, string> { ["type"] = "test", ["route"] = "/notifications" }, ct);
+        return Ok(new { results = report });
+    }
+
     [HttpPut("devices/current")]
     public async Task<ActionResult<MobileDeviceDto>> RegisterCurrentDevice(
         [FromBody] RegisterMobileDeviceRequest request,

@@ -15,6 +15,16 @@ class MobileDevicesService {
     );
   }
 
+  /// Asks the server to push a test notification to this user's devices; returns what it did per device.
+  Future<List<String>> sendTestPush() async {
+    final response = await _dio.post('/api/v1/mobile/devices/current/test-push');
+    final data = response.data;
+    if (data is Map && data['results'] is List) {
+      return (data['results'] as List).map((e) => e.toString()).toList();
+    }
+    return const [];
+  }
+
   Future<void> revokeCurrentDevice(String installationId) async {
     await _dio.delete(
       '/api/v1/mobile/devices/current',

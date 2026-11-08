@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mindlift_ui/mindlift_ui.dart';
 import '../../../core/locale_provider.dart';
 import '../../../core/network_provider.dart';
+import '../../../core/push_service.dart';
 import '../../../core/settings_provider.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -17,6 +18,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _emailNotifications = true;
   bool _dealAlerts = true;
   bool _taskReminders = true;
+
+  Future<void> _testPush() async {
+    try {
+      final results = await ref.read(mobileDevicesServiceProvider).sendTestPush();
+      if (!mounted) return;
+      MlDialog.show(
+        context: context,
+        title: 'Test notification',
+        message: results.isEmpty ? 'The server returned no result.' : results.join(String.fromCharCode(10)),
+        confirmLabel: 'OK',
+        onConfirm: () {},
+      );
+    } catch (e) {
+      if (mounted) MlToast.show(context, message: 'Test failed: $e');
+    }
+  }
 
   void _handleSignOut() {
     MlDialog.show(
@@ -164,6 +181,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               child: Column(
                 children: [
                   _buildToggleRow('Push Notifications', 'Real-time alert pings', _pushNotifications, (v) => setState(() => _pushNotifications = v)),
+                  _buildDivider(),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(child: Text('Check push delivery', style: MlTypography.labelMedium.copyWith(color: MlColors.textPrimary))),
+                      MlButton(label: 'Send test', variant: MlButtonVariant.secondary, onPressed: _testPush),
+                    ],
+                  ),
                   _buildDivider(),
                   _buildToggleRow('Email Notifications', 'Daily digests & summaries', _emailNotifications, (v) => setState(() => _emailNotifications = v)),
                   _buildDivider(),

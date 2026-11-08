@@ -253,7 +253,8 @@ public static class DependencyInjection
         services.AddScoped<MindLift.Application.Abstractions.IMobileDeviceService, MindLift.Infrastructure.Mobile.MobileDeviceService>();
         services.AddScoped<MindLift.Infrastructure.Mobile.MobileDeviceService>();
         services.AddHttpClient();
-        services.AddScoped<MindLift.Application.Abstractions.IPushNotificationSender, MindLift.Infrastructure.Mobile.FcmPushNotificationSender>();
+        services.AddScoped<MindLift.Infrastructure.Mobile.FcmPushNotificationSender>();
+        services.AddScoped<MindLift.Application.Abstractions.IPushNotificationSender>(sp => sp.GetRequiredService<MindLift.Infrastructure.Mobile.FcmPushNotificationSender>());
         services.AddScoped<MindLift.Infrastructure.Activities.ActivityService>();
         services.AddScoped<MindLift.Infrastructure.Activities.QuickLogService>();
         services.AddScoped<MindLift.Infrastructure.Activities.ChecklistService>();

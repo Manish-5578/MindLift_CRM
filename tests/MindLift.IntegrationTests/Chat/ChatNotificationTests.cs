@@ -76,3 +76,20 @@ public sealed class ChatNotificationTests(MindLiftApiFactory factory) : IClassFi
         s.IsAdmin.ShouldBeFalse();
     }
 }
+
+public sealed class MobilePushDiagnosticsTests(MindLiftApiFactory factory) : IClassFixture<MindLiftApiFactory>
+{
+    [Fact]
+    public async Task A_device_registers_with_a_stable_protected_token_and_the_test_push_reports_the_missing_FCM_setup()
+    {
+        var admin = await Workspaces.SignupAsync(factory);
+
+        var register = await admin.Client.PutAsJsonAsync("/api/v1/mobile/devices/current",
+            new RegisterMobileDeviceRequest("install-abc", "android", "production", "fake-token-" + new string('x', 140)));
+        register.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var test = await admin.Client.PostAsync("/api/v1/mobile/devices/current/test-push", null);
+        test.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await test.Content.ReadAsStringAsync()).ShouldContain("not configured");
+    }
+}
