@@ -13,14 +13,31 @@ import '../features/notifications/presentation/notifications_screen.dart';
 import '../features/more/presentation/more_screen.dart';
 import 'network_provider.dart';
 
+/// Listenable that notifies GoRouter ONLY when authentication status changes,
+/// preventing route teardowns and input loss when other auth fields (e.g. isLoading) change.
+class AuthRouterListenable extends ChangeNotifier {
+  AuthRouterListenable(Ref ref) {
+    ref.listen<bool>(
+      authNotifierProvider.select((state) => state.isAuthenticated),
+      (prev, next) {
+        if (prev != next) {
+          notifyListeners();
+        }
+      },
+    );
+  }
+}
+
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authNotifierProvider);
+  final listenable = AuthRouterListenable(ref);
 
   return GoRouter(
     initialLocation: '/home',
+    refreshListenable: listenable,
     redirect: (context, state) {
+      final isAuthenticated = ref.read(authNotifierProvider).isAuthenticated;
       final isLoggingIn = state.matchedLocation == '/login';
-      if (!authState.isAuthenticated) {
+      if (!isAuthenticated) {
         return isLoggingIn ? null : '/login';
       }
       if (isLoggingIn) {
@@ -98,6 +115,15 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/leads',
             builder: (context, state) => const LeadsScreen(),
+            routes: [
+              GoRoute(
+                path: ':id',
+                builder: (context, state) {
+                  final leadId = state.pathParameters['id'] ?? '';
+                  return LeadDetailScreen(leadId: leadId);
+                },
+              ),
+            ],
           ),
           GoRoute(
             path: '/deals',
@@ -111,20 +137,12 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/more',
             builder: (context, state) => const MoreScreen(),
           ),
+          GoRoute(
+            path: '/notifications',
+            builder: (context, state) => const NotificationsScreen(),
+          ),
         ],
-      ),
-      GoRoute(
-        path: '/leads/:id',
-        builder: (context, state) {
-          final id = state.pathParameters['id'] ?? '';
-          return LeadDetailScreen(leadId: id);
-        },
-      ),
-      GoRoute(
-        path: '/notifications',
-        builder: (context, state) => const NotificationsScreen(),
       ),
     ],
   );
 });
-

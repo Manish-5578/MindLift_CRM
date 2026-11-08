@@ -13,11 +13,20 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  late final TextEditingController _serverController;
+  bool _showServerSettings = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _serverController = TextEditingController(text: ref.read(serverUrlProvider));
+  }
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _serverController.dispose();
     super.dispose();
   }
 
@@ -37,9 +46,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  void _applyServerUrl(String url) {
+    ref.read(serverUrlProvider.notifier).setUrl(url);
+    _serverController.text = url;
+    MlToast.show(context, message: 'Server URL updated to $url', type: MlToastType.success);
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authNotifierProvider);
+    final currentServerUrl = ref.watch(serverUrlProvider);
 
     return MlScreen(
       backgroundColor: MlColors.background,
@@ -47,7 +63,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(MlSpacing.xl),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
+            constraints: const BoxConstraints(maxWidth: 440),
             child: Container(
               padding: const EdgeInsets.all(MlSpacing.xl),
               decoration: BoxDecoration(
@@ -100,7 +116,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     style: MlTypography.bodyMedium.copyWith(color: MlColors.textMuted),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: MlSpacing.xl),
+                  const SizedBox(height: MlSpacing.lg),
+
+                  // Error Banner if login fails
+                  if (authState.errorMessage != null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(MlSpacing.md),
+                      decoration: BoxDecoration(
+                        color: MlColors.danger.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(MlRadii.md),
+                        border: Border.all(color: MlColors.danger.withOpacity(0.4)),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('⚠️ ', style: TextStyle(fontSize: 16)),
+                          Expanded(
+                            child: Text(
+                              authState.errorMessage!,
+                              style: MlTypography.caption.copyWith(
+                                color: MlColors.danger,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: MlSpacing.md),
+                  ],
 
                   // Email input
                   MlTextField(
@@ -126,8 +170,81 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     isLoading: authState.isLoading,
                     variant: MlButtonVariant.primary,
                   ),
-                  const SizedBox(height: MlSpacing.md),
+                  const SizedBox(height: MlSpacing.lg),
 
+                  // Collapsible Server Configuration
+                  GestureDetector(
+                    onTap: () => setState(() => _showServerSettings = !_showServerSettings),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          _showServerSettings ? '▲ Hide Server Settings' : '⚙️ Server: $currentServerUrl',
+                          style: MlTypography.caption.copyWith(
+                            color: MlColors.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  if (_showServerSettings) ...[
+                    const SizedBox(height: MlSpacing.md),
+                    Container(
+                      padding: const EdgeInsets.all(MlSpacing.md),
+                      decoration: BoxDecoration(
+                        color: MlColors.surfaceElevated,
+                        borderRadius: BorderRadius.circular(MlRadii.md),
+                        border: Border.all(color: MlColors.border),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            'Backend Server API URL:',
+                            style: MlTypography.caption.copyWith(
+                              color: MlColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: MlSpacing.xs),
+                          MlTextField(
+                            controller: _serverController,
+                            placeholder: 'http://10.0.2.2:5082',
+                          ),
+                          const SizedBox(height: MlSpacing.sm),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: MlButton(
+                                  label: 'Set URL',
+                                  variant: MlButtonVariant.secondary,
+                                  onPressed: () => _applyServerUrl(_serverController.text),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: MlSpacing.xs),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              GestureDetector(
+                                onTap: () => _applyServerUrl('http://10.0.2.2:5082'),
+                                child: Text('Emulator (10.0.2.2)', style: MlTypography.caption.copyWith(color: MlColors.primary)),
+                              ),
+                              GestureDetector(
+                                onTap: () => _applyServerUrl('http://localhost:5082'),
+                                child: Text('Direct (localhost)', style: MlTypography.caption.copyWith(color: MlColors.primary)),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: MlSpacing.md),
                   Text(
                     'Field agents only. Session is securely encrypted.',
                     style: MlTypography.caption.copyWith(color: MlColors.textMuted),
@@ -142,4 +259,3 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 }
-

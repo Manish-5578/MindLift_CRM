@@ -106,10 +106,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
       return true;
     } catch (e) {
+      String msg = 'Invalid credentials or connection error. Please try again.';
+      if (e is DioException) {
+        if (e.response != null && e.response?.data is Map) {
+          final data = e.response!.data as Map;
+          msg = data['detail'] as String? ?? data['title'] as String? ?? data['message'] as String? ?? msg;
+        } else if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.connectionError) {
+          msg = 'Cannot connect to server. Please verify the Server URL.';
+        }
+      }
       state = state.copyWith(
         isAuthenticated: false,
         isLoading: false,
-        errorMessage: 'Invalid credentials or connection error. Please try again.',
+        errorMessage: msg,
       );
       return false;
     }

@@ -1,5 +1,6 @@
 library mindlift_api;
 
+export 'package:dio/dio.dart';
 export 'src/client/api_client.dart';
 export 'src/client/auth_interceptor.dart';
 export 'src/storage/token_storage.dart';

@@ -5,7 +5,28 @@ import '../features/offline/offline_database.dart';
 import 'auth_provider.dart';
 
 // Configurable base URL for staff API
-const kDefaultApiBaseUrl = 'https://crm.mindlift.com';
+const kDefaultApiBaseUrl = String.fromEnvironment(
+  'API_BASE_URL',
+  defaultValue: 'http://10.0.2.2:5082',
+);
+
+class ServerUrlNotifier extends StateNotifier<String> {
+  ServerUrlNotifier() : super(kDefaultApiBaseUrl);
+
+  void setUrl(String url) {
+    var clean = url.trim();
+    if (clean.endsWith('/')) {
+      clean = clean.substring(0, clean.length - 1);
+    }
+    if (clean.isNotEmpty) {
+      state = clean;
+    }
+  }
+}
+
+final serverUrlProvider = StateNotifierProvider<ServerUrlNotifier, String>((ref) {
+  return ServerUrlNotifier();
+});
 
 final offlineDatabaseProvider = Provider<OfflineDatabase>((ref) {
   return OfflineDatabase();
@@ -23,8 +44,9 @@ final sessionEventProvider = StateNotifierProvider<SessionEventNotifier, int>((r
 
 final apiClientProvider = Provider<MindLiftApiClient>((ref) {
   final tokenStorage = ref.watch(tokenStorageProvider);
+  final serverUrl = ref.watch(serverUrlProvider);
   return MindLiftApiClient(
-    baseUrl: kDefaultApiBaseUrl,
+    baseUrl: serverUrl,
     tokenStorage: tokenStorage,
     onSessionExpired: () {
       ref.read(sessionEventProvider.notifier).triggerExpired();

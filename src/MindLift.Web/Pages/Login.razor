@@ -93,6 +93,10 @@ else
         {
             _error = T["We could not reach MindLift. Check your connection and try again."];
         }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
         finally
         {
             _busy = false;
