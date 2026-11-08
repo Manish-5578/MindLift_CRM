@@ -112,14 +112,17 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
   Future<void> _processImageOcr(String? filePath, Uint8List bytes) async {
     setState(() => _isExtracting = true);
     try {
-      final base64Str = base64Encode(bytes);
-
-      // 1. Authoritative Server OCR with deskewing, Arabic/English ensemble and CRM duplicate matching
+      // 1. Authoritative Server OCR via multipart streaming upload
       try {
-        final card = await ref.read(chatServiceProvider).parseLeadCard(
-              imageBase64: base64Str,
-              rawText: _textController.text.trim().isNotEmpty ? _textController.text.trim() : null,
-            );
+        final card = (filePath != null && filePath.isNotEmpty)
+            ? await ref.read(chatServiceProvider).scanCardFilePath(
+                  filePath: filePath,
+                  fileName: _imageFileName ?? 'business_card.jpg',
+                )
+            : await ref.read(chatServiceProvider).scanCardFile(
+                  bytes: bytes,
+                  fileName: _imageFileName ?? 'business_card.jpg',
+                );
 
         if (mounted) {
           setState(() {
@@ -151,7 +154,7 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
         }
         return;
       } catch (serverErr) {
-        debugPrint('Server OCR failed or offline, falling back to on-device vision: $serverErr');
+        debugPrint('Server multipart OCR failed or offline, falling back to on-device vision: $serverErr');
       }
 
       // 2. Offline fallback: Run on-device Google ML Kit text recognition
@@ -307,6 +310,17 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
       return;
     }
 
+    final noteParts = <String>[];
+    if (_titleController.text.trim().isNotEmpty) {
+      noteParts.add('Job Title: ${_titleController.text.trim()}');
+    }
+    if (_duplicateCandidate != null) {
+      noteParts.add(
+        'Duplicate Override: Confirmed by staff member (Matched existing ${_duplicateCandidate!.recordType} "${_duplicateCandidate!.name}" [ID: ${_duplicateCandidate!.id}]).',
+      );
+    }
+    final leadNotes = noteParts.isNotEmpty ? noteParts.join('\n') : null;
+
     setState(() => _isSaving = true);
     try {
       await ref.read(leadsServiceProvider).createLead(
@@ -315,7 +329,7 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
               company: company,
               phone: _phoneController.text.trim(),
               email: _emailController.text.trim().isNotEmpty ? _emailController.text.trim() : null,
-              notes: _titleController.text.trim().isNotEmpty ? 'Job Title: ${_titleController.text.trim()}' : null,
+              notes: leadNotes,
               source: 'Mobile Business Card Scan',
             ),
           );
@@ -345,7 +359,7 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
                     'companyName': company,
                     'phone': _phoneController.text.trim(),
                     'email': _emailController.text.trim().isNotEmpty ? _emailController.text.trim() : null,
-                    'notes': _titleController.text.trim().isNotEmpty ? 'Job Title: ${_titleController.text.trim()}' : null,
+                    'notes': leadNotes,
                     'source': 'Mobile Business Card Scan',
                   }),
                   createdAtUtc: DateTime.now().toUtc(),
@@ -613,7 +627,7 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
                           borderRadius: BorderRadius.circular(MlRadii.sm),
                         ),
                         child: Text(
-                          '$_detectedScript • ${((_overallConfidence ?? 0.8) * 100).toInt()}% conf',
+                          '$_detectedScript • Extraction Confidence: ${((_overallConfidence ?? 0.8) * 100).toInt()}%',
                           style: MlTypography.caption.copyWith(color: MlColors.primary, fontWeight: FontWeight.w600),
                         ),
                       ),

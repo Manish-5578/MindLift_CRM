@@ -117,7 +117,7 @@ public sealed class LeadCardOcrService(
         string? serverText = null;
         if (pageReader != null)
         {
-            var ext = string.IsNullOrWhiteSpace(extension) ? ".png" : extension;
+            var ext = DetectExtension(bytes, extension);
             var tempFile = Path.Combine(Path.GetTempPath(), $"card_{Guid.NewGuid():N}{ext}");
             try
             {
@@ -380,6 +380,58 @@ public sealed class LeadCardOcrService(
                         RecordType: "Lead"
                     );
                 }
+
+                var contact = await db.Set<Contact>()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(c => !c.IsDeleted && c.Phone != null && c.Phone.Contains(phoneSuffix), ct);
+
+                if (contact != null)
+                {
+                    return new LeadDuplicateCandidateDto(
+                        Id: contact.Id,
+                        Name: $"{contact.FirstName} {contact.LastName}".Trim(),
+                        Company: null,
+                        Email: contact.Email,
+                        Phone: contact.Phone,
+                        RecordType: "Contact"
+                    );
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(companyName) && companyName.Trim().Length >= 3)
+            {
+                var normComp = companyName.Trim().ToLowerInvariant();
+                var account = await db.Set<Account>()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(a => !a.IsDeleted && a.Name.ToLower() == normComp, ct);
+
+                if (account != null)
+                {
+                    return new LeadDuplicateCandidateDto(
+                        Id: account.Id,
+                        Name: account.Name,
+                        Company: account.Name,
+                        Email: null,
+                        Phone: account.Phone,
+                        RecordType: "Account"
+                    );
+                }
+
+                var leadComp = await db.Set<Lead>()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(l => !l.IsDeleted && l.CompanyName != null && l.CompanyName.ToLower() == normComp, ct);
+
+                if (leadComp != null)
+                {
+                    return new LeadDuplicateCandidateDto(
+                        Id: leadComp.Id,
+                        Name: $"{leadComp.FirstName} {leadComp.LastName}".Trim(),
+                        Company: leadComp.CompanyName,
+                        Email: leadComp.Email,
+                        Phone: leadComp.Phone,
+                        RecordType: "Lead"
+                    );
+                }
             }
         }
         catch (Exception ex)
@@ -388,6 +440,26 @@ public sealed class LeadCardOcrService(
         }
 
         return null;
+    }
+
+    private static string DetectExtension(byte[] bytes, string? fallbackExt)
+    {
+        if (bytes != null && bytes.Length >= 8)
+        {
+            if (bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF) return ".jpg";
+            if (bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47) return ".png";
+            if (bytes.Length > 12 && bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46 &&
+                bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50) return ".webp";
+            if ((bytes[0] == 0x49 && bytes[1] == 0x49 && bytes[2] == 0x2A && bytes[3] == 0x00) ||
+                (bytes[0] == 0x4D && bytes[1] == 0x4D && bytes[2] == 0x00 && bytes[3] == 0x2A)) return ".tiff";
+        }
+
+        if (!string.IsNullOrWhiteSpace(fallbackExt) && fallbackExt.StartsWith("."))
+        {
+            return fallbackExt.ToLowerInvariant();
+        }
+
+        return ".jpg";
     }
 
     public static string NormalizeArabicIndicDigits(string input)

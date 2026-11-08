@@ -116,4 +116,12 @@ karim@vertex.test";
         await Should.ThrowAsync<ValidationException>(() =>
             _ocrService.ExtractAsync(new ParseCardOcrRequest(null, base64)));
     }
+
+    [Fact]
+    public async Task ExtractFromFileStreamAsync_ThrowsValidationException_WhenStreamIsEmpty()
+    {
+        using var emptyStream = new System.IO.MemoryStream();
+        await Should.ThrowAsync<ValidationException>(() =>
+            _ocrService.ExtractFromFileStreamAsync(emptyStream, "empty.png"));
+    }
 }

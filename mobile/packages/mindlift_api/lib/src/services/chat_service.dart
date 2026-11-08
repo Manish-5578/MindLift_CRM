@@ -63,6 +63,46 @@ class ChatService {
     );
   }
 
+  Future<ExtractedLeadCardDto> scanCardFile({
+    required List<int> bytes,
+    required String fileName,
+  }) async {
+    final formData = FormData.fromMap({
+      'file': MultipartFile.fromBytes(
+        bytes,
+        filename: fileName,
+      ),
+    });
+    final response = await _dio.post(
+      '/api/v1/leads/scan-card-file',
+      data: formData,
+      options: Options(
+        contentType: 'multipart/form-data',
+      ),
+    );
+    return ExtractedLeadCardDto.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<ExtractedLeadCardDto> scanCardFilePath({
+    required String filePath,
+    required String fileName,
+  }) async {
+    final formData = FormData.fromMap({
+      'file': await MultipartFile.fromFile(
+        filePath,
+        filename: fileName,
+      ),
+    });
+    final response = await _dio.post(
+      '/api/v1/leads/scan-card-file',
+      data: formData,
+      options: Options(
+        contentType: 'multipart/form-data',
+      ),
+    );
+    return ExtractedLeadCardDto.fromJson(response.data as Map<String, dynamic>);
+  }
+
   Future<ExtractedLeadCardDto> parseLeadCard({String? rawText, String? imageBase64}) async {
     final response = await _dio.post(
       '/api/v1/leads/parse-card',
