@@ -161,7 +161,7 @@ class _LeadDetailScreenState extends ConsumerState<LeadDetailScreen> {
         title: 'Loading Lead...',
         leading: MlIconButton(
           label: 'Back',
-          icon: const Text('←', style: TextStyle(fontSize: 20, color: MlColors.textPrimary)),
+          icon: Text('←', style: TextStyle(fontSize: 20, color: MlColors.textPrimary)),
           onPressed: () => context.pop(),
         ),
         body: const Padding(
@@ -187,13 +187,13 @@ class _LeadDetailScreenState extends ConsumerState<LeadDetailScreen> {
       subtitle: contactSubtitle,
       leading: MlIconButton(
         label: 'Back',
-        icon: const Text('←', style: TextStyle(fontSize: 20, color: MlColors.textPrimary)),
+        icon: Text('←', style: TextStyle(fontSize: 20, color: MlColors.textPrimary)),
         onPressed: () => context.pop(),
       ),
       actions: [
         MlIconButton(
           label: 'Change Status',
-          icon: const Text('⚙', style: TextStyle(fontSize: 20, color: MlColors.textPrimary)),
+          icon: Text('⚙', style: TextStyle(fontSize: 20, color: MlColors.textPrimary)),
           onPressed: _openChangeStatusSheet,
         ),
       ],

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "377028234213",
+    "project_id": "mindliftcrm",
+    "storage_bucket": "mindliftcrm.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:377028234213:android:5b3d9261ecd0ddaa0fbd0c",
+        "android_client_info": {
+          "package_name": "com.mindlift.crm"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCWVuBDeTU2IzlY0CNsklPbHv-S13YQVps"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

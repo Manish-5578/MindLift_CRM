@@ -92,7 +92,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
         MlIconButton(
           label: 'Refresh Agenda',
-          icon: const Text('↻', style: TextStyle(fontSize: 20, color: MlColors.textPrimary)),
+          icon: Text('↻', style: TextStyle(fontSize: 20, color: MlColors.textPrimary)),
           onPressed: _loadMyDay,
         ),
       ],

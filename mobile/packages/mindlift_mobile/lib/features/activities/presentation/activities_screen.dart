@@ -56,7 +56,7 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
       actions: [
         MlIconButton(
           label: 'Refresh',
-          icon: const Text('↻', style: TextStyle(fontSize: 20, color: MlColors.textPrimary)),
+          icon: Text('↻', style: TextStyle(fontSize: 20, color: MlColors.textPrimary)),
           onPressed: _loadActivities,
         ),
       ],

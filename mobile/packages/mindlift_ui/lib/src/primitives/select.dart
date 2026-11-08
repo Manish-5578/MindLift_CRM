@@ -84,7 +84,7 @@ class MlSelect<T> extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const Text('▼', style: TextStyle(color: MlColors.textMuted, fontSize: 10)),
+                Text('▼', style: TextStyle(color: MlColors.textMuted, fontSize: 10)),
               ],
             ),
           ),
@@ -114,7 +114,7 @@ class MlSelect<T> extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: MlSpacing.md, vertical: 14),
               decoration: BoxDecoration(
                 color: isSelected ? MlColors.surfaceElevated : const Color(0x00000000),
-                border: const Border(bottom: BorderSide(color: MlColors.border, width: 0.5)),
+                border: Border(bottom: BorderSide(color: MlColors.border, width: 0.5)),
               ),
               child: Row(
                 children: [

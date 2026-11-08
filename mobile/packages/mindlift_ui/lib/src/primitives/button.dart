@@ -124,7 +124,7 @@ class _MlButtonState extends State<MlButton> {
 
   _ResolvedStyle _resolveStyle() {
     if (!_enabled) {
-      return const _ResolvedStyle(
+      return _ResolvedStyle(
         backgroundColor: MlColors.surfaceElevated,
         textColor: MlColors.textDisabled,
       );
@@ -138,7 +138,7 @@ class _MlButtonState extends State<MlButton> {
           pressedColor: MlColors.primaryHover,
         );
       case MlButtonVariant.secondary:
-        return const _ResolvedStyle(
+        return _ResolvedStyle(
           backgroundColor: MlColors.surfaceElevated,
           textColor: MlColors.textPrimary,
           pressedColor: MlColors.surfaceLight,
@@ -157,7 +157,7 @@ class _MlButtonState extends State<MlButton> {
           pressedColor: Color(0xFFDC2626),
         );
       case MlButtonVariant.ghost:
-        return const _ResolvedStyle(
+        return _ResolvedStyle(
           backgroundColor: Color(0x00000000),
           textColor: MlColors.textSecondary,
           pressedColor: Color(0x1A94A3B8),

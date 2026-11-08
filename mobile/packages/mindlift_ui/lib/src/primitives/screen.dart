@@ -6,7 +6,7 @@ import '../tokens/typography.dart';
 /// Top-level screen primitive replacing Scaffold.
 /// Strictly uses Flutter base primitives.
 class MlScreen extends StatelessWidget {
-  const MlScreen({
+  MlScreen({
     super.key,
     required this.body,
     this.title,
@@ -15,9 +15,9 @@ class MlScreen extends StatelessWidget {
     this.actions,
     this.bottomRail,
     this.banner,
-    this.backgroundColor = MlColors.background,
+    Color? backgroundColor,
     this.safeArea = true,
-  });
+  }) : _backgroundColor = backgroundColor;
 
   final Widget body;
   final String? title;
@@ -26,7 +26,8 @@ class MlScreen extends StatelessWidget {
   final List<Widget>? actions;
   final Widget? bottomRail;
   final Widget? banner;
-  final Color backgroundColor;
+  final Color? _backgroundColor;
+  Color get backgroundColor => _backgroundColor ?? MlColors.background;
   final bool safeArea;
 
   @override
@@ -61,7 +62,7 @@ class MlScreen extends StatelessWidget {
         horizontal: MlSpacing.md,
         vertical: MlSpacing.sm,
       ),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: MlColors.background,
         border: Border(bottom: BorderSide(color: MlColors.border, width: 1)),
       ),
@@ -106,7 +107,7 @@ class MlScreen extends StatelessWidget {
   Widget _buildBottomRail(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(MlSpacing.md),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: MlColors.surface,
         border: Border(top: BorderSide(color: MlColors.border, width: 1)),
       ),

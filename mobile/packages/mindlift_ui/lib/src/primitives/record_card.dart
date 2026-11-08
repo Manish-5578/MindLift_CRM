@@ -7,7 +7,7 @@ import '../tokens/typography.dart';
 /// Dense, tactile card primitive for CRM records (Leads, Deals, Activities).
 /// Adheres strictly to MindLift custom tokens and zero-native-UI rules.
 class MlRecordCard extends StatefulWidget {
-  const MlRecordCard({
+  MlRecordCard({
     super.key,
     required this.title,
     this.subtitle,
@@ -16,10 +16,10 @@ class MlRecordCard extends StatefulWidget {
     this.statusChip,
     this.metadata,
     this.onTap,
-    this.backgroundColor = MlColors.surface,
-    this.borderColor = MlColors.border,
+    Color? backgroundColor,
+    Color? borderColor,
     this.padding = const EdgeInsets.all(MlSpacing.md),
-  });
+  }) : _backgroundColor = backgroundColor, _borderColor = borderColor;
 
   final String title;
   final String? subtitle;
@@ -28,8 +28,10 @@ class MlRecordCard extends StatefulWidget {
   final Widget? statusChip;
   final List<Widget>? metadata;
   final VoidCallback? onTap;
-  final Color backgroundColor;
-  final Color borderColor;
+  final Color? _backgroundColor;
+  Color get backgroundColor => _backgroundColor ?? MlColors.surface;
+  final Color? _borderColor;
+  Color get borderColor => _borderColor ?? MlColors.border;
   final EdgeInsetsGeometry padding;
 
   @override

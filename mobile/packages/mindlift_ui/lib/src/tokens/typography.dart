@@ -21,24 +21,24 @@ class MlTextStyle extends TextStyle {
 class MlTypography {
   const MlTypography._();
 
-  static const String fontFamily = 'MindLiftSans';
+  static String fontFamily = 'MindLiftSans';
 
   // Headings
-  static const MlTextStyle headingLarge = MlTextStyle(
+  static MlTextStyle headingLarge = MlTextStyle(
     fontSize: 24,
     fontWeight: FontWeight.w700,
     height: 1.25,
     color: MlColors.textPrimary,
   );
 
-  static const MlTextStyle headingMedium = MlTextStyle(
+  static MlTextStyle headingMedium = MlTextStyle(
     fontSize: 20,
     fontWeight: FontWeight.w700,
     height: 1.25,
     color: MlColors.textPrimary,
   );
 
-  static const MlTextStyle headingSmall = MlTextStyle(
+  static MlTextStyle headingSmall = MlTextStyle(
     fontSize: 18,
     fontWeight: FontWeight.w600,
     height: 1.3,
@@ -46,21 +46,21 @@ class MlTypography {
   );
 
   // Titles
-  static const MlTextStyle titleLarge = MlTextStyle(
+  static MlTextStyle titleLarge = MlTextStyle(
     fontSize: 22,
     fontWeight: FontWeight.w700,
     height: 1.25,
     color: MlColors.textPrimary,
   );
 
-  static const MlTextStyle titleMedium = MlTextStyle(
+  static MlTextStyle titleMedium = MlTextStyle(
     fontSize: 18,
     fontWeight: FontWeight.w600,
     height: 1.3,
     color: MlColors.textPrimary,
   );
 
-  static const MlTextStyle titleSmall = MlTextStyle(
+  static MlTextStyle titleSmall = MlTextStyle(
     fontSize: 16,
     fontWeight: FontWeight.w600,
     height: 1.35,
@@ -68,21 +68,21 @@ class MlTypography {
   );
 
   // Bodies
-  static const MlTextStyle bodyLarge = MlTextStyle(
+  static MlTextStyle bodyLarge = MlTextStyle(
     fontSize: 15,
     fontWeight: FontWeight.w400,
     height: 1.4,
     color: MlColors.textPrimary,
   );
 
-  static const MlTextStyle bodyMedium = MlTextStyle(
+  static MlTextStyle bodyMedium = MlTextStyle(
     fontSize: 14,
     fontWeight: FontWeight.w400,
     height: 1.4,
     color: MlColors.textSecondary,
   );
 
-  static const MlTextStyle bodySmall = MlTextStyle(
+  static MlTextStyle bodySmall = MlTextStyle(
     fontSize: 13,
     fontWeight: FontWeight.w400,
     height: 1.4,
@@ -90,35 +90,35 @@ class MlTypography {
   );
 
   // Labels
-  static const MlTextStyle labelLarge = MlTextStyle(
+  static MlTextStyle labelLarge = MlTextStyle(
     fontSize: 15,
     fontWeight: FontWeight.w600,
     height: 1.3,
     color: MlColors.textPrimary,
   );
 
-  static const MlTextStyle labelMedium = MlTextStyle(
+  static MlTextStyle labelMedium = MlTextStyle(
     fontSize: 13,
     fontWeight: FontWeight.w600,
     height: 1.3,
     color: MlColors.textPrimary,
   );
 
-  static const MlTextStyle label = MlTextStyle(
+  static MlTextStyle label = MlTextStyle(
     fontSize: 13,
     fontWeight: FontWeight.w600,
     height: 1.3,
     color: MlColors.textPrimary,
   );
 
-  static const MlTextStyle caption = MlTextStyle(
+  static MlTextStyle caption = MlTextStyle(
     fontSize: 12,
     fontWeight: FontWeight.w400,
     height: 1.3,
     color: MlColors.textMuted,
   );
 
-  static const MlTextStyle button = MlTextStyle(
+  static MlTextStyle button = MlTextStyle(
     fontSize: 14,
     fontWeight: FontWeight.w600,
     height: 1.2,

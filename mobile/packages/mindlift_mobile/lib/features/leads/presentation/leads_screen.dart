@@ -62,7 +62,7 @@ class _LeadsScreenState extends ConsumerState<LeadsScreen> {
         ),
         MlIconButton(
           label: 'Refresh Leads',
-          icon: const Text('↻', style: TextStyle(fontSize: 20, color: MlColors.textPrimary)),
+          icon: Text('↻', style: TextStyle(fontSize: 20, color: MlColors.textPrimary)),
           onPressed: _fetchLeads,
         ),
       ],

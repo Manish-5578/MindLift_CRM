@@ -21,22 +21,24 @@ class MlNavigationDestination {
 /// Custom 5-destination bottom navigation bar with a dedicated center Quick Add button.
 /// Strictly built from Flutter base primitives without Material widgets.
 class MlBottomNavigation extends StatelessWidget {
-  const MlBottomNavigation({
+  MlBottomNavigation({
     super.key,
     required this.currentIndex,
     required this.onTap,
     required this.destinations,
     this.onQuickAdd,
-    this.backgroundColor = MlColors.surface,
-    this.borderColor = MlColors.border,
-  }) : assert(destinations.length <= 5, 'Maximum 5 destinations allowed.');
+    Color? backgroundColor,
+    Color? borderColor,
+  }) : _backgroundColor = backgroundColor, _borderColor = borderColor, assert(destinations.length <= 5, 'Maximum 5 destinations allowed.');
 
   final int currentIndex;
   final ValueChanged<int> onTap;
   final List<MlNavigationDestination> destinations;
   final VoidCallback? onQuickAdd;
-  final Color backgroundColor;
-  final Color borderColor;
+  final Color? _backgroundColor;
+  Color get backgroundColor => _backgroundColor ?? MlColors.surface;
+  final Color? _borderColor;
+  Color get borderColor => _borderColor ?? MlColors.border;
 
   @override
   Widget build(BuildContext context) {

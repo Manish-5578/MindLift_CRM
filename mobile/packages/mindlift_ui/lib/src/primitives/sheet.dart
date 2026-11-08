@@ -56,7 +56,7 @@ class MlSheet extends StatelessWidget {
       constraints: BoxConstraints(
         maxHeight: MediaQuery.sizeOf(context).height * 0.85,
       ),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: MlColors.surface,
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(MlRadii.xl),
@@ -91,7 +91,7 @@ class MlSheet extends StatelessWidget {
                     ),
                     GestureDetector(
                       onTap: onClose ?? () => Navigator.of(context).pop(),
-                      child: const Padding(
+                      child: Padding(
                         padding: EdgeInsets.all(4.0),
                         child: Text('✕', style: TextStyle(color: MlColors.textMuted, fontSize: 16)),
                       ),

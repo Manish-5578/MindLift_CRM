@@ -219,7 +219,7 @@ class MlSearchField extends StatelessWidget {
                 onChanged?.call('');
                 onClear?.call();
               },
-              child: const Text('✕', style: TextStyle(color: MlColors.textMuted, fontSize: 14)),
+              child: Text('✕', style: TextStyle(color: MlColors.textMuted, fontSize: 14)),
             )
           : null,
     );

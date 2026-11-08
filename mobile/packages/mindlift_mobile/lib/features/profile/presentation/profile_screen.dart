@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mindlift_ui/mindlift_ui.dart';
 import '../../../core/locale_provider.dart';
 import '../../../core/network_provider.dart';
+import '../../../core/settings_provider.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -16,7 +17,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _emailNotifications = true;
   bool _dealAlerts = true;
   bool _taskReminders = true;
-  bool _biometricEnabled = true;
 
   void _handleSignOut() {
     MlDialog.show(
@@ -170,6 +170,38 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
             const SizedBox(height: MlSpacing.lg),
 
+            // Appearance
+            _buildSectionHeader('Appearance'),
+            Container(
+              padding: const EdgeInsets.all(MlSpacing.md),
+              decoration: BoxDecoration(
+                color: MlColors.surface,
+                borderRadius: BorderRadius.circular(MlRadii.lg),
+                border: Border.all(color: MlColors.border),
+              ),
+              child: Row(
+                children: [
+                  for (final m in AppThemeMode.values) ...[
+                    if (m != AppThemeMode.values.first) const SizedBox(width: MlSpacing.sm),
+                    Expanded(
+                      child: MlButton(
+                        label: switch (m) {
+                          AppThemeMode.system => 'Auto',
+                          AppThemeMode.light => '☀ Light',
+                          AppThemeMode.dark => '☾ Dark',
+                        },
+                        variant: ref.watch(settingsProvider).themeMode == m
+                            ? MlButtonVariant.primary
+                            : MlButtonVariant.secondary,
+                        onPressed: () => ref.read(settingsProvider.notifier).setThemeMode(m),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: MlSpacing.lg),
+
             // Language & Directionality Module
             _buildSectionHeader('Language & Layout'),
             Container(
@@ -220,7 +252,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
               child: Column(
                 children: [
-                  _buildToggleRow('Biometric Fingerprint / Face', 'Fast unlock on app resume', _biometricEnabled, (v) => setState(() => _biometricEnabled = v)),
+                  _buildToggleRow('Biometric Fingerprint / Face', 'Unlock with the fingerprint/face registered on this device', ref.watch(settingsProvider).biometricLock, (v) async {
+                    final ok = await ref.read(settingsProvider.notifier).setBiometricLock(v);
+                    if (!ok && mounted) {
+                      MlToast.show(context, message: v ? 'Set up a fingerprint, face or screen lock on this device first.' : 'Could not update biometric setting.');
+                    }
+                  }),
                   _buildDivider(),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,

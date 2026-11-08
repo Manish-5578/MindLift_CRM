@@ -121,11 +121,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(
             path: '/home',
-            builder: (context, state) => const HomeScreen(),
+            pageBuilder: (context, state) => const NoTransitionPage(child: HomeScreen()),
           ),
           GoRoute(
             path: '/leads',
-            builder: (context, state) => const LeadsScreen(),
+            pageBuilder: (context, state) => const NoTransitionPage(child: LeadsScreen()),
             routes: [
               GoRoute(
                 path: ':id',
@@ -138,23 +138,23 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/deals',
-            builder: (context, state) => const DealsScreen(),
+            pageBuilder: (context, state) => const NoTransitionPage(child: DealsScreen()),
           ),
           GoRoute(
             path: '/activities',
-            builder: (context, state) => const ActivitiesScreen(),
+            pageBuilder: (context, state) => const NoTransitionPage(child: ActivitiesScreen()),
           ),
           GoRoute(
             path: '/more',
-            builder: (context, state) => const MoreScreen(),
+            pageBuilder: (context, state) => const NoTransitionPage(child: MoreScreen()),
           ),
           GoRoute(
             path: '/notifications',
-            builder: (context, state) => const NotificationsScreen(),
+            pageBuilder: (context, state) => const NoTransitionPage(child: NotificationsScreen()),
           ),
           GoRoute(
             path: '/chat',
-            builder: (context, state) => const ChatScreen(),
+            pageBuilder: (context, state) => const NoTransitionPage(child: ChatScreen()),
           ),
           GoRoute(
             path: '/profile',

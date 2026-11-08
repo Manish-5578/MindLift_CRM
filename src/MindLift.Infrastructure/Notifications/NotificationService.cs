@@ -19,6 +19,7 @@ public sealed class NotificationService(
     ITenantContext tenant,
     IClock clock,
     INotificationPusher pusher,
+    IPushNotificationSender mobilePush,
     IBackgroundJobClient jobs,
     ILogger<NotificationService> logger) : INotificationService
 {
@@ -118,6 +119,9 @@ public sealed class NotificationService(
         {
             var unread = await db.Notifications.CountAsync(n => n.UserId == notification.UserId && !n.IsRead, cancellationToken);
             await pusher.PushAsync(tenantId, notification.UserId, NotificationMapper.ToDto(notification), unread, cancellationToken);
+            await mobilePush.SendPushAsync(tenantId, notification.UserId, notification.Title, notification.Body,
+                new Dictionary<string, string> { ["type"] = notification.Type, ["route"] = "/notifications" },
+                cancellationToken);
         }
         catch (Exception ex)
         {

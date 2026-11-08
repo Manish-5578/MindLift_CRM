@@ -511,3 +511,7 @@ App_Data/
 **/mobile/**/android/gradle/
 **/mobile/**/android/gradlew
 **/mobile/**/android/gradlew.bat
+
+# Firebase / FCM secrets
+*service-account*.json
+*firebase-adminsdk*.json

@@ -12,7 +12,7 @@ using MindLift.Shared.Contracts;
 
 namespace MindLift.Infrastructure.Chat;
 
-public sealed class ChatService(AppDbContext db, ITenantContext tenant)
+public sealed class ChatService(AppDbContext db, ITenantContext tenant, IPushNotificationSender mobilePush, Microsoft.Extensions.Logging.ILogger<ChatService> logger)
 {
     private Guid Me => tenant.UserId ?? throw new UnauthorizedException("not_signed_in", "Please sign in.");
     private Guid CurrentTenantId => tenant.TenantId ?? throw new UnauthorizedException("no_tenant", "No active tenant.");
@@ -85,6 +85,20 @@ public sealed class ChatService(AppDbContext db, ITenantContext tenant)
 
         db.InternalChatMessages.Add(msg);
         await db.SaveChangesAsync(ct);
+
+        if (msg.RecipientId is Guid recipient)
+        {
+            try
+            {
+                var preview = msg.Message.Length <= 120 ? msg.Message : msg.Message[..119] + "…";
+                await mobilePush.SendPushAsync(CurrentTenantId, recipient, myName, preview,
+                    new Dictionary<string, string> { ["type"] = "chat", ["route"] = "/chat", ["senderId"] = me.ToString() }, ct);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Chat push failed for recipient {Recipient}", recipient);
+            }
+        }
 
         return new ChatMessageDto(
             msg.Id,
