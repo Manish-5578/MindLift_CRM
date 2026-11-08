@@ -11,7 +11,6 @@ import '../features/deals/presentation/deals_screen.dart';
 import '../features/quick_add/presentation/quick_add_sheet.dart';
 import '../features/notifications/presentation/notifications_screen.dart';
 import '../features/more/presentation/more_screen.dart';
-import 'auth_provider.dart';
 import 'network_provider.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -128,3 +127,4 @@ final routerProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+

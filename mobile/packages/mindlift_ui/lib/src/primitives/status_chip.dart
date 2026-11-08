@@ -4,11 +4,14 @@ import '../tokens/radii.dart';
 import '../tokens/spacing.dart';
 import '../tokens/typography.dart';
 
+enum MlStatusState { primary, success, warning, danger, neutral }
+
 /// Semantic status chip indicator.
 class MlStatusChip extends StatelessWidget {
   const MlStatusChip({
     super.key,
     required this.label,
+    this.state,
     this.dotColor,
     this.backgroundColor,
     this.textColor,
@@ -16,6 +19,7 @@ class MlStatusChip extends StatelessWidget {
   });
 
   final String label;
+  final MlStatusState? state;
   final Color? dotColor;
   final Color? backgroundColor;
   final Color? textColor;
@@ -23,9 +27,39 @@ class MlStatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveDotColor = dotColor ?? MlColors.primary;
-    final effectiveBg = backgroundColor ?? MlColors.surfaceElevated;
-    final effectiveText = textColor ?? MlColors.textPrimary;
+    Color effectiveDotColor = dotColor ?? MlColors.primary;
+    Color effectiveBg = backgroundColor ?? MlColors.surfaceElevated;
+    Color effectiveText = textColor ?? MlColors.textPrimary;
+
+    if (state != null) {
+      switch (state!) {
+        case MlStatusState.primary:
+          effectiveDotColor = MlColors.primaryLight;
+          effectiveBg = MlColors.primary.withOpacity(0.18);
+          effectiveText = MlColors.primaryLight;
+          break;
+        case MlStatusState.success:
+          effectiveDotColor = MlColors.success;
+          effectiveBg = MlColors.success.withOpacity(0.18);
+          effectiveText = MlColors.success;
+          break;
+        case MlStatusState.warning:
+          effectiveDotColor = MlColors.warning;
+          effectiveBg = MlColors.warning.withOpacity(0.18);
+          effectiveText = MlColors.warning;
+          break;
+        case MlStatusState.danger:
+          effectiveDotColor = MlColors.danger;
+          effectiveBg = MlColors.danger.withOpacity(0.18);
+          effectiveText = MlColors.danger;
+          break;
+        case MlStatusState.neutral:
+          effectiveDotColor = MlColors.textMuted;
+          effectiveBg = MlColors.surfaceElevated;
+          effectiveText = MlColors.textMuted;
+          break;
+      }
+    }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -50,7 +84,8 @@ class MlStatusChip extends StatelessWidget {
           ],
           Text(
             label,
-            style: MlTypography.caption(color: effectiveText).copyWith(
+            style: MlTypography.caption.copyWith(
+              color: effectiveText,
               fontWeight: FontWeight.w600,
             ),
           ),

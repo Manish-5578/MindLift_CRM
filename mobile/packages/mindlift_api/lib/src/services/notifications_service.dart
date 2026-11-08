@@ -30,3 +30,4 @@ class NotificationsService {
     await _dio.post('/api/v1/notifications/read-all');
   }
 }
+

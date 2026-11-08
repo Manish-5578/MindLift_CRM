@@ -1,7 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mindlift_ui/mindlift_ui.dart';
-import '../../../core/auth_provider.dart';
 import '../../../core/network_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -143,3 +142,4 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 }
+

@@ -60,3 +60,4 @@ class UpdateDealStageRequest {
 
   Map<String, dynamic> toJson() => {'stage': stage};
 }
+

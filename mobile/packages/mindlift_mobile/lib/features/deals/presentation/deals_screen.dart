@@ -193,3 +193,4 @@ class _DealsScreenState extends ConsumerState<DealsScreen> {
     );
   }
 }
+

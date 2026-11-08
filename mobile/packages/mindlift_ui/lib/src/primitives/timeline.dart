@@ -195,3 +195,4 @@ class _MlTimelineEntry extends StatelessWidget {
     );
   }
 }
+

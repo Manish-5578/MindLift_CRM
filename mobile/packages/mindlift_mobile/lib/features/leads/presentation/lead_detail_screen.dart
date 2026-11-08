@@ -330,3 +330,4 @@ class _LeadDetailScreenState extends ConsumerState<LeadDetailScreen> {
     );
   }
 }
+

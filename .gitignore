@@ -499,3 +499,15 @@ App_Data/
 # local experiments and test builds
 .scratch/
 .neon
+
+# Flutter / Dart Mobile
+**/mobile/**/.dart_tool/
+**/mobile/**/.flutter-plugins
+**/mobile/**/.flutter-plugins-dependencies
+**/mobile/**/build/
+**/mobile/**/*.lock
+**/mobile/**/android/.gradle/
+**/mobile/**/android/local.properties
+**/mobile/**/android/gradle/
+**/mobile/**/android/gradlew
+**/mobile/**/android/gradlew.bat

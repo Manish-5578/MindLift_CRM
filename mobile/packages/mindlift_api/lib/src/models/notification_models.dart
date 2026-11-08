@@ -49,3 +49,4 @@ class NotificationItemDto {
         if (targetRoute != null) 'targetRoute': targetRoute,
       };
 }
+

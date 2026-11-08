@@ -5,16 +5,22 @@ import 'dart:ui';
 class MlColors {
   const MlColors._();
 
+  // Basic neutrals
+  static const Color white = Color(0xFFFFFFFF);
+  static const Color black = Color(0xFF000000);
+
   // Backgrounds & Surfaces
   static const Color background = Color(0xFF0F172A); // Deep Navy
   static const Color surface = Color(0xFF1E293B);    // Slate Surface Card
   static const Color surfaceElevated = Color(0xFF334155);
+  static const Color surfaceLight = Color(0xFF334155);
   static const Color surfaceMuted = Color(0xFF1E293B);
 
   // Brand Primaries
   static const Color primary = Color(0xFF4F46E5);      // Indigo / Primary Accent
   static const Color primaryHover = Color(0xFF4338CA);
   static const Color primarySoft = Color(0xFFEEF2FF);   // Soft Light Tint
+  static const Color primaryLight = Color(0xFF818CF8);
   static const Color primaryOnDark = Color(0xFF818CF8);
 
   // Status & Accents

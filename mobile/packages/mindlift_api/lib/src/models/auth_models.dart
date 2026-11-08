@@ -72,3 +72,4 @@ class RefreshTokenRequest {
 
   Map<String, dynamic> toJson() => {'refreshToken': refreshToken};
 }
+

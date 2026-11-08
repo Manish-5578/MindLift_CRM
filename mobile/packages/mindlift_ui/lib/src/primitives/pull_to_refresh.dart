@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
 import '../tokens/colors.dart';
-import '../tokens/spacing.dart';
 
 /// Zero-native pull-to-refresh container.
 /// Uses Flutter scroll notification primitives instead of Material RefreshIndicator.
@@ -189,3 +188,4 @@ class _MlRefreshSpinnerPainter extends CustomPainter {
         oldDelegate.color != color;
   }
 }
+

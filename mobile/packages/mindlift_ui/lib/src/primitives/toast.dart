@@ -14,6 +14,7 @@ class MlToast {
     BuildContext context, {
     required String message,
     MlToastType type = MlToastType.info,
+    Color? backgroundColor,
     Duration duration = const Duration(seconds: 3),
   }) {
     final overlay = Overlay.maybeOf(context);
@@ -24,6 +25,7 @@ class MlToast {
       builder: (ctx) => _ToastWidget(
         message: message,
         type: type,
+        customBackgroundColor: backgroundColor,
         onDismiss: () => entry.remove(),
       ),
     );
@@ -39,49 +41,60 @@ class _ToastWidget extends StatelessWidget {
   const _ToastWidget({
     required this.message,
     required this.type,
+    this.customBackgroundColor,
     required this.onDismiss,
   });
 
   final String message;
   final MlToastType type;
+  final Color? customBackgroundColor;
   final VoidCallback onDismiss;
 
   @override
   Widget build(BuildContext context) {
-    final (bg, border, text) = switch (type) {
-      MlToastType.success => (const Color(0xFF064E3B), MlColors.success, const Color(0xFFD1FAE5)),
-      MlToastType.error => (const Color(0xFF7F1D1D), MlColors.danger, const Color(0xFFFEE2E2)),
-      MlToastType.info => (MlColors.surfaceElevated, MlColors.info, MlColors.textPrimary),
-    };
+    Color bg = customBackgroundColor ?? const Color(0xFF1E293B);
+    Color border = MlColors.border;
 
-    return SafeArea(
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: Padding(
-          padding: const EdgeInsets.all(MlSpacing.md),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: MlSpacing.md, vertical: 10),
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: MlRadii.borderMd,
-              border: Border.all(color: border, width: 1.5),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Flexible(
-                  child: Text(
-                    message,
-                    style: MlTypography.caption(color: text),
-                  ),
-                ),
-                const SizedBox(width: MlSpacing.xs),
-                GestureDetector(
-                  onTap: onDismiss,
-                  child: Text('✕', style: TextStyle(color: text, fontSize: 12)),
-                ),
-              ],
-            ),
+    if (customBackgroundColor == null) {
+      switch (type) {
+        case MlToastType.success:
+          bg = const Color(0xFF064E3B);
+          border = MlColors.success;
+          break;
+        case MlToastType.error:
+          bg = const Color(0xFF7F1D1D);
+          border = MlColors.danger;
+          break;
+        case MlToastType.info:
+          bg = MlColors.surface;
+          border = MlColors.primary;
+          break;
+      }
+    }
+
+    return Positioned(
+      bottom: 48,
+      left: 20,
+      right: 20,
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: MlSpacing.md, vertical: MlSpacing.sm),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: MlRadii.borderFull,
+            border: Border.all(color: border, width: 1),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x66000000),
+                blurRadius: 12,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Text(
+            message,
+            style: MlTypography.caption.copyWith(color: MlColors.white),
+            textAlign: TextAlign.center,
           ),
         ),
       ),

@@ -38,3 +38,4 @@ class MindLiftMobileApp extends ConsumerWidget {
     );
   }
 }
+

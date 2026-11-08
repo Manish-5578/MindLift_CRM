@@ -122,3 +122,4 @@ class _MlRecordCardState extends State<MlRecordCard> {
     );
   }
 }
+

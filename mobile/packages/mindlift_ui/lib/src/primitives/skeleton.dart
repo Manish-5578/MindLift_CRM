@@ -66,3 +66,4 @@ class _MlSkeletonState extends State<MlSkeleton> with SingleTickerProviderStateM
     );
   }
 }
+

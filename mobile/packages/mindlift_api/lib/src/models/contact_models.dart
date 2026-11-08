@@ -43,3 +43,4 @@ class ContactDto {
         if (accountId != null) 'accountId': accountId,
       };
 }
+

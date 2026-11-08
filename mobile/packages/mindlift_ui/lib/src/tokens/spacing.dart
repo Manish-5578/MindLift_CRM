@@ -13,4 +13,5 @@ class MlSpacing {
 
   /// Minimum accessible touch target per mobile-flutter.md rulebook.
   static const double minTouchTarget = 44.0;
+  static const double touchTarget = 44.0;
 }

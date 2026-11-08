@@ -275,9 +275,13 @@ h1[tabindex="-1"]:focus, h1[tabindex="-1"]:focus-visible, [tabindex="-1"]:focus:
 }
 
 /* Position notification badge directly adjacent to the bell icon symbol */
-.ml-notification-badge .mud-badge.mud-badge-top.right {
+[data-testid="notification-bell"] .mud-badge,
+.ml-notification-badge .mud-badge {
     top: 6px !important;
     inset-inline-end: 6px !important;
+    inset-inline-start: auto !important;
+    right: 6px !important;
+    transform: translate(25%, -25%) !important;
     font-size: 11px !important;
     height: 18px !important;
     min-width: 18px !important;

@@ -168,3 +168,4 @@ class AddLeadNoteRequest {
 
   Map<String, dynamic> toJson() => {'note': note};
 }
+

@@ -11,12 +11,15 @@ class MlDialog extends StatelessWidget {
     super.key,
     required this.title,
     required this.message,
-    this.confirmText = 'Confirm',
+    String? confirmText,
+    String? confirmLabel,
     this.cancelText = 'Cancel',
     this.onConfirm,
     this.onCancel,
-    this.isDanger = false,
-  });
+    bool? isDanger,
+    bool? isDestructive,
+  })  : confirmText = confirmText ?? confirmLabel ?? 'Confirm',
+        isDanger = isDanger ?? isDestructive ?? false;
 
   final String title;
   final String message;
@@ -30,9 +33,13 @@ class MlDialog extends StatelessWidget {
     required BuildContext context,
     required String title,
     required String message,
-    String confirmText = 'Confirm',
+    String? confirmText,
+    String? confirmLabel,
     String cancelText = 'Cancel',
-    bool isDanger = false,
+    bool? isDanger,
+    bool? isDestructive,
+    VoidCallback? onConfirm,
+    VoidCallback? onCancel,
   }) {
     return showGeneralDialog<bool>(
       context: context,
@@ -44,11 +51,17 @@ class MlDialog extends StatelessWidget {
         child: MlDialog(
           title: title,
           message: message,
-          confirmText: confirmText,
+          confirmText: confirmText ?? confirmLabel ?? 'Confirm',
           cancelText: cancelText,
-          isDanger: isDanger,
-          onConfirm: () => Navigator.of(ctx).pop(true),
-          onCancel: () => Navigator.of(ctx).pop(false),
+          isDanger: isDanger ?? isDestructive ?? false,
+          onConfirm: () {
+            Navigator.of(ctx).pop(true);
+            onConfirm?.call();
+          },
+          onCancel: () {
+            Navigator.of(ctx).pop(false);
+            onCancel?.call();
+          },
         ),
       ),
       transitionBuilder: (ctx, anim1, anim2, child) {
@@ -67,34 +80,49 @@ class MlDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 320,
-      margin: const EdgeInsets.all(MlSpacing.lg),
-      padding: const EdgeInsets.all(MlSpacing.xl),
+      margin: const EdgeInsets.symmetric(horizontal: MlSpacing.lg),
+      padding: const EdgeInsets.all(MlSpacing.lg),
       decoration: BoxDecoration(
         color: MlColors.surface,
         borderRadius: MlRadii.borderLg,
-        border: Border.all(color: MlColors.border, width: 1.5),
+        border: Border.all(color: MlColors.border, width: 1),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x66000000),
+            blurRadius: 20,
+            offset: Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(title, style: MlTypography.titleMedium()),
+          Text(
+            title,
+            style: MlTypography.headingSmall,
+          ),
           const SizedBox(height: MlSpacing.xs),
-          Text(message, style: MlTypography.bodyMedium()),
-          const SizedBox(height: MlSpacing.xl),
+          Text(
+            message,
+            style: MlTypography.bodySmall,
+          ),
+          const SizedBox(height: MlSpacing.lg),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               MlButton(
                 text: cancelText,
                 variant: MlButtonVariant.ghost,
-                onTap: onCancel ?? () => Navigator.of(context).pop(false),
+                size: MlButtonSize.small,
+                onTap: onCancel,
               ),
               const SizedBox(width: MlSpacing.xs),
               MlButton(
                 text: confirmText,
                 variant: isDanger ? MlButtonVariant.danger : MlButtonVariant.primary,
-                onTap: onConfirm ?? () => Navigator.of(context).pop(true),
+                size: MlButtonSize.small,
+                onTap: onConfirm,
               ),
             ],
           ),

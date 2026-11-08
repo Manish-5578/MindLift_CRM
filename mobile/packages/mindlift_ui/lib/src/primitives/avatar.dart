@@ -104,3 +104,4 @@ class MlAvatar extends StatelessWidget {
     );
   }
 }
+

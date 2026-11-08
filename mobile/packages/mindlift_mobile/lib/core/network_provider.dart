@@ -11,13 +11,23 @@ final offlineDatabaseProvider = Provider<OfflineDatabase>((ref) {
   return OfflineDatabase();
 });
 
+// A session event notifier to decouple apiClientProvider from authNotifierProvider
+class SessionEventNotifier extends StateNotifier<int> {
+  SessionEventNotifier() : super(0);
+  void triggerExpired() => state++;
+}
+
+final sessionEventProvider = StateNotifierProvider<SessionEventNotifier, int>((ref) {
+  return SessionEventNotifier();
+});
+
 final apiClientProvider = Provider<MindLiftApiClient>((ref) {
   final tokenStorage = ref.watch(tokenStorageProvider);
   return MindLiftApiClient(
     baseUrl: kDefaultApiBaseUrl,
     tokenStorage: tokenStorage,
     onSessionExpired: () {
-      ref.read(authNotifierProvider.notifier).handleSessionExpired();
+      ref.read(sessionEventProvider.notifier).triggerExpired();
     },
   );
 });
@@ -51,13 +61,19 @@ final authNotifierProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref
   final authService = ref.watch(authServiceProvider);
   final db = ref.watch(offlineDatabaseProvider);
 
-  return AuthNotifier(
+  final notifier = AuthNotifier(
     tokenStorage: tokenStorage,
     authService: authService,
     onPurgeLocalData: () async {
       await db.purgeDatabase();
     },
   );
+
+  ref.listen<int>(sessionEventProvider, (_, __) {
+    notifier.handleSessionExpired();
+  });
+
+  return notifier;
 });
 
 class SyncState {

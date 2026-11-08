@@ -157,3 +157,4 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
     );
   }
 }
+

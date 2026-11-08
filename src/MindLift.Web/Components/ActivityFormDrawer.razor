@@ -183,14 +183,16 @@
         try
         {
             int? minutes = int.TryParse(Value("durationMinutes"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var m) ? Math.Max(0, m) : null;
-            Guid? owner = Guid.TryParse(Value("ownerId"), out var o) ? o : null;
+            var assignedIds = Ids(Value("ownerId"));
+            Guid? owner = assignedIds.Count > 0 ? assignedIds[0] : null;
             var request = new SaveActivityRequest(
                 _type, Value("subject")!, Value("description"), _type == ActivityTypes.Task ? Value("priority") : null,
                 FromLocalInput(Value("dueAt")), FromLocalInput(Value("endAt")), minutes,
                 _type == ActivityTypes.Call ? Value("direction") : null, _type == ActivityTypes.Call ? Value("callOutcome") : null, Value("location"), int.TryParse(Value("reminderMinutes"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var reminder) ? Math.Max(0, reminder) : null,
                 _id is null ? LeadId : null, _id is null ? ContactId : null, _id is null ? AccountId : null, _id is null ? DealId : null, owner,
                 _type == ActivityTypes.Meeting ? Emails(Value("attendees")) : null, _type == ActivityTypes.Meeting && Value("sendInvitations") == "true",
-                _type == ActivityTypes.Note ? Ids(Value("mentions")) : null);
+                _type == ActivityTypes.Note ? Ids(Value("mentions")) : null,
+                AssigneeIds: assignedIds);
 
             if (_id is not null)
             {

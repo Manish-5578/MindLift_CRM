@@ -11,15 +11,18 @@ enum MlButtonSize { small, medium, large }
 class MlButton extends StatefulWidget {
   const MlButton({
     super.key,
-    required this.text,
-    this.onTap,
+    String? text,
+    String? label,
+    VoidCallback? onTap,
+    VoidCallback? onPressed,
     this.variant = MlButtonVariant.primary,
     this.size = MlButtonSize.medium,
     this.icon,
     this.isLoading = false,
     this.isDisabled = false,
     this.fullWidth = false,
-  });
+  })  : text = text ?? label ?? '',
+        onTap = onTap ?? onPressed;
 
   final String text;
   final VoidCallback? onTap;
@@ -61,6 +64,9 @@ class _MlButtonState extends State<MlButton> {
       ],
     );
 
+    final height = _resolveHeight();
+    final padding = _resolvePadding();
+
     return Semantics(
       button: true,
       enabled: _enabled,
@@ -72,95 +78,120 @@ class _MlButtonState extends State<MlButton> {
         onTapUp: _enabled ? (_) => setState(() => _isPressed = false) : null,
         onTapCancel: _enabled ? () => setState(() => _isPressed = false) : null,
         child: Container(
-          constraints: const BoxConstraints(
+          constraints: BoxConstraints(
             minHeight: MlSpacing.minTouchTarget,
             minWidth: MlSpacing.minTouchTarget,
           ),
-          padding: _paddingFor(widget.size),
+          height: height,
+          padding: padding,
           decoration: BoxDecoration(
-            color: _isPressed ? style.pressedColor : style.backgroundColor,
+            color: _isPressed && style.pressedColor != null
+                ? style.pressedColor
+                : style.backgroundColor,
             borderRadius: MlRadii.borderMd,
             border: style.borderColor != null
                 ? Border.all(color: style.borderColor!, width: 1.5)
                 : null,
           ),
+          alignment: Alignment.center,
           child: content,
         ),
       ),
     );
   }
 
+  double _resolveHeight() {
+    switch (widget.size) {
+      case MlButtonSize.small:
+        return 36;
+      case MlButtonSize.medium:
+        return 44; // Meets touch target minimum
+      case MlButtonSize.large:
+        return 52;
+    }
+  }
+
+  EdgeInsets _resolvePadding() {
+    switch (widget.size) {
+      case MlButtonSize.small:
+        return const EdgeInsets.symmetric(horizontal: MlSpacing.sm);
+      case MlButtonSize.medium:
+        return const EdgeInsets.symmetric(horizontal: MlSpacing.md);
+      case MlButtonSize.large:
+        return const EdgeInsets.symmetric(horizontal: MlSpacing.lg);
+    }
+  }
+
+  _ResolvedStyle _resolveStyle() {
+    if (!_enabled) {
+      return const _ResolvedStyle(
+        backgroundColor: MlColors.surfaceElevated,
+        textColor: MlColors.textDisabled,
+      );
+    }
+
+    switch (widget.variant) {
+      case MlButtonVariant.primary:
+        return const _ResolvedStyle(
+          backgroundColor: MlColors.primary,
+          textColor: MlColors.white,
+          pressedColor: MlColors.primaryHover,
+        );
+      case MlButtonVariant.secondary:
+        return const _ResolvedStyle(
+          backgroundColor: MlColors.surfaceElevated,
+          textColor: MlColors.textPrimary,
+          pressedColor: MlColors.surfaceLight,
+        );
+      case MlButtonVariant.outline:
+        return const _ResolvedStyle(
+          backgroundColor: Color(0x00000000),
+          textColor: MlColors.primary,
+          borderColor: MlColors.primary,
+          pressedColor: Color(0x1A4F46E5),
+        );
+      case MlButtonVariant.danger:
+        return const _ResolvedStyle(
+          backgroundColor: MlColors.danger,
+          textColor: MlColors.white,
+          pressedColor: Color(0xFFDC2626),
+        );
+      case MlButtonVariant.ghost:
+        return const _ResolvedStyle(
+          backgroundColor: Color(0x00000000),
+          textColor: MlColors.textSecondary,
+          pressedColor: Color(0x1A94A3B8),
+        );
+    }
+  }
+
   Widget _buildLoadingIndicator(Color color) {
     return SizedBox(
-      width: 14,
-      height: 14,
+      width: 16,
+      height: 16,
       child: CustomPaint(
         painter: _SpinnerPainter(color: color),
       ),
     );
   }
-
-  EdgeInsetsGeometry _paddingFor(MlButtonSize size) => switch (size) {
-        MlButtonSize.small => const EdgeInsets.symmetric(horizontal: MlSpacing.sm, vertical: 8),
-        MlButtonSize.medium => const EdgeInsets.symmetric(horizontal: MlSpacing.md, vertical: 12),
-        MlButtonSize.large => const EdgeInsets.symmetric(horizontal: MlSpacing.xl, vertical: 14),
-      };
-
-  _ResolvedStyle _resolveStyle() {
-    if (!_enabled) {
-      return const _ResolvedStyle(
-        backgroundColor: Color(0xFF334155),
-        textColor: MlColors.textDisabled,
-      );
-    }
-
-    return switch (widget.variant) {
-      MlButtonVariant.primary => const _ResolvedStyle(
-          backgroundColor: MlColors.primary,
-          pressedColor: MlColors.primaryHover,
-          textColor: Color(0xFFFFFFFF),
-        ),
-      MlButtonVariant.secondary => const _ResolvedStyle(
-          backgroundColor: MlColors.surface,
-          pressedColor: Color(0xFF334155),
-          textColor: MlColors.textPrimary,
-          borderColor: MlColors.border,
-        ),
-      MlButtonVariant.outline => const _ResolvedStyle(
-          backgroundColor: Color(0x00000000),
-          pressedColor: Color(0x1A4F46E5),
-          textColor: MlColors.primaryOnDark,
-          borderColor: MlColors.primary,
-        ),
-      MlButtonVariant.danger => const _ResolvedStyle(
-          backgroundColor: MlColors.danger,
-          pressedColor: Color(0xFFDC2626),
-          textColor: Color(0xFFFFFFFF),
-        ),
-      MlButtonVariant.ghost => const _ResolvedStyle(
-          backgroundColor: Color(0x00000000),
-          pressedColor: Color(0x1FFFFFFF),
-          textColor: MlColors.textSecondary,
-        ),
-    };
-  }
 }
 
-/// Icon button primitive with guaranteed 44x44 touch target.
+/// Compact 44x44 icon button primitive.
 class MlIconButton extends StatefulWidget {
   const MlIconButton({
     super.key,
     required this.icon,
-    this.onTap,
-    this.tooltip,
-    this.color,
+    VoidCallback? onTap,
+    VoidCallback? onPressed,
+    String? tooltip,
+    String? label,
     this.backgroundColor = const Color(0x00000000),
-  });
+  })  : onTap = onTap ?? onPressed,
+        tooltip = tooltip ?? label ?? 'Button';
 
   final Widget icon;
   final VoidCallback? onTap;
-  final String? tooltip;
-  final Color? color;
+  final String tooltip;
   final Color backgroundColor;
 
   @override
@@ -223,7 +254,7 @@ class _SpinnerPainter extends CustomPainter {
     canvas.drawArc(
       Rect.fromLTWH(0, 0, size.width, size.height),
       0,
-      4.71, // 270 degrees
+      4.71,
       false,
       paint,
     );

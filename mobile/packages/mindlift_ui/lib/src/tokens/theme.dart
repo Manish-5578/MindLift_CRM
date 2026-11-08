@@ -27,3 +27,4 @@ class MlTheme extends InheritedWidget {
   bool updateShouldNotify(MlTheme oldWidget) =>
       isDark != oldWidget.isDark || textDirection != oldWidget.textDirection;
 }
+

@@ -9,6 +9,20 @@ rootProject.buildDir = '../build'
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
 }
+
+subprojects { project ->
+    afterEvaluate {
+        if (project.hasProperty('android')) {
+            project.android {
+                if (namespace != 'com.mindlift.crm') {
+                    compileSdkVersion 34
+                    buildToolsVersion "34.0.0"
+                }
+            }
+        }
+    }
+}
+
 subprojects {
     project.evaluationDependsOn(':app')
 }

@@ -215,8 +215,9 @@
                     <div class="ml-stack gap-3">
                         <div class="d-flex flex-column gap-2" style="border:1px solid var(--ml-border);padding:16px;border-radius:8px;background:var(--mud-palette-surface)">
                             <MudTextField @bind-Value="_newNoteContent" 
+                                          @bind-Value:after="StateHasChanged"
                                           Immediate="true"
-                                          Placeholder="Lead Description" 
+                                          Placeholder="@T["Write a note..."]" 
                                           Lines="3" 
                                           Variant="Variant.Outlined" 
                                           Margin="Margin.Dense" 
