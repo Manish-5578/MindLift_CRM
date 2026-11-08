@@ -91,37 +91,37 @@ class MlConnectionBanner extends StatelessWidget {
       case MlSyncStatus.online:
         return const _BannerConfig(
           label: 'Connected',
-          backgroundColor: Color(0xFF064E3B),
-          indicatorColor: MlColors.success,
-          textColor: Color(0xFFD1FAE5),
+          backgroundColor: Color(0xFFD1FAE5),
+          indicatorColor: Color(0xFF059669),
+          textColor: Color(0xFF065F46),
         );
       case MlSyncStatus.offline:
         return const _BannerConfig(
           label: 'Offline — changes queued locally',
-          backgroundColor: Color(0xFF78350F),
-          indicatorColor: MlColors.warning,
-          textColor: Color(0xFFFEF3C7),
+          backgroundColor: Color(0xFFFEF3C7),
+          indicatorColor: Color(0xFFD97706),
+          textColor: Color(0xFF92400E),
         );
       case MlSyncStatus.syncing:
         return const _BannerConfig(
           label: 'Syncing changes with MindLift...',
-          backgroundColor: Color(0xFF1E1B4B),
+          backgroundColor: Color(0xFFEEF2FF),
           indicatorColor: MlColors.primary,
-          textColor: Color(0xFFE0E7FF),
+          textColor: Color(0xFF3730A3),
         );
       case MlSyncStatus.conflict:
         return const _BannerConfig(
           label: 'Sync conflict detected — review needed',
-          backgroundColor: Color(0xFF7F1D1D),
+          backgroundColor: Color(0xFFFEE2E2),
           indicatorColor: MlColors.danger,
-          textColor: Color(0xFFFEE2E2),
+          textColor: Color(0xFF991B1B),
         );
       case MlSyncStatus.error:
         return const _BannerConfig(
           label: 'Sync paused — network error',
-          backgroundColor: Color(0xFF7F1D1D),
+          backgroundColor: Color(0xFFFEE2E2),
           indicatorColor: MlColors.danger,
-          textColor: Color(0xFFFEE2E2),
+          textColor: Color(0xFF991B1B),
         );
     }
   }

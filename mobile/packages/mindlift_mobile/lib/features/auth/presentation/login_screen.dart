@@ -70,11 +70,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 color: MlColors.surface,
                 borderRadius: BorderRadius.circular(MlRadii.xl),
                 border: Border.all(color: MlColors.border),
-                boxShadow: [
+                boxShadow: const [
                   BoxShadow(
-                    color: MlColors.black.withOpacity(0.3),
-                    blurRadius: 16,
-                    offset: const Offset(0, 8),
+                    color: Color(0x0F0F172A),
+                    blurRadius: 24,
+                    offset: Offset(0, 8),
                   ),
                 ],
               ),
@@ -123,9 +123,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     Container(
                       padding: const EdgeInsets.all(MlSpacing.md),
                       decoration: BoxDecoration(
-                        color: MlColors.danger.withOpacity(0.12),
+                        color: MlColors.dangerSoft,
                         borderRadius: BorderRadius.circular(MlRadii.md),
-                        border: Border.all(color: MlColors.danger.withOpacity(0.4)),
+                        border: Border.all(color: const Color(0xFFFCA5A5)),
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -135,7 +135,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             child: Text(
                               authState.errorMessage!,
                               style: MlTypography.caption.copyWith(
-                                color: MlColors.danger,
+                                color: const Color(0xFF991B1B),
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -211,7 +211,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           const SizedBox(height: MlSpacing.xs),
                           MlTextField(
                             controller: _serverController,
-                            placeholder: 'http://10.0.2.2:5082',
+                            placeholder: 'https://mindlift-staging.onrender.com',
                           ),
                           const SizedBox(height: MlSpacing.sm),
                           Row(
@@ -225,17 +225,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: MlSpacing.xs),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          const SizedBox(height: MlSpacing.sm),
+                          Wrap(
+                            spacing: MlSpacing.md,
+                            runSpacing: MlSpacing.xs,
                             children: [
                               GestureDetector(
+                                onTap: () => _applyServerUrl('https://mindlift-staging.onrender.com'),
+                                child: Text('🌐 Staging (Cloud)', style: MlTypography.caption.copyWith(color: MlColors.primary, fontWeight: FontWeight.w600)),
+                              ),
+                              GestureDetector(
                                 onTap: () => _applyServerUrl('http://10.0.2.2:5082'),
-                                child: Text('Emulator (10.0.2.2)', style: MlTypography.caption.copyWith(color: MlColors.primary)),
+                                child: Text('📱 Emulator (10.0.2.2)', style: MlTypography.caption.copyWith(color: MlColors.textSecondary)),
                               ),
                               GestureDetector(
                                 onTap: () => _applyServerUrl('http://localhost:5082'),
-                                child: Text('Direct (localhost)', style: MlTypography.caption.copyWith(color: MlColors.primary)),
+                                child: Text('💻 Localhost', style: MlTypography.caption.copyWith(color: MlColors.textSecondary)),
                               ),
                             ],
                           ),

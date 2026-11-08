@@ -45,9 +45,16 @@ class _MlRecordCardState extends State<MlRecordCard> {
       constraints: const BoxConstraints(minHeight: MlSpacing.touchTarget),
       padding: widget.padding,
       decoration: BoxDecoration(
-        color: _isPressed ? widget.backgroundColor.withOpacity(0.85) : widget.backgroundColor,
+        color: _isPressed ? MlColors.surfaceElevated : widget.backgroundColor,
         borderRadius: BorderRadius.circular(MlRadii.lg),
         border: Border.all(color: widget.borderColor, width: 1.0),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A0F172A),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

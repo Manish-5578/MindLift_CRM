@@ -6,7 +6,7 @@ class MlTheme extends InheritedWidget {
   const MlTheme({
     super.key,
     required super.child,
-    this.isDark = true,
+    this.isDark = false,
     this.textDirection = TextDirection.ltr,
   });
 

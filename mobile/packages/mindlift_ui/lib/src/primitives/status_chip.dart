@@ -34,29 +34,29 @@ class MlStatusChip extends StatelessWidget {
     if (state != null) {
       switch (state!) {
         case MlStatusState.primary:
-          effectiveDotColor = MlColors.primaryLight;
-          effectiveBg = MlColors.primary.withOpacity(0.18);
-          effectiveText = MlColors.primaryLight;
+          effectiveDotColor = MlColors.primary;
+          effectiveBg = MlColors.primarySoft;
+          effectiveText = MlColors.primary;
           break;
         case MlStatusState.success:
           effectiveDotColor = MlColors.success;
-          effectiveBg = MlColors.success.withOpacity(0.18);
-          effectiveText = MlColors.success;
+          effectiveBg = MlColors.successSoft;
+          effectiveText = const Color(0xFF065F46);
           break;
         case MlStatusState.warning:
           effectiveDotColor = MlColors.warning;
-          effectiveBg = MlColors.warning.withOpacity(0.18);
-          effectiveText = MlColors.warning;
+          effectiveBg = MlColors.warningSoft;
+          effectiveText = const Color(0xFF92400E);
           break;
         case MlStatusState.danger:
           effectiveDotColor = MlColors.danger;
-          effectiveBg = MlColors.danger.withOpacity(0.18);
-          effectiveText = MlColors.danger;
+          effectiveBg = MlColors.dangerSoft;
+          effectiveText = const Color(0xFF991B1B);
           break;
         case MlStatusState.neutral:
           effectiveDotColor = MlColors.textMuted;
           effectiveBg = MlColors.surfaceElevated;
-          effectiveText = MlColors.textMuted;
+          effectiveText = MlColors.textSecondary;
           break;
       }
     }

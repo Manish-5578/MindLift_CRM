@@ -4,10 +4,10 @@ import 'package:mindlift_ui/mindlift_ui.dart';
 import '../features/offline/offline_database.dart';
 import 'auth_provider.dart';
 
-// Configurable base URL for staff API
+// Configurable base URL for staff API (defaults to live staging environment)
 const kDefaultApiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'http://10.0.2.2:5082',
+  defaultValue: 'https://mindlift-staging.onrender.com',
 );
 
 class ServerUrlNotifier extends StateNotifier<String> {

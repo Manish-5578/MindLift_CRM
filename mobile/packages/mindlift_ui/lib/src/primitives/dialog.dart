@@ -88,8 +88,8 @@ class MlDialog extends StatelessWidget {
         border: Border.all(color: MlColors.border, width: 1),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x66000000),
-            blurRadius: 20,
+            color: Color(0x1F0F172A),
+            blurRadius: 24,
             offset: Offset(0, 8),
           ),
         ],

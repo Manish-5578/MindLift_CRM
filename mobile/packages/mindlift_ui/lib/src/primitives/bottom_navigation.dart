@@ -169,7 +169,7 @@ class MlBottomNavigation extends StatelessWidget {
                 item.label,
                 style: MlTypography.caption.copyWith(
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: isSelected ? MlColors.primaryLight : MlColors.textMuted,
+                  color: isSelected ? MlColors.primary : MlColors.textMuted,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
