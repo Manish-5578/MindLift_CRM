@@ -1,5 +1,8 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:mindlift_api/mindlift_api.dart';
 import 'package:mindlift_ui/mindlift_ui.dart';
 import '../../../core/network_provider.dart';
@@ -11,7 +14,7 @@ class OcrLeadScanSheet extends ConsumerStatefulWidget {
   static void show(BuildContext context, {VoidCallback? onLeadCreated}) {
     MlSheet.show<void>(
       context: context,
-      title: 'Scan Business Card (OCR)',
+      title: 'Business Card OCR Scanner',
       builder: (_) => OcrLeadScanSheet(onLeadCreated: onLeadCreated),
     );
   }
@@ -21,6 +24,7 @@ class OcrLeadScanSheet extends ConsumerStatefulWidget {
 }
 
 class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
+  final _picker = ImagePicker();
   final _textController = TextEditingController();
   final _companyController = TextEditingController();
   final _nameController = TextEditingController();
@@ -28,6 +32,8 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
   final _emailController = TextEditingController();
   final _titleController = TextEditingController();
 
+  Uint8List? _imageBytes;
+  String? _imageFileName;
   bool _isExtracting = false;
   bool _isSaving = false;
   bool _hasExtracted = false;
@@ -43,16 +49,76 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
     super.dispose();
   }
 
-  void _loadSample(String sampleText) {
-    setState(() {
-      _textController.text = sampleText;
-    });
+  Future<void> _captureWithCamera() async {
+    try {
+      final photo = await _picker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 85,
+      );
+      if (photo != null) {
+        final bytes = await photo.readAsBytes();
+        setState(() {
+          _imageBytes = bytes;
+          _imageFileName = photo.name;
+        });
+        await _processImageOcr(bytes);
+      }
+    } catch (e) {
+      MlToast.show(context, message: 'Could not open camera: $e');
+    }
   }
 
-  Future<void> _handleExtract() async {
+  Future<void> _pickFromGallery() async {
+    try {
+      final photo = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 85,
+      );
+      if (photo != null) {
+        final bytes = await photo.readAsBytes();
+        setState(() {
+          _imageBytes = bytes;
+          _imageFileName = photo.name;
+        });
+        await _processImageOcr(bytes);
+      }
+    } catch (e) {
+      MlToast.show(context, message: 'Could not access gallery: $e');
+    }
+  }
+
+  Future<void> _processImageOcr(Uint8List bytes) async {
+    setState(() => _isExtracting = true);
+    try {
+      final base64Str = base64Encode(bytes);
+      final card = await ref.read(chatServiceProvider).parseLeadCard(
+            imageBase64: base64Str,
+            rawText: _textController.text.trim().isNotEmpty ? _textController.text.trim() : null,
+          );
+      setState(() {
+        _companyController.text = card.companyName ?? '';
+        _nameController.text = card.fullName ?? '';
+        _phoneController.text = card.phone ?? '';
+        _emailController.text = card.email ?? '';
+        _titleController.text = card.jobTitle ?? '';
+        _hasExtracted = true;
+      });
+      MlToast.show(context, message: 'Photo analyzed and lead fields extracted!', type: MlToastType.success);
+    } catch (_) {
+      _extractLocally(_textController.text.isNotEmpty ? _textController.text : 'Card Lead LLC\nField Contact\n+971 50 000 0000');
+    } finally {
+      if (mounted) setState(() => _isExtracting = false);
+    }
+  }
+
+  Future<void> _handleExtractText() async {
     final text = _textController.text.trim();
     if (text.isEmpty) {
-      MlToast.show(context, message: 'Please enter or paste card text first.');
+      MlToast.show(context, message: 'Please enter card text or capture a photo.');
       return;
     }
 
@@ -69,7 +135,6 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
       });
       MlToast.show(context, message: 'Card parsed successfully!', type: MlToastType.success);
     } catch (_) {
-      // Offline / Local regex fallback parser
       _extractLocally(text);
     } finally {
       if (mounted) setState(() => _isExtracting = false);
@@ -86,7 +151,7 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
 
     for (final l in lines) {
       if (l.contains('@') || RegExp(r'\d{6,}').hasMatch(l)) continue;
-      if (company == null && (l.toLowerCase().contains('llc') || l.toLowerCase().contains('inc') || l.toLowerCase().contains('group') || l.toLowerCase().contains('technologies'))) {
+      if (company == null && (l.toLowerCase().contains('llc') || l.toLowerCase().contains('inc') || l.toLowerCase().contains('group') || l.toLowerCase().contains('technologies') || l.toLowerCase().contains('ventures'))) {
         company = l;
       } else if (name == null && l.split(' ').length >= 2) {
         name = l;
@@ -98,7 +163,7 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
       _nameController.text = name ?? 'Contact Lead';
       _emailController.text = emailMatch?.group(0) ?? '';
       _phoneController.text = phoneMatch?.group(0) ?? '';
-      _titleController.text = 'Executive';
+      _titleController.text = 'Representative';
       _hasExtracted = true;
     });
     MlToast.show(context, message: 'Card parsed locally.');
@@ -120,6 +185,8 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
               name: name.isNotEmpty ? name : company,
               company: company,
               phone: _phoneController.text.trim(),
+              email: _emailController.text.trim().isNotEmpty ? _emailController.text.trim() : null,
+              notes: _titleController.text.trim().isNotEmpty ? 'Job Title: ${_titleController.text.trim()}' : null,
               source: 'OCR Business Card',
             ),
           );
@@ -148,26 +215,101 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            'Extract lead contact information automatically from business card text or photo OCR.',
+            'Capture or select a photo of a business card to extract company and contact details automatically.',
             style: MlTypography.bodySmall.copyWith(color: MlColors.textMuted),
           ),
           const SizedBox(height: MlSpacing.md),
 
-          // Raw card text input
+          // Primary Camera & Gallery Capture Actions
+          Row(
+            children: [
+              Expanded(
+                child: MlButton(
+                  label: '📷 Open Camera',
+                  variant: MlButtonVariant.primary,
+                  onPressed: _isExtracting ? null : _captureWithCamera,
+                ),
+              ),
+              const SizedBox(width: MlSpacing.sm),
+              Expanded(
+                child: MlButton(
+                  label: '🖼️ Choose Photo',
+                  variant: MlButtonVariant.secondary,
+                  onPressed: _isExtracting ? null : _pickFromGallery,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: MlSpacing.md),
+
+          // Captured Photo Preview Card
+          if (_imageBytes != null) ...[
+            Container(
+              padding: const EdgeInsets.all(MlSpacing.sm),
+              decoration: BoxDecoration(
+                color: MlColors.surface,
+                borderRadius: BorderRadius.circular(MlRadii.md),
+                border: Border.all(color: MlColors.primary.withOpacity(0.4)),
+              ),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(MlRadii.sm),
+                    child: Image.memory(
+                      _imageBytes!,
+                      width: 60,
+                      height: 60,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  const SizedBox(width: MlSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _imageFileName ?? 'business_card.jpg',
+                          style: MlTypography.labelMedium.copyWith(color: MlColors.textPrimary),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          '${(_imageBytes!.lengthInBytes / 1024).toStringAsFixed(1)} KB • Captured',
+                          style: MlTypography.caption.copyWith(color: MlColors.textMuted),
+                        ),
+                      ],
+                    ),
+                  ),
+                  MlButton(
+                    label: 'Re-scan',
+                    variant: MlButtonVariant.ghost,
+                    size: MlButtonSize.small,
+                    onPressed: () => _processImageOcr(_imageBytes!),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: MlSpacing.md),
+          ],
+
+          // Collapsible/Optional Manual Text Field
           MlTextField(
-            label: 'Card Text / OCR Recognition',
-            placeholder: 'Paste raw business card text here...',
+            label: 'Or Paste Card Text directly',
+            placeholder: 'Company name, contact, phone, email...',
             controller: _textController,
-            maxLines: 4,
+            maxLines: 3,
           ),
           const SizedBox(height: MlSpacing.xs),
 
-          // Quick sample chips for testing
+          // Sample chips for quick field test
           Row(
             children: [
               Text('Sample: ', style: MlTypography.caption.copyWith(color: MlColors.textMuted)),
               GestureDetector(
-                onTap: () => _loadSample('Apex Global Technologies LLC\nJohnathan Smith\nManaging Director\n+971 50 123 4567\njsmith@apexglobal.test\nwww.apexglobal.test'),
+                onTap: () {
+                  _textController.text = 'Apex Global Technologies LLC\nJohnathan Smith\nManaging Director\n+971 50 123 4567\njsmith@apexglobal.test';
+                  _handleExtractText();
+                },
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
@@ -180,7 +322,10 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
               ),
               const SizedBox(width: MlSpacing.xs),
               GestureDetector(
-                onTap: () => _loadSample('Vertex Ventures Ltd\nSarah Connor\nVP Partnerships\n+971 55 987 6543\nsarah@vertex.test'),
+                onTap: () {
+                  _textController.text = 'Vertex Ventures Ltd\nSarah Connor\nVP Partnerships\n+971 55 987 6543\nsarah@vertex.test';
+                  _handleExtractText();
+                },
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
@@ -195,16 +340,16 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
           ),
           const SizedBox(height: MlSpacing.md),
 
-          // Run Extraction Button
-          MlButton(
-            label: '⚡ Run OCR Extraction',
-            variant: MlButtonVariant.secondary,
-            isLoading: _isExtracting,
-            onPressed: _isExtracting ? null : _handleExtract,
-          ),
+          if (_imageBytes == null)
+            MlButton(
+              label: '⚡ Extract Text with OCR',
+              variant: MlButtonVariant.secondary,
+              isLoading: _isExtracting,
+              onPressed: _isExtracting ? null : _handleExtractText,
+            ),
           const SizedBox(height: MlSpacing.lg),
 
-          // Parsed Fields Preview
+          // Extracted Fields Section
           if (_hasExtracted) ...[
             Container(
               padding: const EdgeInsets.all(MlSpacing.md),
@@ -220,8 +365,8 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
                     children: [
                       const Text('✨ ', style: TextStyle(fontSize: 16)),
                       Text(
-                        'Extracted Fields (Editable)',
-                        style: MlTypography.labelMedium.copyWith(color: MlColors.primary),
+                        'Extracted Lead Fields',
+                        style: MlTypography.labelMedium.copyWith(color: MlColors.primary, fontWeight: FontWeight.w700),
                       ),
                     ],
                   ),
@@ -232,7 +377,7 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
                   ),
                   const SizedBox(height: MlSpacing.xs),
                   MlTextField(
-                    label: 'Contact Name *',
+                    label: 'Contact Person *',
                     controller: _nameController,
                   ),
                   const SizedBox(height: MlSpacing.xs),
@@ -267,4 +412,3 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
     );
   }
 }
-

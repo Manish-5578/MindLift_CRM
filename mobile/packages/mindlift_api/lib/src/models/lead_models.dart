@@ -28,16 +28,24 @@ class LeadDto {
   final int version;
 
   factory LeadDto.fromJson(Map<String, dynamic> json) {
+    final company = (json['companyName'] ?? json['company']) as String?;
+    final firstName = json['firstName'] as String? ?? '';
+    final lastName = json['lastName'] as String? ?? '';
+    final rawName = (json['fullName'] ?? json['name']) as String?;
+    final derivedName = rawName != null && rawName.isNotEmpty
+        ? rawName
+        : '$firstName $lastName'.trim();
+
     return LeadDto(
       id: json['id'] as String? ?? '',
-      name: json['name'] as String? ?? '',
-      company: json['company'] as String?,
+      name: derivedName.isNotEmpty ? derivedName : (company ?? 'Lead'),
+      company: company,
       email: json['email'] as String?,
       phone: json['phone'] as String?,
       status: json['status'] as String? ?? 'New',
       rating: json['rating'] as String?,
       source: json['source'] as String?,
-      createdBy: json['createdBy'] as String? ?? json['owner'] as String?,
+      createdBy: json['createdByName'] as String? ?? json['ownerName'] as String?,
       createdAtUtc: json['createdAtUtc'] != null
           ? DateTime.tryParse(json['createdAtUtc'] as String)
           : null,
@@ -143,16 +151,27 @@ class CreateLeadRequest {
   final String? rating;
   final String? notes;
 
-  Map<String, dynamic> toJson() => {
-        'name': name,
-        if (company != null) 'company': company,
-        if (email != null) 'email': email,
-        if (phone != null) 'phone': phone,
-        'source': source,
-        'status': status,
-        if (rating != null) 'rating': rating,
-        if (notes != null) 'notes': notes,
-      };
+  Map<String, dynamic> toJson() {
+    final trimmed = name.trim();
+    final parts = trimmed.split(' ');
+    final fName = parts.isNotEmpty && parts[0].isNotEmpty ? parts[0] : (company ?? 'Lead');
+    final lName = parts.length > 1 ? parts.sublist(1).join(' ') : '';
+
+    return {
+      'firstName': fName,
+      'lastName': lName,
+      'name': trimmed,
+      'fullName': trimmed,
+      'companyName': company,
+      'company': company,
+      if (email != null) 'email': email,
+      if (phone != null) 'phone': phone,
+      'source': source,
+      'status': status,
+      if (rating != null) 'rating': rating,
+      if (notes != null) 'description': notes,
+    };
+  }
 }
 
 class UpdateLeadStatusRequest {
