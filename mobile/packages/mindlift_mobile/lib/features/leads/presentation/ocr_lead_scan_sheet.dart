@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mindlift_api/mindlift_api.dart';
 import 'package:mindlift_ui/mindlift_ui.dart';
@@ -34,6 +35,7 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
 
   Uint8List? _imageBytes;
   String? _imageFileName;
+  String? _imageFilePath;
   bool _isExtracting = false;
   bool _isSaving = false;
   bool _hasExtracted = false;
@@ -62,8 +64,9 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
         setState(() {
           _imageBytes = bytes;
           _imageFileName = photo.name;
+          _imageFilePath = photo.path;
         });
-        await _processImageOcr(bytes);
+        await _processImageOcr(photo.path, bytes);
       }
     } catch (e) {
       MlToast.show(context, message: 'Could not open camera: $e');
@@ -83,33 +86,81 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
         setState(() {
           _imageBytes = bytes;
           _imageFileName = photo.name;
+          _imageFilePath = photo.path;
         });
-        await _processImageOcr(bytes);
+        await _processImageOcr(photo.path, bytes);
       }
     } catch (e) {
       MlToast.show(context, message: 'Could not access gallery: $e');
     }
   }
 
-  Future<void> _processImageOcr(Uint8List bytes) async {
+  Future<void> _processImageOcr(String? filePath, Uint8List bytes) async {
     setState(() => _isExtracting = true);
     try {
+      String recognizedText = '';
+
+      // 1. Perform on-device optical character recognition using ML Kit
+      if (filePath != null && filePath.isNotEmpty) {
+        try {
+          final inputImage = InputImage.fromFilePath(filePath);
+          final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
+          final result = await textRecognizer.processImage(inputImage);
+          await textRecognizer.close();
+          recognizedText = result.text.trim();
+        } catch (mlErr) {
+          debugPrint('MLKit on-device OCR error / note: $mlErr');
+        }
+      }
+
+      if (recognizedText.isNotEmpty) {
+        _textController.text = recognizedText;
+      }
+
       final base64Str = base64Encode(bytes);
-      final card = await ref.read(chatServiceProvider).parseLeadCard(
-            imageBase64: base64Str,
-            rawText: _textController.text.trim().isNotEmpty ? _textController.text.trim() : null,
+
+      // 2. Parse recognized card data via backend API
+      try {
+        final card = await ref.read(chatServiceProvider).parseLeadCard(
+              imageBase64: base64Str,
+              rawText: recognizedText.isNotEmpty
+                  ? recognizedText
+                  : (_textController.text.trim().isNotEmpty ? _textController.text.trim() : null),
+            );
+
+        if (mounted) {
+          setState(() {
+            _companyController.text = card.companyName ?? '';
+            _nameController.text = card.fullName ?? '';
+            _phoneController.text = card.phone ?? '';
+            _emailController.text = card.email ?? '';
+            _titleController.text = card.jobTitle ?? '';
+            _hasExtracted = true;
+          });
+          MlToast.show(context, message: 'Card analyzed: lead details extracted!', type: MlToastType.success);
+        }
+        return;
+      } catch (apiErr) {
+        debugPrint('Backend OCR parse fallback: $apiErr');
+      }
+
+      // 3. Fallback: Parse recognized text locally if backend unavailable
+      final textToParse = recognizedText.isNotEmpty ? recognizedText : _textController.text.trim();
+      if (textToParse.isNotEmpty) {
+        _extractLocally(textToParse);
+      } else {
+        if (mounted) {
+          MlToast.show(
+            context,
+            message: 'No readable text could be recognized from the card. Please ensure clear lighting and legible text.',
+            type: MlToastType.info,
           );
-      setState(() {
-        _companyController.text = card.companyName ?? '';
-        _nameController.text = card.fullName ?? '';
-        _phoneController.text = card.phone ?? '';
-        _emailController.text = card.email ?? '';
-        _titleController.text = card.jobTitle ?? '';
-        _hasExtracted = true;
-      });
-      MlToast.show(context, message: 'Photo analyzed and lead fields extracted!', type: MlToastType.success);
-    } catch (_) {
-      _extractLocally(_textController.text.isNotEmpty ? _textController.text : 'Card Lead LLC\nField Contact\n+971 50 000 0000');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        MlToast.show(context, message: 'OCR analysis failed: $e', type: MlToastType.error);
+      }
     } finally {
       if (mounted) setState(() => _isExtracting = false);
     }
@@ -125,15 +176,17 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
     setState(() => _isExtracting = true);
     try {
       final card = await ref.read(chatServiceProvider).parseLeadCard(rawText: text);
-      setState(() {
-        _companyController.text = card.companyName ?? '';
-        _nameController.text = card.fullName ?? '';
-        _phoneController.text = card.phone ?? '';
-        _emailController.text = card.email ?? '';
-        _titleController.text = card.jobTitle ?? '';
-        _hasExtracted = true;
-      });
-      MlToast.show(context, message: 'Card parsed successfully!', type: MlToastType.success);
+      if (mounted) {
+        setState(() {
+          _companyController.text = card.companyName ?? '';
+          _nameController.text = card.fullName ?? '';
+          _phoneController.text = card.phone ?? '';
+          _emailController.text = card.email ?? '';
+          _titleController.text = card.jobTitle ?? '';
+          _hasExtracted = true;
+        });
+        MlToast.show(context, message: 'Card parsed successfully!', type: MlToastType.success);
+      }
     } catch (_) {
       _extractLocally(text);
     } finally {
@@ -142,31 +195,71 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
   }
 
   void _extractLocally(String text) {
-    final emailMatch = RegExp(r'[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}').firstMatch(text);
-    final phoneMatch = RegExp(r'(?:\+?\d{1,3}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{3,4}|\+?\d{9,14}').firstMatch(text);
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) {
+      MlToast.show(context, message: 'No readable card text found to parse.', type: MlToastType.info);
+      return;
+    }
 
-    final lines = text.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+    final emailMatch = RegExp(r'[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}').firstMatch(trimmed);
+    final phoneMatch = RegExp(r'(?:\+?\d{1,3}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{3,4}|\+?\d{9,14}').firstMatch(trimmed);
+
+    final lines = trimmed.split(RegExp(r'\r?\n')).map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
     String? company;
     String? name;
+    String? title;
+
+    final companyKeywords = [
+      'llc', 'inc', 'corp', 'corporation', 'ltd', 'limited', 'group', 'solutions',
+      'technologies', 'tech', 'co.', 'company', 'holdings', 'ventures', 'services',
+      'industries', 'consulting', 'enterprises', 'global', 'international', 'agency'
+    ];
+    final titleKeywords = [
+      'director', 'manager', 'ceo', 'cto', 'cfo', 'founder', 'president', 'consultant',
+      'head', 'lead', 'developer', 'engineer', 'specialist', 'officer', 'representative', 'architect'
+    ];
+
+    final remainingLines = <String>[];
 
     for (final l in lines) {
-      if (l.contains('@') || RegExp(r'\d{6,}').hasMatch(l)) continue;
-      if (company == null && (l.toLowerCase().contains('llc') || l.toLowerCase().contains('inc') || l.toLowerCase().contains('group') || l.toLowerCase().contains('technologies') || l.toLowerCase().contains('ventures'))) {
+      final lower = l.toLowerCase();
+      if (l.contains('@') || RegExp(r'\d{7,}').hasMatch(l)) {
+        continue;
+      }
+      if (title == null && titleKeywords.any((k) => lower.contains(k))) {
+        title = l;
+        continue;
+      }
+      if (company == null && companyKeywords.any((k) => lower.contains(k))) {
         company = l;
-      } else if (name == null && l.split(' ').length >= 2) {
+        continue;
+      }
+      if (lower.contains('street') || lower.contains('road') || lower.contains('tower') ||
+          lower.contains('building') || lower.contains('box') || lower.contains('dubai') ||
+          lower.contains('floor') || lower.contains('uae')) {
+        continue;
+      }
+      remainingLines.add(l);
+    }
+
+    for (final l in remainingLines) {
+      final words = l.split(' ').where((w) => w.isNotEmpty).toList();
+      if (name == null && words.length >= 2 && words.length <= 4 && !words.any((w) => RegExp(r'\d').hasMatch(w))) {
         name = l;
+      } else if (company == null && words.length >= 1 && words.length <= 6) {
+        company = l;
       }
     }
 
     setState(() {
-      _companyController.text = company ?? (lines.isNotEmpty ? lines[0] : 'Scanned Company');
-      _nameController.text = name ?? 'Contact Lead';
+      _companyController.text = company ?? '';
+      _nameController.text = name ?? '';
       _emailController.text = emailMatch?.group(0) ?? '';
       _phoneController.text = phoneMatch?.group(0) ?? '';
-      _titleController.text = 'Representative';
+      _titleController.text = title ?? '';
       _hasExtracted = true;
     });
-    MlToast.show(context, message: 'Card parsed locally.');
+    MlToast.show(context, message: 'Card parsed from recognized text.', type: MlToastType.success);
   }
 
   Future<void> _handleSaveLead() async {
@@ -284,7 +377,7 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
                     label: 'Re-scan',
                     variant: MlButtonVariant.ghost,
                     size: MlButtonSize.small,
-                    onPressed: () => _processImageOcr(_imageBytes!),
+                    onPressed: () => _processImageOcr(_imageFilePath, _imageBytes!),
                   ),
                 ],
               ),

@@ -44,13 +44,11 @@ Level 14, Al Saada Tower, Dubai, UAE";
     }
 
     [Fact]
-    public async Task ExtractAsync_FallbackExtracts_WhenImageBase64ProvidedWithoutRawText()
+    public async Task ExtractAsync_ThrowsValidationException_WhenImageProvidedWithoutOcrEngineAndNoText()
     {
-        var result = await _ocrService.ExtractAsync(new ParseCardOcrRequest(null, "base64imagedata"));
-
-        result.CompanyName.ShouldNotBeNullOrEmpty();
-        result.FullName.ShouldNotBeNullOrEmpty();
-        result.Email.ShouldNotBeNullOrEmpty();
+        // When OCR engine cannot extract any text, it should throw ValidationException rather than returning dummy data
+        await Should.ThrowAsync<ValidationException>(() =>
+            _ocrService.ExtractAsync(new ParseCardOcrRequest(null, "invalid_or_empty_image")));
     }
 }
 

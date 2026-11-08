@@ -5,12 +5,16 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using MindLift.Application.Common.Exceptions;
+using MindLift.Infrastructure.Documents.Text;
 using MindLift.Shared.Contracts;
 
 namespace MindLift.Infrastructure.Leads;
 
-public sealed class LeadCardOcrService
+public sealed class LeadCardOcrService(
+    DocumentPageReader? pageReader = null,
+    ILogger<LeadCardOcrService>? logger = null)
 {
     private static readonly Regex EmailRegex = new(@"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}", RegexOptions.Compiled);
     private static readonly Regex PhoneRegex = new(@"(?:\+?\d{1,3}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{3,4}|\+?\d{9,14}", RegexOptions.Compiled);
@@ -30,20 +34,60 @@ public sealed class LeadCardOcrService
         "industries", "consulting", "enterprises", "global", "international", "agency", "media", "capital"
     ];
 
-    public Task<ExtractedLeadCardDto> ExtractAsync(ParseCardOcrRequest request, CancellationToken ct = default)
+    public async Task<ExtractedLeadCardDto> ExtractAsync(ParseCardOcrRequest request, CancellationToken ct = default)
     {
-        var text = request.RawText ?? string.Empty;
+        var text = request.RawText?.Trim() ?? string.Empty;
 
-        // If raw text is empty but image is provided, parse text or simulate OCR text
+        // If raw text is empty but image is provided, run real OCR on the image bytes
         if (string.IsNullOrWhiteSpace(text) && !string.IsNullOrWhiteSpace(request.ImageBase64))
         {
-            // If image is sent without pre-OCR, provide fallback extracted card info
-            text = "Business Card Scan\nApex Global Technologies LLC\nJohnathan Smith\nManaging Director\n+971 50 123 4567\njsmith@apexglobal.test\nwww.apexglobal.test";
+            if (pageReader != null)
+            {
+                var tempFile = Path.Combine(Path.GetTempPath(), $"card_{Guid.NewGuid():N}.png");
+                try
+                {
+                    var rawBase64 = request.ImageBase64;
+                    var commaIdx = rawBase64.IndexOf(',');
+                    if (commaIdx >= 0)
+                    {
+                        rawBase64 = rawBase64[(commaIdx + 1)..];
+                    }
+
+                    var bytes = Convert.FromBase64String(rawBase64.Trim());
+                    await File.WriteAllBytesAsync(tempFile, bytes, ct);
+
+                    var pages = await pageReader.ReadAsync(tempFile, ct);
+                    var ocrLines = pages
+                        .SelectMany(p => (p.Text ?? string.Empty).Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+                        .Select(l => l.Trim())
+                        .Where(l => l.Length > 0);
+
+                    text = string.Join("\n", ocrLines).Trim();
+                }
+                catch (Exception ex)
+                {
+                    logger?.LogWarning(ex, "OCR page reader failed to extract text from card image bytes.");
+                }
+                finally
+                {
+                    try
+                    {
+                        if (File.Exists(tempFile))
+                        {
+                            File.Delete(tempFile);
+                        }
+                    }
+                    catch
+                    {
+                        // best effort cleanup
+                    }
+                }
+            }
         }
 
         if (string.IsNullOrWhiteSpace(text))
         {
-            throw new ValidationException("empty_card_text", "Could not detect text from card.");
+            throw new ValidationException("empty_card_text", "No readable text could be detected from the business card. Please ensure the card is clear and well lit.");
         }
 
         var lines = text
@@ -100,7 +144,8 @@ public sealed class LeadCardOcrService
 
             if (lower.Contains("street") || lower.Contains("road") || lower.Contains("floor") ||
                 lower.Contains("tower") || lower.Contains("box") || lower.Contains("p.o.") ||
-                lower.Contains("building") || lower.Contains("avenue") || lower.Contains("suite"))
+                lower.Contains("building") || lower.Contains("avenue") || lower.Contains("suite") ||
+                lower.Contains("dubai") || lower.Contains("abu dhabi") || lower.Contains("uae"))
             {
                 address = (address == null ? line : $"{address}, {line}");
                 continue;
@@ -140,26 +185,30 @@ public sealed class LeadCardOcrService
                 lastName = string.Empty;
             }
         }
-        else if (!string.IsNullOrWhiteSpace(companyName))
+        else if (!string.IsNullOrWhiteSpace(email))
         {
-            // If name is absent, derive placeholder from email or company
-            firstName = email?.Split('@').FirstOrDefault() ?? "Lead";
-            lastName = "Contact";
-            fullName = $"{firstName} {lastName}";
+            var userPart = email.Split('@')[0];
+            var segments = userPart.Split(new[] { '.', '_', '-' }, StringSplitOptions.RemoveEmptyEntries);
+            if (segments.Length >= 2)
+            {
+                firstName = char.ToUpperInvariant(segments[0][0]) + segments[0][1..].ToLowerInvariant();
+                lastName = char.ToUpperInvariant(segments[1][0]) + segments[1][1..].ToLowerInvariant();
+                fullName = $"{firstName} {lastName}";
+            }
         }
 
-        return Task.FromResult(new ExtractedLeadCardDto(
-            CompanyName: companyName ?? "New Enterprise",
-            FirstName: firstName ?? "Contact",
-            LastName: lastName ?? "Person",
-            FullName: fullName ?? (!string.IsNullOrWhiteSpace(firstName) ? $"{firstName} {lastName}".Trim() : "Lead Contact"),
+        return new ExtractedLeadCardDto(
+            CompanyName: companyName ?? string.Empty,
+            FirstName: firstName,
+            LastName: lastName,
+            FullName: fullName ?? (!string.IsNullOrWhiteSpace(firstName) ? $"{firstName} {lastName}".Trim() : null),
             Email: email,
             Phone: phone,
             JobTitle: jobTitle,
             Website: website,
             Address: address,
             RawText: text
-        ));
+        );
     }
 }
 
