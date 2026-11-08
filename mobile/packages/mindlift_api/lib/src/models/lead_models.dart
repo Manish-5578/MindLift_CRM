@@ -140,6 +140,7 @@ class CreateLeadRequest {
     this.status = 'New',
     this.rating,
     this.notes,
+    this.address,
   });
 
   final String name;
@@ -150,6 +151,7 @@ class CreateLeadRequest {
   final String status;
   final String? rating;
   final String? notes;
+  final String? address;
 
   Map<String, dynamic> toJson() {
     final trimmed = name.trim();
@@ -170,6 +172,7 @@ class CreateLeadRequest {
       'status': status,
       if (rating != null) 'rating': rating,
       if (notes != null) 'description': notes,
+      if (address != null && address!.trim().isNotEmpty) 'address': address!.trim(),
     };
   }
 }

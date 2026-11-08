@@ -51,12 +51,15 @@ public sealed class LeadOcrController(LeadCardOcrService ocrService) : Controlle
     }
 
     /// <summary>
-    /// True zero-buffer end-to-end streaming OCR endpoint.
-    /// Reads incoming multipart/form-data or raw image bytes directly from Request.Body without ASP.NET IFormFile disk/memory buffering.
+    /// Zero-buffer end-to-end streaming OCR endpoint.
+    /// Accepts:
+    ///   - Single raw binary image (Content-Type: image/*)
+    ///   - Multipart with named parts: "front" (required) and "back" (optional).
+    ///     Front and back are processed independently through the OCR pipeline and results are merged server-side.
     /// </summary>
     [HttpPost("scan-card-file")]
     [DisableFormValueModelBinding]
-    [RequestSizeLimit(16 * 1024 * 1024)]
+    [RequestSizeLimit(32 * 1024 * 1024)]  // Allow up to 32 MB total for two sides
     public async Task<ActionResult<ExtractedLeadCardDto>> ScanCardFile(CancellationToken ct = default)
     {
         var contentType = Request.ContentType;
@@ -65,13 +68,13 @@ public sealed class LeadOcrController(LeadCardOcrService ocrService) : Controlle
             throw new ValidationException("invalid_content_type", "Missing Content-Type header.");
         }
 
-        // 1. Direct binary stream upload (e.g. image/jpeg, image/png, application/octet-stream)
+        // 1. Direct raw binary stream upload (image/jpeg, image/png, application/octet-stream)
         if (contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase) ||
             contentType.StartsWith("application/octet-stream", StringComparison.OrdinalIgnoreCase))
         {
             var fileName = Request.Headers.TryGetValue("X-File-Name", out var headerName)
                 ? headerName.ToString()
-                : "card_scan.jpg";
+                : "card_front.jpg";
             var directResult = await ocrService.ExtractFromDirectStreamAsync(Request.Body, fileName, ct);
             return Ok(directResult);
         }
@@ -88,23 +91,60 @@ public sealed class LeadOcrController(LeadCardOcrService ocrService) : Controlle
 
             var reader = new MultipartReader(boundary, Request.Body)
             {
-                BodyLengthLimit = 16 * 1024 * 1024
+                BodyLengthLimit = 32 * 1024 * 1024
             };
+
+            ExtractedLeadCardDto? frontResult = null;
+            ExtractedLeadCardDto? backResult = null;
+            var sectionCount = 0;
 
             MultipartSection? section;
             while ((section = await reader.ReadNextSectionAsync(ct)) != null)
             {
-                if (ContentDispositionHeaderValue.TryParse(section.ContentDisposition, out var contentDisposition)
-                    && contentDisposition.DispositionType.Equals("form-data", StringComparison.OrdinalIgnoreCase)
-                    && (!string.IsNullOrEmpty(contentDisposition.FileName.Value) || !string.IsNullOrEmpty(contentDisposition.FileNameStar.Value)))
+                if (!ContentDispositionHeaderValue.TryParse(section.ContentDisposition, out var contentDisposition))
+                    continue;
+                if (!contentDisposition.DispositionType.Equals("form-data", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var hasFileName = !string.IsNullOrEmpty(contentDisposition.FileName.Value) ||
+                                  !string.IsNullOrEmpty(contentDisposition.FileNameStar.Value);
+                if (!hasFileName) continue;
+
+                sectionCount++;
+                if (sectionCount > 2)
                 {
-                    var fileName = (contentDisposition.FileName.Value ?? contentDisposition.FileNameStar.Value ?? "card_scan.jpg").Trim('"');
-                    var result = await ocrService.ExtractFromDirectStreamAsync(section.Body, fileName, ct);
-                    return Ok(result);
+                    throw new ValidationException("too_many_images", "Only front and back card images are accepted (maximum 2 parts).");
+                }
+
+                var fieldName = contentDisposition.Name.Value?.Trim('"').ToLowerInvariant() ?? "front";
+                var fileName = (contentDisposition.FileName.Value ?? contentDisposition.FileNameStar.Value ?? "card_scan.jpg").Trim('"');
+
+                var partResult = await ocrService.ExtractFromDirectStreamAsync(section.Body, fileName, ct);
+
+                if (fieldName == "back")
+                {
+                    backResult = partResult;
+                }
+                else
+                {
+                    frontResult = partResult;
                 }
             }
 
-            throw new ValidationException("empty_file", "No image file section found in multipart upload.");
+            if (frontResult == null)
+            {
+                throw new ValidationException("empty_file", "No image file section found in multipart upload. Include a 'front' part.");
+            }
+
+            // If only front was supplied, return it directly
+            if (backResult == null)
+            {
+                return Ok(frontResult);
+            }
+
+            // Merge front and back results
+            var merged = await ocrService.MergeFrontAndBackAsync(frontResult, backResult, ct);
+            return Ok(merged);
         }
 
         throw new ValidationException("invalid_content_type", $"Unsupported Content-Type '{contentType}'. Expected multipart/form-data or image/jpeg.");

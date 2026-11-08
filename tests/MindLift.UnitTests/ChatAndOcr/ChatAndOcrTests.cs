@@ -36,13 +36,29 @@ public sealed class ChatAndOcrTests
         return dir?.FullName ?? AppContext.BaseDirectory;
     }
 
+    /// <summary>The Windows install location, or tesseract on the PATH (how the Linux build machine has it).</summary>
+    private static string? FindTesseract()
+    {
+        var windows = @"C:\Program Files\Tesseract-OCR\tesseract.exe";
+        if (File.Exists(windows)) return windows;
+
+        var fileName = OperatingSystem.IsWindows() ? "tesseract.exe" : "tesseract";
+        foreach (var dir in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty).Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var candidate = Path.Combine(dir.Trim(), fileName);
+            if (File.Exists(candidate)) return candidate;
+        }
+
+        return null;
+    }
+
     private static DocumentPageReader? CreateTestDocumentReader()
     {
         var repoRoot = FindRepoRoot();
-        var tesseractExe = @"C:\Program Files\Tesseract-OCR\tesseract.exe";
+        var tesseractExe = FindTesseract();
         var tessdata = Path.Combine(repoRoot, "tools", "tessdata");
 
-        if (!File.Exists(tesseractExe) || !Directory.Exists(tessdata))
+        if (tesseractExe is null || !Directory.Exists(tessdata))
         {
             return null;
         }
@@ -74,7 +90,8 @@ public sealed class ChatAndOcrTests
         string email,
         bool addGlare = false,
         bool addBlur = false,
-        int rotateDegrees = 0)
+        int rotateDegrees = 0,
+        IReadOnlyList<string>? extraLines = null)
     {
         int width = 900;
         int height = 500;
@@ -98,6 +115,13 @@ public sealed class ChatAndOcrTests
             canvas.DrawText(title, 60, 225, subFont, mutedPaint);
             canvas.DrawText(phone, 60, 310, font, textPaint);
             canvas.DrawText(email, 60, 360, font, textPaint);
+
+            var lineY = 410f;
+            foreach (var extra in extraLines ?? [])
+            {
+                canvas.DrawText(extra, 60, lineY, subFont, mutedPaint);
+                lineY += 34f;
+            }
 
             if (addGlare)
             {
@@ -387,5 +411,26 @@ karim@vertex.test";
         result.DetectedScript.ShouldNotBeNull();
         result.OverallConfidence.ShouldBeGreaterThan(0.6);
         result.Evidence.ShouldNotBeNull();
+    }
+
+    [Fact]
+    public async Task ExtractFromDirectStreamAsync_ReadsLandmarkAndPinFromIndianCard_AsAddressNeverAsContactPerson()
+    {
+        var jpeg = GeneratePhotographedCardJpeg(
+            company: "Acme Industries Pvt Ltd",
+            name: "Rahul Sharma",
+            title: "Sales Manager",
+            phone: "+91 98765 43210",
+            email: "rahul@acme.in",
+            extraLines: ["Landmark: Near ASC Hospital", "HSR Layout, Bengaluru 560 102"]);
+
+        using var ms = new MemoryStream(jpeg);
+        var result = await _fullPipelineOcrService.ExtractFromDirectStreamAsync(ms, "indian_card.jpg");
+
+        (result.FullName ?? string.Empty).ShouldNotContain("Landmark", Case.Insensitive);
+        (result.FullName ?? string.Empty).ShouldNotContain("ASC", Case.Insensitive);
+        result.Email.ShouldBe("rahul@acme.in");
+        result.Address.ShouldNotBeNull();
+        result.Address!.ShouldContain("near", Case.Insensitive);
     }
 }

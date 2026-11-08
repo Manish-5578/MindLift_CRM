@@ -103,6 +103,35 @@ class ChatService {
     return ExtractedLeadCardDto.fromJson(response.data as Map<String, dynamic>);
   }
 
+  /// Scans the front (required) and back (optional) of a card in one request. The server reads each side,
+  /// merges them and lists any field the two sides disagree on in `conflicts`.
+  Future<ExtractedLeadCardDto> scanCardSides({
+    String? frontPath,
+    List<int>? frontBytes,
+    String frontName = 'card_front.jpg',
+    String? backPath,
+    List<int>? backBytes,
+    String backName = 'card_back.jpg',
+  }) async {
+    Future<MultipartFile> part(String? path, List<int>? bytes, String name) async {
+      if (path != null && path.isNotEmpty) return MultipartFile.fromFile(path, filename: name);
+      return MultipartFile.fromBytes(bytes ?? const <int>[], filename: name);
+    }
+
+    final formData = FormData();
+    formData.files.add(MapEntry('front', await part(frontPath, frontBytes, frontName)));
+    if ((backPath != null && backPath.isNotEmpty) || (backBytes != null && backBytes.isNotEmpty)) {
+      formData.files.add(MapEntry('back', await part(backPath, backBytes, backName)));
+    }
+
+    final response = await _dio.post(
+      '/api/v1/leads/scan-card-file',
+      data: formData,
+      options: Options(contentType: 'multipart/form-data'),
+    );
+    return ExtractedLeadCardDto.fromJson(response.data as Map<String, dynamic>);
+  }
+
   Future<ExtractedLeadCardDto> parseLeadCard({String? rawText, String? imageBase64}) async {
     final response = await _dio.post(
       '/api/v1/leads/parse-card',

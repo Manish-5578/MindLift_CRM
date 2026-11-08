@@ -237,4 +237,37 @@ public sealed class OfflineSyncTests(MindLiftApiFactory factory) : IClassFixture
         actDto.Description.ShouldBe("Urgent follow up");
         actDto.DueAtUtc.ShouldNotBeNull();
     }
+
+    [Fact]
+    public async Task A_card_scan_lead_queued_offline_keeps_its_name_company_phone_and_address()
+    {
+        var admin = await Workspaces.SignupAsync(factory);
+        (await admin.Client.PostAsJsonAsync("/api/v1/onboarding/industry", new ApplyIndustryRequest("general"))).EnsureSuccessStatusCode();
+        (await admin.Client.PutAsJsonAsync("/api/v1/features/pwa-offline", new SetFeatureRequest(true))).EnsureSuccessStatusCode();
+
+        // The same keys the phone's scan screen writes to its outbox.
+        var payload = JsonDocument.Parse("""
+            {"fullName":"Rahul Sharma","companyName":"Acme Industries Pvt Ltd","phone":"+91 98765 43210","email":"rahul@acme.in",
+             "address":"HSR Layout, Landmark: Near ASC, Bengaluru 560 102","notes":"Job Title: Sales Manager","source":"Mobile Business Card Scan"}
+            """);
+        var batch = new OfflineSyncBatchRequest("batch_card_1",
+        [
+            new OfflineMutationRequest("card_1", "lead", "create", null, "temp_card_1", payload, null),
+        ]);
+
+        var resp = await admin.Client.PostAsJsonAsync("/api/v1/offline/sync", batch);
+        resp.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var result = await resp.Content.ReadFromJsonAsync<OfflineSyncBatchResultDto>();
+        result!.AppliedCount.ShouldBe(1);
+
+        var lead = await admin.Client.GetFromJsonAsync<LeadDto>($"/api/v1/leads/{result.IdMap["temp_card_1"]}");
+        lead.ShouldNotBeNull();
+        lead.FirstName.ShouldBe("Rahul");
+        lead.LastName.ShouldBe("Sharma");
+        lead.CompanyName.ShouldBe("Acme Industries Pvt Ltd");
+        lead.Phone.ShouldBe("+91 98765 43210");
+        lead.Email.ShouldBe("rahul@acme.in");
+        lead.Address.ShouldBe("HSR Layout, Landmark: Near ASC, Bengaluru 560 102");
+        lead.Source.ShouldBe("Mobile Business Card Scan");
+    }
 }

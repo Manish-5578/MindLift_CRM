@@ -119,6 +119,7 @@ class CardEvidenceBoxDto {
     required this.y,
     required this.width,
     required this.height,
+    this.side,
   });
 
   final String text;
@@ -128,6 +129,9 @@ class CardEvidenceBoxDto {
   final double width;
   final double height;
 
+  /// 'front' or 'back' when a card was scanned on both sides; null for a single image.
+  final String? side;
+
   factory CardEvidenceBoxDto.fromJson(Map<String, dynamic> json) {
     return CardEvidenceBoxDto(
       text: json['text'] as String? ?? '',
@@ -136,6 +140,28 @@ class CardEvidenceBoxDto {
       y: (json['y'] as num?)?.toDouble() ?? 0.0,
       width: (json['width'] as num?)?.toDouble() ?? 0.0,
       height: (json['height'] as num?)?.toDouble() ?? 0.0,
+      side: json['side'] as String?,
+    );
+  }
+}
+
+/// A field the front and back of a card disagree on, with both readings.
+class CardFieldConflictDto {
+  const CardFieldConflictDto({
+    required this.field,
+    required this.frontValue,
+    required this.backValue,
+  });
+
+  final String field;
+  final String frontValue;
+  final String backValue;
+
+  factory CardFieldConflictDto.fromJson(Map<String, dynamic> json) {
+    return CardFieldConflictDto(
+      field: json['field'] as String? ?? '',
+      frontValue: json['frontValue'] as String? ?? '',
+      backValue: json['backValue'] as String? ?? '',
     );
   }
 }
@@ -162,6 +188,8 @@ class ExtractedLeadCardDto {
     this.duplicate,
     this.engineConfidence,
     this.evidence,
+    this.addressConfidence,
+    this.conflicts,
   });
 
   final String? companyName;
@@ -184,6 +212,8 @@ class ExtractedLeadCardDto {
   final LeadDuplicateCandidateDto? duplicate;
   final double? engineConfidence;
   final List<CardEvidenceBoxDto>? evidence;
+  final double? addressConfidence;
+  final List<CardFieldConflictDto>? conflicts;
 
   factory ExtractedLeadCardDto.fromJson(Map<String, dynamic> json) {
     final evidenceRaw = json['evidence'];
@@ -217,6 +247,12 @@ class ExtractedLeadCardDto {
           : null,
       engineConfidence: (json['engineConfidence'] as num?)?.toDouble(),
       evidence: evidenceList,
+      addressConfidence: (json['addressConfidence'] as num?)?.toDouble(),
+      conflicts: (json['conflicts'] is List)
+          ? (json['conflicts'] as List)
+              .map((e) => CardFieldConflictDto.fromJson(e as Map<String, dynamic>))
+              .toList()
+          : null,
     );
   }
 }

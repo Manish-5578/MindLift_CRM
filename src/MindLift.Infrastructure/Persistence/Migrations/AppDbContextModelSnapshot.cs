@@ -132,19 +132,6 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("description");
 
-                    b.Property<Guid?>("NextActivityId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("next_activity_id");
-
-                    b.Property<string>("Remarks")
-                        .HasColumnType("text")
-                        .HasColumnName("remarks");
-
-                    b.Property<string>("RescheduleReason")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("reschedule_reason");
-
                     b.Property<string>("Industry")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
@@ -307,6 +294,10 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("location");
 
+                    b.Property<Guid?>("NextActivityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("next_activity_id");
+
                     b.Property<DateTime?>("OverdueNotifiedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("overdue_notified_at");
@@ -325,6 +316,10 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(10)")
                         .HasColumnName("priority");
 
+                    b.Property<string>("Remarks")
+                        .HasColumnType("text")
+                        .HasColumnName("remarks");
+
                     b.Property<int?>("ReminderMinutes")
                         .HasColumnType("integer")
                         .HasColumnName("reminder_minutes");
@@ -332,6 +327,11 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("ReminderSentAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("reminder_sent_at");
+
+                    b.Property<string>("RescheduleReason")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("reschedule_reason");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -567,32 +567,19 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("entity_type");
 
-                    b.Property<DateTime>("OccurredAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("occurred_at");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<Guid?>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.Property<string>("UserName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("user_name");
-
-                    b.Property<string>("UserEmail")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("user_email");
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("ip_address");
 
                     b.Property<string>("Module")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("module");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
 
                     b.Property<string>("RecordTitle")
                         .HasMaxLength(300)
@@ -604,19 +591,32 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("summary");
 
-                    b.Property<string>("IpAddress")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("ip_address");
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("UserEmail")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("user_email");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("UserName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("user_name");
 
                     b.HasKey("Id")
                         .HasName("pk_audit_logs");
 
-                    b.HasIndex("TenantId", "EntityType", "EntityId", "OccurredAt")
-                        .HasDatabaseName("ix_audit_logs_tenant_id_entity_type_entity_id_occurred_at");
-
                     b.HasIndex("TenantId", "Module", "OccurredAt")
                         .HasDatabaseName("ix_audit_logs_tenant_id_module_occurred_at");
+
+                    b.HasIndex("TenantId", "EntityType", "EntityId", "OccurredAt")
+                        .HasDatabaseName("ix_audit_logs_tenant_id_entity_type_entity_id_occurred_at");
 
                     b.ToTable("audit_logs", (string)null);
                 });
@@ -6606,6 +6606,99 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.ToTable("idempotency_records", (string)null);
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.ImportHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("entity_type");
+
+                    b.PrimitiveCollection<string[]>("Errors")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("errors");
+
+                    b.Property<int>("FailedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("failed_count");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("file_name");
+
+                    b.Property<Guid?>("ImportedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("imported_by_id");
+
+                    b.Property<string>("ImportedByName")
+                        .HasColumnType("text")
+                        .HasColumnName("imported_by_name");
+
+                    b.Property<int>("ImportedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("imported_count");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<int>("SkippedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("skipped_count");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<int>("TotalRows")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_rows");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_import_histories");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_import_histories_tenant_id");
+
+                    b.ToTable("import_histories", (string)null);
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.IntegrationCredential", b =>
                 {
                     b.Property<Guid>("Id")
@@ -6692,6 +6785,99 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasFilter("is_deleted = false");
 
                     b.ToTable("integration_credentials", (string)null);
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.InternalChatMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ChannelName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("channel_name");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_read");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("message");
+
+                    b.Property<Guid?>("RecipientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recipient_id");
+
+                    b.Property<string>("SenderEmail")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("sender_email");
+
+                    b.Property<Guid>("SenderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sender_id");
+
+                    b.Property<string>("SenderName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("sender_name");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_internal_chat_messages");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_internal_chat_messages_tenant_id");
+
+                    b.HasIndex("TenantId", "ChannelName", "CreatedAtUtc")
+                        .HasDatabaseName("ix_internal_chat_messages_tenant_id_channel_name_created_at_utc");
+
+                    b.HasIndex("TenantId", "RecipientId", "SenderId", "CreatedAtUtc")
+                        .HasDatabaseName("ix_internal_chat_messages_tenant_id_recipient_id_sender_id_cre");
+
+                    b.ToTable("internal_chat_messages", (string)null);
                 });
 
             modelBuilder.Entity("MindLift.Domain.Entities.Invitation", b =>
@@ -7213,75 +7399,6 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.ToTable("layout_rules", (string)null);
                 });
 
-            modelBuilder.Entity("MindLift.Domain.Entities.LeadNote", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("AuthorId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("author_id");
-
-                    b.Property<string>("AuthorName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("author_name");
-
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("content");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<Guid?>("CreatedById")
-                        .HasColumnType("uuid")
-                        .HasColumnName("created_by_id");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
-
-                    b.Property<Guid>("LeadId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("lead_id");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<Guid?>("UpdatedById")
-                        .HasColumnType("uuid")
-                        .HasColumnName("updated_by_id");
-
-                    b.Property<int>("Version")
-                        .IsConcurrencyToken()
-                        .HasColumnType("integer")
-                        .HasColumnName("version");
-
-                    b.HasKey("Id")
-                        .HasName("pk_lead_notes");
-
-                    b.HasIndex("TenantId", "LeadId", "CreatedAt")
-                        .IsDescending(false, false, true)
-                        .HasDatabaseName("ix_lead_notes_tenant_id_lead_id_created_at");
-
-                    b.ToTable("lead_notes", (string)null);
-                });
-
             modelBuilder.Entity("MindLift.Domain.Entities.Lead", b =>
                 {
                     b.Property<Guid>("Id")
@@ -7293,17 +7410,13 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("address");
 
-                    b.Property<string>("City")
-                        .HasColumnType("text")
-                        .HasColumnName("city");
-
-                    b.Property<string>("State")
-                        .HasColumnType("text")
-                        .HasColumnName("state");
-
                     b.Property<DateTime?>("AssignedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("assigned_at");
+
+                    b.Property<string>("City")
+                        .HasColumnType("text")
+                        .HasColumnName("city");
 
                     b.Property<string>("CompanyName")
                         .HasColumnType("text")
@@ -7418,6 +7531,10 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("source");
 
+                    b.Property<string>("State")
+                        .HasColumnType("text")
+                        .HasColumnName("state");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text")
@@ -7465,6 +7582,78 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_leads_tenant_id_owner_id_status");
 
                     b.ToTable("leads", (string)null);
+                });
+
+            modelBuilder.Entity("MindLift.Domain.Entities.LeadNote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AuthorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("author_id");
+
+                    b.Property<string>("AuthorName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("author_name");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("content");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<Guid>("LeadId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lead_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_lead_notes");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_lead_notes_tenant_id");
+
+                    b.HasIndex("TenantId", "LeadId", "CreatedAt")
+                        .IsDescending(false, false, true)
+                        .HasDatabaseName("ix_lead_notes_tenant_id_lead_id_created_at");
+
+                    b.ToTable("lead_notes", (string)null);
                 });
 
             modelBuilder.Entity("MindLift.Domain.Entities.LeadRoutingLog", b =>
@@ -8276,6 +8465,150 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.ToTable("message_templates", (string)null);
                 });
 
+            modelBuilder.Entity("MindLift.Domain.Entities.MobileDevice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AppVersion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("app_version");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_id");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("Environment")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("environment");
+
+                    b.Property<int>("FailureCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("failure_count");
+
+                    b.Property<string>("InstallationId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("installation_id");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("LastPushFailureCode")
+                        .HasColumnType("text")
+                        .HasColumnName("last_push_failure_code");
+
+                    b.Property<DateTime?>("LastPushSucceededAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_push_succeeded_at_utc");
+
+                    b.Property<DateTime>("LastSeenAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_seen_at_utc");
+
+                    b.Property<string>("Locale")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("locale");
+
+                    b.Property<bool>("NotificationsAllowed")
+                        .HasColumnType("boolean")
+                        .HasColumnName("notifications_allowed");
+
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("platform");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("ProviderVersion")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("provider_version");
+
+                    b.Property<DateTime?>("RevokedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at_utc");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("TimeZoneId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("time_zone_id");
+
+                    b.Property<string>("TokenCiphertext")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("token_ciphertext");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("token_hash");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_mobile_devices");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_mobile_devices_tenant_id");
+
+                    b.HasIndex("TokenHash")
+                        .HasDatabaseName("ix_mobile_devices_token_hash");
+
+                    b.HasIndex("TenantId", "UserId", "InstallationId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_mobile_devices_tenant_id_user_id_installation_id");
+
+                    b.ToTable("mobile_devices", (string)null);
+                });
+
             modelBuilder.Entity("MindLift.Domain.Entities.ModuleSetting", b =>
                 {
                     b.Property<Guid>("Id")
@@ -8560,12 +8893,28 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                     b.ToTable("number_sequences", (string)null);
                 });
 
-            modelBuilder.Entity("MindLift.Domain.Entities.ImportHistory", b =>
+            modelBuilder.Entity("MindLift.Domain.Entities.OfflineMutationLog", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<string>("BatchId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("batch_id");
+
+                    b.Property<string>("ClientMutationId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("client_mutation_id");
+
+                    b.Property<DateTime>("CompletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at_utc");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -8581,55 +8930,45 @@ namespace MindLift.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("EntityType")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
                         .HasColumnName("entity_type");
 
-                    b.Property<string[]>("Errors")
-                        .IsRequired()
-                        .HasColumnType("text[]")
-                        .HasColumnName("errors");
-
-                    b.Property<int>("FailedCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("failed_count");
-
-                    b.Property<string>("FileName")
-                        .IsRequired()
+                    b.Property<string>("ErrorMessage")
                         .HasColumnType("text")
-                        .HasColumnName("file_name");
-
-                    b.Property<Guid?>("ImportedById")
-                        .HasColumnType("uuid")
-                        .HasColumnName("imported_by_id");
-
-                    b.Property<string>("ImportedByName")
-                        .HasColumnType("text")
-                        .HasColumnName("imported_by_name");
-
-                    b.Property<int>("ImportedCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("imported_count");
+                        .HasColumnName("error_message");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
 
-                    b.Property<int>("SkippedCount")
+                    b.Property<int?>("NewVersion")
                         .HasColumnType("integer")
-                        .HasColumnName("skipped_count");
+                        .HasColumnName("new_version");
+
+                    b.Property<string>("Operation")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("operation");
+
+                    b.Property<string>("ResultJson")
+                        .HasColumnType("text")
+                        .HasColumnName("result_json");
+
+                    b.Property<Guid?>("ServerEntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("server_entity_id");
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
                         .HasColumnName("status");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
-
-                    b.Property<int>("TotalRows")
-                        .HasColumnType("integer")
-                        .HasColumnName("total_rows");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -8640,19 +8979,21 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnName("updated_by_id");
 
                     b.Property<int>("Version")
+                        .IsConcurrencyToken()
                         .HasColumnType("integer")
                         .HasColumnName("version");
 
                     b.HasKey("Id")
-                        .HasName("pk_import_histories");
-
-                    b.HasIndex("EntityType")
-                        .HasDatabaseName("ix_import_histories_entity_type");
+                        .HasName("pk_offline_mutation_logs");
 
                     b.HasIndex("TenantId")
-                        .HasDatabaseName("ix_import_histories_tenant_id");
+                        .HasDatabaseName("ix_offline_mutation_logs_tenant_id");
 
-                    b.ToTable("import_histories", (string)null);
+                    b.HasIndex("TenantId", "ClientMutationId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_offline_mutation_logs_tenant_id_client_mutation_id");
+
+                    b.ToTable("offline_mutation_logs", (string)null);
                 });
 
             modelBuilder.Entity("MindLift.Domain.Entities.OfflineSyncBatchLog", b =>
@@ -12552,6 +12893,10 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("Address")
+                        .HasColumnType("text")
+                        .HasColumnName("address");
+
                     b.Property<bool>("AiReadingEnabled")
                         .HasColumnType("boolean")
                         .HasColumnName("ai_reading_enabled");
@@ -12605,6 +12950,10 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
 
+                    b.Property<string>("LogoUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("logo_url");
+
                     b.Property<string>("Phone")
                         .HasColumnType("text")
                         .HasColumnName("phone");
@@ -12613,17 +12962,9 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("primary_color");
 
-                    b.Property<string>("Address")
-                        .HasColumnType("text")
-                        .HasColumnName("address");
-
-                    b.Property<string>("LogoUrl")
-                        .HasColumnType("text")
-                        .HasColumnName("logo_url");
-
-                    b.Property<string>("SignatureUrl")
-                        .HasColumnType("text")
-                        .HasColumnName("signature_url");
+                    b.Property<bool>("SampleDataLoaded")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sample_data_loaded");
 
                     b.Property<string>("SignatoryName")
                         .HasColumnType("text")
@@ -12633,9 +12974,9 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("signatory_title");
 
-                    b.Property<bool>("SampleDataLoaded")
-                        .HasColumnType("boolean")
-                        .HasColumnName("sample_data_loaded");
+                    b.Property<string>("SignatureUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("signature_url");
 
                     b.Property<bool>("TaxEnabled")
                         .HasColumnType("boolean")

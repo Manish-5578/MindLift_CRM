@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:typed_data';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
@@ -8,6 +8,7 @@ import 'package:mindlift_api/mindlift_api.dart';
 import 'package:mindlift_ui/mindlift_ui.dart';
 import '../../../core/network_provider.dart';
 import '../../offline/offline_database.dart';
+import 'card_line_classifier.dart';
 
 class OcrLeadScanSheet extends ConsumerStatefulWidget {
   const OcrLeadScanSheet({super.key, this.onLeadCreated});
@@ -33,10 +34,22 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _titleController = TextEditingController();
+  final _addressController = TextEditingController();
 
-  Uint8List? _imageBytes;
-  String? _imageFileName;
-  String? _imageFilePath;
+  // Front side (required)
+  Uint8List? _frontBytes;
+  String? _frontFileName;
+  String? _frontFilePath;
+
+  // Back side (optional)
+  Uint8List? _backBytes;
+  String? _backFileName;
+  String? _backFilePath;
+
+  // Legacy alias for backward compat (review overlay uses front image)
+  Uint8List? get _imageBytes => _frontBytes;
+  String? get _imageFileName => _frontFileName;
+
   bool _isExtracting = false;
   bool _isSaving = false;
   bool _hasExtracted = false;
@@ -44,12 +57,32 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
   LeadDuplicateCandidateDto? _duplicateCandidate;
   double? _overallConfidence;
   double? _engineConfidence;
+  double? _nameConfidence;
+  double? _addressConfidence;
+  double? _companyConfidence;
+  double? _phoneConfidence;
+  double? _emailConfidence;
+  double? _titleConfidence;
+  List<CardFieldConflictDto> _conflicts = [];
+  List<String> _lowFields = [];
   String _detectedScript = 'Latin';
 
   List<CardEvidenceBoxDto> _evidence = [];
   bool _showReviewMode = false;
   bool _requiresReview = false;
   bool _isReviewConfirmed = false;
+
+  static bool _isAddressText(String line, {bool hasCompanyWord = false}) =>
+      CardLineClassifier.isAddressText(line, hasCompanyWord: hasCompanyWord);
+
+  /// True if the name field appears to hold an address line (or anything with digits or a colon, which a name never has).
+  bool get _nameIsLikelyAddress {
+    final val = _nameController.text.trim();
+    if (val.isEmpty) return false;
+    return val.contains(':') || RegExp(r'\d').hasMatch(val) || _isAddressText(val);
+  }
+
+  List<CardEvidenceBoxDto> get _frontEvidence => _evidence.where((b) => b.side != 'back').toList();
 
   @override
   void dispose() {
@@ -59,10 +92,11 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
     _phoneController.dispose();
     _emailController.dispose();
     _titleController.dispose();
+    _addressController.dispose();
     super.dispose();
   }
 
-  Future<void> _captureWithCamera() async {
+  Future<void> _captureWithCamera({bool isBack = false}) async {
     try {
       final photo = await _picker.pickImage(
         source: ImageSource.camera,
@@ -72,14 +106,14 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
       );
       if (photo != null) {
         final bytes = await photo.readAsBytes();
-        _validateAndProcessPhoto(photo.path, photo.name, bytes);
+        _validateAndProcessPhoto(photo.path, photo.name, bytes, isBack: isBack);
       }
     } catch (e) {
       MlToast.show(context, message: 'Could not access camera: $e', type: MlToastType.error);
     }
   }
 
-  Future<void> _pickFromGallery() async {
+  Future<void> _pickFromGallery({bool isBack = false}) async {
     try {
       final photo = await _picker.pickImage(
         source: ImageSource.gallery,
@@ -89,14 +123,19 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
       );
       if (photo != null) {
         final bytes = await photo.readAsBytes();
-        _validateAndProcessPhoto(photo.path, photo.name, bytes);
+        _validateAndProcessPhoto(photo.path, photo.name, bytes, isBack: isBack);
       }
     } catch (e) {
       MlToast.show(context, message: 'Could not access gallery: $e', type: MlToastType.error);
     }
   }
 
-  void _validateAndProcessPhoto(String path, String name, Uint8List bytes) {
+  void _validateAndProcessPhoto(String path, String name, Uint8List bytes, {bool isBack = false}) {
+    if (isBack && _frontBytes == null) {
+      MlToast.show(context, message: 'Capture the front of the card first.', type: MlToastType.info);
+      return;
+    }
+
     if (bytes.lengthInBytes < 15000) {
       MlToast.show(
         context,
@@ -106,57 +145,52 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
     }
 
     setState(() {
-      _imageBytes = bytes;
-      _imageFileName = name;
-      _imageFilePath = path;
+      if (isBack) {
+        _backBytes = bytes;
+        _backFileName = name;
+        _backFilePath = path;
+      } else {
+        _frontBytes = bytes;
+        _frontFileName = name;
+        _frontFilePath = path;
+      }
       _duplicateCandidate = null;
       _evidence = [];
+      _conflicts = [];
       _requiresReview = false;
       _isReviewConfirmed = false;
       _showReviewMode = false;
     });
 
-    _processImageOcr(path, bytes);
+    _scanSides();
   }
 
-  Future<void> _processImageOcr(String? filePath, Uint8List bytes) async {
+  void _removeBackSide() {
+    setState(() {
+      _backBytes = null;
+      _backFileName = null;
+      _backFilePath = null;
+    });
+    if (_frontBytes != null) _scanSides();
+  }
+
+  /// Reads the front (and the back, when there is one) on the server in one request. If the server cannot be reached, each side is read on the phone.
+  Future<void> _scanSides() async {
+    if (_frontBytes == null) return;
     setState(() => _isExtracting = true);
     try {
-      // 1. Authoritative Server OCR via multipart streaming upload
       try {
-        final card = (filePath != null && filePath.isNotEmpty)
-            ? await ref.read(chatServiceProvider).scanCardFilePath(
-                  filePath: filePath,
-                  fileName: _imageFileName ?? 'business_card.jpg',
-                )
-            : await ref.read(chatServiceProvider).scanCardFile(
-                  bytes: bytes,
-                  fileName: _imageFileName ?? 'business_card.jpg',
-                );
+        final card = await ref.read(chatServiceProvider).scanCardSides(
+              frontPath: _frontFilePath,
+              frontBytes: _frontBytes,
+              frontName: _frontFileName ?? 'card_front.jpg',
+              backPath: _backFilePath,
+              backBytes: _backBytes,
+              backName: _backFileName ?? 'card_back.jpg',
+            );
 
         if (mounted) {
-          final isLowConf = card.overallConfidence < 0.75 ||
-              (card.engineConfidence != null && card.engineConfidence! < 0.75) ||
-              (card.evidence != null && card.evidence!.any((e) => e.confidence < 0.75));
-
-          setState(() {
-            _companyController.text = card.companyName ?? '';
-            _nameController.text = card.fullName ?? '';
-            _phoneController.text = card.phone ?? '';
-            _emailController.text = card.email ?? '';
-            _titleController.text = card.jobTitle ?? '';
-            _textController.text = card.rawText;
-            _overallConfidence = card.overallConfidence;
-            _engineConfidence = card.engineConfidence;
-            _detectedScript = card.detectedScript;
-            _duplicateCandidate = card.duplicate;
-            _evidence = card.evidence ?? [];
-            _requiresReview = isLowConf;
-            _isReviewConfirmed = !isLowConf;
-            _showReviewMode = isLowConf;
-            _hasExtracted = true;
-          });
-
+          _applyCard(card);
           if (card.duplicate != null) {
             MlToast.show(
               context,
@@ -176,33 +210,32 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
         debugPrint('Server multipart OCR failed or offline, falling back to on-device vision: $serverErr');
       }
 
-      // 2. Offline fallback: Run on-device Google ML Kit text recognition
-      String localText = '';
-      if (filePath != null && filePath.isNotEmpty) {
+      // Offline fallback: Google ML Kit on each side.
+      final texts = <String>[];
+      for (final path in [_frontFilePath, _backFilePath]) {
+        if (path == null || path.isEmpty) continue;
         try {
-          final inputImage = InputImage.fromFilePath(filePath);
-          final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
-          final result = await textRecognizer.processImage(inputImage);
-          await textRecognizer.close();
-          localText = result.text.trim();
+          final recognizer = TextRecognizer(script: TextRecognitionScript.latin);
+          final result = await recognizer.processImage(InputImage.fromFilePath(path));
+          await recognizer.close();
+          if (result.text.trim().isNotEmpty) texts.add(result.text.trim());
         } catch (mlErr) {
           debugPrint('MLKit offline extraction note: $mlErr');
         }
       }
 
+      final localText = texts.join('\n');
       if (localText.isNotEmpty) {
         _textController.text = localText;
         _extractLocally(localText);
       } else if (_textController.text.trim().isNotEmpty) {
         _extractLocally(_textController.text.trim());
-      } else {
-        if (mounted) {
-          MlToast.show(
-            context,
-            message: 'No readable text could be recognized from the card. Ensure adequate lighting and clear text.',
-            type: MlToastType.info,
-          );
-        }
+      } else if (mounted) {
+        MlToast.show(
+          context,
+          message: 'No readable text could be recognized from the card. Ensure adequate lighting and clear text.',
+          type: MlToastType.info,
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -211,6 +244,63 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
     } finally {
       if (mounted) setState(() => _isExtracting = false);
     }
+  }
+
+  /// Puts a server result into the form and decides whether the person has to check anything before saving.
+  void _applyCard(ExtractedLeadCardDto card) {
+    setState(() {
+      _companyController.text = card.companyName ?? '';
+      _nameController.text = card.fullName ?? '';
+      _phoneController.text = card.phone ?? '';
+      _emailController.text = card.email ?? '';
+      _titleController.text = card.jobTitle ?? '';
+      _addressController.text = card.address ?? '';
+      _textController.text = card.rawText;
+      _overallConfidence = card.overallConfidence;
+      _engineConfidence = card.engineConfidence;
+      _companyConfidence = card.companyConfidence;
+      _nameConfidence = card.nameConfidence;
+      _phoneConfidence = card.phoneConfidence;
+      _emailConfidence = card.emailConfidence;
+      _titleConfidence = card.titleConfidence;
+      _addressConfidence = card.addressConfidence;
+      _detectedScript = card.detectedScript;
+      _duplicateCandidate = card.duplicate;
+      _evidence = card.evidence ?? [];
+      _conflicts = card.conflicts ?? [];
+      _hasExtracted = true;
+      _refreshReviewGate();
+    });
+  }
+
+  /// A card is held for review only when a field that has a value is low-confidence, the two sides disagree, or the name looks like an address.
+  /// Low-confidence words in a logo or tagline do not hold it.
+  void _refreshReviewGate() {
+    final low = <String>[];
+    void check(String label, TextEditingController c, double? confidence) {
+      if (c.text.trim().isNotEmpty && confidence != null && confidence < 0.75) low.add(label);
+    }
+
+    check('Company', _companyController, _companyConfidence);
+    check('Contact person', _nameController, _nameConfidence);
+    check('Phone', _phoneController, _phoneConfidence);
+    check('Email', _emailController, _emailConfidence);
+    check('Job title', _titleController, _titleConfidence);
+    check('Address', _addressController, _addressConfidence);
+    if (_nameIsLikelyAddress) low.add('Contact person looks like an address');
+    for (final c in _conflicts) {
+      low.add('${c.field} differs between front and back');
+    }
+
+    _lowFields = low;
+    final needs = low.isNotEmpty;
+    if (!needs) {
+      _isReviewConfirmed = true;
+    } else if (!_requiresReview) {
+      _isReviewConfirmed = false;
+    }
+    _requiresReview = needs;
+    _showReviewMode = needs && _frontEvidence.isNotEmpty;
   }
 
   Future<void> _handleExtractText() async {
@@ -224,17 +314,7 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
     try {
       final card = await ref.read(chatServiceProvider).parseLeadCard(rawText: text);
       if (mounted) {
-        setState(() {
-          _companyController.text = card.companyName ?? '';
-          _nameController.text = card.fullName ?? '';
-          _phoneController.text = card.phone ?? '';
-          _emailController.text = card.email ?? '';
-          _titleController.text = card.jobTitle ?? '';
-          _overallConfidence = card.overallConfidence;
-          _detectedScript = card.detectedScript;
-          _duplicateCandidate = card.duplicate;
-          _hasExtracted = true;
-        });
+        _applyCard(card);
         MlToast.show(context, message: 'Card text parsed successfully!', type: MlToastType.success);
       }
     } catch (_) {
@@ -252,12 +332,14 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
     }
 
     final emailMatch = RegExp(r'[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}').firstMatch(trimmed);
-    final phoneMatch = RegExp(r'(?:\+?\d{1,4}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{3,4}|\+?\d{8,15}').firstMatch(trimmed);
+    final phoneMatch = RegExp(r'(?:\+?\d{1,4}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{3,4}|\+?\d{8,15}');
 
     final lines = trimmed.split(RegExp(r'\r?\n')).map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
     String? company;
     String? name;
     String? title;
+    String? phone;
+    final addressParts = <String>[];
 
     final companyKeywords = [
       'llc', 'inc', 'corp', 'corporation', 'ltd', 'limited', 'group', 'solutions',
@@ -275,20 +357,28 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
 
     for (final l in lines) {
       final lower = l.toLowerCase();
-      if (l.contains('@') || RegExp(r'\d{7,}').hasMatch(l)) {
+      if (l.contains('@') || lower.startsWith('www.') || lower.startsWith('http')) {
+        continue;
+      }
+
+      final hasCompanyWord = companyKeywords.any((k) => lower.contains(k));
+      // An address is claimed before the phone pattern: "560 001" is a PIN code, not a phone number.
+      if (_isAddressText(l, hasCompanyWord: hasCompanyWord)) {
+        addressParts.add(l);
+        continue;
+      }
+
+      final phoneHit = phoneMatch.firstMatch(l);
+      if (phone == null && phoneHit != null && phoneHit.group(0)!.replaceAll(RegExp(r'\D'), '').length >= 7) {
+        phone = phoneHit.group(0);
         continue;
       }
       if (title == null && titleKeywords.any((k) => lower.contains(k))) {
         title = l;
         continue;
       }
-      if (company == null && companyKeywords.any((k) => lower.contains(k))) {
+      if (company == null && hasCompanyWord) {
         company = l;
-        continue;
-      }
-      if (lower.contains('street') || lower.contains('road') || lower.contains('tower') ||
-          lower.contains('building') || lower.contains('box') || lower.contains('dubai') ||
-          lower.contains('floor') || lower.contains('uae') || lower.contains('شارع') || lower.contains('برج')) {
         continue;
       }
       remainingLines.add(l);
@@ -296,26 +386,37 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
 
     for (final l in remainingLines) {
       final words = l.split(' ').where((w) => w.isNotEmpty).toList();
-      if (name == null && words.length >= 2 && words.length <= 4 && !words.any((w) => RegExp(r'\d').hasMatch(w))) {
+      final looksLikeName = words.length >= 2 && words.length <= 4 && !RegExp(r'[\d:@]').hasMatch(l) && !_isAddressText(l);
+      if (name == null && looksLikeName) {
         name = l;
-      } else if (company == null && words.length >= 1 && words.length <= 6) {
+      } else if (company == null && words.isNotEmpty && words.length <= 6) {
         company = l;
       }
     }
 
-    final hasArabic = RegExp(r'[\u0600-\u06FF]').hasMatch(trimmed);
+    final hasArabic = RegExp(r'[؀-ۿ]').hasMatch(trimmed);
     final hasLatin = RegExp(r'[a-zA-Z]').hasMatch(trimmed);
 
     setState(() {
       _companyController.text = company ?? '';
       _nameController.text = name ?? '';
       _emailController.text = emailMatch?.group(0) ?? '';
-      _phoneController.text = phoneMatch?.group(0) ?? '';
+      _phoneController.text = phone ?? '';
       _titleController.text = title ?? '';
+      _addressController.text = addressParts.join(', ');
       _detectedScript = (hasArabic && hasLatin) ? 'Bilingual' : (hasArabic ? 'Arabic' : 'Latin');
       _overallConfidence = 0.75;
+      // A guess made on the phone is never presented as certain: the name and address are marked for a check.
+      _nameConfidence = name != null ? 0.6 : null;
+      _addressConfidence = addressParts.isNotEmpty ? 0.6 : null;
+      _companyConfidence = null;
+      _phoneConfidence = null;
+      _emailConfidence = null;
+      _titleConfidence = null;
+      _conflicts = [];
       _duplicateCandidate = null;
       _hasExtracted = true;
+      _refreshReviewGate();
     });
     MlToast.show(context, message: 'Card parsed locally ($_detectedScript).', type: MlToastType.info);
   }
@@ -329,8 +430,17 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
       return;
     }
 
+    if (_nameIsLikelyAddress) {
+      MlToast.show(
+        context,
+        message: 'Contact Person looks like an address. Move it to Address or correct the name.',
+        type: MlToastType.error,
+      );
+      return;
+    }
+
     if (_requiresReview && !_isReviewConfirmed) {
-      setState(() => _showReviewMode = true);
+      setState(() => _showReviewMode = _frontEvidence.isNotEmpty);
       MlToast.show(
         context,
         message: 'Review Required: Low-confidence OCR detected. Please inspect and approve OCR review before saving.',
@@ -362,6 +472,7 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
               phone: _phoneController.text.trim(),
               email: _emailController.text.trim().isNotEmpty ? _emailController.text.trim() : null,
               notes: leadNotes,
+              address: _addressController.text.trim().isNotEmpty ? _addressController.text.trim() : null,
               source: 'Mobile Business Card Scan',
             ),
           );
@@ -392,6 +503,7 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
                     'phone': _phoneController.text.trim(),
                     'email': _emailController.text.trim().isNotEmpty ? _emailController.text.trim() : null,
                     'notes': leadNotes,
+                    'address': _addressController.text.trim().isNotEmpty ? _addressController.text.trim() : null,
                     'source': 'Mobile Business Card Scan',
                   }),
                   createdAtUtc: DateTime.now().toUtc(),
@@ -442,6 +554,223 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
     }
   }
 
+  Widget _sideSlot({required bool isBack}) {
+    final bytes = isBack ? _backBytes : _frontBytes;
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            isBack ? 'Back (optional)' : 'Front',
+            style: MlTypography.labelMedium.copyWith(color: MlColors.textPrimary, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: MlSpacing.xs),
+          Container(
+            height: 72,
+            decoration: BoxDecoration(
+              color: MlColors.surface,
+              borderRadius: BorderRadius.circular(MlRadii.sm),
+              border: Border.all(color: bytes != null ? MlColors.primary.withOpacity(0.5) : MlColors.border),
+            ),
+            child: bytes != null
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(MlRadii.sm),
+                    child: Image.memory(bytes, fit: BoxFit.cover),
+                  )
+                : Center(
+                    child: Text(
+                      isBack ? 'Add back side' : 'Add front side',
+                      style: MlTypography.caption.copyWith(color: MlColors.textMuted),
+                    ),
+                  ),
+          ),
+          const SizedBox(height: MlSpacing.xs),
+          Row(
+            children: [
+              Expanded(
+                child: MlButton(
+                  label: '📷 Camera',
+                  variant: isBack ? MlButtonVariant.secondary : MlButtonVariant.primary,
+                  size: MlButtonSize.small,
+                  onPressed: _isExtracting ? null : () => _captureWithCamera(isBack: isBack),
+                ),
+              ),
+              const SizedBox(width: MlSpacing.xs),
+              Expanded(
+                child: MlButton(
+                  label: '🖼️ Photo',
+                  variant: MlButtonVariant.secondary,
+                  size: MlButtonSize.small,
+                  onPressed: _isExtracting ? null : () => _pickFromGallery(isBack: isBack),
+                ),
+              ),
+            ],
+          ),
+          if (isBack && _backBytes != null)
+            MlButton(
+              label: 'Remove back',
+              variant: MlButtonVariant.ghost,
+              size: MlButtonSize.small,
+              onPressed: _isExtracting ? null : _removeBackSide,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _confidenceNote(String label, TextEditingController controller, double? confidence) {
+    if (controller.text.trim().isEmpty || confidence == null || confidence >= 0.75) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 2, bottom: 2),
+      child: Text(
+        '$label confidence: ${(confidence * 100).toInt()}% - please check',
+        style: MlTypography.caption.copyWith(color: const Color(0xFFB45309), fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+
+  void _moveNameToAddress() {
+    setState(() {
+      final moved = _nameController.text.trim();
+      final current = _addressController.text.trim();
+      _addressController.text = current.isEmpty ? moved : '$current, $moved';
+      _nameController.clear();
+      _nameConfidence = null;
+      _addressConfidence = 0.6;
+      _refreshReviewGate();
+    });
+  }
+
+  Widget _nameAddressWarning() {
+    if (!_nameIsLikelyAddress) return const SizedBox.shrink();
+    return Container(
+      margin: const EdgeInsets.only(top: MlSpacing.xs),
+      padding: const EdgeInsets.all(MlSpacing.xs),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF2F2),
+        borderRadius: BorderRadius.circular(MlRadii.sm),
+        border: Border.all(color: const Color(0xFFEF4444)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              'This looks like an address, not a person\'s name.',
+              style: MlTypography.caption.copyWith(color: const Color(0xFF991B1B), fontWeight: FontWeight.w600),
+            ),
+          ),
+          MlButton(
+            label: 'Move to Address',
+            variant: MlButtonVariant.primary,
+            size: MlButtonSize.small,
+            onPressed: _moveNameToAddress,
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _chooseConflict(CardFieldConflictDto conflict, String value) {
+    setState(() {
+      switch (conflict.field) {
+        case 'Company':
+          _companyController.text = value;
+        case 'Name':
+          _nameController.text = value;
+        case 'Job title':
+          _titleController.text = value;
+        case 'Email':
+          _emailController.text = value;
+        case 'Phone':
+          _phoneController.text = value;
+      }
+      _conflicts = _conflicts.where((c) => c.field != conflict.field).toList();
+      _refreshReviewGate();
+    });
+  }
+
+  Widget _conflictChip(CardFieldConflictDto conflict, String side, String value) {
+    return GestureDetector(
+      onTap: () => _chooseConflict(conflict, value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: MlColors.surfaceElevated,
+          borderRadius: BorderRadius.circular(MlRadii.sm),
+          border: Border.all(color: MlColors.primary.withOpacity(0.5)),
+        ),
+        child: Text('$side: $value', style: MlTypography.caption.copyWith(color: MlColors.primary)),
+      ),
+    );
+  }
+
+  Widget _conflictPanel() {
+    if (_conflicts.isEmpty) return const SizedBox.shrink();
+    return Container(
+      margin: const EdgeInsets.only(bottom: MlSpacing.sm),
+      padding: const EdgeInsets.all(MlSpacing.xs),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF3C7),
+        borderRadius: BorderRadius.circular(MlRadii.sm),
+        border: Border.all(color: const Color(0xFFF59E0B)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Front and back show different values. Tap the correct one.',
+            style: MlTypography.caption.copyWith(color: const Color(0xFF92400E), fontWeight: FontWeight.w700),
+          ),
+          for (final c in _conflicts) ...[
+            const SizedBox(height: MlSpacing.xs),
+            Text(c.field, style: MlTypography.caption.copyWith(color: const Color(0xFF78350F))),
+            const SizedBox(height: 2),
+            Wrap(
+              spacing: MlSpacing.xs,
+              runSpacing: MlSpacing.xs,
+              children: [
+                _conflictChip(c, 'Front', c.frontValue),
+                _conflictChip(c, 'Back', c.backValue),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// The approval prompt for a card held for review. The evidence overlay carries its own copy when it is open.
+  Widget _reviewBanner() {
+    if (!_requiresReview || (_showReviewMode && _frontEvidence.isNotEmpty)) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.all(MlSpacing.xs),
+      decoration: BoxDecoration(
+        color: _isReviewConfirmed ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2),
+        borderRadius: BorderRadius.circular(MlRadii.sm),
+        border: Border.all(color: _isReviewConfirmed ? const Color(0xFF10B981) : const Color(0xFFEF4444)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              _isReviewConfirmed ? '✓ Checked and approved.' : '⚠️ Check before saving: ${_lowFields.join(', ')}.',
+              style: MlTypography.caption.copyWith(
+                color: _isReviewConfirmed ? const Color(0xFF065F46) : const Color(0xFF991B1B),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          MlButton(
+            label: _isReviewConfirmed ? 'Approved' : 'Approve',
+            variant: _isReviewConfirmed ? MlButtonVariant.ghost : MlButtonVariant.primary,
+            size: MlButtonSize.small,
+            onPressed: () => setState(() => _isReviewConfirmed = true),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -451,29 +780,18 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            'Capture or select a business card image to extract CRM contact and company details automatically.',
+            'Capture the front of the business card, and the back if it has details. Contact, company and address are extracted automatically.',
             style: MlTypography.bodySmall.copyWith(color: MlColors.textMuted),
           ),
           const SizedBox(height: MlSpacing.md),
 
-          // Primary Camera & Gallery Capture Actions
+          // Front and back capture
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: MlButton(
-                  label: '📷 Open Camera',
-                  variant: MlButtonVariant.primary,
-                  onPressed: _isExtracting ? null : _captureWithCamera,
-                ),
-              ),
-              const SizedBox(width: MlSpacing.sm),
-              Expanded(
-                child: MlButton(
-                  label: '🖼️ Choose Photo',
-                  variant: MlButtonVariant.secondary,
-                  onPressed: _isExtracting ? null : _pickFromGallery,
-                ),
-              ),
+              _sideSlot(isBack: false),
+              const SizedBox(width: MlSpacing.md),
+              _sideSlot(isBack: true),
             ],
           ),
           const SizedBox(height: MlSpacing.md),
@@ -513,13 +831,13 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
                               overflow: TextOverflow.ellipsis,
                             ),
                             Text(
-                              '${(_imageBytes!.lengthInBytes / 1024).toStringAsFixed(1)} KB • ${_evidence.length} words',
+                              '${(_imageBytes!.lengthInBytes / 1024).toStringAsFixed(1)} KB • ${_frontEvidence.length} words',
                               style: MlTypography.caption.copyWith(color: MlColors.textMuted),
                             ),
                           ],
                         ),
                       ),
-                      if (_evidence.isNotEmpty)
+                      if (_frontEvidence.isNotEmpty)
                         MlButton(
                           label: _showReviewMode ? 'Hide Review' : '🔍 Review OCR',
                           variant: _requiresReview && !_isReviewConfirmed
@@ -533,13 +851,13 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
                           label: 'Re-scan',
                           variant: MlButtonVariant.ghost,
                           size: MlButtonSize.small,
-                          onPressed: () => _processImageOcr(_imageFilePath, _imageBytes!),
+                          onPressed: () => _scanSides(),
                         ),
                     ],
                   ),
 
                   // Review OCR Bounding Box Overlay
-                  if (_showReviewMode && _evidence.isNotEmpty) ...[
+                  if (_showReviewMode && _frontEvidence.isNotEmpty) ...[
                     const SizedBox(height: MlSpacing.sm),
                     Container(
                       padding: const EdgeInsets.all(MlSpacing.xs),
@@ -562,9 +880,9 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
                                 ),
                               ),
                               Text(
-                                '${_evidence.where((b) => b.confidence < 0.75).length} low confidence',
+                                '${_frontEvidence.where((b) => b.confidence < 0.75).length} low confidence',
                                 style: MlTypography.caption.copyWith(
-                                  color: _evidence.any((b) => b.confidence < 0.75)
+                                  color: _frontEvidence.any((b) => b.confidence < 0.75)
                                       ? const Color(0xFFDC2626)
                                       : const Color(0xFF059669),
                                   fontWeight: FontWeight.w600,
@@ -591,7 +909,7 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
                                           fit: BoxFit.contain,
                                         ),
                                       ),
-                                      ..._evidence.map((box) {
+                                      ..._frontEvidence.map((box) {
                                         final isLow = box.confidence < 0.75;
                                         final boxLeft = (box.x * width).clamp(0.0, width - 10.0);
                                         final boxTop = (box.y * height).clamp(0.0, height - 10.0);
@@ -697,7 +1015,7 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
                                     child: Text(
                                       _isReviewConfirmed
                                           ? '✓ OCR review verified and approved by user.'
-                                          : '⚠️ Low-confidence fields detected. Review and approve before saving.',
+                                          : '⚠️ Check before saving: ${_lowFields.join(', ')}.',
                                       style: MlTypography.caption.copyWith(
                                         color: _isReviewConfirmed ? const Color(0xFF065F46) : const Color(0xFF991B1B),
                                         fontWeight: FontWeight.w600,
@@ -864,34 +1182,56 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
                     ],
                   ),
                   const SizedBox(height: MlSpacing.sm),
+                  _conflictPanel(),
                   MlTextField(
                     label: 'Company Name *',
                     controller: _companyController,
                   ),
+                  _confidenceNote('Company', _companyController, _companyConfidence),
                   const SizedBox(height: MlSpacing.xs),
                   MlTextField(
                     label: 'Contact Person *',
                     controller: _nameController,
+                    onChanged: (_) => setState(_refreshReviewGate),
                   ),
+                  _confidenceNote('Name', _nameController, _nameConfidence),
+                  _nameAddressWarning(),
                   const SizedBox(height: MlSpacing.xs),
                   MlTextField(
                     label: 'Phone Number',
                     controller: _phoneController,
                   ),
+                  _confidenceNote('Phone', _phoneController, _phoneConfidence),
                   const SizedBox(height: MlSpacing.xs),
                   MlTextField(
                     label: 'Email Address',
                     controller: _emailController,
                   ),
+                  _confidenceNote('Email', _emailController, _emailConfidence),
                   const SizedBox(height: MlSpacing.xs),
                   MlTextField(
                     label: 'Job Title',
                     controller: _titleController,
                   ),
+                  _confidenceNote('Job title', _titleController, _titleConfidence),
+                  const SizedBox(height: MlSpacing.xs),
+                  MlTextField(
+                    label: 'Address',
+                    controller: _addressController,
+                    minLines: 2,
+                    maxLines: 4,
+                    inputFormatters: [LengthLimitingTextInputFormatter(500)],
+                    helperText: 'Up to 500 characters',
+                    onChanged: (_) => setState(_refreshReviewGate),
+                  ),
+                  _confidenceNote('Address', _addressController, _addressConfidence),
                 ],
               ),
             ),
             const SizedBox(height: MlSpacing.lg),
+
+            _reviewBanner(),
+            const SizedBox(height: MlSpacing.sm),
 
             MlButton(
               label: (_requiresReview && !_isReviewConfirmed)

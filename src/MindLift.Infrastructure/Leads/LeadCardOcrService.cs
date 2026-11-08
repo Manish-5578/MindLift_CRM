@@ -46,14 +46,6 @@ public sealed class LeadCardOcrService(
         "استشارات", "تكنولوجيا", "حلول", "خدمات", "مشاريع", "القابضة", "التجارية", "العالمية", "للتجارة", "للمقاولات"
     ];
 
-    private static readonly string[] AddressKeywords =
-    [
-        "street", "road", "floor", "tower", "box", "p.o.", "building", "avenue", "suite",
-        "dubai", "abu dhabi", "uae", "riyadh", "doha", "sharjah", "jeddah", "kuwait", "manama", "muscat",
-        // Arabic Address terms
-        "شارع", "برج", "بناية", "صندوق بريد", "طابق", "مكتب", "دبي", "أبوظبي", "الرياض", "جدة", "الدوحة", "المنامة", "الكويت", "مسقط"
-    ];
-
     public async Task<ExtractedLeadCardDto> ExtractFromDirectStreamAsync(
         Stream inputStream,
         string fileName,
@@ -254,6 +246,7 @@ public sealed class LeadCardOcrService(
         string? address = null;
 
         var remainingLines = new List<string>();
+        var nameFromEmail = false;
 
         foreach (var line in lines)
         {
@@ -271,6 +264,17 @@ public sealed class LeadCardOcrService(
                 continue;
             }
 
+            var lower = line.ToLowerInvariant();
+            var hasCompanyWord = CompanyKeywords.Any(k => lower.Contains(k));
+
+            // Address evidence (landmark, street words, a PIN such as "560 001", an "Address:" label) wins before the phone pattern,
+            // which would otherwise take "560 001" for a phone number and drop the whole line.
+            if (CardLineClassifier.IsAddressLine(line, hasCompanyWord))
+            {
+                address = address == null ? line : $"{address}, {line}";
+                continue;
+            }
+
             var matchPhone = PhoneRegex.Match(line);
             if (matchPhone.Success && phone == null && matchPhone.Value.Length >= 7)
             {
@@ -278,39 +282,35 @@ public sealed class LeadCardOcrService(
                 continue;
             }
 
-            var lower = line.ToLowerInvariant();
             if (jobTitle == null && TitleKeywords.Any(k => lower.Contains(k)))
             {
                 jobTitle = line;
                 continue;
             }
 
-            if (companyName == null && CompanyKeywords.Any(k => lower.Contains(k)))
+            if (companyName == null && hasCompanyWord)
             {
                 companyName = line;
-                continue;
-            }
-
-            if (AddressKeywords.Any(k => lower.Contains(k)))
-            {
-                address = (address == null ? line : $"{address}, {line}");
                 continue;
             }
 
             remainingLines.Add(line);
         }
 
-        // Identify person name and company from remaining lines
+        // Person name and company come from the lines nothing else claimed. A name is only taken from a line that cannot be an address.
         foreach (var line in remainingLines)
         {
-            var words = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (fullName == null && words.Length >= 2 && words.Length <= 4 && !words.Any(w => char.IsDigit(w[0])))
+            if (fullName == null && CardLineClassifier.IsLikelyPersonName(line))
             {
                 fullName = line;
             }
-            else if (companyName == null && words.Length >= 1 && words.Length <= 6)
+            else if (companyName == null)
             {
-                companyName = line;
+                var words = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                if (words.Length >= 1 && words.Length <= 6)
+                {
+                    companyName = line;
+                }
             }
         }
 
@@ -340,6 +340,7 @@ public sealed class LeadCardOcrService(
                 firstName = char.ToUpperInvariant(segments[0][0]) + segments[0][1..].ToLowerInvariant();
                 lastName = char.ToUpperInvariant(segments[1][0]) + segments[1][1..].ToLowerInvariant();
                 fullName = $"{firstName} {lastName}";
+                nameFromEmail = true;
             }
         }
 
@@ -354,10 +355,13 @@ public sealed class LeadCardOcrService(
         var companyConf = !string.IsNullOrWhiteSpace(companyName)
             ? (CompanyKeywords.Any(k => companyName.ToLowerInvariant().Contains(k)) ? 0.90 : 0.70)
             : (double?)null;
-        var nameConf = !string.IsNullOrWhiteSpace(fullName) ? 0.85 : (double?)null;
+        var nameConf = string.IsNullOrWhiteSpace(fullName)
+            ? (double?)null
+            : nameFromEmail ? 0.50 : CardLineClassifier.NameConfidence(fullName, email);
+        var addressConf = string.IsNullOrWhiteSpace(address) ? (double?)null : CardLineClassifier.AddressConfidence(address);
         var titleConf = !string.IsNullOrWhiteSpace(jobTitle) ? 0.88 : (double?)null;
 
-        var scores = new[] { emailConf, phoneConf, companyConf, nameConf, titleConf }.Where(s => s.HasValue).Select(s => s!.Value).ToList();
+        var scores = new[] { emailConf, phoneConf, companyConf, nameConf, titleConf, addressConf }.Where(s => s.HasValue).Select(s => s!.Value).ToList();
         var extractionAvg = scores.Count > 0 ? Math.Round(scores.Average(), 2) : 0.70;
         var overallConfidence = engineConfidence.HasValue
             ? Math.Round((engineConfidence.Value * 0.5) + (extractionAvg * 0.5), 2)
@@ -390,7 +394,8 @@ public sealed class LeadCardOcrService(
             DetectedScript: script,
             Duplicate: duplicate,
             EngineConfidence: engineConfidence,
-            Evidence: evidence
+            Evidence: evidence,
+            AddressConfidence: addressConf
         );
     }
 
@@ -596,4 +601,115 @@ public sealed class LeadCardOcrService(
             throw new ValidationException("unsupported_image_format", "Only JPEG, PNG, WEBP, and TIFF images are supported for card scanning.");
         }
     }
+
+    /// <summary>
+    /// Merges what was read from the front and the back of a card.
+    /// For each field the better-trusted side wins (the front on a tie). Email, phone and website that match once formatting is ignored count as one.
+    /// When the two sides disagree on a field, the winner is returned and both readings are listed in <c>Conflicts</c> so the person can choose.
+    /// Addresses from both sides are combined without repeating a line. Evidence boxes are tagged "front" or "back".
+    /// </summary>
+    public async Task<ExtractedLeadCardDto> MergeFrontAndBackAsync(ExtractedLeadCardDto front, ExtractedLeadCardDto back, CancellationToken ct = default)
+    {
+        var conflicts = new List<CardFieldConflictDto>();
+
+        (string? Value, double? Confidence) Pick(string field, string? f, double? fc, string? b, double? bc, Func<string, string> normalise)
+        {
+            var hasF = !string.IsNullOrWhiteSpace(f);
+            var hasB = !string.IsNullOrWhiteSpace(b);
+            if (!hasF && !hasB) return (null, null);
+            if (hasF && !hasB) return (f, fc);
+            if (!hasF) return (b, bc);
+            if (normalise(f!) == normalise(b!)) return (f, Math.Max(fc ?? 0, bc ?? 0));
+            conflicts.Add(new CardFieldConflictDto(field, f!, b!));
+            return (bc ?? 0) > (fc ?? 0) ? (b, bc) : (f, fc);
+        }
+
+        var company = Pick("Company", front.CompanyName, front.CompanyConfidence, back.CompanyName, back.CompanyConfidence, Letters);
+        var name = Pick("Name", front.FullName, front.NameConfidence, back.FullName, back.NameConfidence, Letters);
+        var title = Pick("Job title", front.JobTitle, front.TitleConfidence, back.JobTitle, back.TitleConfidence, Letters);
+        var email = Pick("Email", front.Email, front.EmailConfidence, back.Email, back.EmailConfidence, e => e.Trim().ToLowerInvariant());
+        var phone = Pick("Phone", front.Phone, front.PhoneConfidence, back.Phone, back.PhoneConfidence, PhoneKey);
+        var website = Pick("Website", front.Website, null, back.Website, null, WebsiteKey);
+
+        // First and last name follow whichever side the full name came from.
+        var nameFromBack = name.Value is not null && !string.Equals(name.Value, front.FullName, StringComparison.Ordinal);
+        var firstName = nameFromBack ? back.FirstName : front.FirstName ?? back.FirstName;
+        var lastName = nameFromBack ? back.LastName : front.LastName ?? back.LastName;
+
+        var address = MergeAddress(front.Address, back.Address);
+        double? addressConf = null;
+        if (!string.IsNullOrWhiteSpace(address))
+        {
+            var best = Math.Max(front.AddressConfidence ?? 0, back.AddressConfidence ?? 0);
+            addressConf = best > 0 ? best : CardLineClassifier.AddressConfidence(address);
+        }
+
+        var tagged = new List<CardEvidenceBoxDto>();
+        if (front.Evidence != null) tagged.AddRange(front.Evidence.Select(e => e with { Side = "front" }));
+        if (back.Evidence != null) tagged.AddRange(back.Evidence.Select(e => e with { Side = "back" }));
+
+        // A back that carries little (a logo, a tagline) must not drag a good front down.
+        var backFields = new[] { back.Email, back.Phone, back.FullName, back.CompanyName, back.Address, back.Website }.Count(v => !string.IsNullOrWhiteSpace(v));
+        var overall = backFields <= 1 ? front.OverallConfidence : Math.Round((front.OverallConfidence + back.OverallConfidence) / 2.0, 2);
+        var engine = front.EngineConfidence.HasValue && back.EngineConfidence.HasValue
+            ? Math.Round((front.EngineConfidence.Value + back.EngineConfidence.Value) / 2.0, 2)
+            : front.EngineConfidence ?? back.EngineConfidence;
+
+        var script = front.DetectedScript == back.DetectedScript ? front.DetectedScript : "Bilingual";
+
+        // The duplicate check runs again on the merged values: the back may hold the email that finds the existing record.
+        var duplicate = front.Duplicate ?? back.Duplicate;
+        if (db != null)
+        {
+            duplicate = await FindDuplicateInCrmAsync(email.Value, phone.Value, company.Value, ct) ?? duplicate;
+        }
+
+        return new ExtractedLeadCardDto(
+            CompanyName: company.Value ?? string.Empty,
+            FirstName: firstName,
+            LastName: lastName,
+            FullName: name.Value,
+            Email: email.Value,
+            Phone: phone.Value,
+            JobTitle: title.Value,
+            Website: website.Value,
+            Address: address,
+            RawText: $"[Front]\n{front.RawText}\n[Back]\n{back.RawText}".Trim(),
+            OverallConfidence: overall,
+            CompanyConfidence: company.Confidence,
+            NameConfidence: name.Confidence,
+            EmailConfidence: email.Confidence,
+            PhoneConfidence: phone.Confidence,
+            TitleConfidence: title.Confidence,
+            DetectedScript: script,
+            Duplicate: duplicate,
+            EngineConfidence: engine,
+            Evidence: tagged.Count > 0 ? tagged : null,
+            AddressConfidence: addressConf,
+            Conflicts: conflicts.Count > 0 ? conflicts : null);
+    }
+
+    private static string? MergeAddress(string? a, string? b)
+    {
+        if (string.IsNullOrWhiteSpace(a)) return string.IsNullOrWhiteSpace(b) ? null : b;
+        if (string.IsNullOrWhiteSpace(b)) return a;
+        var pieces = new List<string>();
+        foreach (var piece in a.Split(',').Concat(b.Split(',')).Select(x => x.Trim()).Where(x => x.Length > 0))
+        {
+            if (!pieces.Any(existing => string.Equals(Letters(existing), Letters(piece), StringComparison.Ordinal))) pieces.Add(piece);
+        }
+
+        return string.Join(", ", pieces);
+    }
+
+    private static string Letters(string s) => new(s.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
+
+    private static string PhoneKey(string phone)
+    {
+        var digits = new string(phone.Where(char.IsDigit).ToArray());
+        return digits.Length > 9 ? digits[^9..] : digits;
+    }
+
+    private static string WebsiteKey(string site)
+        => Regex.Replace(site.Trim().ToLowerInvariant(), @"^(https?://)?(www\.)?|/+$", string.Empty);
 }

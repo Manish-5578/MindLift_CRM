@@ -212,17 +212,42 @@ public sealed class OfflineSyncService(
                     if (entity == "lead")
                     {
                         var root = m.Payload.RootElement;
-                        var firstName = root.TryGetProperty("firstName", out var fn) ? fn.GetString() : "Offline";
-                        var lastName = root.TryGetProperty("lastName", out var ln) ? ln.GetString() : "Lead";
-                        var email = root.TryGetProperty("email", out var em) ? em.GetString() : null;
-                        var company = root.TryGetProperty("company", out var cp) ? cp.GetString() : null;
 
+                        // The phone queues a lead in the same shape it would post online (fullName, companyName, phone, address...), and older
+                        // clients queued firstName, lastName and company. Both are read.
+                        string? Text(params string[] names)
+                        {
+                            foreach (var n in names)
+                            {
+                                if (root.TryGetProperty(n, out var v) && v.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(v.GetString()))
+                                {
+                                    return v.GetString()!.Trim();
+                                }
+                            }
+
+                            return null;
+                        }
+
+                        var firstName = Text("firstName");
+                        var lastName = Text("lastName");
+                        if (firstName is null && lastName is null && Text("fullName", "name") is { } fullName)
+                        {
+                            var parts = fullName.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+                            firstName = parts[0];
+                            lastName = parts.Length > 1 ? parts[1] : null;
+                        }
+
+                        var named = firstName is not null || lastName is not null;
                         var lead = new Lead
                         {
                             FirstName = firstName ?? "Offline",
-                            LastName = lastName ?? "Lead",
-                            Email = email,
-                            CompanyName = company,
+                            LastName = lastName ?? (named ? string.Empty : "Lead"),
+                            Email = Text("email"),
+                            Phone = Text("phone"),
+                            CompanyName = Text("companyName", "company"),
+                            Address = Text("address"),
+                            Source = Text("source"),
+                            Description = Text("description", "notes"),
                             Status = "new",
                             OwnerId = userId
                         };

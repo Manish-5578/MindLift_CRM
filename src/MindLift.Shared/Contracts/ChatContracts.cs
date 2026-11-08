@@ -45,8 +45,12 @@ public sealed record CardEvidenceBoxDto(
     double X,
     double Y,
     double Width,
-    double Height
+    double Height,
+    string? Side = null
 );
+
+/// <summary>A field the front and back of a card disagree on: both readings, so the person can choose.</summary>
+public sealed record CardFieldConflictDto(string Field, string FrontValue, string BackValue);
 
 public sealed record ExtractedLeadCardDto(
     string? CompanyName,
@@ -68,7 +72,9 @@ public sealed record ExtractedLeadCardDto(
     string DetectedScript = "Latin",
     LeadDuplicateCandidateDto? Duplicate = null,
     double? EngineConfidence = null,
-    IReadOnlyList<CardEvidenceBoxDto>? Evidence = null
+    IReadOnlyList<CardEvidenceBoxDto>? Evidence = null,
+    double? AddressConfidence = null,
+    IReadOnlyList<CardFieldConflictDto>? Conflicts = null
 );
 
 public sealed record ParseCardOcrRequest(
