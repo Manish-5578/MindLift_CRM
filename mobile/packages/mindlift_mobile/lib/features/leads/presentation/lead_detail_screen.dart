@@ -107,13 +107,38 @@ class _LeadDetailScreenState extends ConsumerState<LeadDetailScreen> {
     );
   }
 
-  Future<void> _deleteNote(LeadNoteDto n) async {
-    try {
-      await ref.read(leadsServiceProvider).deleteLeadNote(widget.leadId, n.id);
-      if (mounted) setState(() => _notes = _notes.where((x) => x.id != n.id).toList());
-    } catch (e) {
-      if (mounted) MlToast.show(context, message: LeadActions.errorText(e, 'We could not delete the note.'), type: MlToastType.error);
-    }
+  void _editNote(LeadNoteDto n) {
+    _noteController.text = n.text;
+    MlSheet.show<void>(
+      context: context,
+      title: 'Edit note',
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.all(MlSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            MlTextField(label: 'Note', controller: _noteController, maxLines: 5, minLines: 3),
+            const SizedBox(height: MlSpacing.md),
+            MlButton(
+              label: 'Save changes',
+              onPressed: () async {
+                final text = _noteController.text.trim();
+                if (text.isEmpty) return;
+                Navigator.of(sheetContext).pop();
+                try {
+                  final updated = await ref.read(leadsServiceProvider).updateLeadNote(widget.leadId, n.id, text);
+                  if (mounted) setState(() => _notes = [for (final x in _notes) x.id == n.id ? updated : x]);
+                  if (mounted) MlToast.show(context, message: 'Note updated.');
+                } catch (e) {
+                  if (mounted) MlToast.show(context, message: LeadActions.errorText(e, 'We could not update the note.'), type: MlToastType.error);
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _convertToContact(LeadRow lead) async {
@@ -327,10 +352,10 @@ class _LeadDetailScreenState extends ConsumerState<LeadDetailScreen> {
                             child: Text('${n.authorName} · ${shortDate(n.createdAtUtc)}',
                                 style: TextStyle(fontSize: 12, color: MlColors.textMuted, decoration: TextDecoration.none, fontWeight: FontWeight.w400)),
                           ),
-                          if (_cfg.canEdit)
+                          if (_cfg.canEdit && n.id.isNotEmpty && n.id != '00000000-0000-0000-0000-000000000000')
                             GestureDetector(
-                              onTap: () => _deleteNote(n),
-                              child: Text('Delete', style: TextStyle(fontSize: 12, color: MlColors.danger, decoration: TextDecoration.none)),
+                              onTap: () => _editNote(n),
+                              child: Text('Edit', style: TextStyle(fontSize: 12, color: MlColors.primaryLight, decoration: TextDecoration.none)),
                             ),
                         ],
                       ),

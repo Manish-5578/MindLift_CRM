@@ -264,12 +264,23 @@
                                             </div>
                                             @if (note.Id != Guid.Empty)
                                             {
-                                                <MudIconButton Icon="@Icons.Material.Outlined.Delete" Size="Size.Small" Color="Color.Default" OnClick="() => DeleteNoteAsync(note.Id)" aria-label="@T["Delete"]" data-testid="delete-note-btn" />
+                                                <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" Color="Color.Default" OnClick="() => StartEditNote(note)" aria-label="@T["Edit"]" data-testid="edit-note-btn" />
                                             }
                                         </div>
-                                        <MudText Typo="Typo.body2" Style="white-space:pre-wrap;overflow-wrap:anywhere" data-testid="note-content">
-                                            @note.Content
-                                        </MudText>
+                                        @if (_editingNoteId == note.Id)
+                                        {
+                                            <MudTextField @bind-Value="_editNoteText" Lines="3" Variant="Variant.Outlined" data-testid="edit-note-input" />
+                                            <div class="d-flex gap-2 mt-2">
+                                                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" OnClick="SaveEditNoteAsync" data-testid="save-note-btn">@T["Save"]</MudButton>
+                                                <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="() => _editingNoteId = null">@T["Cancel"]</MudButton>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <MudText Typo="Typo.body2" Style="white-space:pre-wrap;overflow-wrap:anywhere" data-testid="note-content">
+                                                @note.Content
+                                            </MudText>
+                                        }
                                     </div>
                                 }
                             </div>
@@ -356,17 +367,30 @@
         }
     }
 
-    private async Task DeleteNoteAsync(Guid noteId)
+    private Guid? _editingNoteId;
+    private string? _editNoteText;
+
+    private void StartEditNote(LeadNoteDto note)
     {
-        var res = await Http.DeleteAsync($"api/v1/leads/{Id}/notes/{noteId}");
+        _editingNoteId = note.Id;
+        _editNoteText = note.Content;
+    }
+
+    private async Task SaveEditNoteAsync()
+    {
+        if (_editingNoteId is not { } noteId || string.IsNullOrWhiteSpace(_editNoteText)) return;
+        var res = await Http.PutAsJsonAsync($"api/v1/leads/{Id}/notes/{noteId}", new CreateLeadNoteRequest(_editNoteText));
         if (res.IsSuccessStatusCode)
         {
-            _notesList.RemoveAll(n => n.Id == noteId);
-            Snackbar.Add(T["Note deleted"], Severity.Success);
+            var updated = await res.Content.ReadFromJsonAsync<LeadNoteDto>();
+            var i = _notesList.FindIndex(n => n.Id == noteId);
+            if (i >= 0 && updated is not null) _notesList[i] = updated;
+            _editingNoteId = null;
+            Snackbar.Add(T["Note updated"], Severity.Success);
         }
         else
         {
-            Snackbar.Add(await ProblemText.FromAsync(res, T["Could not delete note."]), Severity.Error);
+            Snackbar.Add(await ProblemText.FromAsync(res, T["Could not update note."]), Severity.Error);
         }
     }
 

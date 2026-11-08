@@ -39,6 +39,7 @@ public sealed class MobileLeadsWorkspaceTests(MindLiftApiFactory factory) : ICla
     public async Task Views_search_status_notes_bulk_and_change_view_work_with_the_mobile_payloads()
     {
         var s = await Workspaces.SignupAsync(factory);
+        s.Client.DefaultRequestHeaders.Add("X-Client", "mobile");
         var a = await CreateLeadAsync(s, "Alpha", "Alpha Trading");
         var b = await CreateLeadAsync(s, "Bravo", "Bravo Logistics");
 
@@ -77,7 +78,17 @@ public sealed class MobileLeadsWorkspaceTests(MindLiftApiFactory factory) : ICla
         var notes = await ReadAsync(await s.Client.GetAsync($"/api/v1/leads/{a}/notes"));
         // The quick note above is kept as a note too, so there are two.
         notes.EnumerateArray().Any(n => n.GetProperty("content").GetString() == "Spoke to the buyer").ShouldBeTrue();
-        (await s.Client.DeleteAsync($"/api/v1/leads/{a}/notes/{note.GetProperty("id").GetString()}")).IsSuccessStatusCode.ShouldBeTrue();
+        // Notes can be edited but never deleted.
+        var noteId = note.GetProperty("id").GetString();
+        var edited = await ReadAsync(await s.Client.PutAsync($"/api/v1/leads/{a}/notes/{noteId}", Json("""{"content":"Spoke to the buyer, wants a quote"}""")));
+        edited.GetProperty("content").GetString().ShouldBe("Spoke to the buyer, wants a quote");
+        (await s.Client.DeleteAsync($"/api/v1/leads/{a}/notes/{noteId}")).IsSuccessStatusCode.ShouldBeFalse();
+        (await ReadAsync(await s.Client.GetAsync($"/api/v1/leads/{a}/notes")))
+            .EnumerateArray().Any(n => n.GetProperty("content").GetString() == "Spoke to the buyer, wants a quote").ShouldBeTrue();
+
+        // Everything done from the app is on the audit trail, tagged as mobile.
+        var trail = await ReadAsync(await s.Client.GetAsync("/api/v1/audit-logs?pageSize=100"));
+        trail.GetProperty("items").EnumerateArray().Count(i => (i.GetProperty("summary").GetString() ?? "").StartsWith("[Mobile]")).ShouldBeGreaterThan(3);
 
         // Edit: the full lead is read, changed and PUT back.
         var raw = await ReadAsync(await s.Client.GetAsync($"/api/v1/leads/{a}"));

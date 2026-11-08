@@ -859,14 +859,20 @@ public sealed class LeadService(
         return new LeadNoteDto(note.Id, note.LeadId, note.Content, note.AuthorId, note.AuthorName, note.CreatedAt);
     }
 
-    public async Task DeleteNoteAsync(Guid leadId, Guid noteId, CancellationToken cancellationToken = default)
+    /// <summary>Notes can be corrected but never removed, so the history on a lead stays complete. The change itself is audited.</summary>
+    public async Task<LeadNoteDto> UpdateNoteAsync(Guid leadId, Guid noteId, CreateLeadNoteRequest request, CancellationToken cancellationToken = default)
     {
-        var note = await db.LeadNotes.FirstOrDefaultAsync(n => n.LeadId == leadId && n.Id == noteId, cancellationToken);
-        if (note != null)
+        if (string.IsNullOrWhiteSpace(request.Content))
         {
-            db.LeadNotes.Remove(note);
-            await db.SaveChangesAsync(cancellationToken);
+            throw RecordHelpers.Invalid("content", "Note content cannot be empty.");
         }
+
+        await LoadScopedAsync(leadId, cancellationToken);
+        var note = await db.LeadNotes.FirstOrDefaultAsync(n => n.LeadId == leadId && n.Id == noteId, cancellationToken)
+            ?? throw new NotFoundException("Note", noteId);
+        note.Content = request.Content.Trim();
+        await db.SaveChangesAsync(cancellationToken);
+        return new LeadNoteDto(note.Id, note.LeadId, note.Content, note.AuthorId, note.AuthorName, note.CreatedAt);
     }
 
     public async Task<LeadDto> UpdateStickyNoteAsync(Guid id, string? note, CancellationToken cancellationToken = default)

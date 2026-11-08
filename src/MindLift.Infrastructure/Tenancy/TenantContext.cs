@@ -13,6 +13,11 @@ public sealed class TenantContext : ITenantContext
     public string? UserEmail { get; private set; }
     public string? IpAddress { get; private set; }
     public bool IsPlatformAdmin { get; private set; }
+    public string? Client { get; private set; }
+    public bool AuditedThisRequest { get; private set; }
+
+    public void MarkAudited() => AuditedThisRequest = true;
+    public void SetClient(string? client) => Client = client;
 
     public IDisposable Use(Guid tenantId, Guid? userId = null, string? userName = null, string? userEmail = null, string? ipAddress = null)
     {

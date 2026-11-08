@@ -173,6 +173,12 @@ public sealed class AuditableEntityInterceptor(ITenantContext tenant, IClock clo
         var module = ResolveModule(entity);
         var recordTitle = ExtractRecordTitle(entity);
         var summary = FormatActionSummary(action, module, entity.GetType().Name, recordTitle, changes);
+        if (tenant.Client == "mobile")
+        {
+            summary = "[Mobile] " + summary;
+        }
+
+        tenant.MarkAudited();
 
         audits.Add(new AuditLog
         {

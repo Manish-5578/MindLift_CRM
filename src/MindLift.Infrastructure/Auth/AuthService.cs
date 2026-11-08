@@ -123,7 +123,7 @@ public sealed class AuthService(
             Module = "Authentication",
             RecordTitle = displayName,
             Action = "Login",
-            Summary = $"User '{displayName}' ({user.Email}) signed in to workspace",
+            Summary = $"{(tenant.Client == "mobile" ? "[Mobile] " : "")}User '{displayName}' ({user.Email}) signed in to workspace",
             IpAddress = tenant.IpAddress,
             OccurredAt = clock.UtcNow
         });

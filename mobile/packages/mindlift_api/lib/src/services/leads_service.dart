@@ -161,7 +161,9 @@ class LeadsService {
     });
   }
 
-  Future<void> deleteLeadNote(String leadId, String noteId) async {
-    await _dio.delete('/api/v1/leads/$leadId/notes/$noteId');
+  /// Notes can be edited but never deleted.
+  Future<LeadNoteDto> updateLeadNote(String leadId, String noteId, String content) async {
+    final res = await _dio.put('/api/v1/leads/$leadId/notes/$noteId', data: {'content': content});
+    return LeadNoteDto.fromJson(Map<String, dynamic>.from(res.data as Map));
   }
 }

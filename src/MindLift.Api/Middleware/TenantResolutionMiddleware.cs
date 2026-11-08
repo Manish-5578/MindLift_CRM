@@ -24,6 +24,12 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
             }
         }
 
+        var isMobile = string.Equals(context.Request.Headers["X-Client"].FirstOrDefault(), "mobile", StringComparison.OrdinalIgnoreCase);
+        if (isMobile && tenant is MindLift.Infrastructure.Tenancy.TenantContext mobileCtx)
+        {
+            mobileCtx.SetClient("mobile");
+        }
+
         var tenantId = user.FindFirstValue("tid");
         if (!Guid.TryParse(tenantId, out var tenantGuid))
         {
@@ -70,5 +76,56 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
 
         using var scope = tenant.Use(tenantGuid, userGuid, userName, userEmail, clientIp);
         await next(context);
+
+        // Every successful change made from the mobile app is on the audit trail. Changes to audited records already wrote their own row
+        // (tagged "[Mobile]"); this covers the rest (chat, devices, sign-out, ...).
+        if (isMobile && userGuid is not null && !tenant.AuditedThisRequest && IsMutation(context.Request.Method)
+            && context.Response.StatusCode is >= 200 and < 300)
+        {
+            var path = context.Request.Path.Value ?? string.Empty;
+            if (!path.Contains("/ping", StringComparison.OrdinalIgnoreCase) && !path.Contains("/offline", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    var db = context.RequestServices.GetRequiredService<MindLift.Infrastructure.Persistence.AppDbContext>();
+                    var clock = context.RequestServices.GetRequiredService<IClock>();
+                    var (module, what) = Describe(context.Request.Method, path);
+                    db.AuditLogs.Add(new MindLift.Domain.Entities.AuditLog
+                    {
+                        TenantId = tenantGuid,
+                        UserId = userGuid,
+                        UserName = userName,
+                        UserEmail = userEmail,
+                        EntityType = "MobileRequest",
+                        EntityId = Guid.Empty,
+                        Module = module,
+                        RecordTitle = what,
+                        Action = context.Request.Method.ToUpperInvariant() == "DELETE" ? "Delete" : "Update",
+                        Summary = $"[Mobile] {what}",
+                        IpAddress = clientIp,
+                        OccurredAt = clock.UtcNow,
+                    });
+                    await db.SaveChangesAsync(CancellationToken.None);
+                }
+                catch
+                {
+                    // Auditing must never turn a finished request into a failure.
+                }
+            }
+        }
+    }
+
+    private static bool IsMutation(string method)
+        => HttpMethods.IsPost(method) || HttpMethods.IsPut(method) || HttpMethods.IsPatch(method) || HttpMethods.IsDelete(method);
+
+    private static (string Module, string What) Describe(string method, string path)
+    {
+        var p = path.ToLowerInvariant();
+        if (p.Contains("/chat")) return ("Chat", p.Contains("messages") ? "Sent a chat message" : "Chat action");
+        if (p.Contains("/mobile/devices")) return ("Mobile App", p.Contains("test-push") ? "Sent a test push notification" : "Registered the device for push notifications");
+        if (p.Contains("/notifications")) return ("Notifications", "Updated notifications");
+        if (p.Contains("/auth/logout")) return ("Authentication", "Signed out of the mobile app");
+        if (p.Contains("/auth/")) return ("Authentication", "Authentication action");
+        return ("Mobile App", $"{method.ToUpperInvariant()} {path}");
     }
 }

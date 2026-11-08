@@ -13,6 +13,14 @@ public interface ITenantContext
     string? IpAddress { get; }
     bool IsPlatformAdmin { get; }
 
+    /// <summary>"mobile" when the request comes from the mobile app (X-Client header), otherwise null.</summary>
+    string? Client => null;
+
+    /// <summary>True once an audit row was written for the current request.</summary>
+    bool AuditedThisRequest => false;
+
+    void MarkAudited() { }
+
     /// <summary>
     /// Sets the tenant (and optionally the user) until the returned scope is disposed.
     /// Used by request middleware, background jobs, webhooks and public endpoints.

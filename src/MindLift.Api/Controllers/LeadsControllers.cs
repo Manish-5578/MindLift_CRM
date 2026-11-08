@@ -220,12 +220,9 @@ public sealed class LeadsController(LeadService leads, ImportNotifier imports) :
         => Ok(await leads.AddNoteAsync(id, request, cancellationToken));
 
     [HasPermission(AppModule.Leads, PermissionAction.Edit)]
-    [HttpDelete("{id:guid}/notes/{noteId:guid}")]
-    public async Task<IActionResult> DeleteNote(Guid id, Guid noteId, CancellationToken cancellationToken)
-    {
-        await leads.DeleteNoteAsync(id, noteId, cancellationToken);
-        return NoContent();
-    }
+    [HttpPut("{id:guid}/notes/{noteId:guid}")]
+    public async Task<ActionResult<LeadNoteDto>> UpdateNote(Guid id, Guid noteId, [FromBody] CreateLeadNoteRequest request, CancellationToken cancellationToken)
+        => Ok(await leads.UpdateNoteAsync(id, noteId, request, cancellationToken));
 }
 
 /// <summary>Assignment rules and web forms (settings, Admin by default).</summary>
