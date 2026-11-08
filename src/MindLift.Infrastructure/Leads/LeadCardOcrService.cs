@@ -2,11 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using MindLift.Application.Abstractions;
 using MindLift.Application.Common.Exceptions;
+using MindLift.Domain.Entities;
 using MindLift.Infrastructure.Documents.Text;
 using MindLift.Shared.Contracts;
 
@@ -14,83 +18,153 @@ namespace MindLift.Infrastructure.Leads;
 
 public sealed class LeadCardOcrService(
     DocumentPageReader? pageReader = null,
+    IAppDbContext? db = null,
+    ITenantContext? tenant = null,
     ILogger<LeadCardOcrService>? logger = null)
 {
     private static readonly Regex EmailRegex = new(@"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}", RegexOptions.Compiled);
-    private static readonly Regex PhoneRegex = new(@"(?:\+?\d{1,3}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{3,4}|\+?\d{9,14}", RegexOptions.Compiled);
+    private static readonly Regex PhoneRegex = new(@"(?:\+?\d{1,4}[-.\s]?)?\(?\d{1,4}\)?[-.\s]?\d{2,4}[-.\s]?\d{3,5}|\+?\d{7,15}", RegexOptions.Compiled);
     private static readonly Regex WebRegex = new(@"(https?:\/\/[^\s]+|www\.[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}[^\s]*)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private static readonly string[] TitleKeywords =
     [
         "director", "manager", "ceo", "cto", "cfo", "coo", "founder", "co-founder", "president",
         "executive", "engineer", "consultant", "head of", "lead", "developer", "specialist",
-        "representative", "partner", "officer", "advisor", "supervisor", "architect", "analyst", "designer"
+        "representative", "partner", "officer", "advisor", "supervisor", "architect", "analyst", "designer",
+        // Arabic Job Titles
+        "مدير عام", "المدير العام", "رئيس تنفيذي", "الرئيس التنفيذي", "مؤسس", "شريك", "مدير",
+        "مهندس", "مستشار", "رئيس", "أخصائي", "مشرف", "مسؤول", "ممثل", "مطور", "معماري"
     ];
 
     private static readonly string[] CompanyKeywords =
     [
         "llc", "inc", "corp", "corporation", "ltd", "limited", "group", "solutions",
         "technologies", "tech", "co.", "company", "holdings", "ventures", "services",
-        "industries", "consulting", "enterprises", "global", "international", "agency", "media", "capital"
+        "industries", "consulting", "enterprises", "global", "international", "agency", "media", "capital",
+        // Arabic Corporate & Legal Entity Designations
+        "ذ.م.م", "ذ م م", "ش.م.ح", "ش م ح", "ش.م.ع", "ش م ع", "شركة", "مؤسسة", "مجموعة",
+        "استشارات", "تكنولوجيا", "حلول", "خدمات", "مشاريع", "القابضة", "التجارية", "العالمية", "للتجارة", "للمقاولات"
     ];
 
-    public async Task<ExtractedLeadCardDto> ExtractAsync(ParseCardOcrRequest request, CancellationToken ct = default)
-    {
-        var text = request.RawText?.Trim() ?? string.Empty;
+    private static readonly string[] AddressKeywords =
+    [
+        "street", "road", "floor", "tower", "box", "p.o.", "building", "avenue", "suite",
+        "dubai", "abu dhabi", "uae", "riyadh", "doha", "sharjah", "jeddah", "kuwait", "manama", "muscat",
+        // Arabic Address terms
+        "شارع", "برج", "بناية", "صندوق بريد", "طابق", "مكتب", "دبي", "أبوظبي", "الرياض", "جدة", "الدوحة", "المنامة", "الكويت", "مسقط"
+    ];
 
-        // If raw text is empty but image is provided, run real OCR on the image bytes
-        if (string.IsNullOrWhiteSpace(text) && !string.IsNullOrWhiteSpace(request.ImageBase64))
+    public async Task<ExtractedLeadCardDto> ExtractFromFileStreamAsync(
+        Stream stream,
+        string fileName,
+        CancellationToken ct = default)
+    {
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms, ct);
+        var bytes = ms.ToArray();
+        return await ExtractFromBytesAsync(bytes, Path.GetExtension(fileName), null, ct);
+    }
+
+    public async Task<ExtractedLeadCardDto> ExtractAsync(
+        ParseCardOcrRequest request,
+        CancellationToken ct = default)
+    {
+        var clientText = request.RawText?.Trim();
+
+        if (!string.IsNullOrWhiteSpace(request.ImageBase64))
         {
-            if (pageReader != null)
+            var rawBase64 = request.ImageBase64;
+            var commaIdx = rawBase64.IndexOf(',');
+            if (commaIdx >= 0)
             {
-                var tempFile = Path.Combine(Path.GetTempPath(), $"card_{Guid.NewGuid():N}.png");
+                rawBase64 = rawBase64[(commaIdx + 1)..];
+            }
+
+            if (rawBase64.Length > 22_000_000)
+            {
+                throw new ValidationException("file_too_large", "The card image exceeds the 15 MB limit.");
+            }
+
+            byte[] bytes;
+            try
+            {
+                bytes = Convert.FromBase64String(rawBase64.Trim());
+            }
+            catch (FormatException)
+            {
+                throw new ValidationException("invalid_image_base64", "The provided image data is corrupted or invalid.");
+            }
+
+            return await ExtractFromBytesAsync(bytes, ".png", clientText, ct);
+        }
+
+        if (string.IsNullOrWhiteSpace(clientText))
+        {
+            throw new ValidationException("empty_card_text", "No readable text or image was provided.");
+        }
+
+        return await ParseTextAndCheckDuplicatesAsync(clientText, ct);
+    }
+
+    private async Task<ExtractedLeadCardDto> ExtractFromBytesAsync(
+        byte[] bytes,
+        string extension,
+        string? clientText,
+        CancellationToken ct)
+    {
+        ValidateImageHeader(bytes);
+
+        string? serverText = null;
+        if (pageReader != null)
+        {
+            var ext = string.IsNullOrWhiteSpace(extension) ? ".png" : extension;
+            var tempFile = Path.Combine(Path.GetTempPath(), $"card_{Guid.NewGuid():N}{ext}");
+            try
+            {
+                await File.WriteAllBytesAsync(tempFile, bytes, ct);
+                var pages = await pageReader.ReadAsync(tempFile, ct);
+                var ocrLines = pages
+                    .SelectMany(p => (p.Text ?? string.Empty).Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+                    .Select(l => l.Trim())
+                    .Where(l => l.Length > 0);
+
+                serverText = string.Join("\n", ocrLines).Trim();
+            }
+            catch (Exception ex)
+            {
+                logger?.LogWarning(ex, "Server OCR engine failed to process image bytes.");
+            }
+            finally
+            {
                 try
                 {
-                    var rawBase64 = request.ImageBase64;
-                    var commaIdx = rawBase64.IndexOf(',');
-                    if (commaIdx >= 0)
-                    {
-                        rawBase64 = rawBase64[(commaIdx + 1)..];
-                    }
-
-                    var bytes = Convert.FromBase64String(rawBase64.Trim());
-                    await File.WriteAllBytesAsync(tempFile, bytes, ct);
-
-                    var pages = await pageReader.ReadAsync(tempFile, ct);
-                    var ocrLines = pages
-                        .SelectMany(p => (p.Text ?? string.Empty).Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
-                        .Select(l => l.Trim())
-                        .Where(l => l.Length > 0);
-
-                    text = string.Join("\n", ocrLines).Trim();
+                    if (File.Exists(tempFile)) File.Delete(tempFile);
                 }
-                catch (Exception ex)
+                catch
                 {
-                    logger?.LogWarning(ex, "OCR page reader failed to extract text from card image bytes.");
-                }
-                finally
-                {
-                    try
-                    {
-                        if (File.Exists(tempFile))
-                        {
-                            File.Delete(tempFile);
-                        }
-                    }
-                    catch
-                    {
-                        // best effort cleanup
-                    }
+                    // cleanup ignore
                 }
             }
         }
 
-        if (string.IsNullOrWhiteSpace(text))
+        // Server OCR is authoritative; fallback to clientText if server OCR produced nothing
+        var chosenText = !string.IsNullOrWhiteSpace(serverText) ? serverText : (clientText ?? string.Empty);
+
+        if (string.IsNullOrWhiteSpace(chosenText))
         {
-            throw new ValidationException("empty_card_text", "No readable text could be detected from the business card. Please ensure the card is clear and well lit.");
+            throw new ValidationException("empty_card_text", "No readable text could be recognized from the card. Please ensure the card is clear, well lit, and in focus.");
         }
 
-        var lines = text
+        return await ParseTextAndCheckDuplicatesAsync(chosenText, ct);
+    }
+
+    private async Task<ExtractedLeadCardDto> ParseTextAndCheckDuplicatesAsync(
+        string rawText,
+        CancellationToken ct)
+    {
+        var normalizedText = NormalizeArabicIndicDigits(rawText);
+
+        var lines = normalizedText
             .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
             .Select(l => l.Trim())
             .Where(l => l.Length > 0)
@@ -123,9 +197,9 @@ public sealed class LeadCardOcrService(
             }
 
             var matchPhone = PhoneRegex.Match(line);
-            if (matchPhone.Success && phone == null && matchPhone.Value.Length >= 8)
+            if (matchPhone.Success && phone == null && matchPhone.Value.Length >= 7)
             {
-                phone = matchPhone.Value;
+                phone = NormalizePhoneNumber(matchPhone.Value);
                 continue;
             }
 
@@ -142,10 +216,7 @@ public sealed class LeadCardOcrService(
                 continue;
             }
 
-            if (lower.Contains("street") || lower.Contains("road") || lower.Contains("floor") ||
-                lower.Contains("tower") || lower.Contains("box") || lower.Contains("p.o.") ||
-                lower.Contains("building") || lower.Contains("avenue") || lower.Contains("suite") ||
-                lower.Contains("dubai") || lower.Contains("abu dhabi") || lower.Contains("uae"))
+            if (AddressKeywords.Any(k => lower.Contains(k)))
             {
                 address = (address == null ? line : $"{address}, {line}");
                 continue;
@@ -154,7 +225,7 @@ public sealed class LeadCardOcrService(
             remainingLines.Add(line);
         }
 
-        // Identify person name and company if not found yet
+        // Identify person name and company from remaining lines
         foreach (var line in remainingLines)
         {
             var words = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -168,7 +239,7 @@ public sealed class LeadCardOcrService(
             }
         }
 
-        // Split name into first and last
+        // First & Last name split
         string? firstName = null;
         string? lastName = null;
         if (!string.IsNullOrWhiteSpace(fullName))
@@ -197,6 +268,30 @@ public sealed class LeadCardOcrService(
             }
         }
 
+        // Script Detection
+        var hasArabic = Regex.IsMatch(rawText, @"[\u0600-\u06FF]");
+        var hasLatin = Regex.IsMatch(rawText, @"[a-zA-Z]");
+        var script = (hasArabic && hasLatin) ? "Bilingual" : (hasArabic ? "Arabic" : "Latin");
+
+        // Confidences calculation
+        var emailConf = !string.IsNullOrWhiteSpace(email) ? 0.95 : (double?)null;
+        var phoneConf = !string.IsNullOrWhiteSpace(phone) ? 0.90 : (double?)null;
+        var companyConf = !string.IsNullOrWhiteSpace(companyName)
+            ? (CompanyKeywords.Any(k => companyName.ToLowerInvariant().Contains(k)) ? 0.90 : 0.70)
+            : (double?)null;
+        var nameConf = !string.IsNullOrWhiteSpace(fullName) ? 0.85 : (double?)null;
+        var titleConf = !string.IsNullOrWhiteSpace(jobTitle) ? 0.88 : (double?)null;
+
+        var scores = new[] { emailConf, phoneConf, companyConf, nameConf, titleConf }.Where(s => s.HasValue).Select(s => s!.Value).ToList();
+        var overallConfidence = scores.Count > 0 ? Math.Round(scores.Average(), 2) : 0.70;
+
+        // Duplicate Candidate Check in CRM Database
+        LeadDuplicateCandidateDto? duplicate = null;
+        if (db != null)
+        {
+            duplicate = await FindDuplicateInCrmAsync(email, phone, companyName, ct);
+        }
+
         return new ExtractedLeadCardDto(
             CompanyName: companyName ?? string.Empty,
             FirstName: firstName,
@@ -207,8 +302,146 @@ public sealed class LeadCardOcrService(
             JobTitle: jobTitle,
             Website: website,
             Address: address,
-            RawText: text
+            RawText: rawText,
+            OverallConfidence: overallConfidence,
+            CompanyConfidence: companyConf,
+            NameConfidence: nameConf,
+            EmailConfidence: emailConf,
+            PhoneConfidence: phoneConf,
+            TitleConfidence: titleConf,
+            DetectedScript: script,
+            Duplicate: duplicate
         );
     }
-}
 
+    private async Task<LeadDuplicateCandidateDto?> FindDuplicateInCrmAsync(
+        string? email,
+        string? phone,
+        string? companyName,
+        CancellationToken ct)
+    {
+        if (db == null) return null;
+
+        var normEmail = email?.Trim().ToLowerInvariant();
+        var normPhone = phone != null ? new string(phone.Where(char.IsDigit).ToArray()) : null;
+
+        try
+        {
+            if (!string.IsNullOrEmpty(normEmail))
+            {
+                var lead = await db.Set<Lead>()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(l => !l.IsDeleted && (l.NormalizedEmail == normEmail || (l.Email != null && l.Email.ToLower() == normEmail)), ct);
+
+                if (lead != null)
+                {
+                    return new LeadDuplicateCandidateDto(
+                        Id: lead.Id,
+                        Name: $"{lead.FirstName} {lead.LastName}".Trim(),
+                        Company: lead.CompanyName,
+                        Email: lead.Email,
+                        Phone: lead.Phone,
+                        RecordType: "Lead"
+                    );
+                }
+
+                var contact = await db.Set<Contact>()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(c => !c.IsDeleted && (c.NormalizedEmail == normEmail || (c.Email != null && c.Email.ToLower() == normEmail)), ct);
+
+                if (contact != null)
+                {
+                    return new LeadDuplicateCandidateDto(
+                        Id: contact.Id,
+                        Name: $"{contact.FirstName} {contact.LastName}".Trim(),
+                        Company: null,
+                        Email: contact.Email,
+                        Phone: contact.Phone,
+                        RecordType: "Contact"
+                    );
+                }
+            }
+
+            if (!string.IsNullOrEmpty(normPhone) && normPhone.Length >= 7)
+            {
+                var phoneSuffix = normPhone[^7..];
+                var lead = await db.Set<Lead>()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(l => !l.IsDeleted && l.Phone != null && l.Phone.Contains(phoneSuffix), ct);
+
+                if (lead != null)
+                {
+                    return new LeadDuplicateCandidateDto(
+                        Id: lead.Id,
+                        Name: $"{lead.FirstName} {lead.LastName}".Trim(),
+                        Company: lead.CompanyName,
+                        Email: lead.Email,
+                        Phone: lead.Phone,
+                        RecordType: "Lead"
+                    );
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(ex, "Failed to execute CRM duplicate query for scanned lead.");
+        }
+
+        return null;
+    }
+
+    public static string NormalizeArabicIndicDigits(string input)
+    {
+        if (string.IsNullOrEmpty(input)) return input;
+        var sb = new StringBuilder(input.Length);
+        foreach (var c in input)
+        {
+            if (c >= '٠' && c <= '٩') sb.Append((char)('0' + (c - '٠')));
+            else if (c >= '۰' && c <= '۹') sb.Append((char)('0' + (c - '۰')));
+            else sb.Append(c);
+        }
+        return sb.ToString();
+    }
+
+    private static string NormalizePhoneNumber(string raw)
+    {
+        var cleaned = raw.Trim();
+        var digitsOnly = new string(cleaned.Where(char.IsDigit).ToArray());
+
+        // Format Gulf numbers e.g. UAE 0501234567 -> +971 50 123 4567
+        if (digitsOnly.StartsWith("05") && digitsOnly.Length == 10)
+        {
+            return $"+971 {digitsOnly[1..3]} {digitsOnly[3..6]} {digitsOnly[6..]}";
+        }
+        if (digitsOnly.StartsWith("00971") && digitsOnly.Length == 14)
+        {
+            return $"+971 {digitsOnly[5..7]} {digitsOnly[7..10]} {digitsOnly[10..]}";
+        }
+        if (digitsOnly.StartsWith("9715") && digitsOnly.Length == 12)
+        {
+            return $"+971 {digitsOnly[3..5]} {digitsOnly[5..8]} {digitsOnly[8..]}";
+        }
+
+        return cleaned;
+    }
+
+    private static void ValidateImageHeader(byte[] bytes)
+    {
+        if (bytes == null || bytes.Length < 8)
+        {
+            throw new ValidationException("invalid_image", "The uploaded file is empty or too small to be a valid image.");
+        }
+
+        // Magic bytes check
+        bool isJpeg = bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF;
+        bool isPng = bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47;
+        bool isWebp = bytes.Length > 12 && bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46 && bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50;
+        bool isTiff = (bytes[0] == 0x49 && bytes[1] == 0x49 && bytes[2] == 0x2A && bytes[3] == 0x00) ||
+                      (bytes[0] == 0x4D && bytes[1] == 0x4D && bytes[2] == 0x00 && bytes[3] == 0x2A);
+
+        if (!isJpeg && !isPng && !isWebp && !isTiff)
+        {
+            throw new ValidationException("unsupported_image_format", "Only JPEG, PNG, WEBP, and TIFF images are supported for card scanning.");
+        }
+    }
+}

@@ -82,6 +82,35 @@ class ChatUserDto {
   }
 }
 
+class LeadDuplicateCandidateDto {
+  const LeadDuplicateCandidateDto({
+    required this.id,
+    required this.name,
+    this.company,
+    this.email,
+    this.phone,
+    this.recordType = 'Lead',
+  });
+
+  final String id;
+  final String name;
+  final String? company;
+  final String? email;
+  final String? phone;
+  final String recordType;
+
+  factory LeadDuplicateCandidateDto.fromJson(Map<String, dynamic> json) {
+    return LeadDuplicateCandidateDto(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? 'Existing Contact',
+      company: json['company'] as String?,
+      email: json['email'] as String?,
+      phone: json['phone'] as String?,
+      recordType: json['recordType'] as String? ?? 'Lead',
+    );
+  }
+}
+
 class ExtractedLeadCardDto {
   const ExtractedLeadCardDto({
     this.companyName,
@@ -94,6 +123,14 @@ class ExtractedLeadCardDto {
     this.website,
     this.address,
     required this.rawText,
+    this.overallConfidence = 0.9,
+    this.companyConfidence,
+    this.nameConfidence,
+    this.emailConfidence,
+    this.phoneConfidence,
+    this.titleConfidence,
+    this.detectedScript = 'Latin',
+    this.duplicate,
   });
 
   final String? companyName;
@@ -106,6 +143,14 @@ class ExtractedLeadCardDto {
   final String? website;
   final String? address;
   final String rawText;
+  final double overallConfidence;
+  final double? companyConfidence;
+  final double? nameConfidence;
+  final double? emailConfidence;
+  final double? phoneConfidence;
+  final double? titleConfidence;
+  final String detectedScript;
+  final LeadDuplicateCandidateDto? duplicate;
 
   factory ExtractedLeadCardDto.fromJson(Map<String, dynamic> json) {
     return ExtractedLeadCardDto(
@@ -119,6 +164,16 @@ class ExtractedLeadCardDto {
       website: json['website'] as String?,
       address: json['address'] as String?,
       rawText: json['rawText'] as String? ?? '',
+      overallConfidence: (json['overallConfidence'] as num?)?.toDouble() ?? 0.85,
+      companyConfidence: (json['companyConfidence'] as num?)?.toDouble(),
+      nameConfidence: (json['nameConfidence'] as num?)?.toDouble(),
+      emailConfidence: (json['emailConfidence'] as num?)?.toDouble(),
+      phoneConfidence: (json['phoneConfidence'] as num?)?.toDouble(),
+      titleConfidence: (json['titleConfidence'] as num?)?.toDouble(),
+      detectedScript: json['detectedScript'] as String? ?? 'Latin',
+      duplicate: json['duplicate'] != null
+          ? LeadDuplicateCandidateDto.fromJson(json['duplicate'] as Map<String, dynamic>)
+          : null,
     );
   }
 }

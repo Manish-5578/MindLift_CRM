@@ -30,6 +30,15 @@ public sealed record ChatUserDto(
     bool IsOnline
 );
 
+public sealed record LeadDuplicateCandidateDto(
+    Guid Id,
+    string Name,
+    string? Company,
+    string? Email,
+    string? Phone,
+    string RecordType
+);
+
 public sealed record ExtractedLeadCardDto(
     string? CompanyName,
     string? FirstName,
@@ -40,7 +49,15 @@ public sealed record ExtractedLeadCardDto(
     string? JobTitle,
     string? Website,
     string? Address,
-    string RawText
+    string RawText,
+    double OverallConfidence = 0.9,
+    double? CompanyConfidence = null,
+    double? NameConfidence = null,
+    double? EmailConfidence = null,
+    double? PhoneConfidence = null,
+    double? TitleConfidence = null,
+    string DetectedScript = "Latin",
+    LeadDuplicateCandidateDto? Duplicate = null
 );
 
 public sealed record ParseCardOcrRequest(
