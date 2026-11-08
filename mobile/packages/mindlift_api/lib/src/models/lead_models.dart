@@ -89,7 +89,7 @@ class LeadNoteDto {
     return LeadNoteDto(
       id: json['id'] as String? ?? '',
       leadId: json['leadId'] as String? ?? '',
-      text: json['text'] as String? ?? json['note'] as String? ?? '',
+      text: json['content'] as String? ?? json['text'] as String? ?? json['note'] as String? ?? '',
       authorName: json['authorName'] as String? ?? json['author'] as String? ?? 'Unknown',
       createdAtUtc: json['createdAtUtc'] != null
           ? DateTime.parse(json['createdAtUtc'] as String)
@@ -188,6 +188,6 @@ class AddLeadNoteRequest {
   const AddLeadNoteRequest({required this.note});
   final String note;
 
-  Map<String, dynamic> toJson() => {'note': note};
+  Map<String, dynamic> toJson() => {'content': note};
 }
 

@@ -4,7 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'package:mindlift_api/mindlift_api.dart';
 import 'package:mindlift_ui/mindlift_ui.dart';
 import '../../../core/network_provider.dart';
+import 'lead_actions.dart';
+import 'leads_screen.dart' show statusColor, statusState, shortDate;
 
+/// One lead, with the same actions as the web detail page: status, edit, notes, move to engagement and convert.
 class LeadDetailScreen extends ConsumerStatefulWidget {
   const LeadDetailScreen({super.key, required this.leadId});
   final String leadId;
@@ -15,14 +18,18 @@ class LeadDetailScreen extends ConsumerStatefulWidget {
 
 class _LeadDetailScreenState extends ConsumerState<LeadDetailScreen> {
   bool _isLoading = true;
-  LeadDto? _lead;
+  Map<String, dynamic>? _raw;
   List<LeadNoteDto> _notes = [];
+  LeadWorkspaceConfig _cfg = const LeadWorkspaceConfig();
   final _noteController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _loadLead();
+    _load();
+    ref.read(leadsServiceProvider).loadWorkspaceConfig().then((c) {
+      if (mounted) setState(() => _cfg = c);
+    }).catchError((_) {});
   }
 
   @override
@@ -31,56 +38,66 @@ class _LeadDetailScreenState extends ConsumerState<LeadDetailScreen> {
     super.dispose();
   }
 
-  Future<void> _loadLead() async {
-    setState(() => _isLoading = true);
+  Future<void> _load() async {
     try {
-      final lead = await ref.read(leadsServiceProvider).getLead(widget.leadId);
-      final notes = await ref.read(leadsServiceProvider).getLeadNotes(widget.leadId);
+      final svc = ref.read(leadsServiceProvider);
+      final raw = await svc.getLeadRaw(widget.leadId);
+      final notes = await svc.getLeadNotes(widget.leadId);
       if (mounted) {
         setState(() {
-          _lead = lead;
+          _raw = raw;
           _notes = notes;
         });
       }
     } catch (_) {
-      // In offline or fallback mode
+      if (mounted && _raw == null) MlToast.show(context, message: 'We could not open this lead.', type: MlToastType.error);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _openAddNoteSheet() {
+  LeadRow? get _row {
+    final r = _raw;
+    if (r == null) return null;
+    final full = '${r['firstName'] ?? ''} ${r['lastName'] ?? ''}'.trim();
+    return LeadRow.fromJson({...r, 'fullName': full});
+  }
+
+  LeadActions get _actions => LeadActions(
+        context: context,
+        ref: ref,
+        cfg: _cfg,
+        views: LeadView.builtIn(),
+        currentViewKey: '',
+        onChanged: _load,
+        onStatusChanged: (_, __) => _load(),
+      );
+
+  void _addNote() {
     _noteController.clear();
     MlSheet.show<void>(
       context: context,
-      title: 'Add Note',
+      title: 'Add note',
       builder: (sheetContext) => Padding(
         padding: const EdgeInsets.all(MlSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
-            MlTextField(
-              label: 'Note Content',
-              placeholder: 'Type client conversation or progress notes...',
-              controller: _noteController,
-              maxLines: 4,
-            ),
-            const SizedBox(height: MlSpacing.lg),
+            MlTextField(label: 'Note', placeholder: 'Conversation or progress notes…', controller: _noteController, maxLines: 5, minLines: 3),
+            const SizedBox(height: MlSpacing.md),
             MlButton(
-              label: 'Save Note to History',
+              label: 'Save note',
               onPressed: () async {
                 final text = _noteController.text.trim();
                 if (text.isEmpty) return;
                 Navigator.of(sheetContext).pop();
                 try {
-                  final newNote = await ref
-                      .read(leadsServiceProvider)
-                      .addLeadNote(widget.leadId, text);
-                  setState(() => _notes.insert(0, newNote));
-                  MlToast.show(context, message: 'Note added successfully!');
-                } catch (_) {
-                  MlToast.show(context, message: 'Saved note to offline queue.');
+                  final n = await ref.read(leadsServiceProvider).addLeadNote(widget.leadId, text);
+                  if (mounted) setState(() => _notes = [n, ..._notes]);
+                  if (mounted) MlToast.show(context, message: 'Note added.');
+                } catch (e) {
+                  if (mounted) MlToast.show(context, message: LeadActions.errorText(e, 'We could not add the note.'), type: MlToastType.error);
                 }
               },
             ),
@@ -90,128 +107,69 @@ class _LeadDetailScreenState extends ConsumerState<LeadDetailScreen> {
     );
   }
 
-  void _openChangeStatusSheet() {
-    const statuses = [
-      MlSelectOption(value: 'New', label: 'New'),
-      MlSelectOption(value: 'Contacted', label: 'Contacted'),
-      MlSelectOption(value: 'Qualified', label: 'Qualified'),
-      MlSelectOption(value: 'Lost', label: 'Lost'),
-    ];
+  Future<void> _deleteNote(LeadNoteDto n) async {
+    try {
+      await ref.read(leadsServiceProvider).deleteLeadNote(widget.leadId, n.id);
+      if (mounted) setState(() => _notes = _notes.where((x) => x.id != n.id).toList());
+    } catch (e) {
+      if (mounted) MlToast.show(context, message: LeadActions.errorText(e, 'We could not delete the note.'), type: MlToastType.error);
+    }
+  }
 
-    MlSheet.show<void>(
-      context: context,
-      title: 'Update Status',
-      builder: (sheetContext) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: statuses.map((opt) {
-          final isSelected = _lead?.status == opt.value;
-          return GestureDetector(
-            onTap: () async {
-              Navigator.of(sheetContext).pop();
-              try {
-                await ref.read(leadsServiceProvider).updateLeadStatus(widget.leadId, opt.value);
-                setState(() {
-                  if (_lead != null) {
-                    _lead = LeadDto(
-                      id: _lead!.id,
-                      name: _lead!.name,
-                      company: _lead!.company,
-                      email: _lead!.email,
-                      phone: _lead!.phone,
-                      status: opt.value,
-                      source: _lead!.source,
-                      createdBy: _lead!.createdBy,
-                    );
-                  }
-                });
-                MlToast.show(context, message: 'Status updated to ${opt.value}!');
-              } catch (_) {
-                MlToast.show(context, message: 'Status change queued offline.');
-              }
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: MlSpacing.lg, vertical: MlSpacing.md),
-              decoration: BoxDecoration(
-                border: Border(bottom: BorderSide(color: MlColors.border)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    opt.label,
-                    style: MlTypography.labelLarge.copyWith(
-                      color: isSelected ? MlColors.primaryLight : MlColors.textPrimary,
-                    ),
-                  ),
-                  if (isSelected)
-                    const Text('✓', style: TextStyle(color: MlColors.primaryLight, fontSize: 18)),
-                ],
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
+  Future<void> _convertToContact(LeadRow lead) async {
+    try {
+      await ref.read(leadsServiceProvider).quickConvertToContact(lead.id);
+      if (mounted) MlToast.show(context, message: 'Converted to a contact.');
+      await _load();
+    } catch (e) {
+      if (mounted) MlToast.show(context, message: LeadActions.errorText(e, 'We could not convert this lead.'), type: MlToastType.error);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading && _lead == null) {
+    final back = MlIconButton(
+      label: 'Back',
+      icon: Text('←', style: TextStyle(fontSize: 20, color: MlColors.textPrimary)),
+      onPressed: () => context.pop(),
+    );
+
+    final lead = _row;
+    if (_isLoading && lead == null) {
       return MlScreen(
-        title: 'Loading Lead...',
-        leading: MlIconButton(
-          label: 'Back',
-          icon: Text('←', style: TextStyle(fontSize: 20, color: MlColors.textPrimary)),
-          onPressed: () => context.pop(),
-        ),
+        title: 'Loading lead…',
+        leading: back,
         body: const Padding(
           padding: EdgeInsets.all(MlSpacing.lg),
-          child: Column(
-            children: [
-              MlSkeleton(height: 120),
-              SizedBox(height: MlSpacing.md),
-              MlSkeleton(height: 200),
-            ],
-          ),
+          child: Column(children: [MlSkeleton(height: 120), SizedBox(height: MlSpacing.md), MlSkeleton(height: 200)]),
         ),
       );
     }
+    if (lead == null) {
+      return MlScreen(title: 'Lead', leading: back, body: const Center(child: Text('This lead could not be opened.')));
+    }
 
-    final lead = _lead ?? LeadDto(id: widget.leadId, name: 'Lead Details');
-    final hasCompany = lead.company != null && lead.company!.trim().isNotEmpty;
-    final displayTitle = hasCompany ? lead.company!.trim() : lead.name;
-    final contactSubtitle = hasCompany ? '👤 Contact: ${lead.name}' : 'Individual Lead';
+    final raw = _raw!;
+    final tags = ((raw['tags'] as List?) ?? const []).map((e) => e.toString()).toList();
+    final canEdit = _cfg.canEdit && !lead.isConverted;
 
     return MlScreen(
-      title: displayTitle,
-      subtitle: contactSubtitle,
-      leading: MlIconButton(
-        label: 'Back',
-        icon: Text('←', style: TextStyle(fontSize: 20, color: MlColors.textPrimary)),
-        onPressed: () => context.pop(),
-      ),
+      title: lead.title,
+      subtitle: lead.fullName.isNotEmpty && lead.companyName != null ? 'Contact: ${lead.fullName}' : 'Lead',
+      leading: back,
       actions: [
-        MlIconButton(
-          label: 'Change Status',
-          icon: Text('⚙', style: TextStyle(fontSize: 20, color: MlColors.textPrimary)),
-          onPressed: _openChangeStatusSheet,
-        ),
+        if (canEdit) MlIconButton(label: 'Edit', icon: const Text('✎', style: TextStyle(fontSize: 20)), onPressed: () => _actions.editLead(lead)),
       ],
       bottomRail: Container(
         padding: const EdgeInsets.all(MlSpacing.md),
-        decoration: BoxDecoration(
-          color: MlColors.surface,
-          border: Border(top: BorderSide(color: MlColors.border)),
-        ),
+        decoration: BoxDecoration(color: MlColors.surface, border: Border(top: BorderSide(color: MlColors.border))),
         child: Row(
           children: [
-            Expanded(
-              child: MlButton(
-                label: '+ Add Note',
-                onPressed: _openAddNoteSheet,
-                variant: MlButtonVariant.primary,
-              ),
-            ),
+            Expanded(child: MlButton(label: '+ Add note', onPressed: _addNote, variant: MlButtonVariant.primary)),
+            if (canEdit) ...[
+              const SizedBox(width: MlSpacing.sm),
+              Expanded(child: MlButton(label: 'Change status', onPressed: () => _actions.changeStatus(lead), variant: MlButtonVariant.secondary)),
+            ],
           ],
         ),
       ),
@@ -220,7 +178,57 @@ class _LeadDetailScreenState extends ConsumerState<LeadDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Lead Card Summary
+            // Status stepper, like the web header.
+            if (!lead.isConverted)
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (final s in _cfg.settableStatuses)
+                      GestureDetector(
+                        onTap: canEdit && s.value != lead.status ? () => _actions.changeStatus(lead) : null,
+                        child: Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: s.value == lead.status ? statusColor(s.value) : MlColors.surface,
+                            borderRadius: BorderRadius.circular(MlRadii.full),
+                            border: Border.all(color: s.value == lead.status ? statusColor(s.value) : MlColors.border),
+                          ),
+                          child: Text(s.label,
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: s.value == lead.status ? const Color(0xFFFFFFFF) : MlColors.textSecondary,
+                                  decoration: TextDecoration.none)),
+                        ),
+                      ),
+                  ],
+                ),
+              )
+            else
+              Align(alignment: Alignment.centerLeft, child: MlStatusChip(label: 'Converted', state: MlStatusState.success)),
+            const SizedBox(height: MlSpacing.md),
+
+            // Actions
+            if (canEdit)
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _chipButton('🤝  Move to engagement', () => _actions.moveToEngagement(lead)),
+                  _chipButton('👤  Convert to contact', () => _convertToContact(lead)),
+                  _chipButton('📝  Quick note', () => _actions.stickyNote(lead)),
+                  if (_cfg.canDelete)
+                    _chipButton('🗑  Delete', () async {
+                      await _actions.deleteLead(lead);
+                      if (mounted && context.canPop()) context.pop();
+                    }, danger: true),
+                ],
+              ),
+            if (canEdit) const SizedBox(height: MlSpacing.md),
+
+            // Details
             Container(
               padding: const EdgeInsets.all(MlSpacing.lg),
               decoration: BoxDecoration(
@@ -232,68 +240,65 @@ class _LeadDetailScreenState extends ConsumerState<LeadDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
+                      MlAvatar(name: lead.title, size: MlAvatarSize.lg),
+                      const SizedBox(width: MlSpacing.md),
                       Expanded(
-                        child: Text(
-                          lead.name,
-                          style: MlTypography.headingSmall.copyWith(color: MlColors.textPrimary),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(lead.fullName.isEmpty ? lead.title : lead.fullName,
+                                style: MlTypography.headingSmall.copyWith(color: MlColors.textPrimary)),
+                            const SizedBox(height: 4),
+                            MlStatusChip(label: _cfg.statusLabel(lead.status), state: statusState(lead.status)),
+                          ],
                         ),
-                      ),
-                      MlStatusChip(
-                        label: lead.status,
-                        state: lead.status == 'Qualified'
-                            ? MlStatusState.success
-                            : lead.status == 'Lost'
-                                ? MlStatusState.danger
-                                : MlStatusState.primary,
                       ),
                     ],
                   ),
                   const SizedBox(height: MlSpacing.md),
-                  _buildDetailRow('Email', lead.email ?? '—'),
-                  const SizedBox(height: MlSpacing.xs),
-                  _buildDetailRow('Phone', lead.phone ?? '—'),
-                  const SizedBox(height: MlSpacing.xs),
-                  _buildDetailRow('Source', lead.source ?? 'Mobile App'),
-                  const SizedBox(height: MlSpacing.xs),
-                  _buildDetailRow('Created By', lead.createdBy ?? 'Staff Agent'),
+                  _detailRow('Company', lead.companyName),
+                  _detailRow('Email', lead.email),
+                  _detailRow('Phone', lead.phone),
+                  _detailRow('Source', lead.source == null ? null : _cfg.sourceLabel(lead.source)),
+                  _detailRow('Rating', lead.rating),
+                  _detailRow('Address', [lead.address, lead.city, lead.state].where((e) => e != null && e.isNotEmpty).join(', ')),
+                  _detailRow('Created', shortDate(lead.createdAtUtc)),
+                  if (raw['firstContactedAtUtc'] != null)
+                    _detailRow('First contacted', shortDate(DateTime.parse(raw['firstContactedAtUtc'] as String))),
+                  if ((raw['disqualifyReason'] as String?)?.isNotEmpty == true) _detailRow('Not interested because', raw['disqualifyReason'] as String),
+                  if (tags.isNotEmpty) _detailRow('Tags', tags.join(', ')),
                 ],
               ),
             ),
+            if (lead.description != null && lead.description!.trim().isNotEmpty) ...[
+              const SizedBox(height: MlSpacing.md),
+              Container(
+                padding: const EdgeInsets.all(MlSpacing.md),
+                decoration: BoxDecoration(
+                  color: MlColors.warningSoft,
+                  borderRadius: BorderRadius.circular(MlRadii.lg),
+                ),
+                child: Text('📝  ${lead.description!.trim()}',
+                    style: TextStyle(fontSize: 14, color: MlColors.textPrimary, decoration: TextDecoration.none, fontWeight: FontWeight.w400)),
+              ),
+            ],
             const SizedBox(height: MlSpacing.lg),
 
-            // Chronological Notes History Section
+            // Notes
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Chronological Notes (${_notes.length})',
-                  style: MlTypography.labelLarge.copyWith(color: MlColors.textPrimary),
-                ),
+                Text('Notes (${_notes.length})', style: MlTypography.labelLarge.copyWith(color: MlColors.textPrimary)),
                 GestureDetector(
-                  onTap: _openAddNoteSheet,
-                  child: Text(
-                    '+ Add',
-                    style: MlTypography.labelMedium.copyWith(color: MlColors.primaryLight),
-                  ),
+                  onTap: _addNote,
+                  child: Text('+ Add', style: MlTypography.labelMedium.copyWith(color: MlColors.primaryLight)),
                 ),
               ],
             ),
             const SizedBox(height: MlSpacing.sm),
-
-            MlTimeline(
-              items: _notes.map((n) {
-                return MlTimelineItemData(
-                  id: n.id,
-                  title: 'Note Recorded',
-                  author: n.authorName,
-                  timestamp: n.createdAtUtc,
-                  content: n.text,
-                  indicatorColor: MlColors.primary,
-                );
-              }).toList(),
-              emptyPlaceholder: Container(
+            if (_notes.isEmpty)
+              Container(
                 padding: const EdgeInsets.all(MlSpacing.xl),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
@@ -301,36 +306,76 @@ class _LeadDetailScreenState extends ConsumerState<LeadDetailScreen> {
                   borderRadius: BorderRadius.circular(MlRadii.md),
                   border: Border.all(color: MlColors.border),
                 ),
-                child: Column(
-                  children: [
-                    Text(
-                      'No notes recorded yet',
-                      style: MlTypography.bodyMedium.copyWith(color: MlColors.textMuted),
-                    ),
-                    const SizedBox(height: MlSpacing.sm),
-                    MlButton(
-                      label: 'Record First Note',
-                      onPressed: _openAddNoteSheet,
-                      variant: MlButtonVariant.secondary,
-                    ),
-                  ],
+                child: Text('No notes recorded yet', style: MlTypography.bodyMedium.copyWith(color: MlColors.textMuted)),
+              )
+            else
+              for (final n in _notes)
+                Container(
+                  margin: const EdgeInsets.only(bottom: MlSpacing.sm),
+                  padding: const EdgeInsets.all(MlSpacing.md),
+                  decoration: BoxDecoration(
+                    color: MlColors.surface,
+                    borderRadius: BorderRadius.circular(MlRadii.md),
+                    border: Border.all(color: MlColors.border),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text('${n.authorName} · ${shortDate(n.createdAtUtc)}',
+                                style: TextStyle(fontSize: 12, color: MlColors.textMuted, decoration: TextDecoration.none, fontWeight: FontWeight.w400)),
+                          ),
+                          if (_cfg.canEdit)
+                            GestureDetector(
+                              onTap: () => _deleteNote(n),
+                              child: Text('Delete', style: TextStyle(fontSize: 12, color: MlColors.danger, decoration: TextDecoration.none)),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(n.text, style: TextStyle(fontSize: 14.5, color: MlColors.textPrimary, decoration: TextDecoration.none, fontWeight: FontWeight.w400)),
+                    ],
+                  ),
                 ),
-              ),
-            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: MlTypography.bodySmall.copyWith(color: MlColors.textMuted)),
-        Text(value, style: MlTypography.bodySmall.copyWith(color: MlColors.textPrimary)),
-      ],
+  Widget _chipButton(String label, VoidCallback onTap, {bool danger = false}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          color: MlColors.surface,
+          borderRadius: BorderRadius.circular(MlRadii.full),
+          border: Border.all(color: danger ? MlColors.danger : MlColors.border),
+        ),
+        child: Text(label,
+            style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: danger ? MlColors.danger : MlColors.textPrimary,
+                decoration: TextDecoration.none)),
+      ),
+    );
+  }
+
+  Widget _detailRow(String label, String? value) {
+    if (value == null || value.trim().isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(width: 120, child: Text(label, style: MlTypography.bodySmall.copyWith(color: MlColors.textMuted))),
+          Expanded(child: Text(value, style: MlTypography.bodySmall.copyWith(color: MlColors.textPrimary))),
+        ],
+      ),
     );
   }
 }
-

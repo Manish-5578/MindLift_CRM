@@ -11,6 +11,7 @@ export 'src/models/auth_models.dart';
 export 'src/models/contact_models.dart';
 export 'src/models/deal_models.dart';
 export 'src/models/lead_models.dart';
+export 'src/models/lead_workspace_models.dart';
 export 'src/models/mobile_device_models.dart';
 export 'src/models/notification_models.dart';
 export 'src/models/offline_models.dart';
