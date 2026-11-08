@@ -55,6 +55,7 @@ class MlIcons {
   static const handshake = Icons.handshake_outlined;
   static const person = Icons.person_outline_rounded;
   static const swap = Icons.swap_horiz_rounded;
+  static const phone = Icons.smartphone_rounded;
   static const refresh = Icons.refresh_rounded;
   static const pending = Icons.schedule_rounded;
   static const sent = Icons.done_rounded;

@@ -25,6 +25,18 @@ class MobileDevicesService {
     return const [];
   }
 
+  /// The phones signed in to this account that can receive push.
+  Future<List<MobileDeviceDto>> myDevices() async {
+    final response = await _dio.get('/api/v1/mobile/devices');
+    final data = response.data;
+    if (data is! List) return const [];
+    return data.whereType<Map>().map((e) => MobileDeviceDto.fromJson(Map<String, dynamic>.from(e))).toList();
+  }
+
+  Future<void> removeDevice(String id) async {
+    await _dio.delete('/api/v1/mobile/devices/$id');
+  }
+
   Future<void> revokeCurrentDevice(String installationId) async {
     await _dio.delete(
       '/api/v1/mobile/devices/current',

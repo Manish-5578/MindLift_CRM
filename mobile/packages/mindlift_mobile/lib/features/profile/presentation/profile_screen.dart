@@ -7,6 +7,7 @@ import '../../../core/offline_store.dart';
 import '../../../core/push_service.dart';
 import '../../../core/settings_provider.dart';
 import '../../../core/top_bar_actions.dart';
+import 'devices_section.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -41,6 +42,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       isDestructive: true,
       onConfirm: () {
         ref.read(authNotifierProvider.notifier).logout();
+      },
+    );
+  }
+
+  void _handleSignOutEverywhere() {
+    MlDialog.show(
+      context: context,
+      title: 'Sign out of all devices?',
+      message: 'Every phone and browser signed in to your account will be signed out, this one included. You will need to sign in again.',
+      confirmLabel: 'Sign out everywhere',
+      isDestructive: true,
+      onConfirm: () async {
+        try {
+          await ref.read(authServiceProvider).logoutEverywhere();
+        } catch (e) {
+          if (mounted) MlToast.show(context, message: 'Could not reach the server. Try again when you are online.', type: MlToastType.error);
+          return;
+        }
+        await ref.read(authNotifierProvider.notifier).logout();
       },
     );
   }
@@ -247,6 +267,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
             const SizedBox(height: MlSpacing.lg),
 
+            // Devices
+            _buildSectionHeader('My devices'),
+            const DevicesSection(),
+            const SizedBox(height: MlSpacing.lg),
+
             // Offline changes
             _buildSectionHeader('Offline & sync'),
             Container(
@@ -314,6 +339,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               label: 'Sign Out of MindLift',
               variant: MlButtonVariant.danger,
               onPressed: _handleSignOut,
+            ),
+            const SizedBox(height: MlSpacing.sm),
+            MlButton(
+              label: 'Sign out of all devices',
+              variant: MlButtonVariant.ghost,
+              onPressed: _handleSignOutEverywhere,
             ),
             const SizedBox(height: MlSpacing.xl),
           ],

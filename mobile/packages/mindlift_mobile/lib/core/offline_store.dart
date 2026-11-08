@@ -76,6 +76,7 @@ class OfflineStore {
   Timer? _saveTimer;
 
   Future<void>? _loading;
+  bool _loaded = false;
 
   /// Loads the file once, even when several callers ask at the same time.
   Future<void> _ensure() => _loading ??= _load();
@@ -97,15 +98,21 @@ class OfflineStore {
       _cache = {};
       _outbox = [];
     }
+    _loaded = true;
   }
 
   void _scheduleSave() {
     _saveTimer?.cancel();
-    _saveTimer = Timer(const Duration(milliseconds: 400), () async {
-      try {
-        await _file?.writeAsString(jsonEncode({'cache': _cache, 'outbox': _outbox.map((e) => e.toJson()).toList()}), flush: true);
-      } catch (_) {}
-    });
+    _saveTimer = Timer(const Duration(milliseconds: 400), flushNow);
+  }
+
+  /// Writes to disk right away (also used when the app goes to the background, so nothing waits in memory).
+  Future<void> flushNow() async {
+    _saveTimer?.cancel();
+    if (!_loaded) return;
+    try {
+      await _file?.writeAsString(jsonEncode({'cache': _cache, 'outbox': _outbox.map((e) => e.toJson()).toList()}), flush: true);
+    } catch (_) {}
   }
 
   Future<void> putCache(String key, Object value) async {
@@ -196,6 +203,7 @@ class OutboxNotifier extends StateNotifier<OutboxState> with WidgetsBindingObser
   @override
   void didChangeAppLifecycleState(AppLifecycleState s) {
     if (s == AppLifecycleState.resumed) flush();
+    if (s == AppLifecycleState.paused) _store.flushNow();
   }
 
   @override
@@ -205,8 +213,14 @@ class OutboxNotifier extends StateNotifier<OutboxState> with WidgetsBindingObser
     super.dispose();
   }
 
+  int _refreshGen = 0;
+  static int _seq = 0; // two changes in the same microsecond must still get different ids
+
   Future<void> refresh() async {
+    // Only the newest refresh may apply, so a slow earlier one can never overwrite fresher numbers.
+    final gen = ++_refreshGen;
     final items = await _store.outbox();
+    if (gen != _refreshGen || !mounted) return;
     state = state.copyWith(pending: items.where((e) => e.error == null).length, failed: items.where((e) => e.error != null).toList());
   }
 
@@ -216,7 +230,7 @@ class OutboxNotifier extends StateNotifier<OutboxState> with WidgetsBindingObser
   }
 
   Future<void> enqueue(String method, String path, Map<String, dynamic>? body, String label) async {
-    await _store.add(OutboxItem(id: DateTime.now().microsecondsSinceEpoch.toString(), method: method, path: path, body: body, label: label, createdAt: DateTime.now()));
+    await _store.add(OutboxItem(id: '${DateTime.now().microsecondsSinceEpoch}-${_seq++}', method: method, path: path, body: body, label: label, createdAt: DateTime.now()));
     markOffline();
     await refresh();
   }

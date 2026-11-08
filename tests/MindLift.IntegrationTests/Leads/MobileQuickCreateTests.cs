@@ -39,6 +39,35 @@ public sealed class MobileQuickCreateTests(MindLiftApiFactory factory) : IClassF
     }
 
     [Fact]
+    public async Task Saved_view_made_on_mobile_can_be_listed_edited_queried_and_deleted()
+    {
+        var s = await Workspaces.SignupAsync(factory);
+        await s.Client.PostAsync("/api/v1/leads", Json("""{"firstName":"Hot","lastName":"One","status":"qualified"}"""));
+        await s.Client.PostAsync("/api/v1/leads", Json("""{"firstName":"Cold","lastName":"One","status":"new"}"""));
+
+        const string filter = """{"logic":"and","conditions":[{"field":"owner_id","op":0,"value":"@me"},{"field":"status","op":12,"value":["qualified"]}],"groups":[]}""";
+        var created = await s.Client.PostAsync("/api/v1/views", Json(
+            $$"""{"entityType":"leads","name":"Hot leads","isShared":false,"isDefault":false,"filter":{{filter}},"columns":[],"sortField":"created_at","sortDir":"desc"}"""));
+        created.StatusCode.ShouldBe(HttpStatusCode.OK, await created.Content.ReadAsStringAsync());
+        var id = System.Text.Json.JsonDocument.Parse(await created.Content.ReadAsStringAsync()).RootElement.GetProperty("id").GetString();
+
+        var list = System.Text.Json.JsonDocument.Parse(await s.Client.GetStringAsync("/api/v1/views/leads")).RootElement;
+        list.EnumerateArray().Any(v => v.GetProperty("name").GetString() == "Hot leads").ShouldBeTrue();
+
+        // The view's own filter returns only what it should.
+        var page = await s.Client.PostAsync("/api/v1/leads/query", Json($$"""{"filter":{{filter}},"page":1,"pageSize":30}"""));
+        System.Text.Json.JsonDocument.Parse(await page.Content.ReadAsStringAsync()).RootElement.GetProperty("total").GetInt32().ShouldBe(1);
+
+        var renamed = await s.Client.PutAsync($"/api/v1/views/{id}", Json(
+            $$"""{"entityType":"leads","name":"Hottest","isShared":false,"isDefault":false,"filter":{{filter}},"columns":[],"sortField":"created_at","sortDir":"asc"}"""));
+        renamed.StatusCode.ShouldBe(HttpStatusCode.OK, await renamed.Content.ReadAsStringAsync());
+
+        (await s.Client.DeleteAsync($"/api/v1/views/{id}")).StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        var after = System.Text.Json.JsonDocument.Parse(await s.Client.GetStringAsync("/api/v1/views/leads")).RootElement;
+        after.EnumerateArray().Any(v => v.GetProperty("name").GetString() == "Hottest").ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task Quick_create_lead_payload_is_accepted()
     {
         var s = await Workspaces.SignupAsync(factory);

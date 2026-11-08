@@ -105,6 +105,18 @@ public sealed class MobileDeviceService(
         }
     }
 
+    /// <summary>Stops push to one of the caller's own devices. Other people's devices are never touched.</summary>
+    public async Task RevokeByIdAsync(Guid deviceId, CancellationToken ct = default)
+    {
+        var tenantId = tenant.TenantId ?? throw new ForbiddenException("Tenant context required.", "no_tenant");
+        var userId = tenant.UserId ?? throw new ForbiddenException("User context required.", "no_user");
+        var device = await db.MobileDevices.FirstOrDefaultAsync(d => d.Id == deviceId && d.TenantId == tenantId && d.UserId == userId, ct)
+            ?? throw new NotFoundException("Device", deviceId);
+        device.RevokedAtUtc = clock.UtcNow;
+        device.UpdatedAt = clock.UtcNow;
+        await db.SaveChangesAsync(ct);
+    }
+
     public async Task HeartbeatAsync(string installationId, string? appVersion, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(installationId)) return;

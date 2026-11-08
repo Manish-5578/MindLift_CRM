@@ -258,6 +258,16 @@ public sealed class AuthService(
         await refreshTokens.RevokeAllForUserAsync(userId, cancellationToken);
     }
 
+    /// <summary>Ends every session of this person on every device, this one included: the session stamp changes and refresh tokens are revoked.</summary>
+    public async Task SignOutEverywhereAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken)
+            ?? throw new NotFoundException("User", userId);
+        await users.UpdateSecurityStampAsync(user);
+        await users.UpdateAsync(user);
+        await refreshTokens.RevokeAllForUserAsync(userId, cancellationToken);
+    }
+
     public async Task<AuthResult> FirstLoginChangePasswordAsync(Guid userId, string newPassword, CancellationToken cancellationToken = default)
     {
         var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken)

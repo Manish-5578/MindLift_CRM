@@ -60,6 +60,10 @@ void main() {
     });
 
     await outbox.flush();
+    // A flush may already be running (the app lifecycle starts one too); wait for the queue to settle.
+    for (var i = 0; i < 50 && (container.read(outboxProvider).pending > 0 || container.read(outboxProvider).syncing); i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
     expect(hits, ['/ok-1', '/reject', '/ok-3']);
     final s = container.read(outboxProvider);
     expect(s.pending, 0);
@@ -68,7 +72,7 @@ void main() {
     expect(s.failed.single.error, 'Subject is required.');
 
     // The set-aside change survives an app restart.
-    await Future<void>.delayed(const Duration(milliseconds: 600));
+    await store.flushNow();
     final reopened = OfflineStore(fileProvider: () async => file);
     final saved = await reopened.outbox();
     expect(saved.single.label, 'Second');
@@ -76,7 +80,7 @@ void main() {
 
     // Cached pages come back too.
     await store.putCache('leads:mine', {'total': 1});
-    await Future<void>.delayed(const Duration(milliseconds: 600));
+    await store.flushNow();
     final again = await OfflineStore(fileProvider: () async => file).getCache('leads:mine');
     expect((again!.data as Map)['total'], 1);
   });

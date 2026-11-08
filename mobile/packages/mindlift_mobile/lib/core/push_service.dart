@@ -72,6 +72,9 @@ class PushService {
     _ref.onDispose(() => _tokenSub?.cancel());
   }
 
+  /// This app install's stable id, the one the server lists as "This device".
+  Future<String> installationId() => _installation();
+
   Future<String> _installation() async {
     if (_installationId != null) return _installationId!;
     var id = await _storage.read(key: _kInstall);

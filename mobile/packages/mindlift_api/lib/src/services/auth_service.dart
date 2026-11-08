@@ -8,6 +8,11 @@ class AuthService {
 
   Dio get _dio => _client.rawDio;
 
+  /// Ends this person's sessions on every device, this one included.
+  Future<void> logoutEverywhere() async {
+    await _client.rawDio.post('/api/v1/auth/logout-all');
+  }
+
   Future<TokenResponse> login(LoginRequest request) async {
     final response = await _dio.post(
       '/api/v1/auth/login',

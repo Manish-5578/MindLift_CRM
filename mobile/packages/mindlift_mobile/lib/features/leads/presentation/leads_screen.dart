@@ -7,6 +7,7 @@ import 'package:mindlift_ui/mindlift_ui.dart';
 import '../../../core/network_provider.dart';
 import '../../../core/offline_store.dart';
 import 'lead_actions.dart';
+import 'saved_view_form.dart';
 import '../../../core/top_bar_actions.dart';
 import 'package:flutter/services.dart' show HapticFeedback;
 import 'ocr_lead_scan_sheet.dart';
@@ -138,6 +139,25 @@ class _LeadsScreenState extends ConsumerState<LeadsScreen> {
         });
       }
     }
+  }
+
+  void _newView() => SavedViewForm.show(context, cfg: _cfg, onDone: _afterViewSaved);
+
+  void _editView(LeadView v) => SavedViewForm.show(context, cfg: _cfg, existing: v, onDone: _afterViewSaved);
+
+  Future<void> _afterViewSaved(String? key) async {
+    try {
+      final v = await ref.read(leadsServiceProvider).loadSavedViews();
+      if (mounted) setState(() => _saved = v);
+    } catch (_) {}
+    if (!mounted) return;
+    if (key != null) {
+      setState(() => _viewKey = key);
+    } else if (!_views.any((v) => v.key == _viewKey)) {
+      setState(() => _viewKey = _views.first.key);
+    }
+    setState(() => _items = []);
+    await _load();
   }
 
   void _selectView(String key) {
@@ -274,12 +294,34 @@ class _LeadsScreenState extends ConsumerState<LeadsScreen> {
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: MlSpacing.md, vertical: 6),
-        itemCount: _views.length,
+        itemCount: _views.length + 1,
         itemBuilder: (context, i) {
+          if (i == _views.length) {
+            return MlPressable(
+              onTap: _newView,
+              child: Container(
+                margin: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(MlRadii.full),
+                  border: Border.all(color: MlColors.primary, width: 1.2),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(MlIcons.add, size: 18, color: MlColors.primary),
+                    const SizedBox(width: 2),
+                    Text('View', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MlColors.primary, decoration: TextDecoration.none)),
+                  ],
+                ),
+              ),
+            );
+          }
           final v = _views[i];
           final on = v.key == _viewKey;
           return GestureDetector(
             onTap: () => _selectView(v.key),
+            onLongPress: v.savedId == null ? null : () => _editView(v),
             child: Container(
               margin: const EdgeInsets.only(right: 8),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),

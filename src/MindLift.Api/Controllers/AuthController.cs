@@ -59,6 +59,15 @@ public sealed class AuthController(
     }
 
     [Authorize]
+    [HttpPost("logout-all")]
+    public async Task<IActionResult> LogoutEverywhere(CancellationToken cancellationToken)
+    {
+        await auth.SignOutEverywhereAsync(CurrentUserId(), cancellationToken);
+        Response.Cookies.Delete(RefreshCookieName, RefreshCookieOptions(DateTimeOffset.UnixEpoch));
+        return NoContent();
+    }
+
+    [Authorize]
     [HttpGet("me")]
     public async Task<ActionResult<MeResponse>> Me(CancellationToken cancellationToken)
         => Ok(await auth.GetMeAsync(CurrentUserId(), cancellationToken));

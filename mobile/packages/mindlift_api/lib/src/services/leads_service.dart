@@ -77,6 +77,33 @@ class LeadsService {
     return const [];
   }
 
+  /// Creates (no [id]) or updates a saved view, the same call the web app makes.
+  Future<LeadView> saveView({
+    String? id,
+    required String name,
+    required Map<String, dynamic> filter,
+    bool shared = false,
+    String sortField = 'created_at',
+    String sortDir = 'desc',
+  }) async {
+    final body = {
+      'entityType': 'leads',
+      'name': name,
+      'isShared': shared,
+      'isDefault': false,
+      'filter': filter,
+      'columns': <String>[],
+      'sortField': sortField,
+      'sortDir': sortDir,
+    };
+    final response = id == null ? await _dio.post('/api/v1/views', data: body) : await _dio.put('/api/v1/views/$id', data: body);
+    return LeadView.fromSaved(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  Future<void> deleteSavedView(String id) async {
+    await _dio.delete('/api/v1/views/$id');
+  }
+
   Future<LeadPage> queryPage({
     String? search,
     Map<String, dynamic>? filter,

@@ -19,6 +19,18 @@ public sealed class MobileController(IMobileDeviceService deviceService, MindLif
         return Ok(new { results = report });
     }
 
+    /// <summary>The phones and tablets signed in to the caller's account that can receive push.</summary>
+    [HttpGet("devices")]
+    public async Task<ActionResult<IReadOnlyList<MobileDeviceDto>>> MyDevices(CancellationToken ct)
+        => Ok(await deviceService.GetUserDevicesAsync(tenant.UserId!.Value, ct));
+
+    [HttpDelete("devices/{id:guid}")]
+    public async Task<IActionResult> RemoveDevice(Guid id, CancellationToken ct)
+    {
+        await deviceService.RevokeByIdAsync(id, ct);
+        return NoContent();
+    }
+
     [HttpPut("devices/current")]
     public async Task<ActionResult<MobileDeviceDto>> RegisterCurrentDevice(
         [FromBody] RegisterMobileDeviceRequest request,
