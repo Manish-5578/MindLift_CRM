@@ -43,7 +43,8 @@ public sealed record MeResponse(
     bool IsAdmin,
     string TenantStatus,
     DateTime? TrialEndsAtUtc,
-    bool MustChangePassword = false);
+    bool MustChangePassword = false,
+    string? JobTitle = null);
 
 /// <summary>Refresh token sent in the body by mobile clients. Web clients send the HttpOnly cookie instead.</summary>
 public sealed record RefreshRequest(string? RefreshToken);

@@ -50,9 +50,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final syncState = ref.watch(syncCoordinatorProvider);
     final serverUrl = ref.watch(serverUrlProvider);
 
-    final name = authState.userFullName ?? 'Sales Agent';
-    final email = authState.userEmail ?? 'agent@mindlift.com';
-    final role = authState.userRole ?? 'Field Staff';
+    final name = authState.userFullName ?? '—';
+    final email = authState.userEmail ?? '';
+    final role = authState.userRole ?? '—';
+    final title = authState.userJobTitle;
 
     return MlScreen(
       title: 'My Profile',
@@ -99,6 +100,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           name,
                           style: MlTypography.headingSmall.copyWith(color: MlColors.textPrimary),
                         ),
+                        if (title != null && title.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(title, style: MlTypography.bodyMedium.copyWith(color: MlColors.textSecondary, fontWeight: FontWeight.w600)),
+                        ],
                         const SizedBox(height: 2),
                         Text(
                           email,

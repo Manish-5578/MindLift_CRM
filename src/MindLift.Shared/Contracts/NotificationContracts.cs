@@ -22,6 +22,7 @@ public static class NotificationTypes
     public const string TicketAssigned = "TicketAssigned";
     public const string TrialEnding = "TrialEnding";
     public const string PortalUpload = "PortalUpload";
+    public const string ChatMessage = "ChatMessage";
 
     /// <summary>A preference row, not a notification: the optional "my day" email sent each morning.</summary>
     public const string DailyDigest = "DailyDigest";
@@ -48,6 +49,7 @@ public static class NotificationTypes
         (TicketAssigned, "A ticket is assigned to me", true),
         (TrialEnding, "My trial is ending", true),
         (PortalUpload, "A customer uploads a requested document", true),
+        (ChatMessage, "A colleague sends me a chat message", false),
     ];
 
     public static bool IsKnown(string type) => type == DailyDigest || All.Any(t => t.Type == type);

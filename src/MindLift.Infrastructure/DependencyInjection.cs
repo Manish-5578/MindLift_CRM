@@ -263,6 +263,7 @@ public static class DependencyInjection
         services.TryAddSingleton<INotificationPusher, NullNotificationPusher>();
         services.AddScoped<INotificationService, MindLift.Infrastructure.Notifications.NotificationService>();
         services.AddScoped<MindLift.Infrastructure.Notifications.NotificationQueryService>();
+        services.AddSingleton<MindLift.Infrastructure.Chat.ChatPresence>();
         services.AddScoped<MindLift.Infrastructure.Chat.ChatService>();
         services.AddScoped<MindLift.Infrastructure.Leads.LeadCardOcrService>();
         services.AddScoped<MindLift.Infrastructure.Notifications.NotificationEmailJob>();

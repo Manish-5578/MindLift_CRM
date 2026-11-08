@@ -32,7 +32,7 @@ class MoreScreen extends ConsumerWidget {
               child: Row(
                 children: [
                   MlAvatar(
-                    name: authState.userFullName ?? 'Sales Agent',
+                    name: authState.userFullName ?? '—',
                     size: MlAvatarSize.lg,
                   ),
                   const SizedBox(width: MlSpacing.md),
@@ -41,17 +41,17 @@ class MoreScreen extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          authState.userFullName ?? 'Sales Agent',
+                          authState.userFullName ?? '—',
                           style: MlTypography.labelLarge.copyWith(color: MlColors.textPrimary),
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          authState.userEmail ?? 'agent@mindlift.com',
+                          authState.userEmail ?? '',
                           style: MlTypography.bodySmall.copyWith(color: MlColors.textMuted),
                         ),
                         const SizedBox(height: 4),
                         MlStatusChip(
-                          label: authState.userRole ?? 'Field Staff',
+                          label: authState.userRole ?? '—',
                           state: MlStatusState.primary,
                         ),
                       ],

@@ -26,8 +26,12 @@ class MlTextField extends StatefulWidget {
     this.prefix,
     this.suffix,
     this.focusNode,
+    this.textInputAction,
+    this.onEditingComplete,
   });
 
+  final TextInputAction? textInputAction;
+  final VoidCallback? onEditingComplete;
   final TextEditingController? controller;
   final String? initialValue;
   final String? label;
@@ -154,6 +158,8 @@ class _MlTextFieldState extends State<MlTextField> {
                         setState(() {});
                         widget.onChanged?.call(text);
                       },
+                      textInputAction: widget.textInputAction,
+                      onEditingComplete: widget.onEditingComplete,
                       onSubmitted: widget.onSubmitted,
                       readOnly: !widget.enabled,
                     ),

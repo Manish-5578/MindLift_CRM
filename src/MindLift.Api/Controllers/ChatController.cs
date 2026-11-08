@@ -39,6 +39,20 @@ public sealed class ChatController(ChatService chatService) : ControllerBase
         return Ok(await chatService.GetChatUsersAsync(ct));
     }
 
+    [HttpPost("ping")]
+    public async Task<IActionResult> Ping()
+    {
+        await chatService.PingAsync();
+        return NoContent();
+    }
+
+    [HttpPost("offline")]
+    public async Task<IActionResult> Offline()
+    {
+        await chatService.GoOfflineAsync();
+        return NoContent();
+    }
+
     [HttpPost("mark-read")]
     public async Task<IActionResult> MarkRead(
         [FromQuery] Guid? otherUserId = null,

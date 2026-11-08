@@ -302,7 +302,8 @@ public sealed class AuthService(
             user.IsTenantOwner || (role?.IsAdmin ?? false),
             tenantRow.Status,
             tenantRow.TrialEndsAt,
-            user.MustChangePassword);
+            user.MustChangePassword,
+            user.JobTitle);
     }
 
     /// <summary>Issues tokens for a user whose tenant is already set by the caller.</summary>

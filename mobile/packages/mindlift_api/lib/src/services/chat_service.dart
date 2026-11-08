@@ -53,6 +53,14 @@ class ChatService {
     return [];
   }
 
+  Future<void> ping() async {
+    await _dio.post('/api/v1/chat/ping');
+  }
+
+  Future<void> goOffline() async {
+    await _dio.post('/api/v1/chat/offline');
+  }
+
   Future<void> markRead({String? otherUserId, String? channel}) async {
     await _dio.post(
       '/api/v1/chat/mark-read',

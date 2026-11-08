@@ -12,7 +12,7 @@ using MindLift.Shared.Contracts;
 
 namespace MindLift.Infrastructure.Chat;
 
-public sealed class ChatService(AppDbContext db, ITenantContext tenant, IPushNotificationSender mobilePush, Microsoft.Extensions.Logging.ILogger<ChatService> logger)
+public sealed class ChatService(AppDbContext db, ITenantContext tenant, INotificationService notifications, ChatPresence presence, Microsoft.Extensions.Logging.ILogger<ChatService> logger)
 {
     private Guid Me => tenant.UserId ?? throw new UnauthorizedException("not_signed_in", "Please sign in.");
     private Guid CurrentTenantId => tenant.TenantId ?? throw new UnauthorizedException("no_tenant", "No active tenant.");
@@ -90,15 +90,19 @@ public sealed class ChatService(AppDbContext db, ITenantContext tenant, IPushNot
         {
             try
             {
-                var preview = msg.Message.Length <= 120 ? msg.Message : msg.Message[..119] + "…";
-                await mobilePush.SendPushAsync(CurrentTenantId, recipient, myName, preview,
-                    new Dictionary<string, string> { ["type"] = "chat", ["route"] = "/chat", ["senderId"] = me.ToString() }, ct);
+                // One notification record: it shows in the recipient's Alerts list and is delivered as a push.
+                var preview = msg.Message.Length <= 140 ? msg.Message : msg.Message[..139] + "…";
+                await notifications.NotifyAsync(new NotificationRequest(
+                    new[] { recipient }, NotificationTypes.ChatMessage, myName, preview,
+                    EntityType: "ChatMessage", EntityId: msg.Id, Url: "/chat",
+                    GroupKey: $"chat:{me}", InAppOnly: true), ct);
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "Chat push failed for recipient {Recipient}", recipient);
+                logger.LogWarning(ex, "Chat notification failed for recipient {Recipient}", recipient);
             }
         }
+        presence.Touch(me);
 
         return new ChatMessageDto(
             msg.Id,
@@ -129,20 +133,42 @@ public sealed class ChatService(AppDbContext db, ITenantContext tenant, IPushNot
             .Select(g => new { SenderId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.SenderId, x => x.Count, ct);
 
+        var recent = await db.InternalChatMessages.AsNoTracking()
+            .Where(m => m.RecipientId != null && (m.SenderId == me || m.RecipientId == me))
+            .OrderByDescending(m => m.CreatedAtUtc)
+            .Take(500)
+            .Select(m => new { m.SenderId, m.RecipientId, m.Message, m.CreatedAtUtc })
+            .ToListAsync(ct);
+        var last = new Dictionary<Guid, (string Text, DateTime At)>();
+        foreach (var m in recent)
+        {
+            var other = m.SenderId == me ? m.RecipientId!.Value : m.SenderId;
+            if (!last.ContainsKey(other)) last[other] = (m.SenderId == me ? "You: " + m.Message : m.Message, m.CreatedAtUtc);
+        }
+        presence.Touch(me);
+
         return users.Select(u =>
         {
             var fullName = $"{u.FirstName} {u.LastName}".Trim();
             var name = !string.IsNullOrWhiteSpace(fullName) ? fullName : u.Email;
+            last.TryGetValue(u.Id, out var lm);
             return new ChatUserDto(
                 u.Id,
                 name,
                 u.Email,
                 u.JobTitle ?? "Staff",
                 unreadCounts.TryGetValue(u.Id, out var count) ? count : 0,
-                true // active workspace user
+                presence.IsOnline(u.Id),
+                lm.Text is null ? null : (lm.Text.Length <= 80 ? lm.Text : lm.Text[..79] + "…"),
+                lm.Text is null ? null : lm.At
             );
-        }).OrderByDescending(u => u.UnreadCount).ThenBy(u => u.Name).ToList();
+        }).OrderByDescending(u => u.LastMessageAtUtc ?? DateTime.MinValue).ThenByDescending(u => u.UnreadCount).ThenBy(u => u.Name).ToList();
     }
+
+    /// <summary>Called by the app every ~30 seconds while it is in the foreground.</summary>
+    public Task PingAsync() { presence.Touch(Me); return Task.CompletedTask; }
+
+    public Task GoOfflineAsync() { presence.Clear(Me); return Task.CompletedTask; }
 
     public async Task MarkReadAsync(Guid? otherUserId, string? channel, CancellationToken ct = default)
     {

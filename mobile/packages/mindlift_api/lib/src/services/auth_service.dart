@@ -23,6 +23,12 @@ class AuthService {
     return tokenResponse;
   }
 
+  /// The signed-in user's profile: name, role and designation (same data as the web portal).
+  Future<Map<String, dynamic>> getMe() async {
+    final response = await _dio.get('/api/v1/auth/me');
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
   Future<void> logout() async {
     try {
       await _dio.post('/api/v1/auth/logout');

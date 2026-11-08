@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mindlift_ui/mindlift_ui.dart';
+import 'keyboard_inset.dart';
 import '../features/auth/presentation/login_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/leads/presentation/leads_screen.dart';
@@ -69,6 +70,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           return Column(
             children: [
               Expanded(child: child),
+              if (!KeyboardInset.isVisible(context))
               MlBottomNavigation(
                 currentIndex: currentIndex,
                 onTap: (index) {
@@ -93,7 +95,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                 onQuickAdd: () => QuickAddSheet.show(context),
                 destinations: [
                   const MlNavigationDestination(
-                    label: 'My Day',
+                    label: 'Home',
                     icon: Text('📅', style: TextStyle(fontSize: 18)),
                   ),
                   const MlNavigationDestination(

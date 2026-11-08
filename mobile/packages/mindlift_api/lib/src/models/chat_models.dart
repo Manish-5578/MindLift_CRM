@@ -60,7 +60,9 @@ class ChatUserDto {
     required this.email,
     this.role,
     this.unreadCount = 0,
-    this.isOnline = true,
+    this.isOnline = false,
+    this.lastMessage,
+    this.lastMessageAtUtc,
   });
 
   final String id;
@@ -69,6 +71,8 @@ class ChatUserDto {
   final String? role;
   final int unreadCount;
   final bool isOnline;
+  final String? lastMessage;
+  final DateTime? lastMessageAtUtc;
 
   factory ChatUserDto.fromJson(Map<String, dynamic> json) {
     return ChatUserDto(
@@ -77,7 +81,9 @@ class ChatUserDto {
       email: json['email'] as String? ?? '',
       role: json['role'] as String? ?? 'Staff',
       unreadCount: json['unreadCount'] as int? ?? 0,
-      isOnline: json['isOnline'] as bool? ?? true,
+      isOnline: json['isOnline'] as bool? ?? false,
+      lastMessage: json['lastMessage'] as String?,
+      lastMessageAtUtc: DateTime.tryParse(json['lastMessageAtUtc'] as String? ?? ''),
     );
   }
 }

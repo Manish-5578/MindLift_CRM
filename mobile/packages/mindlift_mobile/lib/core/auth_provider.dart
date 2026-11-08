@@ -35,6 +35,7 @@ class AuthState {
     this.userFullName,
     this.userEmail,
     this.userRole,
+    this.userJobTitle,
     this.errorMessage,
   });
 
@@ -43,6 +44,7 @@ class AuthState {
   final String? userFullName;
   final String? userEmail;
   final String? userRole;
+  final String? userJobTitle;
   final String? errorMessage;
 
   AuthState copyWith({
@@ -51,6 +53,7 @@ class AuthState {
     String? userFullName,
     String? userEmail,
     String? userRole,
+    String? userJobTitle,
     String? errorMessage,
   }) {
     return AuthState(
@@ -59,6 +62,7 @@ class AuthState {
       userFullName: userFullName ?? this.userFullName,
       userEmail: userEmail ?? this.userEmail,
       userRole: userRole ?? this.userRole,
+      userJobTitle: userJobTitle ?? this.userJobTitle,
       errorMessage: errorMessage,
     );
   }
@@ -83,12 +87,30 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(
         isAuthenticated: true,
         isLoading: false,
-        userFullName: 'Sales Representative',
-        userRole: 'Staff',
       );
+      await _loadProfile();
     } else {
       state = state.copyWith(isAuthenticated: false, isLoading: false);
     }
+  }
+
+  /// Loads the real name, role and designation from the server (same source as the web portal).
+  Future<void> _loadProfile() async {
+    try {
+      final me = await authService.getMe();
+      final roleName = (me['roleName'] as String?)?.trim();
+      final isOwner = me['isTenantOwner'] == true;
+      final isAdmin = me['isAdmin'] == true;
+      final role = (roleName != null && roleName.isNotEmpty)
+          ? roleName
+          : (isOwner ? 'Owner' : (isAdmin ? 'Admin' : 'Team member'));
+      state = state.copyWith(
+        userFullName: (me['fullName'] as String?)?.trim(),
+        userEmail: me['email'] as String?,
+        userRole: role,
+        userJobTitle: (me['jobTitle'] as String?)?.trim(),
+      );
+    } catch (_) {}
   }
 
   Future<bool> login(String email, String password) async {
@@ -100,10 +122,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(
         isAuthenticated: true,
         isLoading: false,
-        userFullName: response.fullName ?? 'Sales Staff',
-        userEmail: response.email ?? email,
-        userRole: response.role ?? 'Staff',
+        userEmail: email,
       );
+      await _loadProfile();
       return true;
     } catch (e) {
       String msg = 'Invalid credentials or connection error. Please try again.';

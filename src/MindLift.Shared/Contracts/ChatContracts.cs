@@ -27,7 +27,9 @@ public sealed record ChatUserDto(
     string Email,
     string? Role,
     int UnreadCount,
-    bool IsOnline
+    bool IsOnline,
+    string? LastMessage = null,
+    DateTime? LastMessageAtUtc = null
 );
 
 public sealed record LeadDuplicateCandidateDto(

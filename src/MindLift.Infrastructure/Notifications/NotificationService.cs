@@ -120,7 +120,7 @@ public sealed class NotificationService(
             var unread = await db.Notifications.CountAsync(n => n.UserId == notification.UserId && !n.IsRead, cancellationToken);
             await pusher.PushAsync(tenantId, notification.UserId, NotificationMapper.ToDto(notification), unread, cancellationToken);
             await mobilePush.SendPushAsync(tenantId, notification.UserId, notification.Title, notification.Body,
-                new Dictionary<string, string> { ["type"] = notification.Type, ["route"] = "/notifications" },
+                new Dictionary<string, string> { ["type"] = notification.Type, ["route"] = notification.Type == NotificationTypes.ChatMessage ? "/chat" : "/notifications" },
                 cancellationToken);
         }
         catch (Exception ex)

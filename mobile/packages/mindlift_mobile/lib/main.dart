@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mindlift_ui/mindlift_ui.dart';
 import 'core/app_lock.dart';
 import 'core/locale_provider.dart';
+import 'core/presence_service.dart';
 import 'core/push_service.dart';
+import 'core/keyboard_inset.dart';
 import 'core/settings_provider.dart';
 import 'dart:ui' show PlatformDispatcher;
 import 'core/router.dart';
@@ -48,6 +50,7 @@ class _MindLiftMobileAppState extends ConsumerState<MindLiftMobileApp> with Widg
     final language = ref.watch(localeProvider);
     final router = ref.watch(routerProvider);
     ref.watch(pushServiceProvider);
+    ref.watch(presenceServiceProvider);
 
     return AppLockGate(
       child: KeyedSubtree(
@@ -60,6 +63,7 @@ class _MindLiftMobileAppState extends ConsumerState<MindLiftMobileApp> with Widg
               title: 'MindLift CRM',
               color: MlColors.primary,
               routerConfig: router,
+              builder: (context, child) => KeyboardInset(child: child ?? const SizedBox.shrink()),
               locale: language.locale,
               supportedLocales: const [
                 Locale('en'),

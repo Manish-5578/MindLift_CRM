@@ -44,12 +44,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
+  static String _firstName(String? full) {
+    final n = (full ?? '').trim();
+    if (n.isEmpty) return 'there';
+    return n.split(RegExp(r'\s+')).first;
+  }
+
   @override
   Widget build(BuildContext context) {
     final syncState = ref.watch(syncCoordinatorProvider);
 
     return MlScreen(
-      title: 'My Day',
+      title: 'Hi, ${_firstName(ref.watch(authNotifierProvider).userFullName)}',
       subtitle: 'Field Agenda & Tasks',
       banner: MlConnectionBanner(
         state: syncState.connectionState,
