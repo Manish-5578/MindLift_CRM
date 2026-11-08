@@ -46,6 +46,11 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
   double? _engineConfidence;
   String _detectedScript = 'Latin';
 
+  List<CardEvidenceBoxDto> _evidence = [];
+  bool _showReviewMode = false;
+  bool _requiresReview = false;
+  bool _isReviewConfirmed = false;
+
   @override
   void dispose() {
     _textController.dispose();
@@ -105,6 +110,10 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
       _imageFileName = name;
       _imageFilePath = path;
       _duplicateCandidate = null;
+      _evidence = [];
+      _requiresReview = false;
+      _isReviewConfirmed = false;
+      _showReviewMode = false;
     });
 
     _processImageOcr(path, bytes);
@@ -126,6 +135,10 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
                 );
 
         if (mounted) {
+          final isLowConf = card.overallConfidence < 0.75 ||
+              (card.engineConfidence != null && card.engineConfidence! < 0.75) ||
+              (card.evidence != null && card.evidence!.any((e) => e.confidence < 0.75));
+
           setState(() {
             _companyController.text = card.companyName ?? '';
             _nameController.text = card.fullName ?? '';
@@ -137,6 +150,10 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
             _engineConfidence = card.engineConfidence;
             _detectedScript = card.detectedScript;
             _duplicateCandidate = card.duplicate;
+            _evidence = card.evidence ?? [];
+            _requiresReview = isLowConf;
+            _isReviewConfirmed = !isLowConf;
+            _showReviewMode = isLowConf;
             _hasExtracted = true;
           });
 
@@ -312,9 +329,22 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
       return;
     }
 
+    if (_requiresReview && !_isReviewConfirmed) {
+      setState(() => _showReviewMode = true);
+      MlToast.show(
+        context,
+        message: 'Review Required: Low-confidence OCR detected. Please inspect and approve OCR review before saving.',
+        type: MlToastType.info,
+      );
+      return;
+    }
+
     final noteParts = <String>[];
     if (_titleController.text.trim().isNotEmpty) {
       noteParts.add('Job Title: ${_titleController.text.trim()}');
+    }
+    if (_requiresReview && _isReviewConfirmed) {
+      noteParts.add('OCR Review: Manually inspected and confirmed by staff member (Low-confidence words verified).');
     }
     if (_duplicateCandidate != null) {
       noteParts.add(
@@ -448,7 +478,7 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
           ),
           const SizedBox(height: MlSpacing.md),
 
-          // Captured Photo Preview Card
+          // Captured Photo Preview & Review OCR Mode
           if (_imageBytes != null) ...[
             Container(
               padding: const EdgeInsets.all(MlSpacing.sm),
@@ -457,41 +487,237 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
                 borderRadius: BorderRadius.circular(MlRadii.md),
                 border: Border.all(color: MlColors.primary.withOpacity(0.4)),
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(MlRadii.sm),
-                    child: Image.memory(
-                      _imageBytes!,
-                      width: 60,
-                      height: 60,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  const SizedBox(width: MlSpacing.sm),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _imageFileName ?? 'business_card.jpg',
-                          style: MlTypography.labelMedium.copyWith(color: MlColors.textPrimary),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                  Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(MlRadii.sm),
+                        child: Image.memory(
+                          _imageBytes!,
+                          width: 54,
+                          height: 54,
+                          fit: BoxFit.cover,
                         ),
-                        Text(
-                          '${(_imageBytes!.lengthInBytes / 1024).toStringAsFixed(1)} KB • Captured',
-                          style: MlTypography.caption.copyWith(color: MlColors.textMuted),
+                      ),
+                      const SizedBox(width: MlSpacing.sm),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _imageFileName ?? 'business_card.jpg',
+                              style: MlTypography.labelMedium.copyWith(color: MlColors.textPrimary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              '${(_imageBytes!.lengthInBytes / 1024).toStringAsFixed(1)} KB • ${_evidence.length} words',
+                              style: MlTypography.caption.copyWith(color: MlColors.textMuted),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
+                      if (_evidence.isNotEmpty)
+                        MlButton(
+                          label: _showReviewMode ? 'Hide Review' : '🔍 Review OCR',
+                          variant: _requiresReview && !_isReviewConfirmed
+                              ? MlButtonVariant.secondary
+                              : MlButtonVariant.ghost,
+                          size: MlButtonSize.small,
+                          onPressed: () => setState(() => _showReviewMode = !_showReviewMode),
+                        )
+                      else
+                        MlButton(
+                          label: 'Re-scan',
+                          variant: MlButtonVariant.ghost,
+                          size: MlButtonSize.small,
+                          onPressed: () => _processImageOcr(_imageFilePath, _imageBytes!),
+                        ),
+                    ],
+                  ),
+
+                  // Review OCR Bounding Box Overlay
+                  if (_showReviewMode && _evidence.isNotEmpty) ...[
+                    const SizedBox(height: MlSpacing.sm),
+                    Container(
+                      padding: const EdgeInsets.all(MlSpacing.xs),
+                      decoration: BoxDecoration(
+                        color: MlColors.surfaceElevated,
+                        borderRadius: BorderRadius.circular(MlRadii.sm),
+                        border: Border.all(color: MlColors.border),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Card Evidence & Bounding Boxes',
+                                style: MlTypography.caption.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: MlColors.textPrimary,
+                                ),
+                              ),
+                              Text(
+                                '${_evidence.where((b) => b.confidence < 0.75).length} low confidence',
+                                style: MlTypography.caption.copyWith(
+                                  color: _evidence.any((b) => b.confidence < 0.75)
+                                      ? const Color(0xFFDC2626)
+                                      : const Color(0xFF059669),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: MlSpacing.xs),
+                          LayoutBuilder(
+                            builder: (context, constraints) {
+                              final width = constraints.maxWidth;
+                              final height = width / 1.75;
+                              return ClipRRect(
+                                borderRadius: BorderRadius.circular(MlRadii.sm),
+                                child: Container(
+                                  width: width,
+                                  height: height,
+                                  color: const Color(0xFF0F172A),
+                                  child: Stack(
+                                    children: [
+                                      Positioned.fill(
+                                        child: Image.memory(
+                                          _imageBytes!,
+                                          fit: BoxFit.contain,
+                                        ),
+                                      ),
+                                      ..._evidence.map((box) {
+                                        final isLow = box.confidence < 0.75;
+                                        final boxLeft = (box.x * width).clamp(0.0, width - 10.0);
+                                        final boxTop = (box.y * height).clamp(0.0, height - 10.0);
+                                        final boxWidth = (box.width * width).clamp(16.0, width - boxLeft);
+                                        final boxHeight = (box.height * height).clamp(10.0, height - boxTop);
+
+                                        return Positioned(
+                                          left: boxLeft,
+                                          top: boxTop,
+                                          width: boxWidth,
+                                          height: boxHeight,
+                                          child: GestureDetector(
+                                            onTap: () {
+                                              MlToast.show(
+                                                context,
+                                                message: '"${box.text}" (Conf: ${(box.confidence * 100).toInt()}%)',
+                                                type: isLow ? MlToastType.error : MlToastType.info,
+                                              );
+                                            },
+                                            child: Container(
+                                              decoration: BoxDecoration(
+                                                color: isLow
+                                                    ? const Color(0x35EF4444)
+                                                    : const Color(0x2510B981),
+                                                border: Border.all(
+                                                  color: isLow
+                                                      ? const Color(0xFFEF4444)
+                                                      : const Color(0xFF10B981),
+                                                  width: isLow ? 1.8 : 1.0,
+                                                ),
+                                                borderRadius: BorderRadius.circular(2),
+                                              ),
+                                              child: isLow
+                                                  ? Align(
+                                                      alignment: Alignment.topLeft,
+                                                      child: Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 1.5, vertical: 0.5),
+                                                        color: const Color(0xFFEF4444),
+                                                        child: Text(
+                                                          '${(box.confidence * 100).toInt()}%',
+                                                          style: const TextStyle(
+                                                            fontSize: 7,
+                                                            color: Color(0xFFFFFFFF),
+                                                            fontWeight: FontWeight.bold,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    )
+                                                  : null,
+                                            ),
+                                          ),
+                                        );
+                                      }),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: MlSpacing.xs),
+                          Row(
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF10B981),
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text('High (≥75%)', style: MlTypography.caption.copyWith(color: MlColors.textMuted)),
+                              const SizedBox(width: MlSpacing.md),
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEF4444),
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Low (<75%) • Tap to inspect',
+                                style: MlTypography.caption.copyWith(color: const Color(0xFFDC2626)),
+                              ),
+                            ],
+                          ),
+                          if (_requiresReview) ...[
+                            const SizedBox(height: MlSpacing.xs),
+                            Container(
+                              padding: const EdgeInsets.all(MlSpacing.xs),
+                              decoration: BoxDecoration(
+                                color: _isReviewConfirmed ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2),
+                                borderRadius: BorderRadius.circular(MlRadii.sm),
+                                border: Border.all(
+                                  color: _isReviewConfirmed ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      _isReviewConfirmed
+                                          ? '✓ OCR review verified and approved by user.'
+                                          : '⚠️ Low-confidence fields detected. Review and approve before saving.',
+                                      style: MlTypography.caption.copyWith(
+                                        color: _isReviewConfirmed ? const Color(0xFF065F46) : const Color(0xFF991B1B),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                  MlButton(
+                                    label: _isReviewConfirmed ? 'Approved' : 'Approve OCR',
+                                    variant: _isReviewConfirmed ? MlButtonVariant.ghost : MlButtonVariant.primary,
+                                    size: MlButtonSize.small,
+                                    onPressed: () => setState(() => _isReviewConfirmed = true),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
-                  ),
-                  MlButton(
-                    label: 'Re-scan',
-                    variant: MlButtonVariant.ghost,
-                    size: MlButtonSize.small,
-                    onPressed: () => _processImageOcr(_imageFilePath, _imageBytes!),
-                  ),
+                  ],
                 ],
               ),
             ),
@@ -668,8 +894,12 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
             const SizedBox(height: MlSpacing.lg),
 
             MlButton(
-              label: _duplicateCandidate != null ? 'Create Lead Anyway (Duplicate Warning)' : 'Save Lead to CRM',
-              variant: _duplicateCandidate != null ? MlButtonVariant.secondary : MlButtonVariant.primary,
+              label: (_requiresReview && !_isReviewConfirmed)
+                  ? '⚠️ Review & Approval Required to Save'
+                  : (_duplicateCandidate != null ? 'Create Lead Anyway (Duplicate Warning)' : 'Save Lead to CRM'),
+              variant: (_requiresReview && !_isReviewConfirmed)
+                  ? MlButtonVariant.secondary
+                  : (_duplicateCandidate != null ? MlButtonVariant.secondary : MlButtonVariant.primary),
               isLoading: _isSaving,
               onPressed: _isSaving ? null : _handleSaveLead,
             ),
