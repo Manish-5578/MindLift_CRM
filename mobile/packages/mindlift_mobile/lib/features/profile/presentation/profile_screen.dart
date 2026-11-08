@@ -75,7 +75,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ...topBarActions(),
         MlIconButton(
           label: 'Sign Out',
-          icon: const Text('🚪', style: TextStyle(fontSize: 18)),
+          icon: MlIcon(MlIcons.logout, size: 18),
           onPressed: _handleSignOut,
         ),
       ],

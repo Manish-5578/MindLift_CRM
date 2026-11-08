@@ -73,7 +73,7 @@ class _DealsScreenState extends ConsumerState<DealsScreen> {
                     ),
                   ),
                   if (isSelected)
-                    const Text('✓', style: TextStyle(color: MlColors.primaryLight, fontSize: 18)),
+                    MlIcon(MlIcons.check, size: 18, color: MlColors.primaryLight),
                 ],
               ),
             ),

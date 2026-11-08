@@ -192,8 +192,9 @@ class _AttachmentViewState extends ConsumerState<AttachmentView> {
                   height: 38,
                   decoration: BoxDecoration(color: widget.isMe ? const Color(0x33FFFFFF) : MlColors.primary, shape: BoxShape.circle),
                   alignment: Alignment.center,
-                  child: Text(_busy ? '…' : (_playing ? '❚❚' : '▶'),
-                      style: const TextStyle(fontSize: 14, color: _white, decoration: TextDecoration.none)),
+                  child: _busy
+                      ? const MlSpinner(color: _white, size: 18)
+                      : Icon(_playing ? MlIcons.pause : MlIcons.play, size: 26, color: _white),
                 ),
               ),
               const SizedBox(width: 10),
@@ -230,7 +231,7 @@ class _AttachmentViewState extends ConsumerState<AttachmentView> {
                 height: 38,
                 decoration: BoxDecoration(color: widget.isMe ? const Color(0x33FFFFFF) : MlColors.surfaceMuted, borderRadius: BorderRadius.circular(10)),
                 alignment: Alignment.center,
-                child: Text(_busy ? '…' : '📄', style: const TextStyle(fontSize: 18, decoration: TextDecoration.none)),
+                child: _busy ? MlSpinner(color: _fg, size: 18) : MlIcon(MlIcons.document, size: 22, color: _fg),
               ),
               const SizedBox(width: 10),
               Flexible(

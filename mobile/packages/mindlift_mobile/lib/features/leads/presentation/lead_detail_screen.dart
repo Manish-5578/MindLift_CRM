@@ -156,7 +156,7 @@ class _LeadDetailScreenState extends ConsumerState<LeadDetailScreen> {
   Widget build(BuildContext context) {
     final back = MlIconButton(
       label: 'Back',
-      icon: Text('←', style: TextStyle(fontSize: 20, color: MlColors.textPrimary)),
+      icon: MlIcon(MlIcons.back, size: 20, color: MlColors.textPrimary),
       onPressed: () => context.pop(),
     );
 
@@ -184,7 +184,7 @@ class _LeadDetailScreenState extends ConsumerState<LeadDetailScreen> {
       subtitle: lead.fullName.isNotEmpty && lead.companyName != null ? 'Contact: ${lead.fullName}' : 'Lead',
       leading: back,
       actions: [
-        if (canEdit) MlIconButton(label: 'Edit', icon: const Text('✎', style: TextStyle(fontSize: 20)), onPressed: () => _actions.editLead(lead)),
+        if (canEdit) MlIconButton(label: 'Edit', icon: MlIcon(MlIcons.edit, size: 20), onPressed: () => _actions.editLead(lead)),
       ],
       bottomRail: Container(
         padding: const EdgeInsets.all(MlSpacing.md),
@@ -243,11 +243,11 @@ class _LeadDetailScreenState extends ConsumerState<LeadDetailScreen> {
                 runSpacing: 8,
                 children: [
                   if ((lead.phone ?? '').trim().isNotEmpty) ...[
-                    _chipButton('📞  Call', () => _open(Uri(scheme: 'tel', path: lead.phone!.trim()))),
-                    _chipButton('💬  WhatsApp', () => _open(Uri.parse('https://wa.me/${lead.phone!.replaceAll(RegExp(r'[^0-9]'), '')}'))),
-                    _chipButton('✉  SMS', () => _open(Uri(scheme: 'sms', path: lead.phone!.trim()))),
+                    _chipButton(MlIcons.call, 'Call', () => _open(Uri(scheme: 'tel', path: lead.phone!.trim()))),
+                    _chipButton(MlIcons.whatsapp, 'WhatsApp', () => _open(Uri.parse('https://wa.me/${lead.phone!.replaceAll(RegExp(r'[^0-9]'), '')}'))),
+                    _chipButton(MlIcons.sms, 'SMS', () => _open(Uri(scheme: 'sms', path: lead.phone!.trim()))),
                   ],
-                  if ((lead.email ?? '').trim().isNotEmpty) _chipButton('📧  Email', () => _open(Uri(scheme: 'mailto', path: lead.email!.trim()))),
+                  if ((lead.email ?? '').trim().isNotEmpty) _chipButton(MlIcons.email, 'Email', () => _open(Uri(scheme: 'mailto', path: lead.email!.trim()))),
                 ],
               ),
               const SizedBox(height: MlSpacing.md),
@@ -259,11 +259,11 @@ class _LeadDetailScreenState extends ConsumerState<LeadDetailScreen> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  _chipButton('🤝  Move to engagement', () => _actions.moveToEngagement(lead)),
-                  _chipButton('👤  Convert to contact', () => _convertToContact(lead)),
-                  _chipButton('📝  Quick note', () => _actions.stickyNote(lead)),
+                  _chipButton(MlIcons.handshake, 'Move to engagement', () => _actions.moveToEngagement(lead)),
+                  _chipButton(MlIcons.person, 'Convert to contact', () => _convertToContact(lead)),
+                  _chipButton(MlIcons.note, 'Quick note', () => _actions.stickyNote(lead)),
                   if (_cfg.canDelete)
-                    _chipButton('🗑  Delete', () async {
+                    _chipButton(MlIcons.delete, 'Delete', () async {
                       await _actions.deleteLead(lead);
                       if (mounted && context.canPop()) context.pop();
                     }, danger: true),
@@ -322,7 +322,7 @@ class _LeadDetailScreenState extends ConsumerState<LeadDetailScreen> {
                   color: MlColors.warningSoft,
                   borderRadius: BorderRadius.circular(MlRadii.lg),
                 ),
-                child: Text('📝  ${lead.description!.trim()}',
+                child: Text(lead.description!.trim(),
                     style: TextStyle(fontSize: 14, color: MlColors.textPrimary, decoration: TextDecoration.none, fontWeight: FontWeight.w400)),
               ),
             ],
@@ -398,22 +398,25 @@ class _LeadDetailScreenState extends ConsumerState<LeadDetailScreen> {
     }
   }
 
-  Widget _chipButton(String label, VoidCallback onTap, {bool danger = false}) {
-    return GestureDetector(
+  Widget _chipButton(IconData icon, String label, VoidCallback onTap, {bool danger = false}) {
+    final color = danger ? MlColors.danger : MlColors.textPrimary;
+    return MlPressable(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        padding: const EdgeInsets.fromLTRB(12, 9, 16, 9),
         decoration: BoxDecoration(
           color: MlColors.surface,
           borderRadius: BorderRadius.circular(MlRadii.full),
           border: Border.all(color: danger ? MlColors.danger : MlColors.border),
         ),
-        child: Text(label,
-            style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: danger ? MlColors.danger : MlColors.textPrimary,
-                decoration: TextDecoration.none)),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            MlIcon(icon, size: 19, color: danger ? MlColors.danger : MlColors.primary),
+            const SizedBox(width: 7),
+            Text(label, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: color, decoration: TextDecoration.none)),
+          ],
+        ),
       ),
     );
   }

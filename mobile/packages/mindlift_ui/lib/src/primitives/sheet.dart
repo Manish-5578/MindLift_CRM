@@ -3,6 +3,8 @@ import '../tokens/colors.dart';
 import '../tokens/radii.dart';
 import '../tokens/spacing.dart';
 import '../tokens/typography.dart';
+import 'button.dart';
+import 'icons.dart';
 
 /// Modal bottom sheet primitive replacing platform sheets.
 class MlSheet extends StatelessWidget {
@@ -27,7 +29,7 @@ class MlSheet extends StatelessWidget {
       barrierDismissible: true,
       barrierLabel: 'Dismiss',
       barrierColor: MlColors.overlay,
-      transitionDuration: const Duration(milliseconds: 250),
+      transitionDuration: const Duration(milliseconds: 320),
       pageBuilder: (ctx, anim1, anim2) => Align(
         alignment: Alignment.bottomCenter,
         child: MlSheet(
@@ -37,12 +39,10 @@ class MlSheet extends StatelessWidget {
         ),
       ),
       transitionBuilder: (ctx, anim1, anim2, child) {
-        final curved = CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic);
+        // Material "emphasized" motion: decelerate in, accelerate out.
+        final curved = CurvedAnimation(parent: anim1, curve: const Cubic(0.05, 0.7, 0.1, 1.0), reverseCurve: const Cubic(0.3, 0.0, 0.8, 0.15));
         return SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(0, 1),
-            end: Offset.zero,
-          ).animate(curved),
+          position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero).animate(curved),
           child: child,
         );
       },
@@ -58,9 +58,9 @@ class MlSheet extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: MlColors.surface,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(MlRadii.xl),
-          topRight: Radius.circular(MlRadii.xl),
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(28),
+          topRight: Radius.circular(28),
         ),
         border: Border(top: BorderSide(color: MlColors.border, width: 1)),
       ),
@@ -89,17 +89,20 @@ class MlSheet extends StatelessWidget {
                     Expanded(
                       child: Text(title!, style: MlTypography.titleMedium()),
                     ),
-                    GestureDetector(
-                      onTap: onClose ?? () => Navigator.of(context).pop(),
-                      child: Padding(
-                        padding: EdgeInsets.all(4.0),
-                        child: Text('✕', style: TextStyle(color: MlColors.textMuted, fontSize: 16)),
-                      ),
+                    MlIconButton(
+                      label: 'Close',
+                      icon: MlIcon(MlIcons.close, size: 22, color: MlColors.textMuted),
+                      onPressed: onClose ?? () => Navigator.of(context).pop(),
                     ),
                   ],
                 ),
               ),
-            Flexible(child: SingleChildScrollView(child: child)),
+            Flexible(
+              child: SingleChildScrollView(
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                child: child,
+              ),
+            ),
           ],
         ),
       ),

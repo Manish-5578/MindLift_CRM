@@ -1,8 +1,9 @@
 import 'package:flutter/widgets.dart';
 import '../tokens/colors.dart';
 import '../tokens/radii.dart';
-import '../tokens/spacing.dart';
 import '../tokens/typography.dart';
+import 'icons.dart';
+import 'pressable.dart';
 
 class MlNavigationDestination {
   const MlNavigationDestination({
@@ -13,13 +14,13 @@ class MlNavigationDestination {
   });
 
   final String label;
-  final Widget icon;
-  final Widget? activeIcon;
+  final IconData icon;
+  final IconData? activeIcon;
   final int? badgeCount;
 }
 
-/// Custom 5-destination bottom navigation bar with a dedicated center Quick Add button.
-/// Strictly built from Flutter base primitives without Material widgets.
+/// Material 3 style navigation bar: icon inside an animated pill, label below, and a raised centre
+/// button for Quick Add when there are four destinations.
 class MlBottomNavigation extends StatelessWidget {
   MlBottomNavigation({
     super.key,
@@ -29,7 +30,9 @@ class MlBottomNavigation extends StatelessWidget {
     this.onQuickAdd,
     Color? backgroundColor,
     Color? borderColor,
-  }) : _backgroundColor = backgroundColor, _borderColor = borderColor, assert(destinations.length <= 5, 'Maximum 5 destinations allowed.');
+  })  : _backgroundColor = backgroundColor,
+        _borderColor = borderColor,
+        assert(destinations.length <= 5, 'Maximum 5 destinations allowed.');
 
   final int currentIndex;
   final ValueChanged<int> onTap;
@@ -42,34 +45,28 @@ class MlBottomNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // If quick add is provided and we have 4 or 5 destinations, we can insert the quick-add
-    // in the center or provide it alongside.
     final hasCenterQuickAdd = onQuickAdd != null && destinations.length == 4;
 
     return Container(
       decoration: BoxDecoration(
         color: backgroundColor,
         border: Border(top: BorderSide(color: borderColor, width: 1.0)),
+        boxShadow: const [BoxShadow(color: Color(0x0F000000), blurRadius: 12, offset: Offset(0, -2))],
       ),
       child: SafeArea(
         top: false,
-        child: Container(
-          height: 64,
-          padding: const EdgeInsets.symmetric(horizontal: MlSpacing.xs),
+        child: SizedBox(
+          height: 68,
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               if (!hasCenterQuickAdd)
-                for (int i = 0; i < destinations.length; i++)
-                  Expanded(
-                    child: _buildItem(context, i, destinations[i]),
-                  )
+                for (var i = 0; i < destinations.length; i++) Expanded(child: _item(i, destinations[i]))
               else ...[
-                Expanded(child: _buildItem(context, 0, destinations[0])),
-                Expanded(child: _buildItem(context, 1, destinations[1])),
-                _buildQuickAddButton(context),
-                Expanded(child: _buildItem(context, 2, destinations[2])),
-                Expanded(child: _buildItem(context, 3, destinations[3])),
+                Expanded(child: _item(0, destinations[0])),
+                Expanded(child: _item(1, destinations[1])),
+                _quickAdd(),
+                Expanded(child: _item(2, destinations[2])),
+                Expanded(child: _item(3, destinations[3])),
               ],
             ],
           ),
@@ -78,109 +75,94 @@ class MlBottomNavigation extends StatelessWidget {
     );
   }
 
-  Widget _buildQuickAddButton(BuildContext context) {
+  Widget _quickAdd() {
     return Semantics(
       button: true,
-      label: 'Quick Add Lead, Task, or Call',
-      child: GestureDetector(
+      label: 'Quick add',
+      child: MlPressable(
         onTap: onQuickAdd,
-        behavior: HitTestBehavior.opaque,
+        scale: 0.9,
         child: Container(
-          width: 48,
-          height: 48,
-          margin: const EdgeInsets.symmetric(horizontal: 4),
+          width: 52,
+          height: 52,
+          margin: const EdgeInsets.symmetric(horizontal: 6),
           decoration: BoxDecoration(
-            color: MlColors.primary,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: MlColors.primary.withOpacity(0.35),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
-              ),
-            ],
+            gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [MlColors.primary, Color(0xFF3730A3)]),
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [BoxShadow(color: MlColors.primary.withOpacity(0.38), blurRadius: 12, offset: const Offset(0, 5))],
           ),
           alignment: Alignment.center,
-          child: const Text(
-            '+',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.w400,
-              color: MlColors.white,
-              height: 1.0,
-            ),
-          ),
+          child: const Icon(MlIcons.add, size: 30, color: MlColors.white),
         ),
       ),
     );
   }
 
-  Widget _buildItem(BuildContext context, int index, MlNavigationDestination item) {
-    final isSelected = index == currentIndex;
+  Widget _item(int index, MlNavigationDestination item) {
+    final selected = index == currentIndex;
+    final color = selected ? MlColors.primary : MlColors.textMuted;
 
     return Semantics(
       button: true,
-      selected: isSelected,
+      selected: selected,
       label: item.label,
-      child: GestureDetector(
+      child: MlPressable(
         onTap: () => onTap(index),
-        behavior: HitTestBehavior.opaque,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: MlSpacing.touchTarget),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: isSelected ? MlColors.primary.withOpacity(0.12) : const Color(0x00000000),
-                      borderRadius: BorderRadius.circular(MlRadii.full),
-                    ),
-                    child: isSelected && item.activeIcon != null ? item.activeIcon! : item.icon,
+        scale: 0.92,
+        haptic: !selected,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 280),
+                  curve: Curves.easeOutCubic,
+                  width: selected ? 60 : 36,
+                  height: 32,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: selected ? MlColors.primary.withOpacity(0.14) : const Color(0x00000000),
+                    borderRadius: BorderRadius.circular(MlRadii.full),
                   ),
-                  if (item.badgeCount != null && item.badgeCount! > 0)
-                    Positioned(
-                      top: -2,
-                      right: 4,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: MlColors.danger,
-                          borderRadius: BorderRadius.circular(MlRadii.full),
-                        ),
-                        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                        alignment: Alignment.center,
-                        child: Text(
-                          item.badgeCount! > 99 ? '99+' : '${item.badgeCount}',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: MlColors.white,
-                            height: 1.0,
-                          ),
-                        ),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 180),
+                    child: Icon(
+                      selected ? (item.activeIcon ?? item.icon) : item.icon,
+                      key: ValueKey(selected),
+                      size: 24,
+                      color: color,
+                    ),
+                  ),
+                ),
+                if (item.badgeCount != null && item.badgeCount! > 0)
+                  Positioned(
+                    top: -3,
+                    right: selected ? 8 : -2,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(color: MlColors.danger, borderRadius: BorderRadius.circular(MlRadii.full)),
+                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                      alignment: Alignment.center,
+                      child: Text(
+                        item.badgeCount! > 99 ? '99+' : '${item.badgeCount}',
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: MlColors.white, height: 1.0, decoration: TextDecoration.none),
                       ),
                     ),
-                ],
-              ),
-              const SizedBox(height: 2),
-              Text(
-                item.label,
-                style: MlTypography.caption.copyWith(
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: isSelected ? MlColors.primary : MlColors.textMuted,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 3),
+            Text(
+              item.label,
+              style: MlTypography.caption.copyWith(fontWeight: selected ? FontWeight.w700 : FontWeight.w500, color: color),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
         ),
       ),
     );
   }
 }
-

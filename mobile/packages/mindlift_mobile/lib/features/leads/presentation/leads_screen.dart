@@ -184,23 +184,23 @@ class _LeadsScreenState extends ConsumerState<LeadsScreen> {
               onTap: () => setState(_selected.clear),
               child: Padding(
                 padding: const EdgeInsets.only(right: MlSpacing.sm),
-                child: Text('✕', style: TextStyle(fontSize: 20, color: MlColors.textPrimary)),
+                child: MlIcon(MlIcons.close, size: 20, color: MlColors.textPrimary),
               ),
             )
           : null,
       actions: _selecting
           ? [
               if (_cfg.canEdit)
-                MlIconButton(label: 'Change status', icon: const Text('✓', style: TextStyle(fontSize: 20)), onPressed: _bulkStatus),
+                MlIconButton(label: 'Change status', icon: MlIcon(MlIcons.check, size: 20), onPressed: _bulkStatus),
               if (_cfg.canEdit)
-                MlIconButton(label: 'Change view', icon: const Text('📂', style: TextStyle(fontSize: 18)), onPressed: _bulkMove),
+                MlIconButton(label: 'Change view', icon: MlIcon(MlIcons.folder, size: 18), onPressed: _bulkMove),
               if (_cfg.canDelete)
-                MlIconButton(label: 'Delete', icon: const Text('🗑', style: TextStyle(fontSize: 18)), onPressed: _bulkDelete),
+                MlIconButton(label: 'Delete', icon: MlIcon(MlIcons.delete, size: 18), onPressed: _bulkDelete),
             ]
           : [
               MlIconButton(
                 label: _board ? 'List view' : 'Board view',
-                icon: Text(_board ? '☰' : '▦', style: TextStyle(fontSize: 20, color: MlColors.textPrimary)),
+                icon: MlIcon(_board ? MlIcons.list : MlIcons.board, size: 24),
                 onPressed: () {
                   setState(() {
                     _board = !_board;
@@ -211,13 +211,13 @@ class _LeadsScreenState extends ConsumerState<LeadsScreen> {
               ),
               MlIconButton(
                 label: 'Scan card',
-                icon: const Text('📷', style: TextStyle(fontSize: 18)),
+                icon: MlIcon(MlIcons.camera, size: 18),
                 onPressed: () => OcrLeadScanSheet.show(context, onLeadCreated: _refreshAll),
               ),
               if (_cfg.canCreate)
                 MlIconButton(
                   label: 'New lead',
-                  icon: Text('＋', style: TextStyle(fontSize: 22, color: MlColors.primary, fontWeight: FontWeight.w700)),
+                  icon: MlIcon(MlIcons.add, size: 22, color: MlColors.primary),
                   onPressed: () => _actions.editLead(null),
                 ),
               ...topBarActions(),
@@ -484,8 +484,11 @@ class _LeadCard extends StatelessWidget {
                 if (selecting)
                   Padding(
                     padding: const EdgeInsets.only(right: 10),
-                    child: Text(selected ? '☑' : '☐',
-                        style: TextStyle(fontSize: 22, color: selected ? MlColors.primary : MlColors.textMuted, decoration: TextDecoration.none)),
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 160),
+                      child: MlIcon(selected ? MlIcons.selectOn : MlIcons.selectOff,
+                          key: ValueKey(selected), size: 24, color: selected ? MlColors.primary : MlColors.textMuted),
+                    ),
                   )
                 else
                   Padding(
@@ -504,7 +507,7 @@ class _LeadCard extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: MlColors.textPrimary, decoration: TextDecoration.none)),
                           ),
-                          if (hasNote) const Padding(padding: EdgeInsets.only(left: 6), child: Text('📝', style: TextStyle(fontSize: 12, decoration: TextDecoration.none))),
+                          if (hasNote) const Padding(padding: EdgeInsets.only(left: 6), child: MlIcon(MlIcons.note, size: 18)),
                         ],
                       ),
                       const SizedBox(height: 2),

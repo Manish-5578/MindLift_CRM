@@ -131,7 +131,7 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
                 OcrLeadScanSheet.show(context);
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: MlSpacing.md, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: MlSpacing.md, vertical: 12),
                 decoration: BoxDecoration(
                   color: MlColors.primarySoft,
                   borderRadius: BorderRadius.circular(MlRadii.md),
@@ -139,14 +139,15 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
                 ),
                 child: Row(
                   children: [
-                    const Text('📷 ', style: TextStyle(fontSize: 16)),
+                    MlIcon(MlIcons.scan, size: 22, color: MlColors.primary),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         'Scan Business Card with OCR',
                         style: MlTypography.caption.copyWith(color: MlColors.primary, fontWeight: FontWeight.w600),
                       ),
                     ),
-                    Text('Auto-fill →', style: MlTypography.caption.copyWith(color: MlColors.primary)),
+                    MlIcon(MlIcons.chevronRight, size: 20, color: MlColors.primary),
                   ],
                 ),
               ),
@@ -196,29 +197,40 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
     );
   }
 
+  static const _tabIcons = {
+    QuickAddType.lead: MlIcons.leadsOutline,
+    QuickAddType.task: MlIcons.checkCircle,
+    QuickAddType.call: MlIcons.call,
+    QuickAddType.note: MlIcons.note,
+  };
+
   Widget _buildTypePill(QuickAddType type, String label) {
     final isSelected = _activeTab == type;
+    final fg = isSelected ? MlColors.white : MlColors.textSecondary;
     return Expanded(
-      child: GestureDetector(
+      child: MlPressable(
         onTap: () => setState(() => _activeTab = type),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+        scale: 0.94,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: isSelected ? MlColors.primary : MlColors.surface,
-            borderRadius: BorderRadius.circular(MlRadii.md),
-            border: Border.all(color: isSelected ? MlColors.primary : MlColors.border),
+            color: isSelected ? MlColors.primary : MlColors.surfaceElevated,
+            borderRadius: BorderRadius.circular(MlRadii.lg),
           ),
           alignment: Alignment.center,
-          child: Text(
-            label,
-            style: MlTypography.caption.copyWith(
-              color: isSelected ? MlColors.white : MlColors.textMuted,
-              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-            ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              MlIcon(_tabIcons[type]!, size: 22, color: fg),
+              const SizedBox(height: 3),
+              Text(label,
+                  style: TextStyle(fontSize: 12.5, color: fg, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500, decoration: TextDecoration.none)),
+            ],
           ),
         ),
       ),
     );
   }
 }
-

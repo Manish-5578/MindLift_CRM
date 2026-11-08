@@ -140,7 +140,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       decoration: BoxDecoration(color: MlColors.surface, borderRadius: BorderRadius.circular(MlRadii.full)),
                       padding: const EdgeInsets.symmetric(horizontal: 6),
                       child: MlTextField(
-                        placeholder: '🔍  Search people',
+                        placeholder: 'Search people',
+                        prefix: MlIcon(MlIcons.search, size: 20, color: MlColors.textMuted),
                         onChanged: (v) => setState(() => _query = v),
                       ),
                     ),
@@ -475,17 +476,17 @@ class _ThreadViewState extends ConsumerState<_ThreadView> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            MlButton(label: '📷  Camera', variant: MlButtonVariant.secondary, onPressed: () {
+            MlButton(label: 'Camera', icon: MlIcon(MlIcons.camera, size: 22), variant: MlButtonVariant.secondary, onPressed: () {
               Navigator.of(sheetContext).pop();
               _pickImage(ImageSource.camera);
             }),
             const SizedBox(height: MlSpacing.sm),
-            MlButton(label: '🖼  Photo from gallery', variant: MlButtonVariant.secondary, onPressed: () {
+            MlButton(label: 'Photo from gallery', icon: MlIcon(MlIcons.gallery, size: 22), variant: MlButtonVariant.secondary, onPressed: () {
               Navigator.of(sheetContext).pop();
               _pickImage(ImageSource.gallery);
             }),
             const SizedBox(height: MlSpacing.sm),
-            MlButton(label: '📄  Document', variant: MlButtonVariant.secondary, onPressed: () {
+            MlButton(label: 'Document', icon: MlIcon(MlIcons.document, size: 22), variant: MlButtonVariant.secondary, onPressed: () {
               Navigator.of(sheetContext).pop();
               _pickDocument();
             }),
@@ -590,13 +591,13 @@ class _ThreadViewState extends ConsumerState<_ThreadView> {
               ],
             ),
             const SizedBox(height: MlSpacing.md),
-            MlButton(label: '↩  Reply', variant: MlButtonVariant.secondary, onPressed: () {
+            MlButton(label: 'Reply', icon: MlIcon(MlIcons.reply, size: 22), variant: MlButtonVariant.secondary, onPressed: () {
               Navigator.of(sheetContext).pop();
               setState(() => _replyTo = m);
             }),
             if (m.message.trim().isNotEmpty) ...[
               const SizedBox(height: MlSpacing.sm),
-              MlButton(label: '⧉  Copy text', variant: MlButtonVariant.secondary, onPressed: () {
+              MlButton(label: 'Copy text', icon: MlIcon(MlIcons.copy, size: 20), variant: MlButtonVariant.secondary, onPressed: () {
                 Navigator.of(sheetContext).pop();
                 Clipboard.setData(ClipboardData(text: m.message));
                 MlToast.show(context, message: 'Copied.');
@@ -690,12 +691,8 @@ class _ThreadViewState extends ConsumerState<_ThreadView> {
                             color: isMe ? const Color(0xB3FFFFFF) : MlColors.textMuted)),
                     if (isMe) ...[
                       const SizedBox(width: 4),
-                      Text(pending ? '🕓' : (msg.isRead ? '✓✓' : '✓'),
-                          style: TextStyle(
-                              fontSize: pending ? 9 : 11,
-                              fontWeight: FontWeight.w800,
-                              decoration: TextDecoration.none,
-                              color: msg.isRead ? const Color(0xFF7DD3FC) : const Color(0xB3FFFFFF))),
+                      Icon(pending ? MlIcons.pending : (msg.isRead ? MlIcons.read : MlIcons.sent),
+                          size: 15, color: msg.isRead ? const Color(0xFF7DD3FC) : const Color(0xB3FFFFFF)),
                     ],
                   ],
                 ),
@@ -739,14 +736,14 @@ class _ThreadViewState extends ConsumerState<_ThreadView> {
                       }),
                       child: const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                        child: Text('‹', style: TextStyle(fontSize: 38, height: 1, color: _white, fontWeight: FontWeight.w300, decoration: TextDecoration.none)),
+                        child: MlIcon(MlIcons.back, size: 28, color: _white),
                       ),
                     ),
                     Expanded(
                       child: Container(
                         decoration: BoxDecoration(color: MlColors.surface, borderRadius: BorderRadius.circular(MlRadii.full)),
                         padding: const EdgeInsets.symmetric(horizontal: 6),
-                        child: MlTextField(placeholder: '🔍  Search this chat', controller: _searchCtl, onChanged: _runSearch),
+                        child: MlTextField(placeholder: 'Search this chat', prefix: MlIcon(MlIcons.search, size: 20, color: MlColors.textMuted), controller: _searchCtl, onChanged: _runSearch),
                       ),
                     ),
                   ],
@@ -758,7 +755,7 @@ class _ThreadViewState extends ConsumerState<_ThreadView> {
                       onTap: widget.onBack,
                       child: const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                        child: Text('‹', style: TextStyle(fontSize: 38, height: 1, color: _white, fontWeight: FontWeight.w300, decoration: TextDecoration.none)),
+                        child: MlIcon(MlIcons.back, size: 28, color: _white),
                       ),
                     ),
                     MlAvatar(name: p.name, size: MlAvatarSize.md, backgroundColor: const Color(0x33FFFFFF), textColor: _white),
@@ -799,7 +796,7 @@ class _ThreadViewState extends ConsumerState<_ThreadView> {
                       onTap: () => setState(() => _searching = true),
                       child: const Padding(
                         padding: EdgeInsets.all(10),
-                        child: Text('🔍', style: TextStyle(fontSize: 18, decoration: TextDecoration.none)),
+                        child: MlIcon(MlIcons.search, size: 18),
                       ),
                     ),
                     const ThemeIconButton(color: _white),
@@ -822,7 +819,7 @@ class _ThreadViewState extends ConsumerState<_ThreadView> {
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => _finishRecording(send: false),
-                child: const Padding(padding: EdgeInsets.all(10), child: Text('🗑', style: TextStyle(fontSize: 22, decoration: TextDecoration.none))),
+                child: const Padding(padding: EdgeInsets.all(10), child: MlIcon(MlIcons.delete, size: 22)),
               ),
               const SizedBox(width: 6),
               Container(width: 10, height: 10, decoration: BoxDecoration(color: MlColors.danger, shape: BoxShape.circle)),
@@ -839,7 +836,7 @@ class _ThreadViewState extends ConsumerState<_ThreadView> {
                   height: 50,
                   decoration: BoxDecoration(gradient: LinearGradient(colors: [MlColors.primary, const Color(0xFF3730A3)]), shape: BoxShape.circle),
                   alignment: Alignment.center,
-                  child: const Text('➤', style: TextStyle(fontSize: 20, color: _white, decoration: TextDecoration.none)),
+                  child: MlIcon(MlIcons.send, size: 20, color: _white),
                 ),
               ),
             ],
@@ -869,7 +866,7 @@ class _ThreadViewState extends ConsumerState<_ThreadView> {
                       onTap: () => setState(() => _replyTo = null),
                       child: Padding(
                         padding: const EdgeInsets.all(8),
-                        child: Text('✕', style: TextStyle(fontSize: 16, color: MlColors.textMuted, decoration: TextDecoration.none)),
+                        child: MlIcon(MlIcons.close, size: 18, color: MlColors.textMuted),
                       ),
                     ),
                   ],
@@ -888,7 +885,7 @@ class _ThreadViewState extends ConsumerState<_ThreadView> {
                   onTap: _uploading ? null : _attachSheet,
                   child: const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                    child: Text('📎', style: TextStyle(fontSize: 22, decoration: TextDecoration.none)),
+                    child: MlIcon(MlIcons.attach, size: 22),
                   ),
                 ),
                 Expanded(
@@ -919,7 +916,11 @@ class _ThreadViewState extends ConsumerState<_ThreadView> {
                       boxShadow: const [BoxShadow(color: Color(0x554F46E5), blurRadius: 10, offset: Offset(0, 4))],
                     ),
                     alignment: Alignment.center,
-                    child: Text(_hasText ? '➤' : '🎤', style: const TextStyle(fontSize: 20, color: _white, decoration: TextDecoration.none)),
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 180),
+                      transitionBuilder: (c, a) => ScaleTransition(scale: a, child: c),
+                      child: Icon(_hasText ? MlIcons.send : MlIcons.mic, key: ValueKey(_hasText), size: 24, color: _white),
+                    ),
                   ),
                 ),
               ],
@@ -969,7 +970,7 @@ class _ThreadViewState extends ConsumerState<_ThreadView> {
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text(_searching ? '🔍' : '👋', style: const TextStyle(fontSize: 34, decoration: TextDecoration.none)),
+                                  MlIcon(_searching ? MlIcons.search : MlIcons.chatOutline, size: 40, color: MlColors.textMuted),
                                   const SizedBox(height: 6),
                                   Text(_searching ? 'No messages found' : 'Say hi to ${p.name.split(' ').first}',
                                       style: MlTypography.bodyMedium.copyWith(color: MlColors.textSecondary, fontWeight: FontWeight.w600)),
@@ -1027,12 +1028,15 @@ class _ThreadViewState extends ConsumerState<_ThreadView> {
                           border: Border.all(color: _newBelow > 0 ? MlColors.primary : MlColors.border),
                           boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 8, offset: Offset(0, 3))],
                         ),
-                        child: Text(_newBelow > 0 ? '↓ $_newBelow new' : '↓',
-                            style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: _newBelow > 0 ? _white : MlColors.textPrimary,
-                                decoration: TextDecoration.none)),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            MlIcon(MlIcons.down, size: 20, color: _newBelow > 0 ? _white : MlColors.textPrimary),
+                            if (_newBelow > 0)
+                              Text(' $_newBelow new',
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _white, decoration: TextDecoration.none)),
+                          ],
+                        ),
                       ),
                     ),
                   ),

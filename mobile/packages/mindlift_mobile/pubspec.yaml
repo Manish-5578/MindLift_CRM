@@ -41,7 +41,7 @@ dev_dependencies:
   build_runner: ^2.4.8
 
 flutter:
-  uses-material-design: false
+  uses-material-design: true
 
 
 dependency_overrides:

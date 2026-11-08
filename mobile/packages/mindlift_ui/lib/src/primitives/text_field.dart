@@ -1,9 +1,12 @@
+import 'package:flutter/material.dart' show materialTextSelectionHandleControls;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import '../tokens/colors.dart';
 import '../tokens/radii.dart';
 import '../tokens/spacing.dart';
 import '../tokens/typography.dart';
+import 'icons.dart';
+import 'selection_toolbar.dart';
 
 /// Bespoke input field replacing Material TextField.
 class MlTextField extends StatefulWidget {
@@ -122,8 +125,8 @@ class _MlTextFieldState extends State<MlTextField> {
           ),
           decoration: BoxDecoration(
             color: widget.enabled ? MlColors.surface : MlColors.surfaceElevated,
-            borderRadius: MlRadii.borderMd,
-            border: Border.all(color: borderColor, width: 1.5),
+            borderRadius: MlRadii.borderLg,
+            border: Border.all(color: borderColor, width: _isFocused ? 2 : 1.2),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -148,6 +151,11 @@ class _MlTextFieldState extends State<MlTextField> {
                         color: widget.enabled ? MlColors.textPrimary : MlColors.textDisabled,
                       ),
                       cursorColor: MlColors.primary,
+                      cursorWidth: 2,
+                      cursorRadius: const Radius.circular(2),
+                      selectionColor: MlColors.primary.withOpacity(0.28),
+                      selectionControls: materialTextSelectionHandleControls,
+                      contextMenuBuilder: (context, editableTextState) => MlSelectionToolbar(state: editableTextState),
                       backgroundCursorColor: MlColors.surface,
                       obscureText: widget.obscureText,
                       keyboardType: widget.keyboardType,
@@ -212,12 +220,7 @@ class MlSearchField extends StatelessWidget {
       controller: controller,
       placeholder: placeholder,
       onChanged: onChanged,
-      prefix: Container(
-        width: 16,
-        height: 16,
-        alignment: Alignment.center,
-        child: const Text('🔍', style: TextStyle(fontSize: 12)),
-      ),
+      prefix: MlIcon(MlIcons.search, size: 20, color: MlColors.textMuted),
       suffix: controller?.text.isNotEmpty == true
           ? GestureDetector(
               onTap: () {
@@ -225,7 +228,7 @@ class MlSearchField extends StatelessWidget {
                 onChanged?.call('');
                 onClear?.call();
               },
-              child: Text('✕', style: TextStyle(color: MlColors.textMuted, fontSize: 14)),
+              child: MlIcon(MlIcons.close, size: 18, color: MlColors.textMuted),
             )
           : null,
     );

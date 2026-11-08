@@ -47,15 +47,15 @@ class LeadActions {
 
   Future<T?> _sheet<T>(String title, WidgetBuilder builder) => MlSheet.show<T>(context: context, title: title, builder: builder);
 
-  Widget _row(String icon, String label, VoidCallback onTap, {bool danger = false, String? hint}) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+  Widget _row(IconData icon, String label, VoidCallback onTap, {bool danger = false, String? hint}) {
+    return MlPressable(
+      scale: 0.98,
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 13, horizontal: MlSpacing.md),
         child: Row(
           children: [
-            SizedBox(width: 30, child: Text(icon, style: const TextStyle(fontSize: 19, decoration: TextDecoration.none))),
+            SizedBox(width: 30, child: MlIcon(icon, size: 22, color: danger ? MlColors.danger : MlColors.primary)),
             const SizedBox(width: 8),
             Expanded(
               child: Text(label,
@@ -84,13 +84,13 @@ class LeadActions {
       return Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _row('↗', 'Open', () => run(() => context.push('/leads/${lead.id}'))),
-          if (!lead.isConverted) _row('🤝', 'Move to engagement', () => run(() => moveToEngagement(lead))),
-          _row('📝', 'Notes', () => run(() => stickyNote(lead))),
-          if (cfg.canEdit) _row('✎', 'Edit', () => run(() => editLead(lead))),
-          if (cfg.canEdit) _row('✓', 'Change status', () => run(() => changeStatus(lead))),
-          if (cfg.canEdit) _row('📂', 'Change view', () => run(() => moveToView([lead.id], lead.title))),
-          if (cfg.canDelete) _row('🗑', 'Delete', () => run(() => deleteLead(lead)), danger: true),
+          _row(MlIcons.chevronRight, 'Open', () => run(() => context.push('/leads/${lead.id}'))),
+          if (!lead.isConverted) _row(MlIcons.handshake, 'Move to engagement', () => run(() => moveToEngagement(lead))),
+          _row(MlIcons.note, 'Notes', () => run(() => stickyNote(lead))),
+          if (cfg.canEdit) _row(MlIcons.edit, 'Edit', () => run(() => editLead(lead))),
+          if (cfg.canEdit) _row(MlIcons.check, 'Change status', () => run(() => changeStatus(lead))),
+          if (cfg.canEdit) _row(MlIcons.folder, 'Change view', () => run(() => moveToView([lead.id], lead.title))),
+          if (cfg.canDelete) _row(MlIcons.delete, 'Delete', () => run(() => deleteLead(lead)), danger: true),
           const SizedBox(height: MlSpacing.sm),
         ],
       );
@@ -222,7 +222,7 @@ class LeadActions {
                   style: TextStyle(fontSize: 13, color: MlColors.textMuted, decoration: TextDecoration.none)),
             ),
           ),
-          for (final v in options) _row('📂', v.label, () => Navigator.of(ctx).pop(v)),
+          for (final v in options) _row(MlIcons.folder, v.label, () => Navigator.of(ctx).pop(v)),
           const SizedBox(height: MlSpacing.sm),
         ],
       );
@@ -267,7 +267,7 @@ class LeadActions {
       return Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          for (final s in choices) _row('•', s.label, () => Navigator.of(ctx).pop(s.value)),
+          for (final s in choices) _row(MlIcons.check, s.label, () => Navigator.of(ctx).pop(s.value)),
           Padding(
             padding: const EdgeInsets.all(MlSpacing.md),
             child: Text('To mark leads as not interested, change them one at a time so each gets a reason.',

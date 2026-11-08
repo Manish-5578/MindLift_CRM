@@ -14,14 +14,21 @@ class ThemeIconButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mode = ref.watch(settingsProvider).themeMode;
-    final (glyph, name) = switch (mode) {
-      AppThemeMode.system => ('◐', 'Auto'),
-      AppThemeMode.light => ('☀', 'Light'),
-      AppThemeMode.dark => ('☾', 'Dark'),
+    final (icon, name) = switch (mode) {
+      AppThemeMode.system => (MlIcons.themeAuto, 'Auto'),
+      AppThemeMode.light => (MlIcons.themeLight, 'Light'),
+      AppThemeMode.dark => (MlIcons.themeDark, 'Dark'),
     };
     return MlIconButton(
       label: 'Appearance: $name',
-      icon: Text(glyph, style: TextStyle(fontSize: 19, color: color ?? MlColors.textPrimary, decoration: TextDecoration.none)),
+      icon: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 260),
+        transitionBuilder: (child, anim) => RotationTransition(
+          turns: Tween<double>(begin: 0.75, end: 1).animate(anim),
+          child: FadeTransition(opacity: anim, child: child),
+        ),
+        child: MlIcon(icon, key: ValueKey(mode), size: 24, color: color),
+      ),
       onPressed: () {
         HapticFeedback.selectionClick();
         final next = AppThemeMode.values[(mode.index + 1) % AppThemeMode.values.length];
@@ -43,7 +50,7 @@ class BellButton extends ConsumerWidget {
       children: [
         MlIconButton(
           label: 'Notifications',
-          icon: const Text('🔔', style: TextStyle(fontSize: 18)),
+          icon: MlIcon(MlIcons.bell, size: 18),
           onPressed: () => context.push('/notifications'),
         ),
         if (unread > 0)

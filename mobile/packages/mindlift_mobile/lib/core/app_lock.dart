@@ -109,7 +109,7 @@ class _LockScreen extends StatelessWidget {
                 boxShadow: const [BoxShadow(color: Color(0x40000000), blurRadius: 30, offset: Offset(0, 12))],
               ),
               alignment: Alignment.center,
-              child: const Text('🔐', style: TextStyle(fontSize: 52, decoration: TextDecoration.none)),
+              child: MlIcon(MlIcons.lock, size: 52),
             ),
             const SizedBox(height: 28),
             const Text('MindLift CRM',

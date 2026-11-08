@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import '../tokens/colors.dart';
+import 'icons.dart';
 import '../tokens/radii.dart';
 import '../tokens/spacing.dart';
 import '../tokens/typography.dart';
@@ -133,7 +134,7 @@ class MlSelect<T> extends StatelessWidget {
                     ),
                   ),
                   if (isSelected)
-                    const Text('✓', style: TextStyle(color: MlColors.primary, fontSize: 16)),
+                    const Icon(MlIcons.check, size: 20, color: MlColors.primary),
                 ],
               ),
             ),

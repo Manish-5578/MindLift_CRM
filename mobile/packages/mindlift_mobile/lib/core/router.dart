@@ -89,22 +89,10 @@ final routerProvider = Provider<GoRouter>((ref) {
                 },
                 onQuickAdd: () => QuickAddSheet.show(context),
                 destinations: [
-                  const MlNavigationDestination(
-                    label: 'Home',
-                    icon: Text('📅', style: TextStyle(fontSize: 18)),
-                  ),
-                  const MlNavigationDestination(
-                    label: 'Leads',
-                    icon: Text('🏢', style: TextStyle(fontSize: 18)),
-                  ),
-                  const MlNavigationDestination(
-                    label: 'Chat',
-                    icon: Text('💬', style: TextStyle(fontSize: 18)),
-                  ),
-                  const MlNavigationDestination(
-                    label: 'Profile',
-                    icon: Text('👤', style: TextStyle(fontSize: 18)),
-                  ),
+                  const MlNavigationDestination(label: 'Home', icon: MlIcons.homeOutline, activeIcon: MlIcons.home),
+                  const MlNavigationDestination(label: 'Leads', icon: MlIcons.leadsOutline, activeIcon: MlIcons.leads),
+                  const MlNavigationDestination(label: 'Chat', icon: MlIcons.chatOutline, activeIcon: MlIcons.chat),
+                  const MlNavigationDestination(label: 'Profile', icon: MlIcons.profileOutline, activeIcon: MlIcons.profile),
                 ],
               ),
             ],
@@ -113,47 +101,74 @@ final routerProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(
             path: '/home',
-            pageBuilder: (context, state) => const NoTransitionPage(child: HomeScreen()),
+            pageBuilder: (context, state) => _fade(state, const HomeScreen()),
           ),
           GoRoute(
             path: '/leads',
-            pageBuilder: (context, state) => const NoTransitionPage(child: LeadsScreen()),
+            pageBuilder: (context, state) => _fade(state, const LeadsScreen()),
             routes: [
               GoRoute(
                 path: ':id',
-                builder: (context, state) {
+                pageBuilder: (context, state) {
                   final leadId = state.pathParameters['id'] ?? '';
-                  return LeadDetailScreen(leadId: leadId);
+                  return _slide(state, LeadDetailScreen(leadId: leadId));
                 },
               ),
             ],
           ),
           GoRoute(
             path: '/deals',
-            pageBuilder: (context, state) => const NoTransitionPage(child: DealsScreen()),
+            pageBuilder: (context, state) => _fade(state, const DealsScreen()),
           ),
           GoRoute(
             path: '/activities',
-            pageBuilder: (context, state) => const NoTransitionPage(child: ActivitiesScreen()),
+            pageBuilder: (context, state) => _fade(state, const ActivitiesScreen()),
           ),
           GoRoute(
             path: '/more',
-            pageBuilder: (context, state) => const NoTransitionPage(child: MoreScreen()),
+            pageBuilder: (context, state) => _fade(state, const MoreScreen()),
           ),
           GoRoute(
             path: '/notifications',
-            pageBuilder: (context, state) => const NoTransitionPage(child: NotificationsScreen()),
+            pageBuilder: (context, state) => _fade(state, const NotificationsScreen()),
           ),
           GoRoute(
             path: '/chat',
-            pageBuilder: (context, state) => const NoTransitionPage(child: ChatScreen()),
+            pageBuilder: (context, state) => _fade(state, const ChatScreen()),
           ),
           GoRoute(
             path: '/profile',
-            builder: (context, state) => const ProfileScreen(),
+            pageBuilder: (context, state) => _fade(state, const ProfileScreen()),
           ),
         ],
       ),
     ],
   );
 });
+
+
+/// Switching tabs: a quick fade-through, so content never slides sideways between peers.
+CustomTransitionPage<void> _fade(GoRouterState state, Widget child) => CustomTransitionPage<void>(
+      key: state.pageKey,
+      child: child,
+      transitionDuration: const Duration(milliseconds: 220),
+      reverseTransitionDuration: const Duration(milliseconds: 160),
+      transitionsBuilder: (context, animation, secondary, child) => FadeTransition(
+        opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+        child: child,
+      ),
+    );
+
+/// Opening a detail screen: shared-axis style slide and fade, with the same curve Material uses.
+CustomTransitionPage<void> _slide(GoRouterState state, Widget child) => CustomTransitionPage<void>(
+      key: state.pageKey,
+      child: child,
+      transitionDuration: const Duration(milliseconds: 320),
+      reverseTransitionDuration: const Duration(milliseconds: 260),
+      transitionsBuilder: (context, animation, secondary, child) => MlPageTransition.buildTransition(
+        context: context,
+        animation: animation,
+        secondaryAnimation: secondary,
+        child: child,
+      ),
+    );
