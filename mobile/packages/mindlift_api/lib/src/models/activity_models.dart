@@ -84,8 +84,12 @@ class CreateActivityRequest {
     this.contactId,
     this.assignedToUserId,
     this.durationMinutes,
+    this.direction,
+    this.callOutcome,
   });
 
+  final String? callOutcome;
+  final String? direction;
   final String type;
   final String subject;
   final String? description;
@@ -109,6 +113,8 @@ class CreateActivityRequest {
         if (contactId != null) 'contactId': contactId,
         if (assignedToUserId != null) 'ownerId': assignedToUserId,
         if (durationMinutes != null) 'durationMinutes': durationMinutes,
+        if (direction != null) 'direction': direction,
+        if (callOutcome != null) 'callOutcome': callOutcome,
       };
 }
 

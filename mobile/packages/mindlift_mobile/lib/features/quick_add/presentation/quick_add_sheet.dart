@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mindlift_api/mindlift_api.dart';
 import 'package:mindlift_ui/mindlift_ui.dart';
 import '../../../core/network_provider.dart';
+import '../../../core/offline_store.dart';
 import '../../leads/presentation/lead_actions.dart';
 import '../../leads/presentation/ocr_lead_scan_sheet.dart';
 
@@ -55,17 +56,23 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
           MlToast.show(context, message: 'Please provide a lead name.');
           return;
         }
-        await ref.read(leadsServiceProvider).createLead(
-              CreateLeadRequest(
-                name: name,
-                company: _companyController.text.trim(),
-                phone: _phoneController.text.trim(),
-                source: 'Mobile Quick Add',
-              ),
-            );
+        final req = CreateLeadRequest(
+          name: name,
+          company: _companyController.text.trim(),
+          phone: _phoneController.text.trim(),
+          source: 'Mobile Quick Add',
+        );
+        final sent = await sendOrQueue(
+          ref,
+          send: () => ref.read(leadsServiceProvider).createLead(req),
+          method: 'POST',
+          path: '/api/v1/leads',
+          body: req.toJson(),
+          label: 'Create lead $name',
+        );
         if (mounted) {
           Navigator.of(context).pop();
-          MlToast.show(context, message: 'Lead created successfully!');
+          MlToast.show(context, message: sent ? 'Lead created successfully!' : 'Saved on this phone. It will sync when you are back online.');
         }
       } else {
         final subject = _subjectController.text.trim();
@@ -79,17 +86,23 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
                 ? 'Note'
                 : 'Task';
 
-        await ref.read(activitiesServiceProvider).createActivity(
-              CreateActivityRequest(
-                type: typeStr,
-                subject: subject,
-                description: _detailsController.text.trim(),
-                dueAtUtc: DateTime.now().add(const Duration(hours: 2)),
-              ),
-            );
+        final req = CreateActivityRequest(
+          type: typeStr,
+          subject: subject,
+          description: _detailsController.text.trim(),
+          dueAtUtc: DateTime.now().add(const Duration(hours: 2)),
+        );
+        final sent = await sendOrQueue(
+          ref,
+          send: () => ref.read(activitiesServiceProvider).createActivity(req),
+          method: 'POST',
+          path: '/api/v1/activities',
+          body: req.toJson(),
+          label: 'Create $typeStr $subject',
+        );
         if (mounted) {
           Navigator.of(context).pop();
-          MlToast.show(context, message: '$typeStr saved!');
+          MlToast.show(context, message: sent ? '$typeStr saved!' : 'Saved on this phone. It will sync when you are back online.');
         }
       }
     } catch (e) {

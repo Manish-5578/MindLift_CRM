@@ -26,6 +26,19 @@ public sealed class MobileQuickCreateTests(MindLiftApiFactory factory) : IClassF
     }
 
     [Fact]
+    public async Task Calling_a_lead_logs_a_call_with_its_outcome()
+    {
+        var s = await Workspaces.SignupAsync(factory);
+        var leadRes = await s.Client.PostAsync("/api/v1/leads", Json("""{"firstName":"Zed","lastName":"Caller","phone":"+971500000001","status":"new"}"""));
+        var lead = System.Text.Json.JsonDocument.Parse(await leadRes.Content.ReadAsStringAsync()).RootElement.GetProperty("id").GetString();
+        var due = DateTime.UtcNow.ToString("o");
+        var created = await s.Client.PostAsync("/api/v1/activities", Json(
+            $$"""{"type":"Call","subject":"Call with Zed Caller","leadId":"{{lead}}","dueAt":"{{due}}","priority":"Normal","direction":"Outbound","callOutcome":"connected"}"""));
+        created.StatusCode.ShouldBe(HttpStatusCode.OK, await created.Content.ReadAsStringAsync());
+        System.Text.Json.JsonDocument.Parse(await created.Content.ReadAsStringAsync()).RootElement.GetProperty("callOutcome").GetString().ShouldBe("connected");
+    }
+
+    [Fact]
     public async Task Quick_create_lead_payload_is_accepted()
     {
         var s = await Workspaces.SignupAsync(factory);

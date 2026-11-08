@@ -5,6 +5,7 @@ import 'package:mindlift_api/mindlift_api.dart';
 import 'package:mindlift_ui/mindlift_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/network_provider.dart';
+import '../../../core/offline_store.dart';
 import 'lead_actions.dart';
 import 'leads_screen.dart' show statusColor, statusState, shortDate;
 
@@ -94,9 +95,17 @@ class _LeadDetailScreenState extends ConsumerState<LeadDetailScreen> {
                 if (text.isEmpty) return;
                 Navigator.of(sheetContext).pop();
                 try {
-                  final n = await ref.read(leadsServiceProvider).addLeadNote(widget.leadId, text);
-                  if (mounted) setState(() => _notes = [n, ..._notes]);
-                  if (mounted) MlToast.show(context, message: 'Note added.');
+                  LeadNoteDto? added;
+                  final sent = await sendOrQueue(
+                    ref,
+                    send: () async => added = await ref.read(leadsServiceProvider).addLeadNote(widget.leadId, text),
+                    method: 'POST',
+                    path: '/api/v1/leads/${widget.leadId}/notes',
+                    body: {'content': text},
+                    label: 'Add note to lead',
+                  );
+                  if (mounted && added != null) setState(() => _notes = [added!, ..._notes]);
+                  if (mounted) MlToast.show(context, message: sent ? 'Note added.' : 'Saved on this phone. It will sync when you are back online.');
                 } catch (e) {
                   if (mounted) MlToast.show(context, message: LeadActions.errorText(e, 'We could not add the note.'), type: MlToastType.error);
                 }
@@ -243,7 +252,7 @@ class _LeadDetailScreenState extends ConsumerState<LeadDetailScreen> {
                 runSpacing: 8,
                 children: [
                   if ((lead.phone ?? '').trim().isNotEmpty) ...[
-                    _chipButton(MlIcons.call, 'Call', () => _open(Uri(scheme: 'tel', path: lead.phone!.trim()))),
+                    _chipButton(MlIcons.call, 'Call', () => _actions.callLead(lead)),
                     _chipButton(MlIcons.whatsapp, 'WhatsApp', () => _open(Uri.parse('https://wa.me/${lead.phone!.replaceAll(RegExp(r'[^0-9]'), '')}'))),
                     _chipButton(MlIcons.sms, 'SMS', () => _open(Uri(scheme: 'sms', path: lead.phone!.trim()))),
                   ],

@@ -5,10 +5,10 @@ import 'package:go_router/go_router.dart';
 import 'package:mindlift_api/mindlift_api.dart';
 import 'package:mindlift_ui/mindlift_ui.dart';
 import '../../../core/network_provider.dart';
+import '../../../core/offline_store.dart';
 import 'lead_actions.dart';
 import '../../../core/top_bar_actions.dart';
 import 'package:flutter/services.dart' show HapticFeedback;
-import 'package:url_launcher/url_launcher.dart';
 import 'ocr_lead_scan_sheet.dart';
 
 /// The leads workspace. It mirrors the web list: the same views (My open leads, All open, New, Not interested,
@@ -107,8 +107,29 @@ class _LeadsScreenState extends ConsumerState<LeadsScreen> {
         _total = result.total;
         _selected.removeWhere((id) => !_items.any((l) => l.id == id));
       });
+      // Keep a copy of the first page of each view so it still opens without a connection.
+      if (!more && !_board && _search.text.trim().isEmpty) {
+        unawaited(ref.read(offlineStoreProvider).putCache('leads:$_viewKey', {'total': result.total, 'items': result.items.map((e) => e.toJson()).toList()}));
+      }
+      if (!ref.read(outboxProvider).online) ref.read(outboxProvider.notifier).flush();
     } catch (e) {
-      if (mounted && !more) setState(() => _error = 'We could not load your leads. Pull to retry.');
+      if (isOfflineError(e) && !more) {
+        ref.read(outboxProvider.notifier).markOffline();
+        final saved = _search.text.trim().isEmpty ? await ref.read(offlineStoreProvider).getCache('leads:$_viewKey') : null;
+        if (mounted && saved != null) {
+          final m = Map<String, dynamic>.from(saved.data as Map);
+          final items = ((m['items'] as List?) ?? const []).whereType<Map>().map((x) => LeadRow.fromJson(Map<String, dynamic>.from(x))).toList();
+          setState(() {
+            _items = items;
+            _total = (m['total'] as num?)?.toInt() ?? items.length;
+            _page = 1;
+          });
+        } else if (mounted) {
+          setState(() => _error = 'You are offline and this view has not been opened before.');
+        }
+      } else if (mounted && !more) {
+        setState(() => _error = 'We could not load your leads. Pull to retry.');
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -137,8 +158,10 @@ class _LeadsScreenState extends ConsumerState<LeadsScreen> {
   }
 
   Future<void> _refreshAll() async {
-    final v = await ref.read(leadsServiceProvider).loadSavedViews();
-    if (mounted) setState(() => _saved = v);
+    try {
+      final v = await ref.read(leadsServiceProvider).loadSavedViews();
+      if (mounted) setState(() => _saved = v);
+    } catch (_) {}
     await _load();
   }
 
@@ -154,8 +177,8 @@ class _LeadsScreenState extends ConsumerState<LeadsScreen> {
         onStatusChanged: (id, status) {
           if (!mounted) return;
           setState(() => _items = _items.map((l) => l.id == id ? l.copyWith(status: status) : l).toList());
-          // The row may no longer belong to this view.
-          _load();
+          // The row may no longer belong to this view (skipped offline, where the saved list would undo the change).
+          if (ref.read(outboxProvider).online) _load();
         },
       );
 
@@ -340,7 +363,7 @@ class _LeadsScreenState extends ConsumerState<LeadsScreen> {
                         confirmDismiss: (dir) async {
                           HapticFeedback.mediumImpact();
                           if (dir == DismissDirection.startToEnd) {
-                            launchUrl(Uri(scheme: 'tel', path: lead.phone!.trim()), mode: LaunchMode.externalApplication).catchError((_) => false);
+                            _actions.callLead(lead);
                           } else {
                             _actions.changeStatus(lead);
                           }

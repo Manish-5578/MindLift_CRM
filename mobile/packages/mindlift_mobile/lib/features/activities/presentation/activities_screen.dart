@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mindlift_api/mindlift_api.dart';
 import 'package:mindlift_ui/mindlift_ui.dart';
 import '../../../core/network_provider.dart';
+import '../../leads/presentation/lead_actions.dart';
+import '../../../core/offline_store.dart';
 import '../../../core/top_bar_actions.dart';
 
 class ActivitiesScreen extends ConsumerStatefulWidget {
@@ -41,11 +43,19 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
 
   Future<void> _completeActivity(ActivityDto act) async {
     try {
-      await ref.read(activitiesServiceProvider).completeActivity(act.id);
-      MlToast.show(context, message: '${act.type} marked complete!');
-      await _loadActivities();
-    } catch (_) {
-      MlToast.show(context, message: 'Action saved offline.');
+      final sent = await sendOrQueue(
+        ref,
+        send: () => ref.read(activitiesServiceProvider).completeActivity(act.id),
+        method: 'POST',
+        path: '/api/v1/activities/${act.id}/complete',
+        body: <String, dynamic>{},
+        label: 'Complete ${act.subject}',
+      );
+      if (!mounted) return;
+      MlToast.show(context, message: sent ? '${act.type} marked complete!' : 'Saved on this phone. It will sync when you are back online.');
+      if (sent) await _loadActivities();
+    } catch (e) {
+      if (mounted) MlToast.show(context, message: LeadActions.errorText(e, 'Could not complete this activity.'), type: MlToastType.error);
     }
   }
 

@@ -82,6 +82,14 @@ class ChatMessageDto {
         'message': message,
         'createdAtUtc': createdAtUtc.toIso8601String(),
         'isRead': isRead,
+        'replyToId': replyToId,
+        'replyToText': replyToText,
+        'replyToSender': replyToSender,
+        'attachmentName': attachmentName,
+        'attachmentKind': attachmentKind,
+        'attachmentSize': attachmentSize,
+        'attachmentDurationMs': attachmentDurationMs,
+        'reactions': reactions.map((r) => {'emoji': r.emoji, 'count': r.count, 'mine': r.mine}).toList(),
       };
 }
 
@@ -105,6 +113,17 @@ class ChatUserDto {
   final bool isOnline;
   final String? lastMessage;
   final DateTime? lastMessageAtUtc;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'email': email,
+        'role': role,
+        'unreadCount': unreadCount,
+        'isOnline': isOnline,
+        'lastMessage': lastMessage,
+        'lastMessageAtUtc': lastMessageAtUtc?.toIso8601String(),
+      };
 
   factory ChatUserDto.fromJson(Map<String, dynamic> json) {
     return ChatUserDto(

@@ -60,6 +60,7 @@ class MlIcons {
   static const sent = Icons.done_rounded;
   static const read = Icons.done_all_rounded;
   static const selectOn = Icons.check_circle_rounded;
+  static const radioOn = Icons.radio_button_checked_rounded;
   static const selectOff = Icons.radio_button_unchecked_rounded;
 
   // Reach someone

@@ -1,10 +1,13 @@
+import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mindlift_api/mindlift_api.dart';
 import 'package:mindlift_ui/mindlift_ui.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/auth_provider.dart' show connectionProblem;
 import '../../../core/network_provider.dart';
+import '../../../core/offline_store.dart';
 
 /// The things the web leads list can do to a lead (row menu and bulk bar), as bottom sheets.
 class LeadActions {
@@ -130,8 +133,8 @@ class LeadActions {
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     child: Row(
                       children: [
-                        Text(selected == s.value ? '◉' : '○',
-                            style: TextStyle(fontSize: 20, color: selected == s.value ? MlColors.primary : MlColors.textMuted, decoration: TextDecoration.none)),
+                        MlIcon(selected == s.value ? MlIcons.radioOn : MlIcons.selectOff, size: 24,
+                            color: selected == s.value ? MlColors.primary : MlColors.textMuted),
                         const SizedBox(width: 12),
                         Text(s.label,
                             style: TextStyle(
@@ -159,12 +162,16 @@ class LeadActions {
     });
     if (picked == null) return;
     try {
-      if (picked == 'disqualified') {
-        await _svc.disqualify(lead.id, reason.text.trim().isEmpty ? 'Not interested' : reason.text.trim());
-      } else {
-        await _svc.updateLeadStatus(lead.id, picked);
-      }
-      _toast('Status updated.');
+      final why = reason.text.trim().isEmpty ? 'Not interested' : reason.text.trim();
+      final sent = await sendOrQueue(
+        ref,
+        send: () => picked == 'disqualified' ? _svc.disqualify(lead.id, why) : _svc.updateLeadStatus(lead.id, picked),
+        method: 'POST',
+        path: picked == 'disqualified' ? '/api/v1/leads/${lead.id}/disqualify' : '/api/v1/leads/${lead.id}/status',
+        body: picked == 'disqualified' ? {'reason': why, 'notes': null} : {'status': picked},
+        label: 'Change status of ${lead.title}',
+      );
+      _toast(sent ? 'Status updated.' : 'Saved on this phone. It will sync when you are back online.');
       onStatusChanged?.call(lead.id, picked);
     } catch (e) {
       _toast(errorText(e, 'We could not change the status.'), error: true);
@@ -172,6 +179,66 @@ class LeadActions {
   }
 
   // ------------------------------------------------------------ notes
+
+  /// Opens the dialer, and when the person comes back to the app asks how the call went and logs it on the lead.
+  Future<void> callLead(LeadRow lead) async {
+    final phone = (lead.phone ?? '').trim();
+    if (phone.isEmpty) return;
+    final back = _ResumeOnce();
+    try {
+      final ok = await launchUrl(Uri(scheme: 'tel', path: phone), mode: LaunchMode.externalApplication);
+      if (!ok) {
+        back.cancel();
+        _toast('No app found to place the call.', error: true);
+        return;
+      }
+    } catch (_) {
+      back.cancel();
+      _toast('No app found to place the call.', error: true);
+      return;
+    }
+    await back.future;
+    if (!context.mounted) return;
+
+    final options = cfg.callOutcomes.isNotEmpty
+        ? cfg.callOutcomes
+        : const [PicklistOption(value: 'connected', label: 'Connected'), PicklistOption(value: 'no_answer', label: 'No answer')];
+    final picked = await _sheet<String>('How did the call go?', (ctx) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(MlSpacing.md, 0, MlSpacing.md, MlSpacing.sm),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Log it on ${lead.title}',
+                  style: TextStyle(fontSize: 13, color: MlColors.textMuted, decoration: TextDecoration.none, fontWeight: FontWeight.w400)),
+            ),
+          ),
+          for (final o in options) _row(MlIcons.call, o.label, () => Navigator.of(ctx).pop(o.value)),
+          _row(MlIcons.close, 'Do not log', () => Navigator.of(ctx).pop('')),
+        ],
+      );
+    });
+    if (picked == null || picked.isEmpty) return;
+
+    final subject = 'Call with ${lead.fullName.trim().isEmpty ? lead.title : lead.fullName.trim()}';
+    final req = CreateActivityRequest(type: 'Call', subject: subject, leadId: lead.id, dueAtUtc: DateTime.now(), direction: 'Outbound', callOutcome: picked);
+    try {
+      // A call dated now is recorded as done, with its outcome, in one request.
+      final sent = await sendOrQueue(
+        ref,
+        send: () => ref.read(activitiesServiceProvider).createActivity(req),
+        method: 'POST',
+        path: '/api/v1/activities',
+        body: req.toJson(),
+        label: subject,
+      );
+      _toast(sent ? 'Call logged.' : 'Saved on this phone. It will sync when you are back online.');
+    } catch (e) {
+      _toast(errorText(e, 'We could not log the call.'), error: true);
+    }
+  }
 
   Future<void> stickyNote(LeadRow lead) async {
     final c = TextEditingController(text: lead.description ?? '');
@@ -443,5 +510,33 @@ class LeadActions {
     } catch (e) {
       _toast(errorText(e, 'We could not save this lead.'), error: true);
     }
+  }
+}
+
+
+/// Completes when the app comes back to the foreground (after the dialer was shown), or after a minute at most.
+class _ResumeOnce with WidgetsBindingObserver {
+  _ResumeOnce() {
+    WidgetsBinding.instance.addObserver(this);
+    _t = Timer(const Duration(minutes: 30), cancel);
+  }
+
+  final _c = Completer<void>();
+  bool _wasAway = false;
+  Timer? _t;
+  Future<void> get future => _c.future;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) _wasAway = true;
+    if (state == AppLifecycleState.resumed && _wasAway) {
+      cancel();
+    }
+  }
+
+  void cancel() {
+    _t?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    if (!_c.isCompleted) _c.complete();
   }
 }

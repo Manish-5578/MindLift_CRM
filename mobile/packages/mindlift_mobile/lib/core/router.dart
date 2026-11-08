@@ -15,6 +15,7 @@ import '../features/more/presentation/more_screen.dart';
 import '../features/profile/presentation/profile_screen.dart';
 import '../features/chat/presentation/chat_screen.dart';
 import 'network_provider.dart';
+import 'offline_banner.dart';
 
 /// Listenable that notifies GoRouter ONLY when authentication status changes,
 /// preventing route teardowns and input loss when other auth fields (e.g. isLoading) change.
@@ -67,6 +68,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
           return Column(
             children: [
+              const OfflineBanner(),
               Expanded(child: child),
               if (!KeyboardInset.isVisible(context))
               MlBottomNavigation(

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +6,8 @@ import 'package:go_router/go_router.dart';
 import 'package:mindlift_api/mindlift_api.dart';
 import 'package:mindlift_ui/mindlift_ui.dart';
 import '../../../core/network_provider.dart';
+import '../../leads/presentation/lead_actions.dart';
+import '../../../core/offline_store.dart';
 import '../../../core/top_bar_actions.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -103,7 +106,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         _leadCounts = {'new': results[0].total, 'working': results[1].total, 'qualified': results[2].total};
         _latestLeads = results[3].items;
       });
-    } catch (_) {}
+      unawaited(ref.read(offlineStoreProvider).putCache('home-leads', {
+        'counts': _leadCounts,
+        'latest': _latestLeads.map((l) => l.toJson()).toList(),
+      }));
+    } catch (e) {
+      if (isOfflineError(e)) {
+        final saved = await ref.read(offlineStoreProvider).getCache('home-leads');
+        if (mounted && saved != null && _leadCounts.isEmpty) {
+          final m = Map<String, dynamic>.from(saved.data as Map);
+          setState(() {
+            _leadCounts = Map<String, int>.from((m['counts'] as Map).map((k, v) => MapEntry(k as String, (v as num).toInt())));
+            _latestLeads = ((m['latest'] as List?) ?? const []).whereType<Map>().map((x) => LeadRow.fromJson(Map<String, dynamic>.from(x))).toList();
+          });
+        }
+      }
+    }
   }
 
   @override
@@ -119,8 +137,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     try {
       final summary = await ref.read(activitiesServiceProvider).getMyDay();
       if (mounted) setState(() => _summary = summary);
-    } catch (_) {
-      // In offline or fallback mode, summary remains or loads from cache
+      unawaited(ref.read(offlineStoreProvider).putCache('myday', {
+        'overdueCount': summary.overdueCount,
+        'dueTodayCount': summary.dueTodayCount,
+        'completedTodayCount': summary.completedTodayCount,
+        'activities': summary.activities.map((a) => a.toJson()).toList(),
+      }));
+    } catch (e) {
+      if (isOfflineError(e)) {
+        ref.read(outboxProvider.notifier).markOffline();
+        final saved = await ref.read(offlineStoreProvider).getCache('myday');
+        if (mounted && saved != null && _summary == null) {
+          setState(() => _summary = MyDaySummaryDto.fromJson(Map<String, dynamic>.from(saved.data as Map)));
+        }
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -128,11 +158,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Future<void> _completeTask(ActivityDto activity) async {
     try {
-      await ref.read(activitiesServiceProvider).completeActivity(activity.id);
-      MlToast.show(context, message: 'Activity marked complete!');
-      await _loadMyDay();
-    } catch (_) {
-      MlToast.show(context, message: 'Saved to offline outbox.');
+      final sent = await sendOrQueue(
+        ref,
+        send: () => ref.read(activitiesServiceProvider).completeActivity(activity.id),
+        method: 'POST',
+        path: '/api/v1/activities/${activity.id}/complete',
+        body: <String, dynamic>{},
+        label: 'Complete ${activity.subject}',
+      );
+      if (!mounted) return;
+      MlToast.show(context, message: sent ? 'Activity marked complete!' : 'Saved on this phone. It will sync when you are back online.');
+      if (sent) await _loadMyDay();
+    } catch (e) {
+      if (mounted) MlToast.show(context, message: LeadActions.errorText(e, 'Could not complete this activity.'), type: MlToastType.error);
     }
   }
 

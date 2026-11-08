@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mindlift_api/mindlift_api.dart';
 import 'package:mindlift_ui/mindlift_ui.dart';
 import '../features/offline/offline_database.dart';
+import 'offline_store.dart';
 import 'auth_provider.dart';
 
 // Configurable base URL for staff API (defaults to live staging environment)
@@ -100,6 +101,7 @@ final authNotifierProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref
     authService: authService,
     onPurgeLocalData: () async {
       await db.purgeDatabase();
+      await ref.read(offlineStoreProvider).clear();
     },
   );
 

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mindlift_ui/mindlift_ui.dart';
 import '../../../core/locale_provider.dart';
 import '../../../core/network_provider.dart';
+import '../../../core/offline_store.dart';
 import '../../../core/push_service.dart';
 import '../../../core/settings_provider.dart';
 import '../../../core/top_bar_actions.dart';
@@ -61,6 +62,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final authState = ref.watch(authNotifierProvider);
     final language = ref.watch(localeProvider);
     final syncState = ref.watch(syncCoordinatorProvider);
+    final outbox = ref.watch(outboxProvider);
     final serverUrl = ref.watch(serverUrlProvider);
 
     final name = authState.userFullName ?? '—';
@@ -245,8 +247,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
             const SizedBox(height: MlSpacing.lg),
 
-            // Diagnostics & Offline Outbox
-            _buildSectionHeader('Diagnostics & Offline Storage'),
+            // Offline changes
+            _buildSectionHeader('Offline & sync'),
             Container(
               padding: const EdgeInsets.all(MlSpacing.md),
               decoration: BoxDecoration(
@@ -255,27 +257,51 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 border: Border.all(color: MlColors.border),
               ),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Encrypted Outbox', style: MlTypography.labelMedium.copyWith(color: MlColors.textPrimary)),
-                          Text('${syncState.pendingCount} local mutations pending sync', style: MlTypography.caption.copyWith(color: MlColors.textMuted)),
-                        ],
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(color: outbox.online ? MlColors.success : MlColors.warning, shape: BoxShape.circle),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          outbox.online
+                              ? (outbox.pending == 0 ? 'Online. Everything is synced.' : '${outbox.pending} change${outbox.pending == 1 ? '' : 's'} waiting to sync')
+                              : 'Offline. ${outbox.pending} change${outbox.pending == 1 ? '' : 's'} saved on this phone.',
+                          style: MlTypography.labelMedium.copyWith(color: MlColors.textPrimary),
+                        ),
                       ),
                       MlButton(
-                        label: 'Sync Outbox',
+                        label: outbox.syncing ? 'Syncing' : 'Sync now',
+                        size: MlButtonSize.small,
                         variant: MlButtonVariant.secondary,
-                        onPressed: () async {
-                          await ref.read(syncCoordinatorProvider.notifier).syncPendingMutations();
-                          MlToast.show(context, message: 'Sync check completed.');
-                        },
+                        onPressed: outbox.syncing ? null : () => ref.read(outboxProvider.notifier).flush(),
                       ),
                     ],
                   ),
+                  if (outbox.lastSyncedAt != null) ...[
+                    const SizedBox(height: 4),
+                    Text('Last synced ${outbox.lastSyncedAt!.toLocal().hour.toString().padLeft(2, '0')}:${outbox.lastSyncedAt!.toLocal().minute.toString().padLeft(2, '0')}',
+                        style: MlTypography.caption.copyWith(color: MlColors.textMuted)),
+                  ],
+                  for (final item in outbox.failed) ...[
+                    _buildDivider(),
+                    Text(item.label, style: MlTypography.labelMedium.copyWith(color: MlColors.textPrimary)),
+                    const SizedBox(height: 2),
+                    Text(item.error ?? 'Not saved', style: MlTypography.caption.copyWith(color: MlColors.danger)),
+                    const SizedBox(height: MlSpacing.xs),
+                    Row(
+                      children: [
+                        MlButton(label: 'Retry', size: MlButtonSize.small, variant: MlButtonVariant.secondary, onPressed: () => ref.read(outboxProvider.notifier).retry(item.id)),
+                        const SizedBox(width: MlSpacing.sm),
+                        MlButton(label: 'Discard', size: MlButtonSize.small, variant: MlButtonVariant.ghost, onPressed: () => ref.read(outboxProvider.notifier).discard(item.id)),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

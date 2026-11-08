@@ -70,6 +70,28 @@ class LeadRow {
         state: state,
       );
 
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'fullName': fullName,
+        'firstName': firstName,
+        'lastName': lastName,
+        'email': email,
+        'phone': phone,
+        'companyName': companyName,
+        'status': status,
+        'source': source,
+        'rating': rating,
+        'ownerName': ownerName,
+        'createdByName': createdByName,
+        'createdAtUtc': createdAtUtc.toUtc().toIso8601String(),
+        'isConverted': isConverted,
+        'isDisqualified': isDisqualified,
+        'address': address,
+        'description': description,
+        'city': city,
+        'state': state,
+      };
+
   factory LeadRow.fromJson(Map<String, dynamic> j) => LeadRow(
         id: j['id'] as String? ?? '',
         fullName: j['fullName'] as String? ?? '',
@@ -124,6 +146,7 @@ class LeadWorkspaceConfig {
   const LeadWorkspaceConfig({
     this.statuses = const [],
     this.sources = const [],
+    this.callOutcomes = const [],
     this.userId,
     this.isAdmin = false,
     this.canCreate = true,
@@ -135,6 +158,7 @@ class LeadWorkspaceConfig {
 
   final List<PicklistOption> statuses;
   final List<PicklistOption> sources;
+  final List<PicklistOption> callOutcomes;
   final String? userId;
   final bool isAdmin;
   final bool canCreate;
@@ -189,6 +213,7 @@ class LeadWorkspaceConfig {
     return LeadWorkspaceConfig(
       statuses: pick('lead_status'),
       sources: pick('lead_source'),
+      callOutcomes: pick('call_outcome'),
       userId: user['userId'] as String?,
       isAdmin: user['isAdmin'] == true,
       canCreate: p == null ? true : p['canCreate'] == true,

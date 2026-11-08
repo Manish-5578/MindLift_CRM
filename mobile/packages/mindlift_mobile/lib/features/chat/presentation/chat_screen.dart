@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mindlift_api/mindlift_api.dart';
 import 'package:mindlift_ui/mindlift_ui.dart';
 import '../../../core/network_provider.dart';
+import '../../../core/offline_store.dart';
 import '../../../core/top_bar_actions.dart';
 import 'chat_widgets.dart';
 
@@ -70,7 +71,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     try {
       final list = await ref.read(chatServiceProvider).getUsers();
       if (mounted) setState(() => _people = list);
-    } catch (_) {
+      unawaited(ref.read(offlineStoreProvider).putCache('chat-people', list.map((u) => u.toJson()).toList()));
+    } catch (e) {
+      if (isOfflineError(e)) {
+        ref.read(outboxProvider.notifier).markOffline();
+        final saved = await ref.read(offlineStoreProvider).getCache('chat-people');
+        if (mounted && saved != null && _people.isEmpty) {
+          setState(() => _people = (saved.data as List).whereType<Map>().map((x) => ChatUserDto.fromJson(Map<String, dynamic>.from(x))).toList());
+        }
+      }
     } finally {
       if (mounted && _loadingPeople) setState(() => _loadingPeople = false);
     }
@@ -365,6 +374,7 @@ class _ThreadViewState extends ConsumerState<_ThreadView> {
       final svc = ref.read(chatServiceProvider);
       final list = await svc.getMessages(recipientId: widget.person.id);
       if (!mounted) return;
+      unawaited(ref.read(offlineStoreProvider).putCache('chat:${widget.person.id}', list.map((m) => m.toJson()).toList()));
       final changed = _signature(list) != _signature(_messages.where((m) => !m.id.startsWith('local-')).toList());
       if (changed || initial) {
         final added = list.length - _messages.where((m) => !m.id.startsWith('local-')).length;
@@ -388,7 +398,13 @@ class _ThreadViewState extends ConsumerState<_ThreadView> {
         final me = users.where((u) => u.id == widget.person.id);
         if (me.isNotEmpty && mounted && me.first.isOnline != _online) setState(() => _online = me.first.isOnline);
       }
-    } catch (_) {
+    } catch (e) {
+      if (isOfflineError(e) && _messages.isEmpty) {
+        final saved = await ref.read(offlineStoreProvider).getCache('chat:${widget.person.id}');
+        if (mounted && saved != null) {
+          setState(() => _messages = (saved.data as List).whereType<Map>().map((x) => ChatMessageDto.fromJson(Map<String, dynamic>.from(x))).toList());
+        }
+      }
     } finally {
       if (mounted && _loading) setState(() => _loading = false);
     }
