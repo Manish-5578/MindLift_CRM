@@ -19,10 +19,51 @@ public sealed class ChatController(ChatService chatService) : ControllerBase
         [FromQuery] string? channel = "general",
         [FromQuery] Guid? recipientId = null,
         [FromQuery] DateTime? since = null,
+        [FromQuery] string? search = null,
         CancellationToken ct = default)
     {
-        return Ok(await chatService.GetMessagesAsync(channel, recipientId, since, ct));
+        return Ok(await chatService.GetMessagesAsync(channel, recipientId, since, ct, search));
     }
+
+    /// <summary>Multipart form: file, and optionally message (caption), recipientId, channel, replyToId, durationMs.</summary>
+    [HttpPost("messages/attachment")]
+    [RequestSizeLimit(16L * 1024 * 1024)]
+    public async Task<ActionResult<ChatMessageDto>> SendAttachment(
+        IFormFile? file,
+        [FromForm] string? message,
+        [FromForm] Guid? recipientId,
+        [FromForm] string? channel,
+        [FromForm] Guid? replyToId,
+        [FromForm] int? durationMs,
+        CancellationToken ct = default)
+    {
+        if (file is null) return BadRequest(new { error = "Choose a file." });
+        await using var stream = file.OpenReadStream();
+        return Ok(await chatService.SendAttachmentAsync(stream, file.FileName, file.Length, message, channel, recipientId, replyToId, durationMs, ct));
+    }
+
+    [HttpGet("messages/{id:guid}/attachment")]
+    public async Task<IActionResult> Attachment(Guid id, CancellationToken ct = default)
+    {
+        var (name, type, content) = await chatService.OpenAttachmentAsync(id, ct);
+        Response.Headers.XContentTypeOptions = "nosniff";
+        return File(content, type, name, enableRangeProcessing: true);
+    }
+
+    [HttpPost("messages/{id:guid}/react")]
+    public async Task<ActionResult<ChatMessageDto>> React(Guid id, [FromBody] ReactRequest request, CancellationToken ct = default)
+        => Ok(await chatService.ReactAsync(id, request.Emoji, ct));
+
+    [HttpPost("typing")]
+    public async Task<IActionResult> Typing([FromQuery] Guid toUserId)
+    {
+        await chatService.TypingAsync(toUserId);
+        return NoContent();
+    }
+
+    [HttpGet("typing")]
+    public ActionResult<object> IsTyping([FromQuery] Guid otherUserId)
+        => Ok(new { typing = chatService.IsTyping(otherUserId) });
 
     [HttpPost("messages")]
     public async Task<ActionResult<ChatMessageDto>> SendMessage(

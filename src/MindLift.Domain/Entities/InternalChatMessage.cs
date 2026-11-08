@@ -17,5 +17,21 @@ public class InternalChatMessage : TenantEntity
     public string Message { get; set; } = string.Empty;
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public bool IsRead { get; set; }
+
+    /// <summary>The message this one replies to.</summary>
+    public Guid? ReplyToId { get; set; }
+
+    /// <summary>Storage key of a photo, file or voice note sent with the message.</summary>
+    public string? AttachmentKey { get; set; }
+    public string? AttachmentName { get; set; }
+    public string? AttachmentContentType { get; set; }
+
+    /// <summary>image, audio or file.</summary>
+    public string? AttachmentKind { get; set; }
+    public long? AttachmentSize { get; set; }
+    public int? AttachmentDurationMs { get; set; }
+
+    /// <summary>JSON object: emoji to the ids of the people who reacted with it.</summary>
+    public string? Reactions { get; set; }
 }
 

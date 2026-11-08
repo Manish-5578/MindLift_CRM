@@ -12,13 +12,26 @@ public sealed record ChatMessageDto(
     string? ChannelName,
     string Message,
     DateTime CreatedAtUtc,
-    bool IsRead
+    bool IsRead,
+    Guid? ReplyToId = null,
+    string? ReplyToText = null,
+    string? ReplyToSender = null,
+    string? AttachmentName = null,
+    string? AttachmentKind = null,
+    long? AttachmentSize = null,
+    int? AttachmentDurationMs = null,
+    IReadOnlyList<ChatReactionDto>? Reactions = null
 );
+
+public sealed record ChatReactionDto(string Emoji, int Count, bool Mine);
+
+public sealed record ReactRequest(string Emoji);
 
 public sealed record SendChatMessageRequest(
     string Message,
     string? ChannelName = null,
-    Guid? RecipientId = null
+    Guid? RecipientId = null,
+    Guid? ReplyToId = null
 );
 
 public sealed record ChatUserDto(

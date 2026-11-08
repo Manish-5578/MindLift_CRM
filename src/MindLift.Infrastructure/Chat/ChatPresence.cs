@@ -16,5 +16,14 @@ public sealed class ChatPresence
 
     public void Clear(Guid userId) => _lastSeen.TryRemove(userId, out _);
 
+    private readonly ConcurrentDictionary<Guid, (Guid To, DateTime At)> _typing = new();
+
+    public void SetTyping(Guid from, Guid to) => _typing[from] = (to, DateTime.UtcNow);
+
+    public void ClearTyping(Guid from) => _typing.TryRemove(from, out _);
+
+    /// <summary>True while the sender has typed to the other person in the last few seconds.</summary>
+    public bool IsTyping(Guid from, Guid to) => _typing.TryGetValue(from, out var t) && t.To == to && DateTime.UtcNow - t.At <= TimeSpan.FromSeconds(5);
+
     public bool IsOnline(Guid userId) => _lastSeen.TryGetValue(userId, out var t) && DateTime.UtcNow - t <= Window;
 }

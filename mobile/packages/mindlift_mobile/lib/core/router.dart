@@ -59,13 +59,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             if (loc.startsWith('/home')) return 0;
             if (loc.startsWith('/leads')) return 1;
             if (loc.startsWith('/chat')) return 2;
-            if (loc.startsWith('/notifications')) return 3;
-            if (loc.startsWith('/profile') || loc.startsWith('/more')) return 4;
+            if (loc.startsWith('/profile') || loc.startsWith('/more')) return 3;
             return 0;
           }
 
           final currentIndex = calculateIndex(state.matchedLocation);
-          final unreadAlerts = ref.watch(unreadNotificationCountProvider).value ?? 0;
 
           return Column(
             children: [
@@ -85,9 +83,6 @@ final routerProvider = Provider<GoRouter>((ref) {
                       context.go('/chat');
                       break;
                     case 3:
-                      context.go('/notifications');
-                      break;
-                    case 4:
                       context.go('/profile');
                       break;
                   }
@@ -105,11 +100,6 @@ final routerProvider = Provider<GoRouter>((ref) {
                   const MlNavigationDestination(
                     label: 'Chat',
                     icon: Text('💬', style: TextStyle(fontSize: 18)),
-                  ),
-                  MlNavigationDestination(
-                    label: 'Alerts',
-                    icon: const Text('🔔', style: TextStyle(fontSize: 18)),
-                    badgeCount: unreadAlerts > 0 ? unreadAlerts : null,
                   ),
                   const MlNavigationDestination(
                     label: 'Profile',

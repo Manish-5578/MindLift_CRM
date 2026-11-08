@@ -1,9 +1,9 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:mindlift_api/mindlift_api.dart';
 import 'package:mindlift_ui/mindlift_ui.dart';
 import '../../../core/network_provider.dart';
+import '../../../core/top_bar_actions.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -62,46 +62,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         pendingCount: syncState.pendingCount,
         onRetry: () => ref.read(syncCoordinatorProvider.notifier).syncPendingMutations(),
       ),
-      actions: [
-        Consumer(
-          builder: (context, ref, _) {
-            final unread = ref.watch(unreadNotificationCountProvider).value ?? 0;
-            return Stack(
-              clipBehavior: Clip.none,
-              children: [
-                MlIconButton(
-                  label: 'Notifications',
-                  icon: const Text('🔔', style: TextStyle(fontSize: 18)),
-                  onPressed: () => context.push('/notifications'),
-                ),
-                if (unread > 0)
-                  Positioned(
-                    top: 6,
-                    right: 6,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: MlColors.danger,
-                        borderRadius: BorderRadius.circular(MlRadii.full),
-                      ),
-                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                      alignment: Alignment.center,
-                      child: Text(
-                        unread > 99 ? '99+' : '$unread',
-                        style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: MlColors.white),
-                      ),
-                    ),
-                  ),
-              ],
-            );
-          },
-        ),
-        MlIconButton(
-          label: 'Refresh Agenda',
-          icon: Text('↻', style: TextStyle(fontSize: 20, color: MlColors.textPrimary)),
-          onPressed: _loadMyDay,
-        ),
-      ],
+      actions: topBarActions(),
       body: MlPullToRefresh(
         onRefresh: _loadMyDay,
         child: SingleChildScrollView(
@@ -134,8 +95,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 MlEmptyState(
                   title: 'All caught up!',
                   subtitle: 'You have no scheduled calls or tasks due today.',
-                  actionLabel: 'Refresh',
-                  onAction: _loadMyDay,
                 )
               else
                 for (final act in _summary!.activities)

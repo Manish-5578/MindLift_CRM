@@ -5,6 +5,7 @@ import '../../../core/locale_provider.dart';
 import '../../../core/network_provider.dart';
 import '../../../core/push_service.dart';
 import '../../../core/settings_provider.dart';
+import '../../../core/top_bar_actions.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -14,11 +15,6 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
-  bool _pushNotifications = true;
-  bool _emailNotifications = true;
-  bool _dealAlerts = true;
-  bool _taskReminders = true;
-
   Future<void> _testPush() async {
     try {
       final results = await ref.read(mobileDevicesServiceProvider).sendTestPush();
@@ -76,6 +72,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       title: 'My Profile',
       subtitle: name,
       actions: [
+        ...topBarActions(),
         MlIconButton(
           label: 'Sign Out',
           icon: const Text('🚪', style: TextStyle(fontSize: 18)),
@@ -164,69 +161,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   _buildInfoRow('Staging Server', serverUrl),
                   _buildDivider(),
                   _buildInfoRow('Connection', syncState.connectionState.name.toUpperCase()),
-                ],
-              ),
-            ),
-            const SizedBox(height: MlSpacing.lg),
-
-            // Notification Preferences Module
-            _buildSectionHeader('Notification Preferences'),
-            Container(
-              padding: const EdgeInsets.all(MlSpacing.md),
-              decoration: BoxDecoration(
-                color: MlColors.surface,
-                borderRadius: BorderRadius.circular(MlRadii.lg),
-                border: Border.all(color: MlColors.border),
-              ),
-              child: Column(
-                children: [
-                  _buildToggleRow('Push Notifications', 'Real-time alert pings', _pushNotifications, (v) => setState(() => _pushNotifications = v)),
-                  _buildDivider(),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(child: Text('Check push delivery', style: MlTypography.labelMedium.copyWith(color: MlColors.textPrimary))),
-                      MlButton(label: 'Send test', variant: MlButtonVariant.secondary, onPressed: _testPush),
-                    ],
-                  ),
-                  _buildDivider(),
-                  _buildToggleRow('Email Notifications', 'Daily digests & summaries', _emailNotifications, (v) => setState(() => _emailNotifications = v)),
-                  _buildDivider(),
-                  _buildToggleRow('Deal & Stage Alerts', 'Notifications on deal moves', _dealAlerts, (v) => setState(() => _dealAlerts = v)),
-                  _buildDivider(),
-                  _buildToggleRow('Overdue Task Reminders', 'Field task deadline alerts', _taskReminders, (v) => setState(() => _taskReminders = v)),
-                ],
-              ),
-            ),
-            const SizedBox(height: MlSpacing.lg),
-
-            // Appearance
-            _buildSectionHeader('Appearance'),
-            Container(
-              padding: const EdgeInsets.all(MlSpacing.md),
-              decoration: BoxDecoration(
-                color: MlColors.surface,
-                borderRadius: BorderRadius.circular(MlRadii.lg),
-                border: Border.all(color: MlColors.border),
-              ),
-              child: Row(
-                children: [
-                  for (final m in AppThemeMode.values) ...[
-                    if (m != AppThemeMode.values.first) const SizedBox(width: MlSpacing.sm),
-                    Expanded(
-                      child: MlButton(
-                        label: switch (m) {
-                          AppThemeMode.system => 'Auto',
-                          AppThemeMode.light => '☀ Light',
-                          AppThemeMode.dark => '☾ Dark',
-                        },
-                        variant: ref.watch(settingsProvider).themeMode == m
-                            ? MlButtonVariant.primary
-                            : MlButtonVariant.secondary,
-                        onPressed: () => ref.read(settingsProvider.notifier).setThemeMode(m),
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -345,6 +279,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ],
               ),
             ),
+            const SizedBox(height: MlSpacing.sm),
+            MlButton(label: 'Check push delivery', variant: MlButtonVariant.secondary, onPressed: _testPush),
             const SizedBox(height: MlSpacing.xl),
 
             // Logout Option

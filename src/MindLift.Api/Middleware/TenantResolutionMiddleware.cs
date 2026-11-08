@@ -83,7 +83,7 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
             && context.Response.StatusCode is >= 200 and < 300)
         {
             var path = context.Request.Path.Value ?? string.Empty;
-            if (!path.Contains("/ping", StringComparison.OrdinalIgnoreCase) && !path.Contains("/offline", StringComparison.OrdinalIgnoreCase))
+            if (!path.Contains("/ping", StringComparison.OrdinalIgnoreCase) && !path.Contains("/typing", StringComparison.OrdinalIgnoreCase) && !path.Contains("/offline", StringComparison.OrdinalIgnoreCase))
             {
                 try
                 {

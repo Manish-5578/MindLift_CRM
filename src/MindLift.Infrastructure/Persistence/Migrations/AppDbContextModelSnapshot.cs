@@ -6794,6 +6794,34 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("AttachmentContentType")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("attachment_content_type");
+
+                    b.Property<int?>("AttachmentDurationMs")
+                        .HasColumnType("integer")
+                        .HasColumnName("attachment_duration_ms");
+
+                    b.Property<string>("AttachmentKey")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("attachment_key");
+
+                    b.Property<string>("AttachmentKind")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("attachment_kind");
+
+                    b.Property<string>("AttachmentName")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("attachment_name");
+
+                    b.Property<long?>("AttachmentSize")
+                        .HasColumnType("bigint")
+                        .HasColumnName("attachment_size");
+
                     b.Property<string>("ChannelName")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
@@ -6829,9 +6857,17 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(4000)")
                         .HasColumnName("message");
 
+                    b.Property<string>("Reactions")
+                        .HasColumnType("text")
+                        .HasColumnName("reactions");
+
                     b.Property<Guid?>("RecipientId")
                         .HasColumnType("uuid")
                         .HasColumnName("recipient_id");
+
+                    b.Property<Guid?>("ReplyToId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reply_to_id");
 
                     b.Property<string>("SenderEmail")
                         .HasMaxLength(320)

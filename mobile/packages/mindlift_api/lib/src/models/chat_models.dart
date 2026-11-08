@@ -9,7 +9,28 @@ class ChatMessageDto {
     required this.message,
     required this.createdAtUtc,
     this.isRead = false,
+    this.replyToId,
+    this.replyToText,
+    this.replyToSender,
+    this.attachmentName,
+    this.attachmentKind,
+    this.attachmentSize,
+    this.attachmentDurationMs,
+    this.reactions = const [],
   });
+
+  final String? replyToId;
+  final String? replyToText;
+  final String? replyToSender;
+  final String? attachmentName;
+
+  /// image, audio or file.
+  final String? attachmentKind;
+  final int? attachmentSize;
+  final int? attachmentDurationMs;
+  final List<ChatReaction> reactions;
+
+  bool get hasAttachment => attachmentKind != null;
 
   final String id;
   final String senderId;
@@ -37,6 +58,17 @@ class ChatMessageDto {
       message: json['message'] as String? ?? '',
       createdAtUtc: dt,
       isRead: json['isRead'] as bool? ?? false,
+      replyToId: json['replyToId'] as String?,
+      replyToText: json['replyToText'] as String?,
+      replyToSender: json['replyToSender'] as String?,
+      attachmentName: json['attachmentName'] as String?,
+      attachmentKind: json['attachmentKind'] as String?,
+      attachmentSize: (json['attachmentSize'] as num?)?.toInt(),
+      attachmentDurationMs: (json['attachmentDurationMs'] as num?)?.toInt(),
+      reactions: ((json['reactions'] as List?) ?? const [])
+          .whereType<Map>()
+          .map((e) => ChatReaction.fromJson(Map<String, dynamic>.from(e)))
+          .toList(),
     );
   }
 
@@ -263,3 +295,17 @@ class ExtractedLeadCardDto {
   }
 }
 
+
+
+class ChatReaction {
+  const ChatReaction({required this.emoji, required this.count, required this.mine});
+  final String emoji;
+  final int count;
+  final bool mine;
+
+  factory ChatReaction.fromJson(Map<String, dynamic> j) => ChatReaction(
+        emoji: j['emoji'] as String? ?? '',
+        count: (j['count'] as num?)?.toInt() ?? 0,
+        mine: j['mine'] as bool? ?? false,
+      );
+}

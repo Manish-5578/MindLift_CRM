@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mindlift_api/mindlift_api.dart';
 import 'package:mindlift_ui/mindlift_ui.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/network_provider.dart';
 import 'lead_actions.dart';
 import 'leads_screen.dart' show statusColor, statusState, shortDate;
@@ -235,6 +236,23 @@ class _LeadDetailScreenState extends ConsumerState<LeadDetailScreen> {
               Align(alignment: Alignment.centerLeft, child: MlStatusChip(label: 'Converted', state: MlStatusState.success)),
             const SizedBox(height: MlSpacing.md),
 
+            // Reach the person in one tap
+            if ((lead.phone ?? '').trim().isNotEmpty || (lead.email ?? '').trim().isNotEmpty) ...[
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if ((lead.phone ?? '').trim().isNotEmpty) ...[
+                    _chipButton('📞  Call', () => _open(Uri(scheme: 'tel', path: lead.phone!.trim()))),
+                    _chipButton('💬  WhatsApp', () => _open(Uri.parse('https://wa.me/${lead.phone!.replaceAll(RegExp(r'[^0-9]'), '')}'))),
+                    _chipButton('✉  SMS', () => _open(Uri(scheme: 'sms', path: lead.phone!.trim()))),
+                  ],
+                  if ((lead.email ?? '').trim().isNotEmpty) _chipButton('📧  Email', () => _open(Uri(scheme: 'mailto', path: lead.email!.trim()))),
+                ],
+              ),
+              const SizedBox(height: MlSpacing.md),
+            ],
+
             // Actions
             if (canEdit)
               Wrap(
@@ -368,6 +386,16 @@ class _LeadDetailScreenState extends ConsumerState<LeadDetailScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _open(Uri uri) async {
+    try {
+      if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && mounted) {
+        MlToast.show(context, message: 'No app found to open this.');
+      }
+    } catch (_) {
+      if (mounted) MlToast.show(context, message: 'No app found to open this.');
+    }
   }
 
   Widget _chipButton(String label, VoidCallback onTap, {bool danger = false}) {

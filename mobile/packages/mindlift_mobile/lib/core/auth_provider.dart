@@ -132,8 +132,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         if (e.response != null && e.response?.data is Map) {
           final data = e.response!.data as Map;
           msg = data['detail'] as String? ?? data['title'] as String? ?? data['message'] as String? ?? msg;
-        } else if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.connectionError) {
-          msg = 'Cannot connect to server. Please verify the Server URL.';
+        } else {
+          msg = connectionProblem(e) ?? msg;
         }
       }
       state = state.copyWith(
@@ -174,3 +174,23 @@ final tokenStorageProvider = Provider<TokenStorage>((ref) {
   return SecureTokenStorage(ref.watch(secureStorageProvider));
 });
 
+
+
+/// Plain-language reason a request could not reach the server, or null if it did reach it.
+String? connectionProblem(Object e) {
+  if (e is! DioException) return null;
+  final text = '${e.error ?? ''} ${e.message ?? ''}'.toLowerCase();
+  if (text.contains('certificate') || text.contains('handshake')) {
+    return "Secure connection failed. Check that your phone's date and time are correct (turn on automatic date & time).";
+  }
+  if (text.contains('failed host lookup') || text.contains('network is unreachable') || text.contains('no address associated')) {
+    return 'No internet connection. Turn on Wi-Fi or mobile data and try again.';
+  }
+  if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.receiveTimeout || e.type == DioExceptionType.sendTimeout) {
+    return 'The server is taking a while to respond (it may be waking up). Please try again in a few seconds.';
+  }
+  if (e.type == DioExceptionType.connectionError) {
+    return 'Cannot reach the server. Check your internet connection and try again.';
+  }
+  return null;
+}

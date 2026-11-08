@@ -12,10 +12,12 @@ class ChatService {
     String? channel,
     String? recipientId,
     DateTime? since,
+    String? search,
   }) async {
     final response = await _dio.get(
       '/api/v1/chat/messages',
       queryParameters: {
+        if (search != null && search.isNotEmpty) 'search': search,
         if (channel != null) 'channel': channel,
         if (recipientId != null) 'recipientId': recipientId,
         if (since != null) 'since': since.toIso8601String(),
@@ -32,16 +34,66 @@ class ChatService {
     required String message,
     String? channel,
     String? recipientId,
+    String? replyToId,
   }) async {
     final response = await _dio.post(
       '/api/v1/chat/messages',
       data: {
         'message': message,
+        if (replyToId != null) 'replyToId': replyToId,
         if (channel != null) 'channelName': channel,
         if (recipientId != null) 'recipientId': recipientId,
       },
     );
     return ChatMessageDto.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// A photo, document or voice note, with an optional caption.
+  Future<ChatMessageDto> sendAttachment({
+    required String filePath,
+    required String fileName,
+    required String recipientId,
+    String? caption,
+    String? replyToId,
+    int? durationMs,
+  }) async {
+    final form = FormData.fromMap({
+      'file': await MultipartFile.fromFile(filePath, filename: fileName),
+      'recipientId': recipientId,
+      if (caption != null && caption.isNotEmpty) 'message': caption,
+      if (replyToId != null) 'replyToId': replyToId,
+      if (durationMs != null) 'durationMs': durationMs,
+    });
+    final response = await _dio.post(
+      '/api/v1/chat/messages/attachment',
+      data: form,
+      options: Options(contentType: 'multipart/form-data', sendTimeout: const Duration(minutes: 2), receiveTimeout: const Duration(minutes: 2)),
+    );
+    return ChatMessageDto.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  Future<List<int>> downloadAttachment(String messageId) async {
+    final response = await _dio.get<List<int>>(
+      '/api/v1/chat/messages/$messageId/attachment',
+      options: Options(responseType: ResponseType.bytes, receiveTimeout: const Duration(minutes: 2)),
+    );
+    return response.data ?? const <int>[];
+  }
+
+  /// Tapping the same emoji again removes the reaction.
+  Future<ChatMessageDto> react(String messageId, String emoji) async {
+    final response = await _dio.post('/api/v1/chat/messages/$messageId/react', data: {'emoji': emoji});
+    return ChatMessageDto.fromJson(Map<String, dynamic>.from(response.data as Map));
+  }
+
+  Future<void> typing(String toUserId) async {
+    await _dio.post('/api/v1/chat/typing', queryParameters: {'toUserId': toUserId});
+  }
+
+  Future<bool> isTyping(String otherUserId) async {
+    final response = await _dio.get('/api/v1/chat/typing', queryParameters: {'otherUserId': otherUserId});
+    final data = response.data;
+    return data is Map && data['typing'] == true;
   }
 
   Future<List<ChatUserDto>> getUsers() async {

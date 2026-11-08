@@ -512,6 +512,11 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
             b.Property(x => x.SenderEmail).HasMaxLength(320);
             b.Property(x => x.ChannelName).HasMaxLength(100);
             b.Property(x => x.Message).HasMaxLength(4000);
+            b.Property(x => x.AttachmentKey).HasMaxLength(300);
+            b.Property(x => x.AttachmentName).HasMaxLength(300);
+            b.Property(x => x.AttachmentContentType).HasMaxLength(120);
+            b.Property(x => x.AttachmentKind).HasMaxLength(10);
+            b.Property(x => x.Reactions).HasColumnType("text");
         });
         builder.Entity<Activity>(b => { b.ToTable("activities"); b.Property(x => x.RescheduleReason).HasMaxLength(200); b.HasIndex(x => new { x.TenantId, x.DealId }); b.HasIndex(x => new { x.TenantId, x.ContactId }); b.HasIndex(x => new { x.TenantId, x.AccountId }); b.HasIndex(x => new { x.TenantId, x.LeadId }); b.Property(x => x.Subject).HasMaxLength(250); b.Property(x => x.Type).HasMaxLength(20); b.Property(x => x.Status).HasMaxLength(20); b.Property(x => x.Priority).HasMaxLength(10); b.Property(x => x.Attendees).HasColumnType("jsonb"); b.HasIndex(x => new { x.TenantId, x.OwnerId, x.Status, x.DueAt }); });
 

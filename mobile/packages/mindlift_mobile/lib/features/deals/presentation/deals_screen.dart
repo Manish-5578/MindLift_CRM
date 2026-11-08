@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mindlift_api/mindlift_api.dart';
 import 'package:mindlift_ui/mindlift_ui.dart';
 import '../../../core/network_provider.dart';
+import '../../../core/top_bar_actions.dart';
 
 class DealsScreen extends ConsumerStatefulWidget {
   const DealsScreen({super.key});
@@ -87,13 +88,7 @@ class _DealsScreenState extends ConsumerState<DealsScreen> {
     return MlScreen(
       title: 'Deals Pipeline',
       subtitle: '${_deals.length} Active Opportunities',
-      actions: [
-        MlIconButton(
-          label: 'Refresh',
-          icon: Text('↻', style: TextStyle(fontSize: 20, color: MlColors.textPrimary)),
-          onPressed: _loadDeals,
-        ),
-      ],
+      actions: topBarActions(),
       body: Column(
         children: [
           // Stage Selector Pills

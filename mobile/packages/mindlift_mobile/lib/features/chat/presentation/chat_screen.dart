@@ -1,10 +1,17 @@
 import 'dart:async';
-import 'package:flutter/services.dart' show TextInputAction;
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData, HapticFeedback, TextInputAction;
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mindlift_api/mindlift_api.dart';
 import 'package:mindlift_ui/mindlift_ui.dart';
 import '../../../core/network_provider.dart';
+import '../../../core/top_bar_actions.dart';
+import 'chat_widgets.dart';
 
 const _white = Color(0xFFFFFFFF);
 
@@ -114,6 +121,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           child: Text('Messages',
                               style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: _white, decoration: TextDecoration.none)),
                         ),
+                        const ThemeIconButton(color: _white),
+                        const BellButton(),
                         if (totalUnread > 0)
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -275,12 +284,31 @@ class _ThreadView extends ConsumerStatefulWidget {
 
 class _ThreadViewState extends ConsumerState<_ThreadView> {
   final _controller = TextEditingController();
+  final _searchCtl = TextEditingController();
   final _scroll = ScrollController();
+  final _recorder = AudioRecorder();
   List<ChatMessageDto> _messages = [];
   bool _loading = true;
   bool _hasText = false;
   late bool _online = widget.person.isOnline;
+  bool _typing = false;
+  DateTime _typingSentAt = DateTime.fromMillisecondsSinceEpoch(0);
   Timer? _poll;
+
+  ChatMessageDto? _replyTo;
+  bool _searching = false;
+  String _searchTerm = '';
+  List<ChatMessageDto> _results = [];
+  bool _uploading = false;
+  int _newBelow = 0;
+  bool _atBottom = true;
+
+  bool _recording = false;
+  DateTime? _recStart;
+  Timer? _recTimer;
+  int _recMs = 0;
+
+  static const _quickReactions = ['👍', '❤️', '😂', '😮', '🙏', '✅'];
 
   @override
   void initState() {
@@ -288,17 +316,30 @@ class _ThreadViewState extends ConsumerState<_ThreadView> {
     _controller.addListener(() {
       final has = _controller.text.trim().isNotEmpty;
       if (has != _hasText) setState(() => _hasText = has);
+      if (has && DateTime.now().difference(_typingSentAt).inSeconds >= 3) {
+        _typingSentAt = DateTime.now();
+        ref.read(chatServiceProvider).typing(widget.person.id).catchError((_) {});
+      }
+    });
+    _scroll.addListener(() {
+      if (!_scroll.hasClients) return;
+      final at = _scroll.position.maxScrollExtent - _scroll.offset < 120;
+      if (at != _atBottom) setState(() => _atBottom = at);
+      if (at && _newBelow != 0) setState(() => _newBelow = 0);
     });
     _fetch(initial: true);
     _poll = Timer.periodic(const Duration(seconds: 3), (_) {
-      if (mounted) _fetch();
+      if (mounted && !_searching) _fetch();
     });
   }
 
   @override
   void dispose() {
     _poll?.cancel();
+    _recTimer?.cancel();
+    _recorder.dispose();
     _controller.dispose();
+    _searchCtl.dispose();
     _scroll.dispose();
     super.dispose();
   }
@@ -315,16 +356,22 @@ class _ThreadViewState extends ConsumerState<_ThreadView> {
     });
   }
 
+  static String _signature(List<ChatMessageDto> l) =>
+      l.map((m) => '${m.id}${m.isRead}${m.reactions.map((r) => '${r.emoji}${r.count}${r.mine}').join()}').join('|');
+
   Future<void> _fetch({bool initial = false}) async {
     try {
       final svc = ref.read(chatServiceProvider);
       final list = await svc.getMessages(recipientId: widget.person.id);
       if (!mounted) return;
-      final changed = list.length != _messages.length ||
-          (list.isNotEmpty && _messages.isNotEmpty && (list.last.id != _messages.last.id || list.last.isRead != _messages.last.isRead));
+      final changed = _signature(list) != _signature(_messages.where((m) => !m.id.startsWith('local-')).toList());
       if (changed || initial) {
+        final added = list.length - _messages.where((m) => !m.id.startsWith('local-')).length;
         final atBottom = !_scroll.hasClients || _scroll.position.maxScrollExtent - _scroll.offset < 100;
-        setState(() => _messages = list);
+        setState(() {
+          _messages = [...list, ..._messages.where((m) => m.id.startsWith('local-'))];
+          if (!initial && !atBottom && added > 0) _newBelow += added;
+        });
         if (initial) {
           _toBottom(animate: false);
         } else if (atBottom) {
@@ -332,6 +379,8 @@ class _ThreadViewState extends ConsumerState<_ThreadView> {
         }
         svc.markRead(otherUserId: widget.person.id).catchError((_) {});
       }
+      final typing = await svc.isTyping(widget.person.id).catchError((_) => false);
+      if (mounted && typing != _typing) setState(() => _typing = typing);
       // Keep the online dot fresh.
       if (initial || DateTime.now().second % 15 < 3) {
         final users = await svc.getUsers();
@@ -347,7 +396,9 @@ class _ThreadViewState extends ConsumerState<_ThreadView> {
   Future<void> _send() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
+    final reply = _replyTo;
     _controller.clear();
+    setState(() => _replyTo = null);
     // Optimistic bubble so the message appears instantly.
     final temp = ChatMessageDto(
       id: 'local-${DateTime.now().microsecondsSinceEpoch}',
@@ -358,11 +409,15 @@ class _ThreadViewState extends ConsumerState<_ThreadView> {
       message: text,
       createdAtUtc: DateTime.now().toUtc(),
       isRead: false,
+      replyToId: reply?.id,
+      replyToText: reply == null ? null : _preview(reply),
+      replyToSender: reply?.senderName,
     );
     setState(() => _messages = [..._messages, temp]);
     _toBottom();
     try {
-      final sent = await ref.read(chatServiceProvider).sendMessage(message: text, recipientId: widget.person.id);
+      final sent = await ref.read(chatServiceProvider).sendMessage(message: text, recipientId: widget.person.id, replyToId: reply?.id);
+      HapticFeedback.lightImpact();
       if (mounted) setState(() => _messages = [..._messages.where((m) => m.id != temp.id), sent]);
     } catch (_) {
       if (mounted) {
@@ -373,41 +428,337 @@ class _ThreadViewState extends ConsumerState<_ThreadView> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final p = widget.person;
-    final myEmail = ref.watch(authNotifierProvider).userEmail ?? '';
-    final dark = MlColors.isDark;
-    final mine = dark ? const Color(0xFF4338CA) : MlColors.primary;
-    final wallpaper = dark ? const Color(0xFF0B1120) : const Color(0xFFEEF0FA);
+  static String _preview(ChatMessageDto m) {
+    if (m.message.trim().isNotEmpty) return m.message;
+    return switch (m.attachmentKind) {
+      'image' => '📷 Photo',
+      'audio' => '🎤 Voice message',
+      'file' => '📎 ${m.attachmentName ?? 'File'}',
+      _ => '',
+    };
+  }
 
-    return Container(
-      color: wallpaper,
-      child: Column(
-        children: [
-          // Header
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [MlColors.primary, const Color(0xFF3730A3)],
-              ),
-              boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 10, offset: Offset(0, 3))],
+  Future<void> _sendFile(String path, String name, {String? caption, int? durationMs}) async {
+    final reply = _replyTo;
+    setState(() {
+      _uploading = true;
+      _replyTo = null;
+    });
+    try {
+      final sent = await ref.read(chatServiceProvider).sendAttachment(
+            filePath: path,
+            fileName: name,
+            recipientId: widget.person.id,
+            caption: caption,
+            replyToId: reply?.id,
+            durationMs: durationMs,
+          );
+      HapticFeedback.lightImpact();
+      if (mounted) {
+        setState(() => _messages = [..._messages, sent]);
+        _toBottom();
+      }
+    } catch (e) {
+      if (mounted) MlToast.show(context, message: 'Could not send the file. It may be too large (15 MB max) or an unsupported type.', type: MlToastType.error);
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  void _attachSheet() {
+    MlSheet.show<void>(
+      context: context,
+      title: 'Send',
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.all(MlSpacing.md),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            MlButton(label: '📷  Camera', variant: MlButtonVariant.secondary, onPressed: () {
+              Navigator.of(sheetContext).pop();
+              _pickImage(ImageSource.camera);
+            }),
+            const SizedBox(height: MlSpacing.sm),
+            MlButton(label: '🖼  Photo from gallery', variant: MlButtonVariant.secondary, onPressed: () {
+              Navigator.of(sheetContext).pop();
+              _pickImage(ImageSource.gallery);
+            }),
+            const SizedBox(height: MlSpacing.sm),
+            MlButton(label: '📄  Document', variant: MlButtonVariant.secondary, onPressed: () {
+              Navigator.of(sheetContext).pop();
+              _pickDocument();
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final x = await ImagePicker().pickImage(source: source, imageQuality: 80, maxWidth: 1920);
+      if (x == null) return;
+      final caption = _controller.text.trim();
+      _controller.clear();
+      await _sendFile(x.path, x.name.isEmpty ? 'photo.jpg' : x.name, caption: caption);
+    } catch (_) {
+      if (mounted) MlToast.show(context, message: 'Could not open the camera or gallery.');
+    }
+  }
+
+  Future<void> _pickDocument() async {
+    try {
+      final r = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['pdf', 'docx', 'xlsx', 'txt', 'csv']);
+      final f = r?.files.single;
+      if (f == null || f.path == null) return;
+      await _sendFile(f.path!, f.name);
+    } catch (_) {
+      if (mounted) MlToast.show(context, message: 'Could not pick the file.');
+    }
+  }
+
+  Future<void> _startRecording() async {
+    try {
+      if (!await _recorder.hasPermission()) {
+        if (mounted) MlToast.show(context, message: 'Allow microphone access to send voice messages.');
+        return;
+      }
+      final dir = await getTemporaryDirectory();
+      final path = '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      await _recorder.start(const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 64000, sampleRate: 22050), path: path);
+      HapticFeedback.mediumImpact();
+      _recStart = DateTime.now();
+      _recTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {
+        if (mounted && _recStart != null) setState(() => _recMs = DateTime.now().difference(_recStart!).inMilliseconds);
+      });
+      setState(() {
+        _recording = true;
+        _recMs = 0;
+      });
+    } catch (_) {
+      if (mounted) MlToast.show(context, message: 'Could not start recording.');
+    }
+  }
+
+  Future<void> _finishRecording({required bool send}) async {
+    _recTimer?.cancel();
+    final ms = _recStart == null ? 0 : DateTime.now().difference(_recStart!).inMilliseconds;
+    setState(() => _recording = false);
+    String? path;
+    try {
+      path = await _recorder.stop();
+    } catch (_) {}
+    if (!send || path == null) {
+      if (path != null) File(path).delete().catchError((_) => File(path!));
+      return;
+    }
+    if (ms < 700) {
+      MlToast.show(context, message: 'Hold on a little longer to record.');
+      return;
+    }
+    await _sendFile(path, path.split(RegExp(r'[\\/]')).last, durationMs: ms);
+  }
+
+  void _messageMenu(ChatMessageDto m) {
+    if (m.id.startsWith('local-')) return;
+    HapticFeedback.selectionClick();
+    MlSheet.show<void>(
+      context: context,
+      title: 'Message',
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.all(MlSpacing.md),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                for (final e in _quickReactions)
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.of(sheetContext).pop();
+                      _react(m, e);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(color: MlColors.surfaceMuted, shape: BoxShape.circle),
+                      child: Text(e, style: const TextStyle(fontSize: 24, decoration: TextDecoration.none)),
+                    ),
+                  ),
+              ],
             ),
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(4, 8, MlSpacing.md, 10),
-                child: Row(
+            const SizedBox(height: MlSpacing.md),
+            MlButton(label: '↩  Reply', variant: MlButtonVariant.secondary, onPressed: () {
+              Navigator.of(sheetContext).pop();
+              setState(() => _replyTo = m);
+            }),
+            if (m.message.trim().isNotEmpty) ...[
+              const SizedBox(height: MlSpacing.sm),
+              MlButton(label: '⧉  Copy text', variant: MlButtonVariant.secondary, onPressed: () {
+                Navigator.of(sheetContext).pop();
+                Clipboard.setData(ClipboardData(text: m.message));
+                MlToast.show(context, message: 'Copied.');
+              }),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _react(ChatMessageDto m, String emoji) async {
+    try {
+      final updated = await ref.read(chatServiceProvider).react(m.id, emoji);
+      if (mounted) setState(() => _messages = [for (final x in _messages) x.id == m.id ? updated : x]);
+    } catch (_) {
+      if (mounted) MlToast.show(context, message: 'Could not react.');
+    }
+  }
+
+  Future<void> _runSearch(String term) async {
+    _searchTerm = term.trim();
+    if (_searchTerm.isEmpty) {
+      setState(() => _results = []);
+      return;
+    }
+    try {
+      final r = await ref.read(chatServiceProvider).getMessages(recipientId: widget.person.id, search: _searchTerm);
+      if (mounted && _searchTerm == term.trim()) setState(() => _results = r);
+    } catch (_) {}
+  }
+
+  Widget _bubble(ChatMessageDto msg, bool isMe, bool sameAsPrev, Color mine) {
+    final pending = msg.id.startsWith('local-');
+    final hasText = msg.message.trim().isNotEmpty;
+    return Column(
+      crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onLongPress: () => _messageMenu(msg),
+          onDoubleTap: () => msg.id.startsWith('local-') ? null : _react(msg, '👍'),
+          child: Container(
+            margin: EdgeInsets.only(bottom: 3, top: sameAsPrev ? 0 : 6),
+            constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.78),
+            padding: const EdgeInsets.fromLTRB(13, 9, 11, 6),
+            decoration: BoxDecoration(
+              color: isMe ? mine : MlColors.surface,
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(18),
+                topRight: const Radius.circular(18),
+                bottomLeft: Radius.circular(isMe ? 18 : 4),
+                bottomRight: Radius.circular(isMe ? 4 : 18),
+              ),
+              border: isMe ? null : Border.all(color: MlColors.border),
+              boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 6, offset: Offset(0, 2))],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (msg.replyToId != null)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: ReplyQuote(sender: msg.replyToSender ?? 'Message', text: msg.replyToText ?? '', isMe: isMe),
+                  ),
+                if (msg.hasAttachment)
+                  Padding(
+                    padding: EdgeInsets.only(bottom: hasText ? 6 : 0),
+                    child: AttachmentView(message: msg, isMe: isMe),
+                  ),
+                if (hasText)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(msg.message,
+                        style: TextStyle(
+                            fontSize: 15.5,
+                            height: 1.3,
+                            color: isMe ? _white : MlColors.textPrimary,
+                            decoration: TextDecoration.none,
+                            fontWeight: FontWeight.w400)),
+                  ),
+                const SizedBox(height: 3),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_hm(msg.createdAtUtc),
+                        style: TextStyle(
+                            fontSize: 10.5,
+                            decoration: TextDecoration.none,
+                            fontWeight: FontWeight.w400,
+                            color: isMe ? const Color(0xB3FFFFFF) : MlColors.textMuted)),
+                    if (isMe) ...[
+                      const SizedBox(width: 4),
+                      Text(pending ? '🕓' : (msg.isRead ? '✓✓' : '✓'),
+                          style: TextStyle(
+                              fontSize: pending ? 9 : 11,
+                              fontWeight: FontWeight.w800,
+                              decoration: TextDecoration.none,
+                              color: msg.isRead ? const Color(0xFF7DD3FC) : const Color(0xB3FFFFFF))),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (msg.reactions.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4, left: 6, right: 6),
+            child: ReactionsRow(reactions: msg.reactions, onTap: (e) => _react(msg, e)),
+          ),
+      ],
+    );
+  }
+
+  Widget _header(ChatUserDto p) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [MlColors.primary, const Color(0xFF3730A3)],
+        ),
+        boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 10, offset: Offset(0, 3))],
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(4, 8, MlSpacing.sm, 10),
+          child: _searching
+              ? Row(
+                  children: [
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => setState(() {
+                        _searching = false;
+                        _searchCtl.clear();
+                        _results = [];
+                        _searchTerm = '';
+                      }),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                        child: Text('‹', style: TextStyle(fontSize: 38, height: 1, color: _white, fontWeight: FontWeight.w300, decoration: TextDecoration.none)),
+                      ),
+                    ),
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(color: MlColors.surface, borderRadius: BorderRadius.circular(MlRadii.full)),
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        child: MlTextField(placeholder: '🔍  Search this chat', controller: _searchCtl, onChanged: _runSearch),
+                      ),
+                    ),
+                  ],
+                )
+              : Row(
                   children: [
                     GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: widget.onBack,
                       child: const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                        child: Text('‹',
-                            style: TextStyle(fontSize: 38, height: 1, color: _white, fontWeight: FontWeight.w300, decoration: TextDecoration.none)),
+                        child: Text('‹', style: TextStyle(fontSize: 38, height: 1, color: _white, fontWeight: FontWeight.w300, decoration: TextDecoration.none)),
                       ),
                     ),
                     MlAvatar(name: p.name, size: MlAvatarSize.md, backgroundColor: const Color(0x33FFFFFF), textColor: _white),
@@ -429,186 +780,266 @@ class _ThreadViewState extends ConsumerState<_ThreadView> {
                               ),
                               const SizedBox(width: 6),
                               Flexible(
-                                child: Text(_online ? 'Online' : (p.role ?? 'Offline'),
+                                child: Text(_typing ? 'typing…' : (_online ? 'Online' : (p.role ?? 'Offline')),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontSize: 12, color: Color(0xCCFFFFFF), decoration: TextDecoration.none, fontWeight: FontWeight.w400)),
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        color: _typing ? const Color(0xFF86EFAC) : const Color(0xCCFFFFFF),
+                                        decoration: TextDecoration.none,
+                                        fontWeight: _typing ? FontWeight.w700 : FontWeight.w400)),
                               ),
                             ],
                           ),
                         ],
                       ),
                     ),
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => setState(() => _searching = true),
+                      child: const Padding(
+                        padding: EdgeInsets.all(10),
+                        child: Text('🔍', style: TextStyle(fontSize: 18, decoration: TextDecoration.none)),
+                      ),
+                    ),
+                    const ThemeIconButton(color: _white),
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _composer() {
+    if (_recording) {
+      return Container(
+        padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+        decoration: BoxDecoration(color: MlColors.surface, border: Border(top: BorderSide(color: MlColors.border))),
+        child: SafeArea(
+          top: false,
+          child: Row(
+            children: [
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _finishRecording(send: false),
+                child: const Padding(padding: EdgeInsets.all(10), child: Text('🗑', style: TextStyle(fontSize: 22, decoration: TextDecoration.none))),
+              ),
+              const SizedBox(width: 6),
+              Container(width: 10, height: 10, decoration: BoxDecoration(color: MlColors.danger, shape: BoxShape.circle)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('Recording…  ${clock(_recMs)}',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: MlColors.textPrimary, decoration: TextDecoration.none)),
+              ),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _finishRecording(send: true),
+                child: Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(gradient: LinearGradient(colors: [MlColors.primary, const Color(0xFF3730A3)]), shape: BoxShape.circle),
+                  alignment: Alignment.center,
+                  child: const Text('➤', style: TextStyle(fontSize: 20, color: _white, decoration: TextDecoration.none)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(6, 8, 10, 10),
+      decoration: BoxDecoration(color: MlColors.surface, border: Border(top: BorderSide(color: MlColors.border))),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_replyTo != null)
+              Container(
+                margin: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: ReplyQuote(sender: _replyTo!.senderName, text: _preview(_replyTo!), isMe: false),
+                    ),
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => setState(() => _replyTo = null),
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Text('✕', style: TextStyle(fontSize: 16, color: MlColors.textMuted, decoration: TextDecoration.none)),
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ),
-          ),
-
-          // Messages
-          Expanded(
-            child: _loading && _messages.isEmpty
-                ? const Center(child: Text('Loading...'))
-                : _messages.isEmpty
-                    ? Center(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
-                          decoration: BoxDecoration(
-                            color: MlColors.surface,
-                            borderRadius: BorderRadius.circular(MlRadii.xl),
-                            border: Border.all(color: MlColors.border),
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text('👋', style: TextStyle(fontSize: 34, decoration: TextDecoration.none)),
-                              const SizedBox(height: 6),
-                              Text('Say hi to ${p.name.split(' ').first}',
-                                  style: MlTypography.bodyMedium.copyWith(color: MlColors.textSecondary, fontWeight: FontWeight.w600)),
-                            ],
-                          ),
-                        ),
-                      )
-                    : ListView.builder(
-                        controller: _scroll,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                        itemCount: _messages.length,
-                        itemBuilder: (context, i) {
-                          final msg = _messages[i];
-                          final isMe = msg.senderEmail == myEmail || msg.senderName == 'You';
-                          final showDay = i == 0 || _day(_messages[i - 1].createdAtUtc) != _day(msg.createdAtUtc);
-                          final sameAsPrev = i > 0 && !showDay && _messages[i - 1].senderId == msg.senderId;
-                          final pending = msg.id.startsWith('local-');
-                          return RepaintBoundary(
-                            child: Column(
-                              children: [
-                                if (showDay)
-                                  Container(
-                                    margin: const EdgeInsets.symmetric(vertical: 10),
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-                                    decoration: BoxDecoration(
-                                      color: MlColors.surface,
-                                      borderRadius: BorderRadius.circular(MlRadii.full),
-                                      border: Border.all(color: MlColors.border),
-                                    ),
-                                    child: Text(_day(msg.createdAtUtc),
-                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: MlColors.textMuted, decoration: TextDecoration.none)),
-                                  ),
-                                Align(
-                                  alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                                  child: Container(
-                                    margin: EdgeInsets.only(bottom: 3, top: sameAsPrev ? 0 : 6),
-                                    constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.78),
-                                    padding: const EdgeInsets.fromLTRB(13, 9, 11, 6),
-                                    decoration: BoxDecoration(
-                                      color: isMe ? mine : MlColors.surface,
-                                      borderRadius: BorderRadius.only(
-                                        topLeft: const Radius.circular(18),
-                                        topRight: const Radius.circular(18),
-                                        bottomLeft: Radius.circular(isMe ? 18 : 4),
-                                        bottomRight: Radius.circular(isMe ? 4 : 18),
-                                      ),
-                                      border: isMe ? null : Border.all(color: MlColors.border),
-                                      boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 6, offset: Offset(0, 2))],
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.end,
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Align(
-                                          alignment: Alignment.centerLeft,
-                                          child: Text(msg.message,
-                                              style: TextStyle(
-                                                  fontSize: 15.5,
-                                                  height: 1.3,
-                                                  color: isMe ? _white : MlColors.textPrimary,
-                                                  decoration: TextDecoration.none,
-                                                  fontWeight: FontWeight.w400)),
-                                        ),
-                                        const SizedBox(height: 3),
-                                        Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Text(_hm(msg.createdAtUtc),
-                                                style: TextStyle(
-                                                    fontSize: 10.5,
-                                                    decoration: TextDecoration.none,
-                                                    fontWeight: FontWeight.w400,
-                                                    color: isMe ? const Color(0xB3FFFFFF) : MlColors.textMuted)),
-                                            if (isMe) ...[
-                                              const SizedBox(width: 4),
-                                              Text(pending ? '🕓' : (msg.isRead ? '✓✓' : '✓'),
-                                                  style: TextStyle(
-                                                      fontSize: pending ? 9 : 11,
-                                                      fontWeight: FontWeight.w800,
-                                                      decoration: TextDecoration.none,
-                                                      color: msg.isRead ? const Color(0xFF7DD3FC) : const Color(0xB3FFFFFF))),
-                                            ],
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-          ),
-
-          // Composer
-          Container(
-            padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-            decoration: BoxDecoration(
-              color: MlColors.surface,
-              border: Border(top: BorderSide(color: MlColors.border)),
-            ),
-            child: SafeArea(
-              top: false,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: MlColors.surfaceElevated,
-                        borderRadius: BorderRadius.circular(26),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: MlTextField(
-                        placeholder: 'Type a message',
-                        controller: _controller,
-                        maxLines: 5,
-                        minLines: 1,
-                        textInputAction: TextInputAction.send,
-                        onEditingComplete: _send,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: _send,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: _hasText ? [MlColors.primary, const Color(0xFF3730A3)] : [MlColors.textDisabled, MlColors.textDisabled],
-                        ),
-                        shape: BoxShape.circle,
-                        boxShadow: _hasText ? const [BoxShadow(color: Color(0x554F46E5), blurRadius: 10, offset: Offset(0, 4))] : null,
-                      ),
-                      alignment: Alignment.center,
-                      child: const Text('➤', style: TextStyle(fontSize: 20, color: _white, decoration: TextDecoration.none)),
-                    ),
-                  ),
-                ],
+            if (_uploading)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text('Sending…', style: TextStyle(fontSize: 12, color: MlColors.textMuted, decoration: TextDecoration.none, fontWeight: FontWeight.w400)),
               ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _uploading ? null : _attachSheet,
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                    child: Text('📎', style: TextStyle(fontSize: 22, decoration: TextDecoration.none)),
+                  ),
+                ),
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(color: MlColors.surfaceElevated, borderRadius: BorderRadius.circular(26)),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: MlTextField(
+                      placeholder: 'Type a message',
+                      controller: _controller,
+                      maxLines: 5,
+                      minLines: 1,
+                      textInputAction: TextInputAction.send,
+                      onEditingComplete: _send,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _hasText ? _send : (_uploading ? null : _startRecording),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(colors: [MlColors.primary, const Color(0xFF3730A3)]),
+                      shape: BoxShape.circle,
+                      boxShadow: const [BoxShadow(color: Color(0x554F46E5), blurRadius: 10, offset: Offset(0, 4))],
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(_hasText ? '➤' : '🎤', style: const TextStyle(fontSize: 20, color: _white, decoration: TextDecoration.none)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.person;
+    final myEmail = ref.watch(authNotifierProvider).userEmail ?? '';
+    final dark = MlColors.isDark;
+    final mine = dark ? const Color(0xFF4338CA) : MlColors.primary;
+    final wallpaper = dark ? const Color(0xFF0B1120) : const Color(0xFFEEF0FA);
+    final shown = _searching ? _results : _messages;
+
+    return Container(
+      color: wallpaper,
+      child: Column(
+        children: [
+          _header(p),
+          if (_searching && _searchTerm.isNotEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: MlSpacing.md, vertical: 6),
+              color: MlColors.surface,
+              child: Text('${_results.length} result${_results.length == 1 ? '' : 's'}',
+                  style: TextStyle(fontSize: 12, color: MlColors.textMuted, decoration: TextDecoration.none, fontWeight: FontWeight.w400)),
+            ),
+          Expanded(
+            child: Stack(
+              children: [
+                _loading && _messages.isEmpty
+                    ? const Center(child: Text('Loading...'))
+                    : shown.isEmpty
+                        ? Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+                              decoration: BoxDecoration(
+                                color: MlColors.surface,
+                                borderRadius: BorderRadius.circular(MlRadii.xl),
+                                border: Border.all(color: MlColors.border),
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(_searching ? '🔍' : '👋', style: const TextStyle(fontSize: 34, decoration: TextDecoration.none)),
+                                  const SizedBox(height: 6),
+                                  Text(_searching ? 'No messages found' : 'Say hi to ${p.name.split(' ').first}',
+                                      style: MlTypography.bodyMedium.copyWith(color: MlColors.textSecondary, fontWeight: FontWeight.w600)),
+                                ],
+                              ),
+                            ),
+                          )
+                        : ListView.builder(
+                            controller: _scroll,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                            itemCount: shown.length,
+                            itemBuilder: (context, i) {
+                              final msg = shown[i];
+                              final isMe = msg.senderEmail == myEmail || msg.senderName == 'You';
+                              final showDay = i == 0 || _day(shown[i - 1].createdAtUtc) != _day(msg.createdAtUtc);
+                              final sameAsPrev = i > 0 && !showDay && shown[i - 1].senderId == msg.senderId;
+                              return RepaintBoundary(
+                                child: Column(
+                                  children: [
+                                    if (showDay)
+                                      Container(
+                                        margin: const EdgeInsets.symmetric(vertical: 10),
+                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                                        decoration: BoxDecoration(
+                                          color: MlColors.surface,
+                                          borderRadius: BorderRadius.circular(MlRadii.full),
+                                          border: Border.all(color: MlColors.border),
+                                        ),
+                                        child: Text(_day(msg.createdAtUtc),
+                                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: MlColors.textMuted, decoration: TextDecoration.none)),
+                                      ),
+                                    Align(
+                                      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                                      child: _bubble(msg, isMe, sameAsPrev, mine),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                if (!_searching && (_newBelow > 0 || !_atBottom) && _messages.isNotEmpty)
+                  Positioned(
+                    right: 14,
+                    bottom: 12,
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() => _newBelow = 0);
+                        _toBottom();
+                      },
+                      child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: _newBelow > 0 ? 14 : 12, vertical: 9),
+                        decoration: BoxDecoration(
+                          color: _newBelow > 0 ? MlColors.primary : MlColors.surface,
+                          borderRadius: BorderRadius.circular(MlRadii.full),
+                          border: Border.all(color: _newBelow > 0 ? MlColors.primary : MlColors.border),
+                          boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 8, offset: Offset(0, 3))],
+                        ),
+                        child: Text(_newBelow > 0 ? '↓ $_newBelow new' : '↓',
+                            style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: _newBelow > 0 ? _white : MlColors.textPrimary,
+                                decoration: TextDecoration.none)),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
+          if (!_searching) _composer(),
         ],
       ),
     );

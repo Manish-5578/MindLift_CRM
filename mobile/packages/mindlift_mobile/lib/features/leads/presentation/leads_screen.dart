@@ -6,6 +6,7 @@ import 'package:mindlift_api/mindlift_api.dart';
 import 'package:mindlift_ui/mindlift_ui.dart';
 import '../../../core/network_provider.dart';
 import 'lead_actions.dart';
+import '../../../core/top_bar_actions.dart';
 import 'ocr_lead_scan_sheet.dart';
 
 /// The leads workspace. It mirrors the web list: the same views (My open leads, All open, New, Not interested,
@@ -219,6 +220,7 @@ class _LeadsScreenState extends ConsumerState<LeadsScreen> {
                   icon: Text('＋', style: TextStyle(fontSize: 22, color: MlColors.primary, fontWeight: FontWeight.w700)),
                   onPressed: () => _actions.editLead(null),
                 ),
+              ...topBarActions(),
             ],
       body: Column(
         children: [

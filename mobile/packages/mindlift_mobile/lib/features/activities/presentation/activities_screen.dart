@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mindlift_api/mindlift_api.dart';
 import 'package:mindlift_ui/mindlift_ui.dart';
 import '../../../core/network_provider.dart';
+import '../../../core/top_bar_actions.dart';
 
 class ActivitiesScreen extends ConsumerStatefulWidget {
   const ActivitiesScreen({super.key});
@@ -53,13 +54,7 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
     return MlScreen(
       title: 'Activities',
       subtitle: '${_activities.length} Scheduled Interactions',
-      actions: [
-        MlIconButton(
-          label: 'Refresh',
-          icon: Text('↻', style: TextStyle(fontSize: 20, color: MlColors.textPrimary)),
-          onPressed: _loadActivities,
-        ),
-      ],
+      actions: topBarActions(),
       body: Column(
         children: [
           // Filter pills
@@ -115,8 +110,6 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
                       ? MlEmptyState(
                           title: 'No activities found',
                           subtitle: 'You are all caught up on scheduled follow-ups.',
-                          actionLabel: 'Refresh List',
-                          onAction: _loadActivities,
                         )
                       : ListView.builder(
                           physics: const AlwaysScrollableScrollPhysics(),
