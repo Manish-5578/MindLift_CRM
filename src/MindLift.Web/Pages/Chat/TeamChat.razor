@@ -1,0 +1,291 @@
+@page "/chat"
+@using MindLift.Shared.Contracts
+@inject HttpClient Http
+@inject AuthSession Session
+@inject AppState App
+@inject ISnackbar Snackbar
+@inject Translator T
+@implements IDisposable
+
+<PageTitle>@T["Team Chat"] · MindLift</PageTitle>
+
+<div class="ml-page d-flex flex-column" style="height: calc(100vh - 84px); padding: 12px 16px;">
+    <div class="d-flex align-center justify-space-between mb-3">
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Outlined.Forum" Color="Color.Primary" Size="Size.Medium" />
+            <MudText Typo="Typo.h5" Style="font-weight: 700;">@T["Workspace Team Chat"]</MudText>
+        </div>
+        <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Outlined.Refresh" OnClick="RefreshChatAsync">@T["Refresh"]</MudButton>
+    </div>
+
+    <MudPaper Elevation="1" Class="d-flex flex-grow-1 overflow-hidden" Style="border-radius: 12px; border: 1px solid var(--mud-palette-lines-default);">
+        <!-- Channels & Team Members Sidebar -->
+        <div style="width: 280px; min-width: 240px; border-right: 1px solid var(--mud-palette-lines-default); background-color: var(--mud-palette-background-grey);" class="d-flex flex-column">
+            <div class="pa-3" style="border-bottom: 1px solid var(--mud-palette-lines-default);">
+                <MudText Typo="Typo.caption" Style="font-weight: 700; text-transform: uppercase; color: var(--mud-palette-text-secondary);">@T["Channels"]</MudText>
+            </div>
+            <MudList T="string" Dense="true" Class="py-1">
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Tag" Text="general" Value="@("general")"
+                             Selected="@(_selectedRecipientId == null && _selectedChannel == "general")"
+                             OnClick="@(() => SelectChannelAsync("general"))" />
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Tag" Text="deals" Value="@("deals")"
+                             Selected="@(_selectedRecipientId == null && _selectedChannel == "deals")"
+                             OnClick="@(() => SelectChannelAsync("deals"))" />
+                <MudListItem T="string" Icon="@Icons.Material.Filled.Tag" Text="field-team" Value="@("field-team")"
+                             Selected="@(_selectedRecipientId == null && _selectedChannel == "field-team")"
+                             OnClick="@(() => SelectChannelAsync("field-team"))" />
+            </MudList>
+
+            <div class="pa-3 mt-2" style="border-bottom: 1px solid var(--mud-palette-lines-default); border-top: 1px solid var(--mud-palette-lines-default);">
+                <MudText Typo="Typo.caption" Style="font-weight: 700; text-transform: uppercase; color: var(--mud-palette-text-secondary);">@T["Direct Messages"]</MudText>
+            </div>
+            <div class="flex-grow-1 overflow-y-auto">
+                @if (_loadingUsers)
+                {
+                    <div class="pa-4 text-center">
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                    </div>
+                }
+                else if (_users.Count == 0)
+                {
+                    <div class="pa-4 text-center">
+                        <MudText Typo="Typo.caption" Class="ml-muted">@T["No other colleagues yet"]</MudText>
+                    </div>
+                }
+                else
+                {
+                    <MudList T="Guid" Dense="true">
+                        @foreach (var u in _users)
+                        {
+                            <MudListItem T="Guid" Value="@u.Id" Selected="@(_selectedRecipientId == u.Id)" OnClick="@(() => SelectUserAsync(u))">
+                                <div class="d-flex align-center gap-2" style="width: 100%;">
+                                    <MudAvatar Size="Size.Small" Color="Color.Primary" Style="font-size: 0.75rem;">
+                                        @u.Name.Substring(0, 1).ToUpperInvariant()
+                                    </MudAvatar>
+                                    <div class="flex-grow-1 text-truncate">
+                                        <MudText Typo="Typo.body2" Class="text-truncate" Style="font-weight: 600;">@u.Name</MudText>
+                                        <MudText Typo="Typo.caption" Class="ml-muted text-truncate" Style="display: block;">@u.Role</MudText>
+                                    </div>
+                                    @if (u.UnreadCount > 0)
+                                    {
+                                        <MudChip T="int" Size="Size.Small" Color="Color.Error" Variant="Variant.Filled" Style="height: 18px; min-width: 18px; font-size: 0.7rem; padding: 0 4px;">@u.UnreadCount</MudChip>
+                                    }
+                                </div>
+                            </MudListItem>
+                        }
+                    </MudList>
+                }
+            </div>
+        </div>
+
+        <!-- Chat Conversation Area -->
+        <div class="d-flex flex-column flex-grow-1" style="background-color: var(--mud-palette-surface);">
+            <!-- Active Header -->
+            <div class="pa-3 d-flex align-center gap-2" style="border-bottom: 1px solid var(--mud-palette-lines-default); min-height: 54px;">
+                @if (_selectedRecipientId != null)
+                {
+                    <MudAvatar Size="Size.Small" Color="Color.Primary">
+                        @_selectedRecipientName?.Substring(0, 1).ToUpperInvariant()
+                    </MudAvatar>
+                    <div>
+                        <MudText Typo="Typo.subtitle2" Style="font-weight: 700;">@_selectedRecipientName</MudText>
+                        <MudText Typo="Typo.caption" Class="ml-muted">@T["Direct Conversation"]</MudText>
+                    </div>
+                }
+                else
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Tag" Color="Color.Primary" />
+                    <div>
+                        <MudText Typo="Typo.subtitle2" Style="font-weight: 700;">#@_selectedChannel</MudText>
+                        <MudText Typo="Typo.caption" Class="ml-muted">@T["Workspace Public Channel"]</MudText>
+                    </div>
+                }
+            </div>
+
+            <!-- Messages Stream -->
+            <div class="flex-grow-1 pa-4 overflow-y-auto d-flex flex-column gap-3" id="chat-messages-scroll" style="background: var(--mud-palette-background);">
+                @if (_loadingMessages)
+                {
+                    <div class="d-flex justify-center align-center flex-grow-1">
+                        <MudProgressCircular Size="Size.Medium" Indeterminate="true" />
+                    </div>
+                }
+                else if (_messages.Count == 0)
+                {
+                    <div class="d-flex flex-column align-center justify-center flex-grow-1 ml-muted">
+                        <MudIcon Icon="@Icons.Material.Outlined.ChatBubbleOutline" Size="Size.Large" Class="mb-2" />
+                        <MudText Typo="Typo.body2">@T["No messages in this conversation yet. Send the first message below!"]</MudText>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var msg in _messages)
+                    {
+                        var isMe = msg.SenderId == App.Bootstrap?.User.UserId;
+                        <div class="d-flex flex-column @(isMe ? "align-end" : "align-start")">
+                            <div class="d-flex align-center gap-1 mb-1">
+                                <MudText Typo="Typo.caption" Style="font-weight: 700; color: var(--mud-palette-text-secondary);">@(isMe ? T["You"] : msg.SenderName)</MudText>
+                                <MudText Typo="Typo.caption" Class="ml-muted">@msg.CreatedAtUtc.ToLocalTime().ToString("t")</MudText>
+                            </div>
+                            <div class="pa-3" style="max-width: 75%; border-radius: 12px; @(isMe ? "background-color: var(--mud-palette-primary); color: white; border-bottom-right-radius: 2px;" : "background-color: var(--mud-palette-surface); color: var(--mud-palette-text-primary); border: 1px solid var(--mud-palette-lines-default); border-bottom-left-radius: 2px;")">
+                                <MudText Typo="Typo.body2" Style="white-space: pre-wrap; word-break: break-word;">@msg.Message</MudText>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+
+            <!-- Composer Input Bar -->
+            <div class="pa-3 d-flex align-center gap-2" style="border-top: 1px solid var(--mud-palette-lines-default); background-color: var(--mud-palette-surface);">
+                <MudTextField @bind-Value="_newMessage"
+                              Placeholder="@(_selectedRecipientId != null ? T["Message {0}...", _selectedRecipientName ?? ""] : T["Message #{0}...", _selectedChannel])"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Immediate="true"
+                              OnKeyDown="HandleKeyDown"
+                              Class="flex-grow-1" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" EndIcon="@Icons.Material.Filled.Send"
+                           Disabled="@(string.IsNullOrWhiteSpace(_newMessage) || _isSending)"
+                           OnClick="SendMessageAsync">
+                    @T["Send"]
+                </MudButton>
+            </div>
+        </div>
+    </MudPaper>
+</div>
+
+@code {
+    private string _selectedChannel = "general";
+    private Guid? _selectedRecipientId;
+    private string? _selectedRecipientName;
+    private string _newMessage = string.Empty;
+    private bool _loadingUsers = true;
+    private bool _loadingMessages = true;
+    private bool _isSending;
+    private List<ChatUserDto> _users = [];
+    private List<ChatMessageDto> _messages = [];
+    private System.Threading.Timer? _pollTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsersAsync();
+        await LoadMessagesAsync();
+        _pollTimer = new System.Threading.Timer(async _ =>
+        {
+            await InvokeAsync(async () =>
+            {
+                await LoadMessagesAsync(silent: true);
+                StateHasChanged();
+            });
+        }, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        _loadingUsers = true;
+        try
+        {
+            var res = await Http.GetFromJsonAsync<List<ChatUserDto>>("api/v1/chat/users");
+            _users = res ?? [];
+        }
+        catch { }
+        finally { _loadingUsers = false; }
+    }
+
+    private async Task LoadMessagesAsync(bool silent = false)
+    {
+        if (!silent) _loadingMessages = true;
+        try
+        {
+            string url;
+            if (_selectedRecipientId.HasValue)
+            {
+                url = $"api/v1/chat/messages?recipientId={_selectedRecipientId.Value}";
+            }
+            else
+            {
+                url = $"api/v1/chat/messages?channel={Uri.EscapeDataString(_selectedChannel)}";
+            }
+            var res = await Http.GetFromJsonAsync<List<ChatMessageDto>>(url);
+            _messages = res ?? [];
+        }
+        catch { }
+        finally { if (!silent) _loadingMessages = false; }
+    }
+
+    private async Task SelectChannelAsync(string channel)
+    {
+        _selectedChannel = channel;
+        _selectedRecipientId = null;
+        _selectedRecipientName = null;
+        await LoadMessagesAsync();
+    }
+
+    private async Task SelectUserAsync(ChatUserDto user)
+    {
+        _selectedRecipientId = user.Id;
+        _selectedRecipientName = user.Name;
+        await LoadMessagesAsync();
+        try
+        {
+            await Http.PostAsync($"api/v1/chat/mark-read?otherUserId={user.Id}", null);
+            user = user with { UnreadCount = 0 };
+        }
+        catch { }
+    }
+
+    private async Task RefreshChatAsync()
+    {
+        await LoadUsersAsync();
+        await LoadMessagesAsync();
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+        {
+            await SendMessageAsync();
+        }
+    }
+
+    private async Task SendMessageAsync()
+    {
+        var text = _newMessage.Trim();
+        if (string.IsNullOrWhiteSpace(text) || _isSending) return;
+
+        _isSending = true;
+        try
+        {
+            var req = new SendChatMessageRequest(
+                Message: text,
+                ChannelName: _selectedRecipientId == null ? _selectedChannel : null,
+                RecipientId: _selectedRecipientId
+            );
+
+            var res = await Http.PostAsJsonAsync("api/v1/chat/messages", req);
+            if (res.IsSuccessStatusCode)
+            {
+                var sent = await res.Content.ReadFromJsonAsync<ChatMessageDto>();
+                if (sent != null)
+                {
+                    _messages.Add(sent);
+                    _newMessage = string.Empty;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _isSending = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        _pollTimer?.Dispose();
+    }
+}
+

@@ -74,6 +74,18 @@ final notificationsServiceProvider = Provider<NotificationsService>((ref) {
   return NotificationsService(ref.watch(apiClientProvider));
 });
 
+final chatServiceProvider = Provider<ChatService>((ref) {
+  return ChatService(ref.watch(apiClientProvider));
+});
+
+final unreadNotificationCountProvider = FutureProvider.autoDispose<int>((ref) async {
+  try {
+    return await ref.watch(notificationsServiceProvider).getUnreadCount();
+  } catch (_) {
+    return 0;
+  }
+});
+
 final offlineSyncServiceProvider = Provider<OfflineSyncService>((ref) {
   return OfflineSyncService(ref.watch(apiClientProvider));
 });

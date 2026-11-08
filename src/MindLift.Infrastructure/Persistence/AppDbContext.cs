@@ -49,6 +49,7 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
     public DbSet<PicklistValue> PicklistValues { get; set; } = null!;
     public DbSet<Lead> Leads { get; set; } = null!;
     public DbSet<LeadNote> LeadNotes { get; set; } = null!;
+    public DbSet<InternalChatMessage> InternalChatMessages { get; set; } = null!;
     public DbSet<Contact> Contacts { get; set; } = null!;
     public DbSet<Account> Accounts { get; set; } = null!;
     public DbSet<Deal> Deals { get; set; } = null!;
@@ -502,6 +503,16 @@ public class AppDbContext(DbContextOptions options, ITenantContext tenant)
         builder.Entity<NotificationPreference>(b => { b.ToTable("notification_preferences"); b.HasIndex(x => new { x.UserId, x.Type }).IsUnique().HasFilter("is_deleted = false"); b.Property(x => x.Type).HasMaxLength(40); });
         builder.Entity<ChecklistTemplate>(b => { b.ToTable("checklist_templates"); b.HasIndex(x => new { x.TenantId, x.Trigger }); b.Property(x => x.Name).HasMaxLength(150); b.Property(x => x.Items).HasColumnType("jsonb"); });
         builder.Entity<LeadNote>(b => { b.ToTable("lead_notes"); b.HasIndex(x => new { x.TenantId, x.LeadId, x.CreatedAt }).IsDescending(false, false, true); b.Property(x => x.AuthorName).HasMaxLength(200); });
+        builder.Entity<InternalChatMessage>(b =>
+        {
+            b.ToTable("internal_chat_messages");
+            b.HasIndex(x => new { x.TenantId, x.ChannelName, x.CreatedAtUtc });
+            b.HasIndex(x => new { x.TenantId, x.RecipientId, x.SenderId, x.CreatedAtUtc });
+            b.Property(x => x.SenderName).HasMaxLength(200);
+            b.Property(x => x.SenderEmail).HasMaxLength(320);
+            b.Property(x => x.ChannelName).HasMaxLength(100);
+            b.Property(x => x.Message).HasMaxLength(4000);
+        });
         builder.Entity<Activity>(b => { b.ToTable("activities"); b.Property(x => x.RescheduleReason).HasMaxLength(200); b.HasIndex(x => new { x.TenantId, x.DealId }); b.HasIndex(x => new { x.TenantId, x.ContactId }); b.HasIndex(x => new { x.TenantId, x.AccountId }); b.HasIndex(x => new { x.TenantId, x.LeadId }); b.Property(x => x.Subject).HasMaxLength(250); b.Property(x => x.Type).HasMaxLength(20); b.Property(x => x.Status).HasMaxLength(20); b.Property(x => x.Priority).HasMaxLength(10); b.Property(x => x.Attendees).HasColumnType("jsonb"); b.HasIndex(x => new { x.TenantId, x.OwnerId, x.Status, x.DueAt }); });
 
         builder.Entity<Pipeline>(b => { b.ToTable("pipelines"); b.HasIndex(x => new { x.TenantId, x.Name }).IsUnique().HasFilter("is_deleted = false"); });

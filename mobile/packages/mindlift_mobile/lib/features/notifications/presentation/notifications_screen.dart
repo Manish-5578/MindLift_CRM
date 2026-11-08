@@ -97,7 +97,25 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                             label: item.isRead ? 'Read' : 'New',
                             state: item.isRead ? MlStatusState.neutral : MlStatusState.primary,
                           ),
-                          onTap: () {
+                          onTap: () async {
+                            if (!item.isRead) {
+                              try {
+                                await ref.read(notificationsServiceProvider).markAsRead(item.id);
+                                setState(() {
+                                  _notifications[index] = NotificationItemDto(
+                                    id: item.id,
+                                    title: item.title,
+                                    message: item.message,
+                                    type: item.type,
+                                    isRead: true,
+                                    createdAtUtc: item.createdAtUtc,
+                                    targetRoute: item.targetRoute,
+                                    entityId: item.entityId,
+                                    entityType: item.entityType,
+                                  );
+                                });
+                              } catch (_) {}
+                            }
                             if (item.targetRoute != null && item.targetRoute!.isNotEmpty) {
                               context.push(item.targetRoute!);
                             }

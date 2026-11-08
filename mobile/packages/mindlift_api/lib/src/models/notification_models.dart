@@ -22,18 +22,21 @@ class NotificationItemDto {
   final String? targetRoute;
 
   factory NotificationItemDto.fromJson(Map<String, dynamic> json) {
+    final rawDate = json['createdAtUtc'] ?? json['createdAt'];
+    DateTime dt = DateTime.now().toUtc();
+    if (rawDate is String) {
+      dt = DateTime.tryParse(rawDate) ?? DateTime.now().toUtc();
+    }
     return NotificationItemDto(
       id: json['id'] as String? ?? '',
       title: json['title'] as String? ?? '',
-      message: json['message'] as String? ?? '',
+      message: (json['body'] ?? json['message'] ?? '') as String,
       type: json['type'] as String? ?? 'General',
       isRead: json['isRead'] as bool? ?? false,
-      createdAtUtc: json['createdAtUtc'] != null
-          ? DateTime.parse(json['createdAtUtc'] as String)
-          : DateTime.now().toUtc(),
+      createdAtUtc: dt,
       entityType: json['entityType'] as String?,
       entityId: json['entityId'] as String?,
-      targetRoute: json['targetRoute'] as String?,
+      targetRoute: (json['url'] ?? json['targetRoute']) as String?,
     );
   }
 

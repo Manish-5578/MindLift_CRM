@@ -178,10 +178,13 @@ class _LeadDetailScreenState extends ConsumerState<LeadDetailScreen> {
     }
 
     final lead = _lead ?? LeadDto(id: widget.leadId, name: 'Lead Details');
+    final hasCompany = lead.company != null && lead.company!.trim().isNotEmpty;
+    final displayTitle = hasCompany ? lead.company!.trim() : lead.name;
+    final contactSubtitle = hasCompany ? '👤 Contact: ${lead.name}' : 'Individual Lead';
 
     return MlScreen(
-      title: lead.name,
-      subtitle: lead.company ?? 'Individual Lead',
+      title: displayTitle,
+      subtitle: contactSubtitle,
       leading: MlIconButton(
         label: 'Back',
         icon: const Text('←', style: TextStyle(fontSize: 20, color: MlColors.textPrimary)),

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mindlift_api/mindlift_api.dart';
 import 'package:mindlift_ui/mindlift_ui.dart';
 import '../../../core/network_provider.dart';
+import '../../leads/presentation/ocr_lead_scan_sheet.dart';
 
 enum QuickAddType { lead, task, call, note }
 
@@ -124,6 +125,33 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
 
           // Form depending on active type
           if (_activeTab == QuickAddType.lead) ...[
+            GestureDetector(
+              onTap: () {
+                Navigator.of(context).pop();
+                OcrLeadScanSheet.show(context);
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: MlSpacing.md, vertical: 8),
+                decoration: BoxDecoration(
+                  color: MlColors.primarySoft,
+                  borderRadius: BorderRadius.circular(MlRadii.md),
+                  border: Border.all(color: MlColors.primary.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Text('📷 ', style: TextStyle(fontSize: 16)),
+                    Expanded(
+                      child: Text(
+                        'Scan Business Card with OCR',
+                        style: MlTypography.caption.copyWith(color: MlColors.primary, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    Text('Auto-fill →', style: MlTypography.caption.copyWith(color: MlColors.primary)),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: MlSpacing.sm),
             MlTextField(
               label: 'Lead Name *',
               placeholder: 'e.g. Acme Logistics or John Doe',

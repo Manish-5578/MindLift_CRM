@@ -14,10 +14,12 @@ export 'src/models/lead_models.dart';
 export 'src/models/mobile_device_models.dart';
 export 'src/models/notification_models.dart';
 export 'src/models/offline_models.dart';
+export 'src/models/chat_models.dart';
 
 // Services
 export 'src/services/activities_service.dart';
 export 'src/services/auth_service.dart';
+export 'src/services/chat_service.dart';
 export 'src/services/deals_service.dart';
 export 'src/services/devices_service.dart';
 export 'src/services/leads_service.dart';

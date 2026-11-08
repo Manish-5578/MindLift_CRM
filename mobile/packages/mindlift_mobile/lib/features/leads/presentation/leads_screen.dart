@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mindlift_api/mindlift_api.dart';
 import 'package:mindlift_ui/mindlift_ui.dart';
 import '../../../core/network_provider.dart';
+import 'ocr_lead_scan_sheet.dart';
 
 class LeadsScreen extends ConsumerStatefulWidget {
   const LeadsScreen({super.key});
@@ -54,6 +55,11 @@ class _LeadsScreenState extends ConsumerState<LeadsScreen> {
       title: 'Leads',
       subtitle: '${_leads.length} Active Records',
       actions: [
+        MlIconButton(
+          label: 'Scan OCR Card',
+          icon: const Text('📷', style: TextStyle(fontSize: 18)),
+          onPressed: () => OcrLeadScanSheet.show(context, onLeadCreated: _fetchLeads),
+        ),
         MlIconButton(
           label: 'Refresh Leads',
           icon: const Text('↻', style: TextStyle(fontSize: 20, color: MlColors.textPrimary)),
@@ -146,12 +152,16 @@ class _LeadsScreenState extends ConsumerState<LeadsScreen> {
                           itemCount: _leads.length,
                           itemBuilder: (context, index) {
                             final lead = _leads[index];
+                            final hasCompany = lead.company != null && lead.company!.trim().isNotEmpty;
+                            final displayTitle = hasCompany ? lead.company!.trim() : lead.name;
+                            final contactSubtitle = hasCompany ? '👤 ${lead.name} • ${lead.phone ?? 'No phone'}' : (lead.phone ?? 'No phone');
+
                             return Padding(
                               padding: const EdgeInsets.only(bottom: MlSpacing.sm),
                               child: MlRecordCard(
-                                leading: MlAvatar(name: lead.name, size: MlAvatarSize.md),
-                                title: lead.name,
-                                subtitle: '${lead.company ?? 'Individual'} • ${lead.phone ?? 'No phone'}',
+                                leading: MlAvatar(name: displayTitle, size: MlAvatarSize.md),
+                                title: displayTitle,
+                                subtitle: contactSubtitle,
                                 statusChip: MlStatusChip(
                                   label: lead.status,
                                   state: lead.status == 'Qualified'

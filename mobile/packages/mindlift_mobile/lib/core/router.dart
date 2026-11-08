@@ -11,6 +11,8 @@ import '../features/deals/presentation/deals_screen.dart';
 import '../features/quick_add/presentation/quick_add_sheet.dart';
 import '../features/notifications/presentation/notifications_screen.dart';
 import '../features/more/presentation/more_screen.dart';
+import '../features/profile/presentation/profile_screen.dart';
+import '../features/chat/presentation/chat_screen.dart';
 import 'network_provider.dart';
 
 /// Listenable that notifies GoRouter ONLY when authentication status changes,
@@ -55,19 +57,20 @@ final routerProvider = Provider<GoRouter>((ref) {
           int calculateIndex(String loc) {
             if (loc.startsWith('/home')) return 0;
             if (loc.startsWith('/leads')) return 1;
-            if (loc.startsWith('/deals')) return 2;
-            if (loc.startsWith('/activities')) return 3;
-            if (loc.startsWith('/more')) return 4;
+            if (loc.startsWith('/chat')) return 2;
+            if (loc.startsWith('/notifications')) return 3;
+            if (loc.startsWith('/profile') || loc.startsWith('/more')) return 4;
             return 0;
           }
 
           final currentIndex = calculateIndex(state.matchedLocation);
+          final unreadAlerts = ref.watch(unreadNotificationCountProvider).value ?? 0;
 
           return Column(
             children: [
               Expanded(child: child),
               MlBottomNavigation(
-                currentIndex: currentIndex > 3 ? 3 : currentIndex,
+                currentIndex: currentIndex,
                 onTap: (index) {
                   switch (index) {
                     case 0:
@@ -77,30 +80,38 @@ final routerProvider = Provider<GoRouter>((ref) {
                       context.go('/leads');
                       break;
                     case 2:
-                      context.go('/deals');
+                      context.go('/chat');
                       break;
                     case 3:
-                      context.go('/activities');
+                      context.go('/notifications');
+                      break;
+                    case 4:
+                      context.go('/profile');
                       break;
                   }
                 },
                 onQuickAdd: () => QuickAddSheet.show(context),
-                destinations: const [
-                  MlNavigationDestination(
+                destinations: [
+                  const MlNavigationDestination(
                     label: 'My Day',
-                    icon: Text('📅', style: TextStyle(fontSize: 20)),
+                    icon: Text('📅', style: TextStyle(fontSize: 18)),
                   ),
-                  MlNavigationDestination(
+                  const MlNavigationDestination(
                     label: 'Leads',
-                    icon: Text('👥', style: TextStyle(fontSize: 20)),
+                    icon: Text('🏢', style: TextStyle(fontSize: 18)),
+                  ),
+                  const MlNavigationDestination(
+                    label: 'Chat',
+                    icon: Text('💬', style: TextStyle(fontSize: 18)),
                   ),
                   MlNavigationDestination(
-                    label: 'Deals',
-                    icon: Text('💼', style: TextStyle(fontSize: 20)),
+                    label: 'Alerts',
+                    icon: const Text('🔔', style: TextStyle(fontSize: 18)),
+                    badgeCount: unreadAlerts > 0 ? unreadAlerts : null,
                   ),
-                  MlNavigationDestination(
-                    label: 'Activity',
-                    icon: Text('⚡', style: TextStyle(fontSize: 20)),
+                  const MlNavigationDestination(
+                    label: 'Profile',
+                    icon: Text('👤', style: TextStyle(fontSize: 18)),
                   ),
                 ],
               ),
@@ -140,6 +151,14 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/notifications',
             builder: (context, state) => const NotificationsScreen(),
+          ),
+          GoRoute(
+            path: '/chat',
+            builder: (context, state) => const ChatScreen(),
+          ),
+          GoRoute(
+            path: '/profile',
+            builder: (context, state) => const ProfileScreen(),
           ),
         ],
       ),
