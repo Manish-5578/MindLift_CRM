@@ -31,29 +31,49 @@ public sealed class FcmPushNotificationSender(
 
     private sealed record ServiceAccount(string ProjectId, string ClientEmail, string PrivateKey);
 
-    private ServiceAccount? LoadAccount()
+    private (ServiceAccount? Account, string? Problem) LoadAccountWithReason()
     {
+        var json = config["Fcm:ServiceAccountJson"];
+        var path = config["Fcm:ServiceAccountPath"];
+        string source;
+        if (!string.IsNullOrWhiteSpace(json)) source = "Fcm__ServiceAccountJson";
+        else if (!string.IsNullOrWhiteSpace(path))
+        {
+            if (!File.Exists(path)) return (null, $"Fcm__ServiceAccountPath is set to '{path}' but no file exists there.");
+            json = File.ReadAllText(path);
+            source = "Fcm__ServiceAccountPath file";
+        }
+        else
+        {
+            return (null, "Neither Fcm__ServiceAccountJson nor Fcm__ServiceAccountPath is set on this server (check the variable name has two underscores and that this deploy finished).");
+        }
+
         try
         {
-            var json = config["Fcm:ServiceAccountJson"];
-            var path = config["Fcm:ServiceAccountPath"];
-            if (string.IsNullOrWhiteSpace(json) && !string.IsNullOrWhiteSpace(path) && File.Exists(path))
-            {
-                json = File.ReadAllText(path);
-            }
-            if (string.IsNullOrWhiteSpace(json)) return null;
-            using var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json!);
             var r = doc.RootElement;
-            return new ServiceAccount(
-                r.GetProperty("project_id").GetString()!,
-                r.GetProperty("client_email").GetString()!,
-                r.GetProperty("private_key").GetString()!);
+            string Get(string name) => r.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(v.GetString())
+                ? v.GetString()!
+                : throw new FormatException($"field '{name}' is missing");
+            var account = new ServiceAccount(Get("project_id"), Get("client_email"), Get("private_key"));
+            using var rsa = RSA.Create();
+            rsa.ImportFromPem(account.PrivateKey);
+            return (account, null);
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "FCM service account is configured but could not be read.");
-            return null;
+            return (null, $"{source} is set ({json!.Length} characters, starts with '{json[..Math.Min(1, json.Length)]}') but is not a usable service-account key: {ex.Message}");
         }
+    }
+
+    private ServiceAccount? LoadAccount()
+    {
+        var (account, problem) = LoadAccountWithReason();
+        if (account is null && problem is not null && !problem.StartsWith("Neither", StringComparison.Ordinal))
+        {
+            logger.LogWarning("FCM service account problem: {Problem}", problem);
+        }
+        return account;
     }
 
     public async Task SendPushAsync(Guid tenantId, Guid userId, string title, string? body,
@@ -65,10 +85,10 @@ public sealed class FcmPushNotificationSender(
         IReadOnlyDictionary<string, string> payload, CancellationToken cancellationToken = default)
     {
         var report = new List<string>();
-        var account = LoadAccount();
+        var (account, problem) = LoadAccountWithReason();
         if (account is null)
         {
-            report.Add("FCM is not configured on the server (Fcm__ServiceAccountJson missing or unreadable).");
+            report.Add("FCM is not configured: " + problem);
             return report;
         }
 
