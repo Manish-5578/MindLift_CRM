@@ -25,8 +25,15 @@ public sealed class PortalService(
     IOptions<AppOptions> app,
     IDocumentOcrService ocrService,
     INotificationService notifications,
-    IDataScopeService scope) : IPortalService
+    IDataScopeService scope,
+    Microsoft.Extensions.Configuration.IConfiguration configuration) : IPortalService
 {
+    /// <summary>Same short window as staff sessions (Auth:RefreshReuseGraceSeconds, default 10 seconds, 0 = strict).</summary>
+    private TimeSpan ReuseGrace => TimeSpan.FromSeconds(Math.Clamp(configuration.GetValue<int?>("Auth:RefreshReuseGraceSeconds") ?? 10, 0, 60));
+
+    /// <summary>A revoked token is stamped well before any grace window, so only a token that was truly rotated just now is let through again.</summary>
+    private static DateTime RevokedStamp() => DateTime.UtcNow.AddHours(-1);
+
     private Guid CurrentTenantId => tenant.TenantId ?? throw new UnauthorizedAccessException("Tenant context required.");
     private static readonly PasswordHasher<PortalUser> Hasher = new();
 
@@ -291,7 +298,7 @@ public sealed class PortalService(
 
         if (token.UsedAt.HasValue)
         {
-            if (DateTime.UtcNow - token.UsedAt.Value <= TimeSpan.FromSeconds(60))
+            if (DateTime.UtcNow - token.UsedAt.Value <= ReuseGrace)
             {
                 var concurrentUser = await db.PortalUsers.IgnoreQueryFilters()
                     .FirstOrDefaultAsync(u => u.Id == token.PortalUserId && u.TenantId == t.Id && !u.IsDeleted, ct);
@@ -320,7 +327,8 @@ public sealed class PortalService(
 
         if (!await TryConsumeAsync(token, ct))
         {
-            if (user.IsActive)
+            // Another request used this token an instant ago. Only let it through inside the grace window.
+            if (user.IsActive && ReuseGrace > TimeSpan.Zero)
             {
                 return await IssueAsync(t.Id, user, ct);
             }
@@ -502,14 +510,14 @@ public sealed class PortalService(
             .ToListAsync(ct);
         foreach (var item in live)
         {
-            item.UsedAt = DateTime.UtcNow;
+            item.UsedAt = RevokedStamp();
         }
         await db.SaveChangesAsync(ct);
     }
 
     private async Task RevokeAllTokensAsync(Guid tenantId, Guid portalUserId, CancellationToken ct)
     {
-        var now = DateTime.UtcNow;
+        var now = RevokedStamp();
         await db.PortalTokens.IgnoreQueryFilters()
             .Where(x => x.TenantId == tenantId && x.PortalUserId == portalUserId && x.UsedAt == null && !x.IsDeleted)
             .ExecuteUpdateAsync(set => set.SetProperty(x => x.UsedAt, now), ct);

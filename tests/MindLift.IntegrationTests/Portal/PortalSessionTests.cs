@@ -103,7 +103,7 @@ public sealed class PortalSessionTests(MindLiftApiFactory factory) : IClassFixtu
         resp.Headers.TryGetValues("Set-Cookie", out var cookies).ShouldBeTrue();
         var cookie = cookies!.Single(c => c.StartsWith("ml_portal_refresh=", StringComparison.Ordinal));
         cookie.ShouldContain("httponly", Case.Insensitive);
-        cookie.ShouldContain("samesite=strict", Case.Insensitive);
+        cookie.ShouldContain("samesite=lax", Case.Insensitive);
         cookie.ShouldContain($"path=/api/v1/portal/{inv.Slug}/auth", Case.Insensitive);
     }
 

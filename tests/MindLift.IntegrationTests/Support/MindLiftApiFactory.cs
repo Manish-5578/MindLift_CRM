@@ -64,6 +64,8 @@ public sealed class MindLiftApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("ConnectionStrings:Default", _connectionString.Value);
         builder.UseSetting("Database:MigrateOnStartup", "true");
         builder.UseSetting("Hangfire:WorkerCount", "2");
+        // Strict reuse detection for the security tests; the grace window has its own test.
+        builder.UseSetting("Auth:RefreshReuseGraceSeconds", "0");
         // Many tests sign in from the one test address, so the limits are lifted here. RateLimitTests sets a low limit of its own.
         builder.UseSetting("RateLimiting:PublicPermitsPerMinute", "100000");
         builder.UseSetting("RateLimiting:WebhookPermitsPerMinute", "100000");

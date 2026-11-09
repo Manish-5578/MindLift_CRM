@@ -1,4 +1,6 @@
+using System.Net;
 using System.Net.Http.Json;
+using MindLift.Shared.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MindLift.Domain.Entities;
@@ -89,5 +91,29 @@ internal static class RefreshHelper
     {
         var response = await client.PostAsJsonAsync(url, new MindLift.Shared.Contracts.RefreshRequest(refreshToken));
         return response.IsSuccessStatusCode;
+    }
+}
+
+/// <summary>The short grace window after a rotation: a retry or second tab works, then reuse ends the session.</summary>
+public sealed class RefreshReuseGraceTests(MindLiftApiFactory factory) : IClassFixture<MindLiftApiFactory>
+{
+    [Fact]
+    public async Task A_token_replayed_inside_the_grace_window_still_works_and_one_replayed_outside_it_ends_the_session()
+    {
+        using var lenient = factory.WithWebHostBuilder(b => b.UseSetting("Auth:RefreshReuseGraceSeconds", "30"));
+        var owner = await Workspaces.SignupAsync(factory);
+        var client = Workspaces.MobileClient(lenient);
+
+        // First use rotates. A second use right away (a retry or another tab) is let through.
+        var first = await client.PostAsJsonAsync("/api/v1/auth/refresh", new RefreshRequest(owner.RefreshToken));
+        first.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var retry = await client.PostAsJsonAsync("/api/v1/auth/refresh", new RefreshRequest(owner.RefreshToken));
+        retry.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        // With no grace at all the same replay ends the session (this is the strict setting the security tests use).
+        var strictOwner = await Workspaces.SignupAsync(factory);
+        var strictClient = Workspaces.MobileClient(factory);
+        (await strictClient.PostAsJsonAsync("/api/v1/auth/refresh", new RefreshRequest(strictOwner.RefreshToken))).StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await strictClient.PostAsJsonAsync("/api/v1/auth/refresh", new RefreshRequest(strictOwner.RefreshToken))).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 }

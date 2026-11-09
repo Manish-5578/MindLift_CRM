@@ -234,7 +234,7 @@ public sealed class ProductionVerificationTests(MindLiftApiFactory factory) : IC
     }
 
     [Fact]
-    public async Task Pipeline_auth_cookies_are_httponly_and_samesite_strict()
+    public async Task Pipeline_auth_cookies_are_httponly_and_samesite_lax()
     {
         var client = factory.CreateClient();
         var email = $"cookietest-{Guid.NewGuid():N}@example.test";
@@ -251,6 +251,7 @@ public sealed class ProductionVerificationTests(MindLiftApiFactory factory) : IC
 
         // Must be HttpOnly and SameSite=Strict
         refreshCookie.ShouldContain("httponly", Case.Insensitive);
-        refreshCookie.ShouldContain("samesite=strict", Case.Insensitive);
+        // Lax, not Strict: the web app and the API are on different sites, so Strict would stop the cookie being sent at all.
+        refreshCookie.ShouldContain("samesite=lax", Case.Insensitive);
     }
 }

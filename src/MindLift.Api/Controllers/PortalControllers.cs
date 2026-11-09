@@ -139,7 +139,8 @@ public sealed class PortalAuthController(IPortalService portalService) : Control
         HttpOnly = true,
         Secure = Request.IsHttps,
         SameSite = SameSiteMode.Lax,
-        Path = "/",
+        // Only the refresh and logout endpoints ever need this cookie, so it is not sent anywhere else.
+        Path = $"/api/v1/portal/{slug}/auth",
         Expires = expires,
     };
 }

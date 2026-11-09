@@ -10,8 +10,14 @@ namespace MindLift.Infrastructure.Auth;
 /// Refresh-token rotation with reuse detection (plan 4.3): every refresh issues a new token and revokes the old one.
 /// Presenting a revoked token revokes its whole family, because it means the token was stolen or copied.
 /// </summary>
-public sealed class RefreshTokenService(AppDbContext db, IClock clock, TokenService tokens)
+public sealed class RefreshTokenService(AppDbContext db, IClock clock, TokenService tokens, Microsoft.Extensions.Configuration.IConfiguration configuration)
 {
+    /// <summary>
+    /// How long after a rotation the old token is still accepted (two tabs, or a retry after a dropped connection). It is kept short:
+    /// anyone who copies a token gets only this window. Set Auth:RefreshReuseGraceSeconds to 0 for strict reuse detection.
+    /// </summary>
+    private TimeSpan ReuseGrace => TimeSpan.FromSeconds(Math.Clamp(configuration.GetValue<int?>("Auth:RefreshReuseGraceSeconds") ?? 10, 0, 60));
+
     /// <summary>Issues a new refresh token and returns the raw value (only the hash is stored).</summary>
     public async Task<string> IssueAsync(Guid userId, Guid tenantId, Guid? familyId = null, CancellationToken cancellationToken = default)
     {
@@ -41,10 +47,10 @@ public sealed class RefreshTokenService(AppDbContext db, IClock clock, TokenServ
         if (row.RevokedAt is not null)
         {
             // OAuth 2.0 Security BCP Grace Period:
-            // If the token was rotated recently within the grace window (60s) and was replaced by a normal rotation,
+            // If the token was rotated recently within the grace window (10s by default) and was replaced by a normal rotation,
             // this is a concurrent request or race condition (e.g. multi-tab or network retry).
             // Do NOT revoke the family. Issue a new token for this concurrent request so legitimate sessions stay active.
-            if (row.ReplacedByHash is not null && (now - row.RevokedAt.Value) <= TimeSpan.FromSeconds(60))
+            if (row.ReplacedByHash is not null && (now - row.RevokedAt.Value) <= ReuseGrace)
             {
                 var nextConcurrent = await IssueAsync(row.UserId, row.TenantId, row.FamilyId, cancellationToken);
                 return (row.UserId, row.TenantId, nextConcurrent);
