@@ -171,7 +171,8 @@ public sealed class AuditableEntityInterceptor(ITenantContext tenant, IClock clo
         }
 
         var module = ResolveModule(entity);
-        var recordTitle = ExtractRecordTitle(entity);
+        // The audit columns are limited (300 and 500); a long company plus a long name must never make the real save fail.
+        var recordTitle = Trim(ExtractRecordTitle(entity), 300);
         var summary = FormatActionSummary(action, module, entity.GetType().Name, recordTitle, changes);
         if (tenant.Client == "mobile")
         {
@@ -191,7 +192,7 @@ public sealed class AuditableEntityInterceptor(ITenantContext tenant, IClock clo
             Module = module,
             RecordTitle = recordTitle,
             Action = action,
-            Summary = summary,
+            Summary = Trim(summary, 500),
             Changes = changes,
             IpAddress = tenant.IpAddress,
             OccurredAt = now,
@@ -220,6 +221,9 @@ public sealed class AuditableEntityInterceptor(ITenantContext tenant, IClock clo
             _ => name
         };
     }
+
+    private static string? Trim(string? text, int max)
+        => text is null || text.Length <= max ? text : text[..(max - 1)] + "…";
 
     private static string? ExtractRecordTitle(object entity)
     {
