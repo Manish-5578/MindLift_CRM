@@ -131,7 +131,7 @@ class CompleteActivityRequest {
 
   Map<String, dynamic> toJson() => {
         if (outcome != null) 'outcome': outcome,
-        if (note != null) 'note': note,
+        if (note != null) 'notes': note,
         if (durationMinutes != null) 'durationMinutes': durationMinutes,
       };
 }
@@ -156,8 +156,11 @@ class MyDaySummaryDto {
     this.overdueCount = 0,
     this.dueTodayCount = 0,
     this.completedTodayCount = 0,
+    this.upcomingCount = 0,
     this.activities = const [],
   });
+
+  final int upcomingCount;
 
   final int overdueCount;
   final int dueTodayCount;
@@ -165,14 +168,14 @@ class MyDaySummaryDto {
   final List<ActivityDto> activities;
 
   factory MyDaySummaryDto.fromJson(Map<String, dynamic> json) {
-    final list = (json['activities'] as List<dynamic>?)
-            ?.map((e) => ActivityDto.fromJson(e as Map<String, dynamic>))
-            .toList() ??
-        [];
+    // The API answers { overdue, today, upcoming, items }; older saved copies used the long names.
+    final raw = (json['items'] ?? json['activities']) as List<dynamic>?;
+    final list = raw?.whereType<Map>().map((e) => ActivityDto.fromJson(Map<String, dynamic>.from(e))).toList() ?? [];
     return MyDaySummaryDto(
-      overdueCount: (json['overdueCount'] as num?)?.toInt() ?? 0,
-      dueTodayCount: (json['dueTodayCount'] as num?)?.toInt() ?? 0,
+      overdueCount: (json['overdue'] as num?)?.toInt() ?? (json['overdueCount'] as num?)?.toInt() ?? 0,
+      dueTodayCount: (json['today'] as num?)?.toInt() ?? (json['dueTodayCount'] as num?)?.toInt() ?? 0,
       completedTodayCount: (json['completedTodayCount'] as num?)?.toInt() ?? 0,
+      upcomingCount: (json['upcoming'] as num?)?.toInt() ?? (json['upcomingCount'] as num?)?.toInt() ?? 0,
       activities: list,
     );
   }

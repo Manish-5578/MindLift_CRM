@@ -7,6 +7,9 @@ import '../../../core/offline_store.dart';
 import '../../../core/push_service.dart';
 import '../../../core/settings_provider.dart';
 import '../../../core/top_bar_actions.dart';
+import 'package:image_picker/image_picker.dart';
+import '../../leads/presentation/lead_actions.dart';
+import '../../workspace/workspace_widgets.dart' show UserAvatar;
 import 'devices_section.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -30,6 +33,56 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       );
     } catch (e) {
       if (mounted) MlToast.show(context, message: 'Test failed: $e');
+    }
+  }
+
+  int _photoVersion = 0;
+
+  Future<void> _changePhoto() async {
+    final id = ref.read(authNotifierProvider).userId;
+    await MlSheet.show<void>(
+      context: context,
+      title: 'Profile photo',
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.all(MlSpacing.md),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          MlButton(label: 'Take a photo', icon: MlIcon(MlIcons.camera, size: 22), variant: MlButtonVariant.secondary, onPressed: () {
+            Navigator.of(sheetContext).pop();
+            _pickPhoto(ImageSource.camera, id);
+          }),
+          const SizedBox(height: MlSpacing.sm),
+          MlButton(label: 'Choose from gallery', icon: MlIcon(MlIcons.gallery, size: 22), variant: MlButtonVariant.secondary, onPressed: () {
+            Navigator.of(sheetContext).pop();
+            _pickPhoto(ImageSource.gallery, id);
+          }),
+          const SizedBox(height: MlSpacing.sm),
+          MlButton(label: 'Remove photo', variant: MlButtonVariant.ghost, onPressed: () async {
+            Navigator.of(sheetContext).pop();
+            try {
+              await ref.read(workspaceServiceProvider).removeAvatar();
+              UserAvatar.forget(id);
+              if (mounted) setState(() => _photoVersion++);
+            } catch (e) {
+              if (mounted) MlToast.show(context, message: LeadActions.errorText(e, 'Could not remove the photo.'), type: MlToastType.error);
+            }
+          }),
+        ]),
+      ),
+    );
+  }
+
+  Future<void> _pickPhoto(ImageSource source, String? id) async {
+    try {
+      final x = await ImagePicker().pickImage(source: source, imageQuality: 80, maxWidth: 800, maxHeight: 800);
+      if (x == null) return;
+      await ref.read(workspaceServiceProvider).uploadAvatar(path: x.path, name: x.name.isEmpty ? 'me.jpg' : x.name);
+      UserAvatar.forget(id);
+      if (mounted) {
+        setState(() => _photoVersion++);
+        MlToast.show(context, message: 'Photo updated.', type: MlToastType.success);
+      }
+    } catch (e) {
+      if (mounted) MlToast.show(context, message: LeadActions.errorText(e, 'Could not update the photo.'), type: MlToastType.error);
     }
   }
 
@@ -123,9 +176,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
               child: Row(
                 children: [
-                  MlAvatar(
-                    name: name,
-                    size: MlAvatarSize.lg,
+                  MlPressable(
+                    onTap: _changePhoto,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        UserAvatar(userId: authState.userId, name: name, size: MlAvatarSize.xl, version: _photoVersion),
+                        Positioned(
+                          right: -2,
+                          bottom: -2,
+                          child: Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(color: MlColors.primary, shape: BoxShape.circle, border: Border.all(color: MlColors.surface, width: 2)),
+                            alignment: Alignment.center,
+                            child: const Icon(MlIcons.camera, size: 13, color: MlColors.white),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(width: MlSpacing.md),
                   Expanded(

@@ -67,6 +67,10 @@ final activitiesServiceProvider = Provider<ActivitiesService>((ref) {
   return ActivitiesService(ref.watch(apiClientProvider));
 });
 
+final workspaceServiceProvider = Provider<WorkspaceService>((ref) {
+  return WorkspaceService(ref.watch(apiClientProvider));
+});
+
 final dealsServiceProvider = Provider<DealsService>((ref) {
   return DealsService(ref.watch(apiClientProvider));
 });

@@ -6,6 +6,7 @@ import 'package:mindlift_ui/mindlift_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/network_provider.dart';
 import '../../../core/offline_store.dart';
+import '../../workspace/workspace_widgets.dart' show DocumentsSection;
 import 'lead_actions.dart';
 import 'leads_screen.dart' show statusColor, statusState, shortDate;
 
@@ -336,6 +337,9 @@ class _LeadDetailScreenState extends ConsumerState<LeadDetailScreen> {
               ),
             ],
             const SizedBox(height: MlSpacing.lg),
+
+            DocumentsSection(entityType: 'leads', entityId: widget.leadId, canAdd: _cfg.canEdit),
+            const SizedBox(height: MlSpacing.md),
 
             // Notes
             Row(

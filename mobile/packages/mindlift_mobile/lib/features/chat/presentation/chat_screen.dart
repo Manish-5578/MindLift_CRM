@@ -12,6 +12,7 @@ import 'package:mindlift_ui/mindlift_ui.dart';
 import '../../../core/network_provider.dart';
 import '../../../core/offline_store.dart';
 import '../../../core/top_bar_actions.dart';
+import '../../workspace/workspace_widgets.dart' show UserAvatar;
 import 'chat_widgets.dart';
 
 const _white = Color(0xFFFFFFFF);
@@ -205,7 +206,7 @@ class _PersonTile extends StatelessWidget {
           children: [
             Stack(
               children: [
-                MlAvatar(name: person.name, size: MlAvatarSize.lg),
+                UserAvatar(userId: person.id, name: person.name, size: MlAvatarSize.lg),
                 Positioned(
                   right: 0,
                   bottom: 0,
@@ -375,6 +376,10 @@ class _ThreadViewState extends ConsumerState<_ThreadView> {
       final list = await svc.getMessages(recipientId: widget.person.id);
       if (!mounted) return;
       unawaited(ref.read(offlineStoreProvider).putCache('chat:${widget.person.id}', list.map((m) => m.toJson()).toList()));
+      final ob = ref.read(outboxProvider);
+      if (ob.pending == 0 && !ob.syncing && _messages.any((m) => m.id.startsWith('local-'))) {
+        setState(() => _messages = _messages.where((m) => !m.id.startsWith('local-')).toList());
+      }
       final changed = _signature(list) != _signature(_messages.where((m) => !m.id.startsWith('local-')).toList());
       if (changed || initial) {
         final added = list.length - _messages.where((m) => !m.id.startsWith('local-')).length;
@@ -436,11 +441,20 @@ class _ThreadViewState extends ConsumerState<_ThreadView> {
       final sent = await ref.read(chatServiceProvider).sendMessage(message: text, recipientId: widget.person.id, replyToId: reply?.id);
       HapticFeedback.lightImpact();
       if (mounted) setState(() => _messages = [..._messages.where((m) => m.id != temp.id), sent]);
-    } catch (_) {
-      if (mounted) {
+    } catch (e) {
+      if (!mounted) return;
+      if (isOfflineError(e)) {
+        // Keep the bubble (with its clock) and send it when the phone is back online, in order.
+        await ref.read(outboxProvider.notifier).enqueue(
+          'POST',
+          '/api/v1/chat/messages',
+          {'message': text, 'recipientId': widget.person.id, if (reply != null) 'replyToId': reply.id},
+          'Message to ${widget.person.name}',
+        );
+      } else {
         setState(() => _messages = _messages.where((m) => m.id != temp.id).toList());
         _controller.text = text;
-        MlToast.show(context, message: 'Could not send. Check your connection.');
+        MlToast.show(context, message: 'Could not send the message. Please try again.', type: MlToastType.error);
       }
     }
   }

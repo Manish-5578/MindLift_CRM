@@ -8,7 +8,9 @@ import '../features/home/presentation/home_screen.dart';
 import '../features/leads/presentation/leads_screen.dart';
 import '../features/leads/presentation/lead_detail_screen.dart';
 import '../features/activities/presentation/activities_screen.dart';
-import '../features/deals/presentation/deals_screen.dart';
+import '../features/workspace/workspace_screens.dart';
+import '../features/workspace/calendar_screen.dart';
+import '../features/notifications/presentation/notification_settings_screen.dart';
 import '../features/quick_add/presentation/quick_add_sheet.dart';
 import '../features/notifications/presentation/notifications_screen.dart';
 import '../features/more/presentation/more_screen.dart';
@@ -121,6 +123,25 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/deals',
             pageBuilder: (context, state) => _fade(state, const DealsScreen()),
+            routes: [GoRoute(path: ':id', pageBuilder: (context, state) => _slide(state, DealDetailScreen(id: state.pathParameters['id'] ?? '')))],
+          ),
+          GoRoute(
+            path: '/contacts',
+            pageBuilder: (context, state) => _fade(state, const ContactsScreen()),
+            routes: [GoRoute(path: ':id', pageBuilder: (context, state) => _slide(state, ContactDetailScreen(id: state.pathParameters['id'] ?? '')))],
+          ),
+          GoRoute(
+            path: '/accounts',
+            pageBuilder: (context, state) => _fade(state, const AccountsScreen()),
+            routes: [GoRoute(path: ':id', pageBuilder: (context, state) => _slide(state, AccountDetailScreen(id: state.pathParameters['id'] ?? '')))],
+          ),
+          GoRoute(
+            path: '/calendar',
+            pageBuilder: (context, state) => _fade(state, const CalendarScreen()),
+          ),
+          GoRoute(
+            path: '/notification-settings',
+            pageBuilder: (context, state) => _slide(state, const NotificationSettingsScreen()),
           ),
           GoRoute(
             path: '/activities',

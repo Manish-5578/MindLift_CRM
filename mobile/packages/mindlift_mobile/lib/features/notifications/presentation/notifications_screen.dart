@@ -59,12 +59,15 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     return MlScreen(
       title: 'Notifications',
       subtitle: '${_notifications.where((n) => !n.isRead).length} Unread',
+      leading: MlIconButton(label: 'Back', icon: const MlIcon(MlIcons.back, size: 24), onPressed: () => context.canPop() ? context.pop() : context.go('/home')),
       actions: [
         MlButton(
-          label: 'Mark All Read',
+          label: 'Mark all read',
+          size: MlButtonSize.small,
           onPressed: _notifications.isEmpty ? null : _markAllRead,
           variant: MlButtonVariant.ghost,
         ),
+        MlIconButton(label: 'Notification settings', icon: const MlIcon(MlIcons.settings, size: 24), onPressed: () => context.push('/notification-settings')),
       ],
       body: MlPullToRefresh(
         onRefresh: _loadNotifications,

@@ -18,17 +18,19 @@ class ActivitiesService {
     String? status,
     String? leadId,
   }) async {
-    final response = await _dio.get(
-      '/api/v1/activities',
-      queryParameters: {
-        if (type != null) 'type': type,
-        if (status != null) 'status': status,
-        if (leadId != null) 'leadId': leadId,
-      },
-    );
+    // The API lists activities with POST /activities/query and a tab: open ones are today / overdue / upcoming.
+    final response = await _dio.post('/api/v1/activities/query', data: {
+      'tab': status == 'Completed' ? 'completed' : 'all',
+      if (type != null) 'type': type,
+      'mineOnly': leadId == null,
+      if (leadId != null) 'leadId': leadId,
+      'page': 1,
+      'pageSize': 100,
+    });
     final data = response.data;
-    if (data is List) {
-      return data.map((e) => ActivityDto.fromJson(e as Map<String, dynamic>)).toList();
+    if (data is Map && data['items'] is List) {
+      final all = (data['items'] as List).whereType<Map>().map((e) => ActivityDto.fromJson(Map<String, dynamic>.from(e))).toList();
+      return status == 'Open' ? all.where((a) => a.status != 'Completed').toList() : all;
     }
     return [];
   }

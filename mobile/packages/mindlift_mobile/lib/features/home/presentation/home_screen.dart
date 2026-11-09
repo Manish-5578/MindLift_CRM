@@ -205,6 +205,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               _buildMetricsRow(),
               const SizedBox(height: MlSpacing.lg),
 
+              // Workspace shortcuts
+              Row(children: [
+                Expanded(child: _shortcut(MlIcons.person, 'Contacts', '/contacts')),
+                const SizedBox(width: MlSpacing.sm),
+                Expanded(child: _shortcut(MlIcons.leadsOutline, 'Accounts', '/accounts')),
+                const SizedBox(width: MlSpacing.sm),
+                Expanded(child: _shortcut(MlIcons.handshake, 'Deals', '/deals')),
+                const SizedBox(width: MlSpacing.sm),
+                Expanded(child: _shortcut(MlIcons.refresh, 'Calendar', '/calendar', icon2: MlIcons.calendar)),
+              ]),
+              const SizedBox(height: MlSpacing.lg),
+
               // My leads snapshot
               if (_leadCounts.isNotEmpty) ...[
                 Row(
@@ -319,7 +331,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildMetricsRow() {
     final overdue = _summary?.overdueCount ?? 0;
     final dueToday = _summary?.dueTodayCount ?? 0;
-    final completed = _summary?.completedTodayCount ?? 0;
+    final upcoming = _summary?.upcomingCount ?? 0;
 
     return Row(
       children: [
@@ -332,9 +344,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
         const SizedBox(width: MlSpacing.sm),
         Expanded(
-          child: _buildMetricTile('Completed', completed.toString(), MlColors.success),
+          child: _buildMetricTile('Upcoming', upcoming.toString(), MlColors.success),
         ),
       ],
+    );
+  }
+
+  Widget _shortcut(IconData icon, String label, String route, {IconData? icon2}) {
+    return MlPressable(
+      onTap: () => context.push(route),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(color: MlColors.surface, borderRadius: BorderRadius.circular(MlRadii.lg), border: Border.all(color: MlColors.border)),
+        child: Column(children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(color: MlColors.primary.withOpacity(0.12), borderRadius: BorderRadius.circular(12)),
+            alignment: Alignment.center,
+            child: MlIcon(icon2 ?? icon, size: 22, color: MlColors.primary),
+          ),
+          const SizedBox(height: 6),
+          Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: MlColors.textPrimary, decoration: TextDecoration.none)),
+        ]),
+      ),
     );
   }
 

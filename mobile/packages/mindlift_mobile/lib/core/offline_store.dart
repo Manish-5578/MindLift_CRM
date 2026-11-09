@@ -233,6 +233,8 @@ class OutboxNotifier extends StateNotifier<OutboxState> with WidgetsBindingObser
     await _store.add(OutboxItem(id: '${DateTime.now().microsecondsSinceEpoch}-${_seq++}', method: method, path: path, body: body, label: label, createdAt: DateTime.now()));
     markOffline();
     await refresh();
+    // A timeout does not always mean the connection changed, so try again shortly even if no network event arrives.
+    Timer(const Duration(seconds: 20), flush);
   }
 
   Future<void> discard(String id) async {

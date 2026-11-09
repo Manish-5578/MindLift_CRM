@@ -34,6 +34,7 @@ class AuthState {
     this.isLoading = false,
     this.userFullName,
     this.userEmail,
+    this.userId,
     this.userRole,
     this.userJobTitle,
     this.errorMessage,
@@ -43,6 +44,7 @@ class AuthState {
   final bool isLoading;
   final String? userFullName;
   final String? userEmail;
+  final String? userId;
   final String? userRole;
   final String? userJobTitle;
   final String? errorMessage;
@@ -52,6 +54,7 @@ class AuthState {
     bool? isLoading,
     String? userFullName,
     String? userEmail,
+    String? userId,
     String? userRole,
     String? userJobTitle,
     String? errorMessage,
@@ -61,6 +64,7 @@ class AuthState {
       isLoading: isLoading ?? this.isLoading,
       userFullName: userFullName ?? this.userFullName,
       userEmail: userEmail ?? this.userEmail,
+      userId: userId ?? this.userId,
       userRole: userRole ?? this.userRole,
       userJobTitle: userJobTitle ?? this.userJobTitle,
       errorMessage: errorMessage,
@@ -107,6 +111,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(
         userFullName: (me['fullName'] as String?)?.trim(),
         userEmail: me['email'] as String?,
+        userId: (me['userId'] ?? me['id']) as String?,
         userRole: role,
         userJobTitle: (me['jobTitle'] as String?)?.trim(),
       );

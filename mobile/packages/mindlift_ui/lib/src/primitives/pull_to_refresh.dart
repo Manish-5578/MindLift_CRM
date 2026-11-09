@@ -1,15 +1,17 @@
-import 'dart:math' as math;
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import '../tokens/colors.dart';
+import 'button.dart';
+import 'icons.dart';
 
-/// Zero-native pull-to-refresh container.
-/// Uses Flutter scroll notification primitives instead of Material RefreshIndicator.
+/// Pull-to-refresh: a round indicator drops in from the top as you pull, fills as you approach the release point,
+/// ticks once when it is ready, then spins while loading and slides away. No Material widgets.
 class MlPullToRefresh extends StatefulWidget {
   const MlPullToRefresh({
     super.key,
     required this.child,
     required this.onRefresh,
-    this.displacement = 56.0,
+    this.displacement = 64.0,
   });
 
   final Widget child;
@@ -20,64 +22,49 @@ class MlPullToRefresh extends StatefulWidget {
   State<MlPullToRefresh> createState() => _MlPullToRefreshState();
 }
 
-class _MlPullToRefreshState extends State<MlPullToRefresh> with SingleTickerProviderStateMixin {
-  double _dragOffset = 0.0;
-  bool _isRefreshing = false;
-  late AnimationController _spinController;
+class _MlPullToRefreshState extends State<MlPullToRefresh> {
+  double _drag = 0.0;
+  bool _refreshing = false;
+  bool _armed = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _spinController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    );
-  }
+  bool _onScroll(ScrollNotification n) {
+    if (_refreshing || n.depth != 0) return false;
 
-  @override
-  void dispose() {
-    _spinController.dispose();
-    super.dispose();
-  }
-
-  bool _handleScrollNotification(ScrollNotification notification) {
-    if (_isRefreshing) return false;
-
-    if (notification is OverscrollNotification) {
-      if (notification.overscroll < 0) {
-        setState(() {
-          _dragOffset -= notification.overscroll * 0.5;
-          if (_dragOffset > widget.displacement * 1.5) {
-            _dragOffset = widget.displacement * 1.5;
-          }
-        });
-      }
-    } else if (notification is ScrollEndNotification) {
-      if (_dragOffset >= widget.displacement && !_isRefreshing) {
-        _triggerRefresh();
-      } else {
-        setState(() => _dragOffset = 0.0);
+    if (n is OverscrollNotification && n.overscroll < 0) {
+      setState(() {
+        _drag = (_drag - n.overscroll * 0.55).clamp(0.0, widget.displacement * 1.6);
+        final ready = _drag >= widget.displacement;
+        if (ready && !_armed) HapticFeedback.selectionClick();
+        _armed = ready;
+      });
+    } else if (n is ScrollUpdateNotification && n.metrics.pixels > 0 && _drag > 0) {
+      setState(() {
+        _drag = 0;
+        _armed = false;
+      });
+    } else if (n is ScrollEndNotification) {
+      if (_armed) {
+        _trigger();
+      } else if (_drag > 0) {
+        setState(() => _drag = 0);
       }
     }
     return false;
   }
 
-  Future<void> _triggerRefresh() async {
+  Future<void> _trigger() async {
     setState(() {
-      _isRefreshing = true;
-      _dragOffset = widget.displacement;
+      _refreshing = true;
+      _drag = widget.displacement;
     });
-    _spinController.repeat();
-
     try {
       await widget.onRefresh();
     } finally {
       if (mounted) {
-        _spinController.stop();
-        _spinController.reset();
         setState(() {
-          _isRefreshing = false;
-          _dragOffset = 0.0;
+          _refreshing = false;
+          _armed = false;
+          _drag = 0;
         });
       }
     }
@@ -85,107 +72,54 @@ class _MlPullToRefreshState extends State<MlPullToRefresh> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
+    final progress = (_drag / widget.displacement).clamp(0.0, 1.0);
+    final show = _drag > 0 || _refreshing;
     return Stack(
       children: [
-        NotificationListener<ScrollNotification>(
-          onNotification: _handleScrollNotification,
-          child: widget.child,
-        ),
-        if (_dragOffset > 0 || _isRefreshing)
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              height: _dragOffset,
-              alignment: Alignment.center,
-              child: _buildIndicator(),
+        NotificationListener<ScrollNotification>(onNotification: _onScroll, child: widget.child),
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: widget.displacement,
+          child: IgnorePointer(
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 160),
+              opacity: show ? 1 : 0,
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: Transform.translate(
+                  offset: Offset(0, _drag - 46),
+                  child: Transform.scale(
+                    scale: 0.6 + 0.4 * progress,
+                    child: Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: MlColors.surface,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: MlColors.border),
+                        boxShadow: const [BoxShadow(color: Color(0x30000000), blurRadius: 10, offset: Offset(0, 3))],
+                      ),
+                      alignment: Alignment.center,
+                      child: _refreshing
+                          ? const MlSpinner(size: 22)
+                          : Transform.rotate(
+                              angle: progress * 6.28,
+                              child: Icon(
+                                MlIcons.refresh,
+                                size: 22,
+                                color: _armed ? MlColors.primary : MlColors.textMuted,
+                              ),
+                            ),
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
+        ),
       ],
     );
   }
-
-  Widget _buildIndicator() {
-    if (_isRefreshing) {
-      return AnimatedBuilder(
-        animation: _spinController,
-        builder: (context, _) {
-          return CustomPaint(
-            size: const Size(26, 26),
-            painter: _MlRefreshSpinnerPainter(
-              progress: 0.75,
-              rotation: _spinController.value * 2 * math.pi,
-              color: MlColors.primary,
-            ),
-          );
-        },
-      );
-    }
-
-    final pullProgress = math.min(1.0, _dragOffset / widget.displacement);
-    return CustomPaint(
-      size: const Size(26, 26),
-      painter: _MlRefreshSpinnerPainter(
-        progress: pullProgress,
-        rotation: pullProgress * math.pi,
-        color: pullProgress >= 1.0 ? MlColors.primary : MlColors.textMuted,
-      ),
-    );
-  }
 }
-
-class _MlRefreshSpinnerPainter extends CustomPainter {
-  const _MlRefreshSpinnerPainter({
-    required this.progress,
-    required this.rotation,
-    required this.color,
-  });
-
-  final double progress;
-  final double rotation;
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final strokeWidth = 3.0;
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.width - strokeWidth) / 2;
-
-    final bgPaint = Paint()
-      ..color = MlColors.border
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth;
-    canvas.drawCircle(center, radius, bgPaint);
-
-    final sweepPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeWidth = strokeWidth;
-
-    canvas.save();
-    canvas.translate(center.dx, center.dy);
-    canvas.rotate(rotation);
-    canvas.translate(-center.dx, -center.dy);
-
-    final sweepAngle = 2 * math.pi * progress * 0.8;
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      -math.pi / 2,
-      sweepAngle,
-      false,
-      sweepPaint,
-    );
-
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(covariant _MlRefreshSpinnerPainter oldDelegate) {
-    return oldDelegate.progress != progress ||
-        oldDelegate.rotation != rotation ||
-        oldDelegate.color != color;
-  }
-}
-
