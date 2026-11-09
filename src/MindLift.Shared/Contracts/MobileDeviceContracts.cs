@@ -32,5 +32,9 @@ public sealed record MobileDeviceDto(
     DateTime LastSeenAtUtc,
     DateTime? RevokedAtUtc,
     DateTime? LastPushSucceededAtUtc,
-    int FailureCount);
+    int FailureCount,
+    int? QuietStartMinute = null,
+    int? QuietEndMinute = null);
+
+public sealed record SetQuietHoursRequest(string InstallationId, int? StartMinute, int? EndMinute);
 

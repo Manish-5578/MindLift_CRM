@@ -7,6 +7,7 @@ public interface IMobileDeviceService
     Task<MobileDeviceDto> RegisterOrUpdateCurrentAsync(RegisterMobileDeviceRequest request, CancellationToken ct = default);
     Task RevokeCurrentAsync(string installationId, CancellationToken ct = default);
     Task RevokeByIdAsync(Guid deviceId, CancellationToken ct = default);
+    Task SetQuietHoursAsync(string installationId, int? startMinute, int? endMinute, CancellationToken ct = default);
     Task HeartbeatAsync(string installationId, string? appVersion, CancellationToken ct = default);
     Task<IReadOnlyList<MobileDeviceDto>> GetUserDevicesAsync(Guid userId, CancellationToken ct = default);
     Task RecordPushSuccessAsync(Guid deviceId, CancellationToken ct = default);

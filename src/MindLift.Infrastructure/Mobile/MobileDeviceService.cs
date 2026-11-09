@@ -117,6 +117,28 @@ public sealed class MobileDeviceService(
         await db.SaveChangesAsync(ct);
     }
 
+    public async Task SetQuietHoursAsync(string installationId, int? startMinute, int? endMinute, CancellationToken ct = default)
+    {
+        var tenantId = tenant.TenantId ?? throw new ForbiddenException("Tenant context required.", "no_tenant");
+        var userId = tenant.UserId ?? throw new ForbiddenException("User context required.", "no_user");
+        if ((startMinute is null) != (endMinute is null))
+        {
+            throw new ValidationException("quietHours", "Choose both a start and an end time, or neither.");
+        }
+
+        if (startMinute is { } s && (s < 0 || s > 1439) || endMinute is { } e && (e < 0 || e > 1439))
+        {
+            throw new ValidationException("quietHours", "Times must be within a day.");
+        }
+
+        var device = await db.MobileDevices.FirstOrDefaultAsync(d => d.TenantId == tenantId && d.UserId == userId && d.InstallationId == installationId.Trim(), ct)
+            ?? throw new NotFoundException("Device", installationId);
+        device.QuietStartMinute = startMinute;
+        device.QuietEndMinute = endMinute;
+        device.UpdatedAt = clock.UtcNow;
+        await db.SaveChangesAsync(ct);
+    }
+
     public async Task HeartbeatAsync(string installationId, string? appVersion, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(installationId)) return;
@@ -193,6 +215,8 @@ public sealed class MobileDeviceService(
         d.LastSeenAtUtc,
         d.RevokedAtUtc,
         d.LastPushSucceededAtUtc,
-        d.FailureCount);
+        d.FailureCount,
+        d.QuietStartMinute,
+        d.QuietEndMinute);
 }
 

@@ -31,6 +31,14 @@ public sealed class MobileController(IMobileDeviceService deviceService, MindLif
         return NoContent();
     }
 
+    /// <summary>Pushes to this phone are held back between the two times (device time). Send both as null to turn it off.</summary>
+    [HttpPut("devices/current/quiet-hours")]
+    public async Task<IActionResult> QuietHours([FromBody] SetQuietHoursRequest request, CancellationToken ct)
+    {
+        await deviceService.SetQuietHoursAsync(request.InstallationId, request.StartMinute, request.EndMinute, ct);
+        return NoContent();
+    }
+
     [HttpPut("devices/current")]
     public async Task<ActionResult<MobileDeviceDto>> RegisterCurrentDevice(
         [FromBody] RegisterMobileDeviceRequest request,

@@ -8586,6 +8586,14 @@ namespace MindLift.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("provider_version");
 
+                    b.Property<int?>("QuietEndMinute")
+                        .HasColumnType("integer")
+                        .HasColumnName("quiet_end_minute");
+
+                    b.Property<int?>("QuietStartMinute")
+                        .HasColumnType("integer")
+                        .HasColumnName("quiet_start_minute");
+
                     b.Property<DateTime?>("RevokedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("revoked_at_utc");

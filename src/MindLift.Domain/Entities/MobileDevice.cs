@@ -40,5 +40,9 @@ public sealed class MobileDevice : TenantEntity
     public DateTime? LastPushSucceededAtUtc { get; set; }
     public string? LastPushFailureCode { get; set; }
     public int FailureCount { get; set; }
+
+    /// <summary>Quiet hours for pushes to this phone, in minutes after local midnight (device time zone). Both null means off.</summary>
+    public int? QuietStartMinute { get; set; }
+    public int? QuietEndMinute { get; set; }
 }
 

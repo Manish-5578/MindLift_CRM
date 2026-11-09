@@ -76,6 +76,23 @@ public sealed class FcmPushNotificationSender(
         return account;
     }
 
+    /// <summary>True when the phone's local time is inside its quiet hours (the window may cross midnight).</summary>
+    public static bool IsQuiet(MindLift.Domain.Entities.MobileDevice device, DateTime utcNow)
+    {
+        if (device.QuietStartMinute is not { } start || device.QuietEndMinute is not { } end || start == end)
+        {
+            return false;
+        }
+
+        TimeZoneInfo zone;
+        try { zone = TimeZoneInfo.FindSystemTimeZoneById(device.TimeZoneId); }
+        catch (Exception) { zone = TimeZoneInfo.Utc; }
+
+        var local = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcNow, DateTimeKind.Utc), zone);
+        var minute = local.Hour * 60 + local.Minute;
+        return start < end ? minute >= start && minute < end : minute >= start || minute < end;
+    }
+
     public async Task SendPushAsync(Guid tenantId, Guid userId, string title, string? body,
         IReadOnlyDictionary<string, string> payload, CancellationToken cancellationToken = default)
         => await SendAsync(tenantId, userId, title, body, payload, cancellationToken);
@@ -120,6 +137,13 @@ public sealed class FcmPushNotificationSender(
 
         foreach (var device in rows)
         {
+            // Quiet hours hold back the push only; the notification is still in the app's list. A test push always goes through.
+            if (IsQuiet(device, DateTime.UtcNow) && !(payload is not null && payload.TryGetValue("type", out var kind) && kind == "test"))
+            {
+                report.Add($"Device {device.InstallationId}: held back by quiet hours.");
+                continue;
+            }
+
             try
             {
                 var token = secretProtector.Unprotect(device.TokenCiphertext);
