@@ -515,3 +515,6 @@ App_Data/
 # Firebase / FCM secrets
 *service-account*.json
 *firebase-adminsdk*.json
+
+# generated knowledge graph output
+graphify-out/
