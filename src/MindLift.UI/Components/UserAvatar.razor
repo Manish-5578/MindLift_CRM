@@ -1,11 +1,30 @@
-<MudAvatar Size="@SizeOf(Size)" Style="@($"width:{Size}px;height:{Size}px;background:{Background};color:#fff;font-weight:600;font-size:{Size * 0.4:0.##}px")" title="@Name" data-testid="user-avatar">@Initials(Name)</MudAvatar>
+@implements IDisposable
+@inject IServiceProvider Services
+
+<MudAvatar Size="@SizeOf(Size)" Style="@($"width:{Size}px;height:{Size}px;background:{Background};color:#fff;font-weight:600;font-size:{Size * 0.4:0.##}px")" title="@Name" data-testid="user-avatar">
+    @if (_photo is not null)
+    {
+        <img src="@_photo" alt="@Name" style="width:100%;height:100%;object-fit:cover;border-radius:50%" data-testid="user-avatar-photo" />
+    }
+    else
+    {
+        @Initials(Name)
+    }
+</MudAvatar>
 
 @code {
     private static readonly string[] Palette = ["#4F46E5", "#0D9488", "#F59E0B", "#EC4899", "#0EA5E9", "#84CC16", "#8B5CF6", "#F97316"];
 
+    private AvatarPhotos? _photos;
+    private Guid? _loadedFor;
+    private string? _photo;
+
     [Parameter] public string Name { get; set; } = "";
     [Parameter] public Guid? Id { get; set; }
     [Parameter] public int Size { get; set; } = 32;
+
+    /// <summary>True when <see cref="Id"/> is a user, so their profile photo is shown. Contacts, accounts and leads keep their initials.</summary>
+    [Parameter] public bool IsUser { get; set; }
 
     private string Background
     {
@@ -14,6 +33,38 @@
             var key = Id?.ToByteArray().Sum(b => (int)b) ?? Name.Sum(c => (int)c);
             return Palette[Math.Abs(key) % Palette.Length];
         }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_photos is null)
+        {
+            _photos = Services.GetService(typeof(AvatarPhotos)) as AvatarPhotos;
+            if (_photos is not null) _photos.Changed += OnChanged;
+        }
+
+        if (_photos is null || !IsUser || Id is not { } id)
+        {
+            _photo = null;
+            _loadedFor = null;
+            return;
+        }
+
+        if (_loadedFor == id) return;
+        _loadedFor = id;
+        _photo = await _photos.GetAsync(id);
+    }
+
+    private async void OnChanged(Guid changed)
+    {
+        if (_photos is null || _loadedFor != changed) return;
+        _photo = await _photos.GetAsync(changed);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        if (_photos is not null) _photos.Changed -= OnChanged;
     }
 
     private static MudBlazor.Size SizeOf(int size) => size <= 24 ? MudBlazor.Size.Small : MudBlazor.Size.Medium;

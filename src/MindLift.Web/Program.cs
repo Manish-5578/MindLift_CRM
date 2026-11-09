@@ -21,6 +21,7 @@ builder.Services.AddMindLiftLocalization();
 builder.Services.AddScoped<AuthSession>();
 builder.Services.AddScoped<AppState>();
 builder.Services.AddScoped<NotificationClient>();
+builder.Services.AddScoped<MindLift.UI.Components.AvatarPhotos>();
 builder.Services.AddScoped<PlatformNotifier>();
 builder.Services.AddScoped<QuickLogDockState>();
 builder.Services.AddScoped(sp => new HttpClient(new AuthHandler(sp.GetRequiredService<AuthSession>(), apiBase)) { BaseAddress = apiBase });

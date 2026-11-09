@@ -90,7 +90,7 @@
                 <MudText Typo="Typo.body2" Class="ml-muted ml-truncate">@(deal.AccountName ?? deal.ContactName ?? "—")</MudText>
                 <div class="ml-row ml-row--between">
                     <MoneyText Amount="deal.Amount" Currency="@deal.Currency" />
-                    <UserAvatar Name="@OwnerName(deal)" Id="@deal.OwnerId" Size="24" />
+                    <UserAvatar Name="@OwnerName(deal)" Id="@deal.OwnerId" IsUser="true" Size="24" />
                 </div>
                 <div class="ml-row ml-row--wrap">
                     @if (deal.ExpectedCloseDate is not null)

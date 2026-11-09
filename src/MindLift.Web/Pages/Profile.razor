@@ -1,0 +1,66 @@
+@page "/profile"
+@inject AppState App
+@inject AvatarPhotos Photos
+@inject ISnackbar Snackbar
+@inject Translator T
+
+<PageTitle>@T["My profile"] · MindLift</PageTitle>
+
+@if (App.Bootstrap is { } boot)
+{
+    var me = boot.User;
+    <PageHeader Title="My profile" Subtitle="Your photo is shown to your team across the app." />
+
+    <MlCard Title="Profile photo" Subtitle="A square photo works best. JPG, PNG or WEBP up to 3 MB.">
+        <div class="d-flex align-center flex-wrap gap-4" data-testid="profile-photo-card">
+            <UserAvatar Name="@me.FullName" Id="@me.UserId" IsUser="true" Size="96" />
+            <div class="ml-stack">
+                <div>
+                    <MudText Typo="Typo.subtitle1" Style="font-weight:600">@me.FullName</MudText>
+                    <MudText Typo="Typo.body2" Class="ml-muted">@me.Email</MudText>
+                </div>
+                <div class="d-flex align-center flex-wrap gap-2">
+                    <label class="mud-button-root mud-button mud-button-filled mud-button-filled-primary mud-button-filled-size-medium" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;@(_busy ? "opacity:.6;pointer-events:none" : "")">
+                        <MudIcon Icon="@Icons.Material.Outlined.PhotoCamera" Size="Size.Small" />
+                        <span>@T["Upload photo"]</span>
+                        <InputFile OnChange="OnFileSelected" accept="image/png,image/jpeg,image/webp" style="display:none" aria-label="@T["Upload photo"]" data-testid="profile-photo-input" />
+                    </label>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" Disabled="@_busy" OnClick="RemoveAsync" StartIcon="@Icons.Material.Outlined.Delete" data-testid="profile-photo-remove">@T["Remove photo"]</MudButton>
+                </div>
+                @if (_busy)
+                {
+                    <MudProgressLinear Indeterminate="true" Size="Size.Small" />
+                }
+            </div>
+        </div>
+    </MlCard>
+}
+
+@code {
+    private bool _busy;
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        if (App.Bootstrap is not { } boot || e.File is null) return;
+        _busy = true;
+        var error = await Photos.UploadAsync(boot.User.UserId, e.File);
+        _busy = false;
+        if (error is null)
+        {
+            Snackbar.Add(T["Your photo was updated."], Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add(T[error], Severity.Warning);
+        }
+    }
+
+    private async Task RemoveAsync()
+    {
+        if (App.Bootstrap is not { } boot) return;
+        _busy = true;
+        var ok = await Photos.RemoveAsync(boot.User.UserId);
+        _busy = false;
+        Snackbar.Add(ok ? T["Your photo was removed."] : T["The photo could not be removed. Try again."], ok ? Severity.Success : Severity.Warning);
+    }
+}

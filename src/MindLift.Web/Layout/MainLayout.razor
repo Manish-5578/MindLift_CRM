@@ -48,13 +48,19 @@
                 <QuickAdd />
                 <MudIconButton Icon="@Icons.Material.Outlined.Forum" Color="Color.Inherit" Href="/chat" Title="@T["Team Chat"]" aria-label="@T["Team Chat"]" />
                 <NotificationBell />
-                <MudMenu Icon="@Icons.Material.Outlined.Person" Color="Color.Inherit" AriaLabel="@T["Account menu"]" Dense="true">
+                <MudMenu Color="Color.Inherit" AriaLabel="@T["Account menu"]" Dense="true">
+                    <ActivatorContent>
+                        <UserAvatar Name="@App.Bootstrap.User.FullName" Id="@App.Bootstrap.User.UserId" IsUser="true" Size="32" />
+                    </ActivatorContent>
+                    <ChildContent>
                     <MudText Typo="Typo.body2" Class="px-4 py-2 ml-muted">@App.Bootstrap.User.FullName</MudText>
                     <MudDivider />
+                    <MudMenuItem Href="/profile">@T["My profile"]</MudMenuItem>
                     <MudMenuItem Href="/notifications/preferences">@T["Notification preferences"]</MudMenuItem>
                     <MudMenuItem OnClick="ToggleDark">@(_isDark ? T["Light mode"] : T["Dark mode"])</MudMenuItem>
                     <MudMenuItem OnClick="ToggleLanguage">@(App.IsArabic ? "English" : "العربية")</MudMenuItem>
                     <MudMenuItem OnClick="SignOut">@T["Sign out"]</MudMenuItem>
+                    </ChildContent>
                 </MudMenu>
             }
         </MudAppBar>

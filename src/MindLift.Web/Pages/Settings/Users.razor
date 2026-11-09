@@ -50,7 +50,7 @@
             @foreach (var user in _users.Items)
             {
                 <div class="ml-row ml-row--wrap" style="padding:12px 20px;border-bottom:1px solid var(--ml-border);min-height:56px" data-testid="row">
-                    <UserAvatar Name="@user.FullName" Id="@user.Id" Size="32" />
+                    <UserAvatar Name="@user.FullName" Id="@user.Id" IsUser="true" Size="32" />
                     <div class="ml-grow" style="min-width:0;overflow-wrap:anywhere">
                         <MudText Typo="Typo.subtitle2">@user.FullName</MudText>
                         <MudText Typo="Typo.caption" Class="ml-muted">@user.Email · @(user.RoleName ?? "No role")</MudText>

@@ -94,7 +94,7 @@
                 <MudText Typo="Typo.body2" Class="ml-muted ml-truncate">@LeadSubtitle(lead)</MudText>
                 <div class="ml-row ml-row--between">
                     <MudText Typo="Typo.caption" Class="ml-muted">@SourceLabel(lead.Source) · <DateText Value="@lead.CreatedAtUtc" /></MudText>
-                    <UserAvatar Name="@(lead.CreatedByName ?? lead.OwnerName ?? "?")" Id="@(lead.CreatedById ?? lead.OwnerId)" Size="24" />
+                    <UserAvatar Name="@(lead.CreatedByName ?? lead.OwnerName ?? "?")" Id="@(lead.CreatedById ?? lead.OwnerId)" IsUser="true" Size="24" />
                 </div>
             </div>;
 

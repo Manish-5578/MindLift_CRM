@@ -59,9 +59,7 @@
                         {
                             <MudListItem T="Guid" Value="@u.Id" Selected="@(_selectedRecipientId == u.Id)" OnClick="@(() => SelectUserAsync(u))">
                                 <div class="d-flex align-center gap-2" style="width: 100%;">
-                                    <MudAvatar Size="Size.Small" Color="Color.Primary" Style="font-size: 0.75rem;">
-                                        @u.Name.Substring(0, 1).ToUpperInvariant()
-                                    </MudAvatar>
+                                    <UserAvatar Name="@u.Name" Id="@u.Id" IsUser="true" Size="28" />
                                     <div class="flex-grow-1 text-truncate">
                                         <MudText Typo="Typo.body2" Class="text-truncate" Style="font-weight: 600;">@u.Name</MudText>
                                         <MudText Typo="Typo.caption" Class="ml-muted text-truncate" Style="display: block;">@u.Role</MudText>
@@ -84,9 +82,7 @@
             <div class="pa-3 d-flex align-center gap-2" style="border-bottom: 1px solid var(--mud-palette-lines-default); min-height: 54px;">
                 @if (_selectedRecipientId != null)
                 {
-                    <MudAvatar Size="Size.Small" Color="Color.Primary">
-                        @_selectedRecipientName?.Substring(0, 1).ToUpperInvariant()
-                    </MudAvatar>
+                    <UserAvatar Name="@(_selectedRecipientName ?? "?")" Id="@_selectedRecipientId" IsUser="true" Size="28" />
                     <div>
                         <MudText Typo="Typo.subtitle2" Style="font-weight: 700;">@_selectedRecipientName</MudText>
                         <MudText Typo="Typo.caption" Class="ml-muted">@T["Direct Conversation"]</MudText>
