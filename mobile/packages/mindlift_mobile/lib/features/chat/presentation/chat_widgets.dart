@@ -205,7 +205,7 @@ class _AttachmentViewState extends ConsumerState<AttachmentView> {
                     Container(
                       height: 4,
                       decoration: BoxDecoration(color: _fg.withOpacity(0.25), borderRadius: BorderRadius.circular(2)),
-                      alignment: Alignment.centerLeft,
+                      alignment: AlignmentDirectional.centerStart,
                       child: FractionallySizedBox(
                         widthFactor: progress,
                         child: Container(decoration: BoxDecoration(color: _fg, borderRadius: BorderRadius.circular(2))),

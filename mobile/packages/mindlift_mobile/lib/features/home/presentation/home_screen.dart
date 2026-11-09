@@ -82,9 +82,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: MlTypography.labelLarge.copyWith(color: MlColors.textPrimary)),
+                  Text(MlStrings.t(title), style: MlTypography.labelLarge.copyWith(color: MlColors.textPrimary)),
                   const SizedBox(height: 2),
-                  Text(body, style: MlTypography.bodySmall.copyWith(color: MlColors.textMuted)),
+                  Text(MlStrings.t(body), style: MlTypography.bodySmall.copyWith(color: MlColors.textMuted)),
                 ],
               ),
             ),
@@ -223,11 +223,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               if (_leadCounts.isNotEmpty) ...[
                 Row(
                   children: [
-                    Expanded(child: Text('My leads', style: MlTypography.labelLarge.copyWith(color: MlColors.textPrimary))),
+                    Expanded(child: Text('My leads'.tr, style: MlTypography.labelLarge.copyWith(color: MlColors.textPrimary))),
                     MlPressable(
                       onTap: () => context.go('/leads'),
                       child: Row(children: [
-                        Text('View all', style: MlTypography.labelMedium.copyWith(color: MlColors.primary)),
+                        Text('View all'.tr, style: MlTypography.labelMedium.copyWith(color: MlColors.primaryText)),
                         const MlIcon(MlIcons.chevronRight, size: 20, color: MlColors.primary),
                       ]),
                     ),
@@ -367,7 +367,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: MlIcon(icon2 ?? icon, size: 22, color: MlColors.primary),
           ),
           const SizedBox(height: 6),
-          Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: MlColors.textPrimary, decoration: TextDecoration.none)),
+          Text(MlStrings.t(label), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: MlColors.textPrimary, decoration: TextDecoration.none)),
         ]),
       ),
     );

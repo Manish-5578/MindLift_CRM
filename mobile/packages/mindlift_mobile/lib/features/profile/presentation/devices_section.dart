@@ -84,12 +84,12 @@ class _DevicesSectionState extends ConsumerState<DevicesSection> {
           if (devices == null)
             _failed
                 ? Row(children: [
-                    Expanded(child: Text('Could not load your devices.', style: MlTypography.bodySmall.copyWith(color: MlColors.textMuted))),
+                    Expanded(child: Text('Could not load your devices.'.tr, style: MlTypography.bodySmall.copyWith(color: MlColors.textMuted))),
                     MlButton(label: 'Retry', size: MlButtonSize.small, variant: MlButtonVariant.secondary, onPressed: _load),
                   ])
                 : const Padding(padding: EdgeInsets.all(8), child: Center(child: MlSpinner(size: 22)))
           else if (devices.isEmpty)
-            Text('No devices are registered for notifications.', style: MlTypography.bodySmall.copyWith(color: MlColors.textMuted))
+            Text('No devices are registered for notifications.'.tr, style: MlTypography.bodySmall.copyWith(color: MlColors.textMuted))
           else
             for (var i = 0; i < devices.length; i++) ...[
               if (i > 0) Container(height: 1, color: MlColors.border, margin: const EdgeInsets.symmetric(vertical: MlSpacing.sm)),

@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import '../tokens/strings.dart';
 import '../tokens/colors.dart';
 import '../tokens/spacing.dart';
 import '../tokens/typography.dart';
@@ -81,14 +82,14 @@ class MlScreen extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    title!,
+                    MlStrings.t(title!),
                     style: MlTypography.titleMedium(),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   if (subtitle != null)
                     Text(
-                      subtitle!,
+                      MlStrings.t(subtitle!),
                       style: MlTypography.caption(),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

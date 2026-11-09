@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import '../tokens/strings.dart';
 import '../tokens/colors.dart';
 import '../tokens/radii.dart';
 import '../tokens/spacing.dart';
@@ -87,7 +88,7 @@ class MlSheet extends StatelessWidget {
                 child: Row(
                   children: [
                     Expanded(
-                      child: Text(title!, style: MlTypography.titleMedium()),
+                      child: Text(MlStrings.t(title!), style: MlTypography.titleMedium()),
                     ),
                     MlIconButton(
                       label: 'Close',

@@ -7,6 +7,7 @@ import 'package:mindlift_ui/mindlift_ui.dart';
 import '../../../core/network_provider.dart';
 import '../../../core/offline_store.dart';
 import 'lead_actions.dart';
+import 'lead_tools.dart';
 import 'saved_view_form.dart';
 import '../../../core/top_bar_actions.dart';
 import 'package:flutter/services.dart' show HapticFeedback;
@@ -228,7 +229,7 @@ class _LeadsScreenState extends ConsumerState<LeadsScreen> {
               behavior: HitTestBehavior.opaque,
               onTap: () => setState(_selected.clear),
               child: Padding(
-                padding: const EdgeInsets.only(right: MlSpacing.sm),
+                padding: const EdgeInsetsDirectional.only(end: MlSpacing.sm),
                 child: MlIcon(MlIcons.close, size: 20, color: MlColors.textPrimary),
               ),
             )
@@ -265,6 +266,11 @@ class _LeadsScreenState extends ConsumerState<LeadsScreen> {
                   icon: MlIcon(MlIcons.add, size: 22, color: MlColors.primary),
                   onPressed: () => _actions.editLead(null),
                 ),
+              MlIconButton(
+                label: 'More',
+                icon: const MlIcon(MlIcons.more, size: 26),
+                onPressed: () => LeadTools(context: context, ref: ref, cfg: _cfg).menu(view: _view, search: _search.text, onImported: _refreshAll),
+              ),
               ...topBarActions(),
             ],
       body: Column(
@@ -300,7 +306,7 @@ class _LeadsScreenState extends ConsumerState<LeadsScreen> {
             return MlPressable(
               onTap: _newView,
               child: Container(
-                margin: const EdgeInsets.only(right: 8),
+                margin: const EdgeInsetsDirectional.only(end: 8),
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(MlRadii.full),
@@ -311,7 +317,7 @@ class _LeadsScreenState extends ConsumerState<LeadsScreen> {
                   children: [
                     const Icon(MlIcons.add, size: 18, color: MlColors.primary),
                     const SizedBox(width: 2),
-                    Text('View', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MlColors.primary, decoration: TextDecoration.none)),
+                    Text('View'.tr, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MlColors.primaryText, decoration: TextDecoration.none)),
                   ],
                 ),
               ),
@@ -323,7 +329,7 @@ class _LeadsScreenState extends ConsumerState<LeadsScreen> {
             onTap: () => _selectView(v.key),
             onLongPress: v.savedId == null ? null : () => _editView(v),
             child: Container(
-              margin: const EdgeInsets.only(right: 8),
+              margin: const EdgeInsetsDirectional.only(end: 8),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
                 color: on ? MlColors.primary : MlColors.surface,
@@ -411,8 +417,8 @@ class _LeadsScreenState extends ConsumerState<LeadsScreen> {
                           }
                           return false;
                         },
-                        background: _swipeBackground(MlIcons.call, 'Call', MlColors.success, Alignment.centerLeft),
-                        secondaryBackground: _swipeBackground(MlIcons.swap, 'Status', MlColors.primary, Alignment.centerRight),
+                        background: _swipeBackground(MlIcons.call, 'Call', MlColors.success, AlignmentDirectional.centerStart),
+                        secondaryBackground: _swipeBackground(MlIcons.swap, 'Status', MlColors.primary, AlignmentDirectional.centerEnd),
                         child: card,
                       ),
                     );
@@ -437,7 +443,7 @@ class _LeadsScreenState extends ConsumerState<LeadsScreen> {
                 final col = _items.where((l) => l.status == s.value).toList();
                 return Container(
                   width: 280,
-                  margin: const EdgeInsets.only(right: MlSpacing.sm, bottom: MlSpacing.sm),
+                  margin: const EdgeInsetsDirectional.only(end: MlSpacing.sm, bottom: MlSpacing.sm),
                   decoration: BoxDecoration(
                     color: MlColors.surfaceElevated,
                     borderRadius: BorderRadius.circular(MlRadii.lg),
@@ -460,7 +466,7 @@ class _LeadsScreenState extends ConsumerState<LeadsScreen> {
                       ),
                       Expanded(
                         child: col.isEmpty
-                            ? Center(child: Text('No leads', style: TextStyle(fontSize: 12, color: MlColors.textMuted, decoration: TextDecoration.none)))
+                            ? Center(child: Text('No leads'.tr, style: TextStyle(fontSize: 12, color: MlColors.textMuted, decoration: TextDecoration.none)))
                             : ListView.builder(
                                 padding: const EdgeInsets.fromLTRB(MlSpacing.xs, 0, MlSpacing.xs, MlSpacing.sm),
                                 itemCount: col.length,
@@ -529,7 +535,7 @@ String shortDate(DateTime utc) {
   return '${t.day} ${m[t.month - 1]} ${t.year}';
 }
 
-Widget _swipeBackground(IconData icon, String label, Color color, Alignment align) {
+Widget _swipeBackground(IconData icon, String label, Color color, AlignmentGeometry align) {
   return Container(
     margin: const EdgeInsets.only(bottom: MlSpacing.sm),
     padding: const EdgeInsets.symmetric(horizontal: 22),
@@ -541,7 +547,7 @@ Widget _swipeBackground(IconData icon, String label, Color color, Alignment alig
       children: [
         Icon(icon, color: MlColors.white, size: 26),
         const SizedBox(height: 2),
-        Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: MlColors.white, decoration: TextDecoration.none)),
+        Text(MlStrings.t(label), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: MlColors.white, decoration: TextDecoration.none)),
       ],
     ),
   );
@@ -591,7 +597,7 @@ class _LeadCard extends StatelessWidget {
               children: [
                 if (selecting)
                   Padding(
-                    padding: const EdgeInsets.only(right: 10),
+                    padding: const EdgeInsetsDirectional.only(end: 10),
                     child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 160),
                       child: MlIcon(selected ? MlIcons.selectOn : MlIcons.selectOff,
@@ -600,7 +606,7 @@ class _LeadCard extends StatelessWidget {
                   )
                 else
                   Padding(
-                    padding: const EdgeInsets.only(right: 12),
+                    padding: const EdgeInsetsDirectional.only(end: 12),
                     child: MlAvatar(name: lead.title, size: compact ? MlAvatarSize.sm : MlAvatarSize.md),
                   ),
                 Expanded(
@@ -615,7 +621,7 @@ class _LeadCard extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: MlColors.textPrimary, decoration: TextDecoration.none)),
                           ),
-                          if (hasNote) const Padding(padding: EdgeInsets.only(left: 6), child: MlIcon(MlIcons.note, size: 18)),
+                          if (hasNote) const Padding(padding: EdgeInsetsDirectional.only(start: 6), child: MlIcon(MlIcons.note, size: 18)),
                         ],
                       ),
                       const SizedBox(height: 2),
@@ -631,7 +637,7 @@ class _LeadCard extends StatelessWidget {
                     behavior: HitTestBehavior.opaque,
                     onTap: onMenu,
                     child: Padding(
-                      padding: const EdgeInsets.only(left: 8, top: 2, bottom: 2),
+                      padding: const EdgeInsetsDirectional.only(start: 8, top: 2, bottom: 2),
                       child: Text('⋮', style: TextStyle(fontSize: 22, color: MlColors.textMuted, fontWeight: FontWeight.w700, decoration: TextDecoration.none)),
                     ),
                   ),

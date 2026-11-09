@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' show materialTextSelectionHandleControls;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import '../tokens/colors.dart';
+import '../tokens/strings.dart';
 import '../tokens/radii.dart';
 import '../tokens/spacing.dart';
 import '../tokens/typography.dart';
@@ -110,7 +111,7 @@ class _MlTextFieldState extends State<MlTextField> {
       children: [
         if (widget.label != null) ...[
           Text(
-            widget.label!,
+            MlStrings.t(widget.label!),
             style: MlTypography.label(
               color: hasError ? MlColors.danger : MlColors.textSecondary,
             ),
@@ -137,11 +138,11 @@ class _MlTextFieldState extends State<MlTextField> {
               ],
               Expanded(
                 child: Stack(
-                  alignment: Alignment.centerLeft,
+                  alignment: AlignmentDirectional.centerStart,
                   children: [
                     if (_controller.text.isEmpty && widget.placeholder != null)
                       Text(
-                        widget.placeholder!,
+                        MlStrings.t(widget.placeholder!),
                         style: MlTypography.bodyMedium(color: MlColors.textMuted),
                       ),
                     EditableText(
@@ -184,13 +185,13 @@ class _MlTextFieldState extends State<MlTextField> {
         if (widget.errorText != null) ...[
           const SizedBox(height: MlSpacing.xxs),
           Text(
-            widget.errorText!,
+            MlStrings.t(widget.errorText!),
             style: MlTypography.caption(color: MlColors.danger),
           ),
         ] else if (widget.helperText != null) ...[
           const SizedBox(height: MlSpacing.xxs),
           Text(
-            widget.helperText!,
+            MlStrings.t(widget.helperText!),
             style: MlTypography.caption(color: MlColors.textMuted),
           ),
         ],

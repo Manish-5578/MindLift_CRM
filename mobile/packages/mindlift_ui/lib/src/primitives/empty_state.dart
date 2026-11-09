@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import '../tokens/strings.dart';
 import '../tokens/colors.dart';
 import '../tokens/spacing.dart';
 import '../tokens/typography.dart';
@@ -45,14 +46,14 @@ class MlEmptyState extends StatelessWidget {
               const SizedBox(height: MlSpacing.lg),
             ],
             Text(
-              title,
+              MlStrings.t(title),
               style: MlTypography.headingSmall.copyWith(color: MlColors.textPrimary),
               textAlign: TextAlign.center,
             ),
             if (subtitle != null) ...[
               const SizedBox(height: MlSpacing.xs),
               Text(
-                subtitle!,
+                MlStrings.t(subtitle!),
                 style: MlTypography.bodyMedium.copyWith(color: MlColors.textMuted),
                 textAlign: TextAlign.center,
               ),

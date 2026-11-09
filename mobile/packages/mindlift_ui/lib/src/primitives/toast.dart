@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import '../tokens/strings.dart';
 import '../tokens/colors.dart';
 import '../tokens/radii.dart';
 import '../tokens/spacing.dart';
@@ -100,7 +101,7 @@ class _ToastWidgetState extends State<_ToastWidget> with SingleTickerProviderSta
                     const SizedBox(width: 10),
                     Flexible(
                       child: Text(
-                        widget.message,
+                        MlStrings.t(widget.message),
                         style: const TextStyle(fontSize: 14, height: 1.3, fontWeight: FontWeight.w500, color: MlColors.white, decoration: TextDecoration.none),
                       ),
                     ),

@@ -29,3 +29,4 @@ export 'src/primitives/text_field.dart';
 export 'src/primitives/timeline.dart';
 export 'src/primitives/toast.dart';
 
+export 'src/tokens/strings.dart';

@@ -104,6 +104,64 @@ class LeadsService {
     await _dio.delete('/api/v1/views/$id');
   }
 
+  // ---- export, import, duplicates and convert: the same calls the web list and lead page make
+
+  /// The leads of a view (or search) as CSV bytes.
+  Future<List<int>> exportCsv({String? search, Map<String, dynamic>? filter, String sortField = 'created_at', String sortDir = 'desc'}) async {
+    final response = await _dio.post<List<int>>(
+      '/api/v1/leads/export',
+      queryParameters: {'format': 'csv'},
+      data: {
+        if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
+        if (filter != null) 'filter': filter,
+        'sortField': sortField,
+        'sortDir': sortDir,
+        'page': 1,
+        'pageSize': 5000,
+      },
+      options: Options(responseType: ResponseType.bytes, receiveTimeout: const Duration(minutes: 2)),
+    );
+    return response.data ?? const <int>[];
+  }
+
+  Future<List<int>> importTemplateCsv() async {
+    final response = await _dio.get<List<int>>('/api/v1/leads/template', queryParameters: {'format': 'csv'}, options: Options(responseType: ResponseType.bytes));
+    return response.data ?? const <int>[];
+  }
+
+  /// Uploads a CSV or Excel file. Returns {total, created, skipped, failed, errors}.
+  Future<Map<String, dynamic>> importFile({required String path, required String name}) async {
+    final form = FormData.fromMap({'file': await MultipartFile.fromFile(path, filename: name)});
+    final response = await _dio.post('/api/v1/leads/import', data: form, options: Options(contentType: 'multipart/form-data', sendTimeout: const Duration(minutes: 3), receiveTimeout: const Duration(minutes: 3)));
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  /// Other leads, contacts or accounts that look like this lead.
+  Future<List<Map<String, dynamic>>> duplicatesOf(String leadId) async {
+    final response = await _dio.get('/api/v1/leads/$leadId/duplicates');
+    return ((response.data as List?) ?? const []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> checkDuplicates({required String firstName, required String lastName, String? email, String? phone, String? companyName}) async {
+    final response = await _dio.post('/api/v1/leads/check-duplicates', data: {'firstName': firstName, 'lastName': lastName, 'email': email, 'phone': phone, 'companyName': companyName});
+    return ((response.data as List?) ?? const []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+
+  /// Folds the chosen duplicate leads into [id] and deletes them.
+  Future<void> merge(String id, List<String> duplicateIds) async {
+    await _dio.post('/api/v1/leads/$id/merge', data: {'duplicateIds': duplicateIds, 'fieldOverrides': null});
+  }
+
+  Future<Map<String, dynamic>> convertOptions(String leadId) async {
+    final response = await _dio.get('/api/v1/leads/$leadId/convert-options');
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<Map<String, dynamic>> convert(String leadId, Map<String, dynamic> body) async {
+    final response = await _dio.post('/api/v1/leads/$leadId/convert', data: body);
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
   Future<LeadPage> queryPage({
     String? search,
     Map<String, dynamic>? filter,

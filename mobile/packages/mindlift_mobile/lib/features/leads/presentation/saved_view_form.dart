@@ -156,7 +156,7 @@ class _SavedViewFormState extends ConsumerState<SavedViewForm> {
               height: 28,
               padding: const EdgeInsets.all(3),
               decoration: BoxDecoration(color: value ? MlColors.primary : MlColors.surfaceMuted, borderRadius: BorderRadius.circular(14)),
-              alignment: value ? Alignment.centerRight : Alignment.centerLeft,
+              alignment: value ? AlignmentDirectional.centerEnd : AlignmentDirectional.centerStart,
               child: Container(width: 22, height: 22, decoration: const BoxDecoration(color: MlColors.white, shape: BoxShape.circle)),
             ),
           ],
@@ -193,7 +193,7 @@ class _SavedViewFormState extends ConsumerState<SavedViewForm> {
         children: [
           MlTextField(label: 'View name', placeholder: 'e.g. Hot leads this week', controller: _name, errorText: _nameError),
           const SizedBox(height: MlSpacing.md),
-          Text('Show leads with status', style: MlTypography.labelMedium.copyWith(color: MlColors.textSecondary)),
+          Text('Show leads with status'.tr, style: MlTypography.labelMedium.copyWith(color: MlColors.textSecondary)),
           const SizedBox(height: 4),
           Text(_statuses.isEmpty ? 'Any status' : '${_statuses.length} selected', style: MlTypography.caption.copyWith(color: MlColors.textMuted)),
           const SizedBox(height: MlSpacing.xs),
@@ -211,7 +211,7 @@ class _SavedViewFormState extends ConsumerState<SavedViewForm> {
           _toggle('Newest first', 'Turn off to list oldest first', _newestFirst, (v) => setState(() => _newestFirst = v)),
           if (_otherConditions.isNotEmpty || _groups.isNotEmpty) ...[
             const SizedBox(height: 4),
-            Text('Other filters set on the web are kept as they are.', style: MlTypography.caption.copyWith(color: MlColors.textMuted)),
+            Text('Other filters set on the web are kept as they are.'.tr, style: MlTypography.caption.copyWith(color: MlColors.textMuted)),
           ],
           const SizedBox(height: MlSpacing.md),
           MlButton(label: widget.existing == null ? 'Create view' : 'Save changes', isLoading: _busy, onPressed: _busy ? null : _save),

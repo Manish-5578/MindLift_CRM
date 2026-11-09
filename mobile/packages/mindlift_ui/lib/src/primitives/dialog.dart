@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import '../tokens/strings.dart';
 import '../tokens/colors.dart';
 import '../tokens/radii.dart';
 import '../tokens/spacing.dart';
@@ -99,12 +100,12 @@ class MlDialog extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            title,
+            MlStrings.t(title),
             style: MlTypography.headingSmall,
           ),
           const SizedBox(height: MlSpacing.xs),
           Text(
-            message,
+            MlStrings.t(message),
             style: MlTypography.bodySmall,
           ),
           const SizedBox(height: MlSpacing.lg),

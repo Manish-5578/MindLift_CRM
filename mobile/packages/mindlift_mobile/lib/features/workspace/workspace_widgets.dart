@@ -64,7 +64,7 @@ class SectionCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(child: Text(title, style: MlTypography.labelLarge.copyWith(color: MlColors.textPrimary))),
+              Expanded(child: Text(MlStrings.t(title), style: MlTypography.labelLarge.copyWith(color: MlColors.textPrimary))),
               if (action != null) action!,
             ],
           ),
@@ -90,7 +90,7 @@ class InfoRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 104, child: Text(label, style: MlTypography.bodySmall.copyWith(color: MlColors.textMuted))),
+          SizedBox(width: 104, child: Text(MlStrings.t(label), style: MlTypography.bodySmall.copyWith(color: MlColors.textMuted))),
           Expanded(
             child: GestureDetector(
               onTap: onTap,
@@ -124,7 +124,7 @@ class ActionChip2 extends StatelessWidget {
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           MlIcon(icon, size: 19, color: MlColors.primary),
           const SizedBox(width: 7),
-          Text(label, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: MlColors.textPrimary, decoration: TextDecoration.none)),
+          Text(MlStrings.t(label), style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: MlColors.textPrimary, decoration: TextDecoration.none)),
         ]),
       ),
     );
@@ -398,16 +398,16 @@ class _DocumentsSectionState extends ConsumerState<DocumentsSection> {
                   onTap: _addSheet,
                   child: Row(children: [
                     const MlIcon(MlIcons.add, size: 20, color: MlColors.primary),
-                    Text('Add', style: MlTypography.labelMedium.copyWith(color: MlColors.primary)),
+                    Text('Add'.tr, style: MlTypography.labelMedium.copyWith(color: MlColors.primaryText)),
                   ]),
                 ))
           : null,
       child: files == null
           ? (_failed
-              ? Text('Could not load documents.', style: MlTypography.bodySmall.copyWith(color: MlColors.textMuted))
+              ? Text('Could not load documents.'.tr, style: MlTypography.bodySmall.copyWith(color: MlColors.textMuted))
               : const Center(child: Padding(padding: EdgeInsets.all(8), child: MlSpinner(size: 22))))
           : files.isEmpty
-              ? Text('No documents yet.', style: MlTypography.bodySmall.copyWith(color: MlColors.textMuted))
+              ? Text('No documents yet.'.tr, style: MlTypography.bodySmall.copyWith(color: MlColors.textMuted))
               : Column(
                   children: [
                     for (final f in files)
@@ -504,7 +504,7 @@ class _LinkedActivitiesState extends ConsumerState<LinkedActivities> {
       child: items == null
           ? const Center(child: Padding(padding: EdgeInsets.all(8), child: MlSpinner(size: 22)))
           : items.isEmpty
-              ? Text('Nothing logged yet.', style: MlTypography.bodySmall.copyWith(color: MlColors.textMuted))
+              ? Text('Nothing logged yet.'.tr, style: MlTypography.bodySmall.copyWith(color: MlColors.textMuted))
               : Column(children: [
                   for (final a in items.take(12))
                     Padding(

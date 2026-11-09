@@ -127,8 +127,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   children: [
                     Row(
                       children: [
-                        const Expanded(
-                          child: Text('Messages',
+                        Expanded(
+                          child: Text('Messages'.tr,
                               style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: _white, decoration: TextDecoration.none)),
                         ),
                         const ThemeIconButton(color: _white),
@@ -162,7 +162,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ),
           Expanded(
             child: _loadingPeople
-                ? const Center(child: Text('Loading...'))
+                ? Center(child: Text('Loading...'.tr))
                 : shown.isEmpty
                     ? Center(
                         child: Text(
@@ -675,11 +675,11 @@ class _ThreadViewState extends ConsumerState<_ThreadView> {
             padding: const EdgeInsets.fromLTRB(13, 9, 11, 6),
             decoration: BoxDecoration(
               color: isMe ? mine : MlColors.surface,
-              borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(18),
-                topRight: const Radius.circular(18),
-                bottomLeft: Radius.circular(isMe ? 18 : 4),
-                bottomRight: Radius.circular(isMe ? 4 : 18),
+              borderRadius: BorderRadiusDirectional.only(
+                topStart: const Radius.circular(18),
+                topEnd: const Radius.circular(18),
+                bottomStart: Radius.circular(isMe ? 18 : 4),
+                bottomEnd: Radius.circular(isMe ? 4 : 18),
               ),
               border: isMe ? null : Border.all(color: MlColors.border),
               boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 6, offset: Offset(0, 2))],
@@ -690,7 +690,7 @@ class _ThreadViewState extends ConsumerState<_ThreadView> {
               children: [
                 if (msg.replyToId != null)
                   Align(
-                    alignment: Alignment.centerLeft,
+                    alignment: AlignmentDirectional.centerStart,
                     child: ReplyQuote(sender: msg.replyToSender ?? 'Message', text: msg.replyToText ?? '', isMe: isMe),
                   ),
                 if (msg.hasAttachment)
@@ -700,7 +700,7 @@ class _ThreadViewState extends ConsumerState<_ThreadView> {
                   ),
                 if (hasText)
                   Align(
-                    alignment: Alignment.centerLeft,
+                    alignment: AlignmentDirectional.centerStart,
                     child: Text(msg.message,
                         style: TextStyle(
                             fontSize: 15.5,
@@ -732,7 +732,7 @@ class _ThreadViewState extends ConsumerState<_ThreadView> {
         ),
         if (msg.reactions.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.only(bottom: 4, left: 6, right: 6),
+            padding: const EdgeInsetsDirectional.only(bottom: 4, start: 6, end: 6),
             child: ReactionsRow(reactions: msg.reactions, onTap: (e) => _react(msg, e)),
           ),
       ],
@@ -905,7 +905,7 @@ class _ThreadViewState extends ConsumerState<_ThreadView> {
             if (_uploading)
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
-                child: Text('Sending…', style: TextStyle(fontSize: 12, color: MlColors.textMuted, decoration: TextDecoration.none, fontWeight: FontWeight.w400)),
+                child: Text('Sending…'.tr, style: TextStyle(fontSize: 12, color: MlColors.textMuted, decoration: TextDecoration.none, fontWeight: FontWeight.w400)),
               ),
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -987,7 +987,7 @@ class _ThreadViewState extends ConsumerState<_ThreadView> {
             child: Stack(
               children: [
                 _loading && _messages.isEmpty
-                    ? const Center(child: Text('Loading...'))
+                    ? Center(child: Text('Loading...'.tr))
                     : shown.isEmpty
                         ? Center(
                             child: Container(
@@ -1033,7 +1033,7 @@ class _ThreadViewState extends ConsumerState<_ThreadView> {
                                             style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: MlColors.textMuted, decoration: TextDecoration.none)),
                                       ),
                                     Align(
-                                      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                                      alignment: isMe ? AlignmentDirectional.centerEnd : AlignmentDirectional.centerStart,
                                       child: _bubble(msg, isMe, sameAsPrev, mine),
                                     ),
                                   ],

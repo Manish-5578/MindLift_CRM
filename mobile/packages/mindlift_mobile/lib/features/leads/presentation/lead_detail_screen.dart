@@ -8,6 +8,7 @@ import '../../../core/network_provider.dart';
 import '../../../core/offline_store.dart';
 import '../../workspace/workspace_widgets.dart' show DocumentsSection;
 import 'lead_actions.dart';
+import 'lead_tools.dart';
 import 'leads_screen.dart' show statusColor, statusState, shortDate;
 
 /// One lead, with the same actions as the web detail page: status, edit, notes, move to engagement and convert.
@@ -182,7 +183,7 @@ class _LeadDetailScreenState extends ConsumerState<LeadDetailScreen> {
       );
     }
     if (lead == null) {
-      return MlScreen(title: 'Lead', leading: back, body: const Center(child: Text('This lead could not be opened.')));
+      return MlScreen(title: 'Lead', leading: back, body: Center(child: Text('This lead could not be opened.'.tr)));
     }
 
     final raw = _raw!;
@@ -224,7 +225,7 @@ class _LeadDetailScreenState extends ConsumerState<LeadDetailScreen> {
                       GestureDetector(
                         onTap: canEdit && s.value != lead.status ? () => _actions.changeStatus(lead) : null,
                         child: Container(
-                          margin: const EdgeInsets.only(right: 8),
+                          margin: const EdgeInsetsDirectional.only(end: 8),
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                           decoration: BoxDecoration(
                             color: s.value == lead.status ? statusColor(s.value) : MlColors.surface,
@@ -243,7 +244,7 @@ class _LeadDetailScreenState extends ConsumerState<LeadDetailScreen> {
                 ),
               )
             else
-              Align(alignment: Alignment.centerLeft, child: MlStatusChip(label: 'Converted', state: MlStatusState.success)),
+              Align(alignment: AlignmentDirectional.centerStart, child: MlStatusChip(label: 'Converted', state: MlStatusState.success)),
             const SizedBox(height: MlSpacing.md),
 
             // Reach the person in one tap
@@ -271,6 +272,10 @@ class _LeadDetailScreenState extends ConsumerState<LeadDetailScreen> {
                 children: [
                   _chipButton(MlIcons.handshake, 'Move to engagement', () => _actions.moveToEngagement(lead)),
                   _chipButton(MlIcons.person, 'Convert to contact', () => _convertToContact(lead)),
+                  _chipButton(MlIcons.swap, 'Convert…', () => LeadTools(context: context, ref: ref, cfg: _cfg).convert(lead, _load)),
+                  _chipButton(MlIcons.copy, 'Find duplicates', () => LeadTools(context: context, ref: ref, cfg: _cfg).duplicates(lead, () async {
+                        await _load();
+                      })),
                   _chipButton(MlIcons.note, 'Quick note', () => _actions.stickyNote(lead)),
                   if (_cfg.canDelete)
                     _chipButton(MlIcons.delete, 'Delete', () async {
@@ -348,7 +353,7 @@ class _LeadDetailScreenState extends ConsumerState<LeadDetailScreen> {
                 Text('Notes (${_notes.length})', style: MlTypography.labelLarge.copyWith(color: MlColors.textPrimary)),
                 GestureDetector(
                   onTap: _addNote,
-                  child: Text('+ Add', style: MlTypography.labelMedium.copyWith(color: MlColors.primaryLight)),
+                  child: Text('+ Add'.tr, style: MlTypography.labelMedium.copyWith(color: MlColors.primaryLight)),
                 ),
               ],
             ),
@@ -362,7 +367,7 @@ class _LeadDetailScreenState extends ConsumerState<LeadDetailScreen> {
                   borderRadius: BorderRadius.circular(MlRadii.md),
                   border: Border.all(color: MlColors.border),
                 ),
-                child: Text('No notes recorded yet', style: MlTypography.bodyMedium.copyWith(color: MlColors.textMuted)),
+                child: Text('No notes recorded yet'.tr, style: MlTypography.bodyMedium.copyWith(color: MlColors.textMuted)),
               )
             else
               for (final n in _notes)
@@ -386,7 +391,7 @@ class _LeadDetailScreenState extends ConsumerState<LeadDetailScreen> {
                           if (_cfg.canEdit && n.id.isNotEmpty && n.id != '00000000-0000-0000-0000-000000000000')
                             GestureDetector(
                               onTap: () => _editNote(n),
-                              child: Text('Edit', style: TextStyle(fontSize: 12, color: MlColors.primaryLight, decoration: TextDecoration.none)),
+                              child: Text('Edit'.tr, style: TextStyle(fontSize: 12, color: MlColors.primaryLight, decoration: TextDecoration.none)),
                             ),
                         ],
                       ),
@@ -427,7 +432,7 @@ class _LeadDetailScreenState extends ConsumerState<LeadDetailScreen> {
           children: [
             MlIcon(icon, size: 19, color: danger ? MlColors.danger : MlColors.primary),
             const SizedBox(width: 7),
-            Text(label, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: color, decoration: TextDecoration.none)),
+            Text(MlStrings.t(label), style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: color, decoration: TextDecoration.none)),
           ],
         ),
       ),

@@ -58,6 +58,40 @@ public sealed class MobileWorkspaceContractTests(MindLiftApiFactory factory) : I
     }
 
     [Fact]
+    public async Task Lead_export_import_duplicates_merge_and_convert_work_as_the_app_calls_them()
+    {
+        var s = await Workspaces.SignupAsync(factory);
+
+        // Import a file (multipart, as the file picker sends it), then export it back.
+        var csv = "First name,Last name,Company,Address,Email,Phone\nAnna,Twin,Twin Co,1 Main Street,anna@twin.test,+971500000021\n";
+        var form = new MultipartFormDataContent { { new ByteArrayContent(Encoding.UTF8.GetBytes(csv)), "file", "leads.csv" } };
+        var imported = await Ok(await s.Client.PostAsync("/api/v1/leads/import", form));
+        imported.GetProperty("created").GetInt32().ShouldBe(1);
+
+        var export = await s.Client.PostAsync("/api/v1/leads/export?format=csv", Json("""{"sortField":"created_at","sortDir":"desc","page":1,"pageSize":5000}"""));
+        export.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await export.Content.ReadAsStringAsync()).ShouldContain("Anna");
+        (await s.Client.GetAsync("/api/v1/leads/template?format=csv")).StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        // A second lead with the same email is a duplicate of the first.
+        var first = (await Ok(await s.Client.PostAsync("/api/v1/leads/query", Json("""{"search":"Anna","page":1,"pageSize":5}""")))).GetProperty("items")[0].GetProperty("id").GetString();
+        var twin = await Ok(await s.Client.PostAsync("/api/v1/leads", Json("""{"firstName":"Anna","lastName":"Twin","email":"anna@twin.test","companyName":"Twin Co","status":"new"}""")));
+        var check = await Ok(await s.Client.PostAsync("/api/v1/leads/check-duplicates", Json("""{"firstName":"Anna","lastName":"Twin","email":"anna@twin.test","phone":null,"companyName":"Twin Co"}""")));
+        check.GetArrayLength().ShouldBeGreaterThan(0);
+
+        var duplicates = await Ok(await s.Client.GetAsync($"/api/v1/leads/{twin.GetProperty("id").GetString()}/duplicates"));
+        duplicates.EnumerateArray().Any(d => d.GetProperty("id").GetString() == first).ShouldBeTrue();
+        (await s.Client.PostAsync($"/api/v1/leads/{twin.GetProperty("id").GetString()}/merge", Json($$"""{"duplicateIds":["{{first}}"],"fieldOverrides":null}"""))).IsSuccessStatusCode.ShouldBeTrue();
+
+        // Convert options and a full convert with a new account and contact.
+        var options = await Ok(await s.Client.GetAsync($"/api/v1/leads/{twin.GetProperty("id").GetString()}/convert-options"));
+        options.GetProperty("leadName").GetString().ShouldNotBeNullOrEmpty();
+        var converted = await Ok(await s.Client.PostAsync($"/api/v1/leads/{twin.GetProperty("id").GetString()}/convert", Json(
+            """{"accountMode":"create","existingAccountId":null,"accountName":"Twin Co","contactMode":"create","existingContactId":null,"createDeal":false,"dealName":null,"pipelineId":null,"stageId":null,"amount":null,"currency":null,"expectedCloseDate":null}""")));
+        converted.GetProperty("contactId").GetString().ShouldNotBeNullOrEmpty();
+    }
+
+    [Fact]
     public async Task Calendar_and_my_day_use_the_query_and_my_day_endpoints()
     {
         var s = await Workspaces.SignupAsync(factory);

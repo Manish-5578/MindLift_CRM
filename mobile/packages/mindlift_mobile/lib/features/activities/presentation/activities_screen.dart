@@ -74,7 +74,7 @@ class _ActivitiesScreenState extends ConsumerState<ActivitiesScreen> {
               children: _types.map((type) {
                 final isSelected = type == _selectedType;
                 return Padding(
-                  padding: const EdgeInsets.only(right: MlSpacing.xs),
+                  padding: const EdgeInsetsDirectional.only(end: MlSpacing.xs),
                   child: GestureDetector(
                     onTap: () {
                       setState(() => _selectedType = type);

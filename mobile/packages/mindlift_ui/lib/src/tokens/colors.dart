@@ -24,6 +24,8 @@ class MlColors {
   static const Color primaryHover = Color(0xFF4338CA);    // Indigo 700
   static Color get primarySoft => isDark ? const Color(0xFF26264F) : Color(0xFFEEF2FF);     // Soft Indigo 50 tint
   static const Color primaryLight = Color(0xFF6366F1);     // Indigo 500
+  /// The brand colour when it is used as text or a link: lighter in dark mode so it stays readable (4.5:1).
+  static Color get primaryText => isDark ? const Color(0xFFA5B4FC) : const Color(0xFF4F46E5);
   static const Color primaryOnDark = Color(0xFFFFFFFF);
 
   // Status & Accents (tuned for light background legibility)

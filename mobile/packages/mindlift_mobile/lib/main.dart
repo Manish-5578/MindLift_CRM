@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mindlift_ui/mindlift_ui.dart';
 import 'core/app_lock.dart';
+import 'core/l10n.dart';
 import 'core/locale_provider.dart';
 import 'core/presence_service.dart';
 import 'core/push_service.dart';
@@ -48,13 +49,14 @@ class _MindLiftMobileAppState extends ConsumerState<MindLiftMobileApp> with Widg
     final dark = settings.isDark(PlatformDispatcher.instance.platformBrightness);
     MlColors.isDark = dark;
     final language = ref.watch(localeProvider);
+    applyLanguage(language);
     final router = ref.watch(routerProvider);
     ref.watch(pushServiceProvider);
     ref.watch(presenceServiceProvider);
 
     return AppLockGate(
       child: KeyedSubtree(
-        key: ValueKey(dark),
+        key: ValueKey('$dark-${language.name}'),
         child: MlTheme(
           isDark: dark,
           child: Directionality(

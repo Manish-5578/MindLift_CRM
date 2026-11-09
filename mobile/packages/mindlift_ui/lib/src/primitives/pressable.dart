@@ -35,7 +35,10 @@ class _MlPressableState extends State<MlPressable> {
   @override
   Widget build(BuildContext context) {
     final enabled = widget.onTap != null || widget.onLongPress != null;
-    return GestureDetector(
+    return Semantics(
+      button: enabled,
+      enabled: enabled,
+      child: GestureDetector(
       behavior: widget.behavior,
       onTapDown: enabled ? (_) => _set(true) : null,
       onTapUp: enabled ? (_) => _set(false) : null,
@@ -57,6 +60,6 @@ class _MlPressableState extends State<MlPressable> {
           child: widget.child,
         ),
       ),
-    );
+    ));
   }
 }

@@ -90,8 +90,8 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
         child: Row(children: [
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(title, style: MlTypography.labelMedium.copyWith(color: MlColors.textPrimary)),
-              if (hint != null) Text(hint, style: MlTypography.caption.copyWith(color: MlColors.textMuted)),
+              Text(MlStrings.t(title), style: MlTypography.labelMedium.copyWith(color: MlColors.textPrimary)),
+              if (hint != null) Text(MlStrings.t(hint), style: MlTypography.caption.copyWith(color: MlColors.textMuted)),
             ]),
           ),
           AnimatedContainer(
@@ -100,7 +100,7 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
             height: 28,
             padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(color: value ? MlColors.primary : MlColors.surfaceMuted, borderRadius: BorderRadius.circular(14)),
-            alignment: value ? Alignment.centerRight : Alignment.centerLeft,
+            alignment: value ? AlignmentDirectional.centerEnd : AlignmentDirectional.centerStart,
             child: Container(width: 22, height: 22, decoration: const BoxDecoration(color: MlColors.white, shape: BoxShape.circle)),
           ),
         ]),
@@ -112,7 +112,7 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
     return Row(children: [
       Expanded(child: Text(label, style: MlTypography.labelMedium.copyWith(color: MlColors.textPrimary))),
       MlIconButton(label: 'Earlier', icon: const MlIcon(MlIcons.chevronLeft, size: 26), onPressed: () => onChanged((minute - 30 + 1440) % 1440)),
-      SizedBox(width: 84, child: Center(child: Text(_clock(minute), style: MlTypography.labelLarge.copyWith(color: MlColors.primary)))),
+      SizedBox(width: 84, child: Center(child: Text(_clock(minute), style: MlTypography.labelLarge.copyWith(color: MlColors.primaryText)))),
       MlIconButton(label: 'Later', icon: const MlIcon(MlIcons.chevronRight, size: 26), onPressed: () => onChanged((minute + 30) % 1440)),
     ]);
   }
@@ -134,9 +134,9 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
                     padding: const EdgeInsets.all(MlSpacing.md),
                     decoration: BoxDecoration(color: MlColors.surface, borderRadius: BorderRadius.circular(MlRadii.lg), border: Border.all(color: MlColors.border)),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('Quiet hours', style: MlTypography.labelLarge.copyWith(color: MlColors.textPrimary)),
+                      Text('Quiet hours'.tr, style: MlTypography.labelLarge.copyWith(color: MlColors.textPrimary)),
                       const SizedBox(height: 2),
-                      Text('This phone will not buzz between these times. Everything still shows in your notifications list.', style: MlTypography.caption.copyWith(color: MlColors.textMuted)),
+                      Text('This phone will not buzz between these times. Everything still shows in your notifications list.'.tr, style: MlTypography.caption.copyWith(color: MlColors.textMuted)),
                       const SizedBox(height: MlSpacing.xs),
                       _toggle('Turn on quiet hours', null, _quiet, (v) {
                         setState(() => _quiet = v);
@@ -159,9 +159,9 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
                     padding: const EdgeInsets.all(MlSpacing.md),
                     decoration: BoxDecoration(color: MlColors.surface, borderRadius: BorderRadius.circular(MlRadii.lg), border: Border.all(color: MlColors.border)),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('What to be notified about', style: MlTypography.labelLarge.copyWith(color: MlColors.textPrimary)),
+                      Text('What to be notified about'.tr, style: MlTypography.labelLarge.copyWith(color: MlColors.textPrimary)),
                       const SizedBox(height: 2),
-                      Text('Turn a kind off to stop its alerts and pushes.', style: MlTypography.caption.copyWith(color: MlColors.textMuted)),
+                      Text('Turn a kind off to stop its alerts and pushes.'.tr, style: MlTypography.caption.copyWith(color: MlColors.textMuted)),
                       const SizedBox(height: MlSpacing.xs),
                       for (var i = 0; i < _prefs.length; i++)
                         _toggle('${_prefs[i]['label'] ?? _prefs[i]['type']}', null, _prefs[i]['inApp'] == true, (v) {

@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import '../tokens/strings.dart';
 import '../tokens/colors.dart';
 import '../tokens/radii.dart';
 import '../tokens/typography.dart';
@@ -155,8 +156,8 @@ class MlBottomNavigation extends StatelessWidget {
             ),
             const SizedBox(height: 3),
             Text(
-              item.label,
-              style: MlTypography.caption.copyWith(fontWeight: selected ? FontWeight.w700 : FontWeight.w500, color: color),
+              MlStrings.t(item.label),
+              style: MlTypography.caption.copyWith(fontWeight: selected ? FontWeight.w700 : FontWeight.w500, color: selected ? MlColors.primaryText : MlColors.textMuted),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),

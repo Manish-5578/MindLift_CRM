@@ -158,7 +158,7 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
                     Expanded(
                       child: Text(
                         'Scan Business Card with OCR',
-                        style: MlTypography.caption.copyWith(color: MlColors.primary, fontWeight: FontWeight.w600),
+                        style: MlTypography.caption.copyWith(color: MlColors.primaryText, fontWeight: FontWeight.w600),
                       ),
                     ),
                     MlIcon(MlIcons.chevronRight, size: 20, color: MlColors.primary),

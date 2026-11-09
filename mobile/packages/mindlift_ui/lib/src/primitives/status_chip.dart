@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import '../tokens/strings.dart';
 import '../tokens/colors.dart';
 import '../tokens/radii.dart';
 import '../tokens/spacing.dart';
@@ -83,7 +84,7 @@ class MlStatusChip extends StatelessWidget {
             const SizedBox(width: MlSpacing.xxs),
           ],
           Text(
-            label,
+            MlStrings.t(label),
             style: MlTypography.caption.copyWith(
               color: effectiveText,
               fontWeight: FontWeight.w600,

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'lead_tools.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -71,7 +72,7 @@ class LeadActions {
             SizedBox(width: 30, child: MlIcon(icon, size: 22, color: danger ? MlColors.danger : MlColors.primary)),
             const SizedBox(width: 8),
             Expanded(
-              child: Text(label,
+              child: Text(MlStrings.t(label),
                   style: TextStyle(
                       fontSize: 15.5,
                       fontWeight: FontWeight.w600,
@@ -211,7 +212,7 @@ class LeadActions {
           Padding(
             padding: const EdgeInsets.fromLTRB(MlSpacing.md, 0, MlSpacing.md, MlSpacing.sm),
             child: Align(
-              alignment: Alignment.centerLeft,
+              alignment: AlignmentDirectional.centerStart,
               child: Text('Log it on ${lead.title}',
                   style: TextStyle(fontSize: 13, color: MlColors.textMuted, decoration: TextDecoration.none, fontWeight: FontWeight.w400)),
             ),
@@ -294,7 +295,7 @@ class LeadActions {
           Padding(
             padding: const EdgeInsets.fromLTRB(MlSpacing.md, 0, MlSpacing.md, MlSpacing.xs),
             child: Align(
-              alignment: Alignment.centerLeft,
+              alignment: AlignmentDirectional.centerStart,
               child: Text('Move $label to another view:',
                   style: TextStyle(fontSize: 13, color: MlColors.textMuted, decoration: TextDecoration.none)),
             ),
@@ -347,7 +348,7 @@ class LeadActions {
           for (final s in choices) _row(MlIcons.check, s.label, () => Navigator.of(ctx).pop(s.value)),
           Padding(
             padding: const EdgeInsets.all(MlSpacing.md),
-            child: Text('To mark leads as not interested, change them one at a time so each gets a reason.',
+            child: Text('To mark leads as not interested, change them one at a time so each gets a reason.'.tr,
                 style: TextStyle(fontSize: 12, color: MlColors.textMuted, decoration: TextDecoration.none)),
           ),
         ],
@@ -452,7 +453,7 @@ class LeadActions {
               ),
               if (cfg.sources.isNotEmpty) ...[
                 const SizedBox(height: MlSpacing.md),
-                Text('Source', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: MlColors.textSecondary, decoration: TextDecoration.none)),
+                Text('Source'.tr, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: MlColors.textSecondary, decoration: TextDecoration.none)),
                 const SizedBox(height: 6),
                 Wrap(
                   spacing: 8,
@@ -511,6 +512,16 @@ class LeadActions {
       'city': n(city),
       'state': n(state),
     };
+    if (lead == null) {
+      final go = await LeadTools(context: context, ref: ref, cfg: cfg).confirmNotDuplicate(
+        first: '${body['firstName'] ?? ''}',
+        last: '${body['lastName'] ?? ''}',
+        email: body['email'] as String?,
+        phone: body['phone'] as String?,
+        company: body['companyName'] as String?,
+      );
+      if (!go) return;
+    }
     try {
       final sent = await sendOrQueue(
         ref,

@@ -320,7 +320,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Account Password', style: MlTypography.labelMedium.copyWith(color: MlColors.textPrimary)),
+                          Text('Account Password'.tr, style: MlTypography.labelMedium.copyWith(color: MlColors.textPrimary)),
                           Text('Last updated 30 days ago', style: MlTypography.caption.copyWith(color: MlColors.textMuted)),
                         ],
                       ),
@@ -424,7 +424,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   Widget _buildSectionHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: MlSpacing.xs, left: MlSpacing.xs),
+      padding: const EdgeInsetsDirectional.only(bottom: MlSpacing.xs, start: MlSpacing.xs),
       child: Text(
         title,
         style: MlTypography.labelMedium.copyWith(color: MlColors.textSecondary, fontWeight: FontWeight.w700),
@@ -473,7 +473,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               color: value ? MlColors.primary : MlColors.surfaceMuted,
               borderRadius: BorderRadius.circular(13),
             ),
-            alignment: value ? Alignment.centerRight : Alignment.centerLeft,
+            alignment: value ? AlignmentDirectional.centerEnd : AlignmentDirectional.centerStart,
             child: Container(
               width: 22,
               height: 22,

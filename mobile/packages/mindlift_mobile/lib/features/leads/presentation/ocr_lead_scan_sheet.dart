@@ -699,7 +699,7 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
           borderRadius: BorderRadius.circular(MlRadii.sm),
           border: Border.all(color: MlColors.primary.withOpacity(0.5)),
         ),
-        child: Text('$side: $value', style: MlTypography.caption.copyWith(color: MlColors.primary)),
+        child: Text('$side: $value', style: MlTypography.caption.copyWith(color: MlColors.primaryText)),
       ),
     );
   }
@@ -1110,7 +1110,7 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
                     borderRadius: BorderRadius.circular(MlRadii.sm),
                     border: Border.all(color: MlColors.border),
                   ),
-                  child: Text('English Card', style: MlTypography.caption.copyWith(color: MlColors.primary)),
+                  child: Text('English Card', style: MlTypography.caption.copyWith(color: MlColors.primaryText)),
                 ),
               ),
               const SizedBox(width: MlSpacing.xs),
@@ -1126,7 +1126,7 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
                     borderRadius: BorderRadius.circular(MlRadii.sm),
                     border: Border.all(color: MlColors.border),
                   ),
-                  child: Text('بطاقة عربية', style: MlTypography.caption.copyWith(color: MlColors.primary)),
+                  child: Text('بطاقة عربية', style: MlTypography.caption.copyWith(color: MlColors.primaryText)),
                 ),
               ),
             ],
@@ -1162,7 +1162,7 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
                           const Text('✨ ', style: TextStyle(fontSize: 16)),
                           Text(
                             'Extracted Lead Fields',
-                            style: MlTypography.labelMedium.copyWith(color: MlColors.primary, fontWeight: FontWeight.w700),
+                            style: MlTypography.labelMedium.copyWith(color: MlColors.primaryText, fontWeight: FontWeight.w700),
                           ),
                         ],
                       ),
@@ -1176,7 +1176,7 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
                           _engineConfidence != null
                               ? '$_detectedScript • OCR: ${((_engineConfidence!) * 100).toInt()}% • Extraction: ${((_overallConfidence ?? 0.8) * 100).toInt()}%'
                               : '$_detectedScript • Extraction Confidence: ${((_overallConfidence ?? 0.8) * 100).toInt()}%',
-                          style: MlTypography.caption.copyWith(color: MlColors.primary, fontWeight: FontWeight.w600),
+                          style: MlTypography.caption.copyWith(color: MlColors.primaryText, fontWeight: FontWeight.w600),
                         ),
                       ),
                     ],

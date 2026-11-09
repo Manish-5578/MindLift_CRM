@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import '../tokens/strings.dart';
 import '../tokens/colors.dart';
 import '../tokens/radii.dart';
 import '../tokens/spacing.dart';
@@ -63,7 +64,7 @@ class MlButton extends StatelessWidget {
         ],
         Flexible(
           child: Text(
-            text,
+            MlStrings.t(text),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: MlTypography.button(color: style.textColor),
