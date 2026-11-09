@@ -193,7 +193,7 @@ public sealed class LeadFlowTests(MindLiftApiFactory factory) : IClassFixture<Mi
         var existing = $"imp-{Guid.NewGuid():N}@example.test";
         await owner.Client.PostAsJsonAsync("/api/v1/leads", Lead("Existing", email: existing));
 
-        var csv = $"First name,Last name,Email,Phone,Company\nAna,Q,ana-{Guid.NewGuid():N}@example.test,,Acme\n\"Ben, Jr\",Z,{existing},,\n,Missing,,,\n";
+        var csv = $"First name,Last name,Email,Phone,Company,Address\nAna,Q,ana-{Guid.NewGuid():N}@example.test,,Acme,1 Main Street\n\"Ben, Jr\",Z,{existing},,Acme,1 Main Street\n,Missing,,,Acme,1 Main Street\n";
         var imported = await owner.Client.PostAsync("/api/v1/leads/import", new StringContent(csv, System.Text.Encoding.UTF8, "text/csv"));
 
         imported.StatusCode.ShouldBe(HttpStatusCode.OK);

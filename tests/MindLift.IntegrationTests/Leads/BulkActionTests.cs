@@ -157,10 +157,10 @@ public sealed class BulkActionTests(MindLiftApiFactory factory) : IClassFixture<
     {
         var admin = await Workspaces.SignupAsync(factory);
         admin.Client.Timeout = TimeSpan.FromMinutes(10);
-        var csv = new StringBuilder("First name,Last name,Email\n");
+        var csv = new StringBuilder("First name,Last name,Company,Address,Email\n");
         for (var i = 0; i <= BulkActions.MaxRecords; i++)
         {
-            csv.Append($"Many{i:D3},Test,many{i:D3}-{Guid.NewGuid():N}@example.test\n");
+            csv.Append($"Many{i:D3},Test,Test Co,1 Main Street,many{i:D3}-{Guid.NewGuid():N}@example.test\n");
         }
 
         var import = await admin.Client.PostAsync("/api/v1/leads/import", new StringContent(csv.ToString(), Encoding.UTF8, "text/csv"));

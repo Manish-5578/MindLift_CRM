@@ -78,10 +78,10 @@ public sealed class LeadExportImportTests(MindLiftApiFactory factory) : IClassFi
     {
         var owner = await Workspaces.SignupAsync(factory);
         owner.Client.Timeout = TimeSpan.FromMinutes(10);
-        var csv = new StringBuilder("First name,Last name,Email\n");
+        var csv = new StringBuilder("First name,Last name,Company,Address,Email\n");
         for (var i = 0; i < 450; i++)
         {
-            csv.Append($"Person{i:D3},Test,person{i:D3}-{Guid.NewGuid():N}@example.test\n");
+            csv.Append($"Person{i:D3},Test,Test Co,1 Main Street,person{i:D3}-{Guid.NewGuid():N}@example.test\n");
         }
 
         (await ImportAsync(owner, csv.ToString())).Created.ShouldBe(450);
@@ -128,7 +128,7 @@ public sealed class LeadExportImportTests(MindLiftApiFactory factory) : IClassFi
     public async Task Importing_the_same_file_twice_creates_nothing_the_second_time()
     {
         var owner = await Workspaces.SignupAsync(factory);
-        var csv = $"First name,Last name,Email\nOne,A,one-{Guid.NewGuid():N}@example.test\nTwo,B,two-{Guid.NewGuid():N}@example.test\n";
+        var csv = $"First name,Last name,Company,Address,Email\nOne,A,Co,1 Main Street,one-{Guid.NewGuid():N}@example.test\nTwo,B,Co,1 Main Street,two-{Guid.NewGuid():N}@example.test\n";
 
         (await ImportAsync(owner, csv)).Created.ShouldBe(2);
         var again = await ImportAsync(owner, csv);
@@ -142,7 +142,7 @@ public sealed class LeadExportImportTests(MindLiftApiFactory factory) : IClassFi
     {
         var owner = await Workspaces.SignupAsync(factory);
 
-        var partial = await ImportAsync(owner, "First name,Email\n,nobody@example.test\nOk,ok-" + Guid.NewGuid().ToString("N") + "@example.test\n");
+        var partial = await ImportAsync(owner, "First name,Company,Address,Email\n,Co,1 Main Street,nobody@example.test\nOk,Co,1 Main Street,ok-" + Guid.NewGuid().ToString("N") + "@example.test\n");
         partial.Failed.ShouldBe(1);
         partial.Created.ShouldBe(1);
         partial.Errors.ShouldNotBeEmpty();
@@ -155,10 +155,10 @@ public sealed class LeadExportImportTests(MindLiftApiFactory factory) : IClassFi
     public async Task A_file_with_too_many_rows_is_refused()
     {
         var owner = await Workspaces.SignupAsync(factory);
-        var csv = new StringBuilder("First name,Email\n");
+        var csv = new StringBuilder("First name,Company,Address,Email\n");
         for (var i = 0; i < 5001; i++)
         {
-            csv.Append($"P{i},p{i}@example.test\n");
+            csv.Append($"P{i},Co,1 Main Street,p{i}@example.test\n");
         }
 
         var response = await owner.Client.PostAsync("/api/v1/leads/import", new StringContent(csv.ToString(), Encoding.UTF8, "text/csv"));
