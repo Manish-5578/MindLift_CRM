@@ -1,0 +1,69 @@
+name: iOS build (unsigned, for Sideloadly)
+
+# Builds the iPhone app without signing. Download the "MindLift-iOS-ipa" artifact from the run,
+# then sign and install it from a Windows PC with Sideloadly using a free Apple ID.
+# Free Apple IDs: the app lasts 7 days before it must be re-signed, and push notifications are not available.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/ios-build.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-ios:
+    name: Build iOS app
+    runs-on: macos-14
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: mobile/packages/mindlift_mobile
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.5'
+          channel: stable
+          cache: true
+
+      - name: Get packages
+        run: flutter pub get
+
+      - name: Generate platform files (creates the Podfile)
+        run: flutter build ios --config-only --release --no-codesign
+
+      - name: Set the iOS version the Pods build for
+        run: |
+          sed -i '' "s/^# platform :ios, .*/platform :ios, '15.5'/" ios/Podfile
+          grep -n "platform :ios" ios/Podfile
+
+      - name: Build the app (no signing)
+        run: |
+          flutter build ios --release --no-codesign \
+            --dart-define=API_BASE_URL=https://mindlift-staging.onrender.com
+
+      - name: Package as an .ipa
+        run: |
+          mkdir -p build/ipa/Payload
+          cp -R build/ios/iphoneos/Runner.app build/ipa/Payload/
+          cd build/ipa
+          zip -qry MindLift-CRM-$(date +%m-%y).ipa Payload
+          ls -lh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MindLift-iOS-ipa
+          path: mobile/packages/mindlift_mobile/build/ipa/*.ipa
+          retention-days: 14
+          if-no-files-found: error

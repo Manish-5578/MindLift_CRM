@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -42,6 +42,8 @@ class PushService {
   );
 
   Future<void> _init() async {
+    // iPhones signed with a free Apple ID cannot receive push, and Firebase would stop the app without its iOS config file.
+    if (defaultTargetPlatform == TargetPlatform.iOS) return;
     try {
       await Firebase.initializeApp();
       FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
