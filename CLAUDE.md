@@ -13,6 +13,8 @@ The owner adds new rules by telling Claude; append them below with the next numb
 - Whenever app code is pushed, build the latest release APK from the code being pushed and put it on the phone in the same task.
 - Install over the existing app with `adb install -r` so the user stays signed in (never uninstall, never clear data).
 - Copy the APK to internal storage in both `/sdcard/CRM` and `/sdcard/MLC`.
+- Name the APK `MindLift-CRM-MM-YY.apk`, ending with the month and year of the build (for example `MindLift-CRM-11-26.apk` for November 2026). A slash cannot be used in a file name, so a dash is used.
+- Delete every older APK from both folders when copying the new one, so only the latest build stays on the phone.
 - If no device is connected, still build the APK, say clearly that it was not installed, and install it when the device is next connected. Never claim it was installed when it was not.
 
 ## Standing working patterns
