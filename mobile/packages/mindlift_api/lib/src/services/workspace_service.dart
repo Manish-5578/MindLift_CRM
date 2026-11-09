@@ -72,11 +72,79 @@ class WorkspaceService {
     return _map(response.data);
   }
 
+  /// Edits a contact. The API replaces the whole record, so unchanged fields are sent back as they were.
+  Future<Map<String, dynamic>> updateContact(Map<String, dynamic> current, {required String firstName, String lastName = '', String? email, String? phone, String? jobTitle, String? description}) async {
+    final response = await _dio.put('/api/v1/contacts/${current['id']}', data: {
+      'firstName': firstName,
+      'lastName': lastName,
+      'email': email,
+      'phone': phone,
+      'jobTitle': jobTitle,
+      'description': description,
+      'accountId': current['accountId'],
+      'type': current['type'],
+      'ownerId': current['ownerId'],
+      'customFields': current['customFields'] ?? <String, dynamic>{},
+    });
+    return _map(response.data);
+  }
+
+  Future<Map<String, dynamic>> updateAccount(Map<String, dynamic> current, {required String name, String? website, String? phone, String? industry, String? description}) async {
+    final response = await _dio.put('/api/v1/accounts/${current['id']}', data: {
+      'name': name,
+      'website': website,
+      'phone': phone,
+      'industry': industry,
+      'description': description,
+      'parentAccountId': current['parentAccountId'],
+      'ownerId': current['ownerId'],
+      'customFields': current['customFields'] ?? <String, dynamic>{},
+    });
+    return _map(response.data);
+  }
+
   // ---- deals
 
   Future<List<Map<String, dynamic>>> pipelines() async {
     final response = await _dio.get('/api/v1/settings/pipelines');
     return ((response.data as List?) ?? const []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+
+  /// Edits a deal's own details; its stage, pipeline, people and owner stay as they were.
+  Future<Map<String, dynamic>> updateDeal(Map<String, dynamic> current, {required String name, required double amount, String? currency, String? expectedCloseDate, String? description}) async {
+    final contacts = ((current['contacts'] as List?) ?? const []).whereType<Map>().map((c) => {'contactId': c['contactId'], 'role': c['role'], 'isPrimary': c['isPrimary'] == true}).toList();
+    final response = await _dio.put('/api/v1/deals/${current['id']}', data: {
+      'name': name,
+      'pipelineId': current['pipelineId'],
+      'stageId': current['stageId'],
+      'amount': amount,
+      'currency': currency,
+      'probability': current['probabilityOverridden'] == true ? current['probability'] : null,
+      'expectedCloseDate': expectedCloseDate,
+      'accountId': current['accountId'],
+      'contacts': contacts,
+      'description': description,
+      'ownerId': current['ownerId'],
+      'customFields': current['customFields'] ?? <String, dynamic>{},
+    });
+    return _map(response.data);
+  }
+
+  /// A new deal in the default pipeline's first open stage.
+  Future<Map<String, dynamic>> createDeal({required String name, required double amount, String? currency, String? expectedCloseDate}) async {
+    final pipelines = await this.pipelines();
+    final pipeline = pipelines.firstWhere((p) => p['isDefault'] == true, orElse: () => pipelines.isEmpty ? <String, dynamic>{} : pipelines.first);
+    final stages = ((pipeline['stages'] as List?) ?? const []).whereType<Map>().where((s) => s['stageType'] == 'Open').toList()
+      ..sort((a, b) => ((a['sortOrder'] as num?) ?? 0).compareTo((b['sortOrder'] as num?) ?? 0));
+    final response = await _dio.post('/api/v1/deals', data: {
+      'name': name,
+      'pipelineId': pipeline['id'],
+      'stageId': stages.isEmpty ? null : stages.first['id'],
+      'amount': amount,
+      'currency': currency,
+      'expectedCloseDate': expectedCloseDate,
+    });
+    return _map(response.data);
   }
 
   Future<Map<String, dynamic>> changeDealStage(String dealId, String stageId, {String? lostReason}) async {

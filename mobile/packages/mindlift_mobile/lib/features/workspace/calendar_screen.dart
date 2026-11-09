@@ -42,7 +42,15 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
   Future<void> _load() async {
     try {
-      final p = await ref.read(workspaceServiceProvider).myActivities();
+      // The API returns at most 200 per page, so read several pages: this covers well past and well ahead of today.
+      final svc = ref.read(workspaceServiceProvider);
+      var p = await svc.myActivities();
+      final items = [...p.items];
+      for (var page = 2; p.hasMore && page <= 6; page++) {
+        p = await svc.myActivities(page: page);
+        items.addAll(p.items);
+      }
+      p = RecordPage(items: items, total: p.total, page: 1, pageSize: items.length);
       if (!mounted) return;
       setState(() {
         _all = p.items;

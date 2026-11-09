@@ -218,10 +218,13 @@ public sealed class ActivityService(AppDbContext db, ITenantContext tenant, IClo
 
         if (!string.IsNullOrWhiteSpace(request.Outcome))
         {
-            if (activity.Type == ActivityTypes.Call)
+            // Only a call has an outcome; sending one for a task or meeting is a mistake, not something to store quietly.
+            if (activity.Type != ActivityTypes.Call)
             {
-                await ValidateOutcomeAsync(request.Outcome, cancellationToken);
+                throw RecordHelpers.Invalid("outcome", "Only a call can record an outcome.");
             }
+
+            await ValidateOutcomeAsync(request.Outcome, cancellationToken);
             activity.CallOutcome = request.Outcome;
         }
 

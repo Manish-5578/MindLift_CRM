@@ -34,6 +34,7 @@ class LeadActions {
   // ------------------------------------------------------------ helpers
 
   static String errorText(Object e, String fallback) {
+    if (e is FormatException && e.message.isNotEmpty) return e.message;
     if (e is DioException) {
       final d = e.response?.data;
       if (d is Map) {
@@ -392,11 +393,18 @@ class LeadActions {
   Future<void> editLead(LeadRow? lead) async {
     Map<String, dynamic> raw = {};
     if (lead != null) {
+      final store = ref.read(offlineStoreProvider);
       try {
         raw = await _svc.getLeadRaw(lead.id);
+        store.putCache('lead-raw:${lead.id}', raw);
       } catch (e) {
-        _toast(errorText(e, 'We could not open this lead.'), error: true);
-        return;
+        // Offline: edit the copy saved the last time this lead was opened, and queue the change.
+        final saved = isOfflineError(e) ? await store.getCache('lead-raw:${lead.id}') : null;
+        if (saved == null) {
+          _toast(errorText(e, 'We could not open this lead.'), error: true);
+          return;
+        }
+        raw = Map<String, dynamic>.from(saved.data as Map);
       }
     }
     String s(String k) => (raw[k] as String?) ?? '';
@@ -504,9 +512,16 @@ class LeadActions {
       'state': n(state),
     };
     try {
-      await _svc.saveLead(lead?.id, body);
-      _toast(lead == null ? 'Lead created.' : 'Lead saved.');
-      await onChanged();
+      final sent = await sendOrQueue(
+        ref,
+        send: () => _svc.saveLead(lead?.id, body),
+        method: lead == null ? 'POST' : 'PUT',
+        path: lead == null ? '/api/v1/leads' : '/api/v1/leads/${lead.id}',
+        body: body,
+        label: lead == null ? 'Create lead ${body['companyName'] ?? body['firstName'] ?? ''}' : 'Edit lead ${lead.title}',
+      );
+      _toast(sent ? (lead == null ? 'Lead created.' : 'Lead saved.') : 'Saved on this phone. It will sync when you are back online.');
+      if (sent) await onChanged();
     } catch (e) {
       _toast(errorText(e, 'We could not save this lead.'), error: true);
     }

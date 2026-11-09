@@ -214,6 +214,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 Expanded(child: _shortcut(MlIcons.handshake, 'Deals', '/deals')),
                 const SizedBox(width: MlSpacing.sm),
                 Expanded(child: _shortcut(MlIcons.refresh, 'Calendar', '/calendar', icon2: MlIcons.calendar)),
+                const SizedBox(width: MlSpacing.sm),
+                Expanded(child: _shortcut(MlIcons.checkCircle, 'Tasks', '/activities')),
               ]),
               const SizedBox(height: MlSpacing.lg),
 

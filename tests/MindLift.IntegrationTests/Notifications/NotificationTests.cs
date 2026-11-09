@@ -196,8 +196,8 @@ public sealed class NotificationTests(MindLiftApiFactory factory) : IClassFixtur
     {
         var p = await PairAsync();
 
-        var response = await p.Admin.Client.PostAsync("/api/v1/leads/import", new StringContent("First name,Email\nImp,imp@example.test\n", System.Text.Encoding.UTF8, "text/csv"));
-        response.EnsureSuccessStatusCode();
+        var response = await p.Admin.Client.PostAsync("/api/v1/leads/import", new StringContent("First name,Last name,Company,Address,Email\nImp,Orter,Imp Co,1 Main Street,imp@example.test\n", System.Text.Encoding.UTF8, "text/csv"));
+        response.StatusCode.ShouldBe(System.Net.HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
 
         var mine = (await ListAsync(p.Admin)).Items;
         mine.Single(n => n.Type == NotificationTypes.ImportCompleted).Body.ShouldBe("1 imported, 0 skipped, 0 could not be imported.");

@@ -9,6 +9,14 @@ import 'record_detail_screen.dart';
 import 'record_list_screen.dart';
 import 'workspace_widgets.dart';
 
+/// YYYY-MM-DD to an ISO date the API accepts, or null if it is not a date (empty stays null too).
+String? _parseDate(String text) {
+  final t = text.trim();
+  if (t.isEmpty) return null;
+  final d = DateTime.tryParse(t);
+  return d == null ? null : DateTime.utc(d.year, d.month, d.day).toIso8601String();
+}
+
 MlStatusState _dealState(String status) => switch (status.toLowerCase()) {
       'won' => MlStatusState.success,
       'lost' => MlStatusState.danger,
@@ -19,7 +27,7 @@ MlStatusState _dealState(String status) => switch (status.toLowerCase()) {
 Future<bool> _formSheet(
   BuildContext context, {
   required String title,
-  required List<({String label, String hint, TextInputTypeHint type})> fields,
+  required List<({String label, String hint, TextInputTypeHint type, String? initial})> fields,
   required Future<void> Function(List<String> values) onSave,
 }) async {
   var saved = false;
@@ -38,11 +46,11 @@ Future<bool> _formSheet(
   return saved;
 }
 
-enum TextInputTypeHint { text, phone, email }
+enum TextInputTypeHint { text, phone, email, number }
 
 class _FormBody extends StatefulWidget {
   const _FormBody({required this.fields, required this.onSave});
-  final List<({String label, String hint, TextInputTypeHint type})> fields;
+  final List<({String label, String hint, TextInputTypeHint type, String? initial})> fields;
   final Future<void> Function(List<String> values) onSave;
 
   @override
@@ -50,7 +58,7 @@ class _FormBody extends StatefulWidget {
 }
 
 class _FormBodyState extends State<_FormBody> {
-  late final List<TextEditingController> _c = [for (final _ in widget.fields) TextEditingController()];
+  late final List<TextEditingController> _c = [for (final f in widget.fields) TextEditingController(text: f.initial)];
   bool _busy = false;
   String? _error;
 
@@ -75,6 +83,7 @@ class _FormBodyState extends State<_FormBody> {
             keyboardType: switch (widget.fields[i].type) {
               TextInputTypeHint.phone => TextInputType.phone,
               TextInputTypeHint.email => TextInputType.emailAddress,
+              TextInputTypeHint.number => const TextInputType.numberWithOptions(decimal: true),
               _ => TextInputType.text,
             },
             errorText: i == 0 ? _error : null,
@@ -126,11 +135,11 @@ class ContactsScreen extends StatelessWidget {
       emptyIcon: MlIcons.person,
       onAdd: (context, ref) async {
         await _formSheet(context, title: 'New contact', fields: [
-          (label: 'First name', hint: 'Rita', type: TextInputTypeHint.text),
-          (label: 'Last name', hint: 'Shaw', type: TextInputTypeHint.text),
-          (label: 'Phone', hint: '+971 50 123 4567', type: TextInputTypeHint.phone),
-          (label: 'Email', hint: 'rita@company.com', type: TextInputTypeHint.email),
-          (label: 'Job title', hint: 'Purchasing manager', type: TextInputTypeHint.text),
+          (label: 'First name', hint: 'Rita', type: TextInputTypeHint.text, initial: null),
+          (label: 'Last name', hint: 'Shaw', type: TextInputTypeHint.text, initial: null),
+          (label: 'Phone', hint: '+971 50 123 4567', type: TextInputTypeHint.phone, initial: null),
+          (label: 'Email', hint: 'rita@company.com', type: TextInputTypeHint.email, initial: null),
+          (label: 'Job title', hint: 'Purchasing manager', type: TextInputTypeHint.text, initial: null),
         ], onSave: (v) async {
           await ref.read(workspaceServiceProvider).createContact(firstName: v[0], lastName: v[1], phone: v[2].isEmpty ? null : v[2], email: v[3].isEmpty ? null : v[3], jobTitle: v[4].isEmpty ? null : v[4]);
           if (context.mounted) MlToast.show(context, message: 'Contact created.', type: MlToastType.success);
@@ -157,6 +166,25 @@ class ContactDetailScreen extends ConsumerWidget {
       id: id,
       title: (s) => str((s['contact'] as Map)['firstName']) + ' ' + str((s['contact'] as Map)['lastName']),
       subtitle: (s) => [str((s['contact'] as Map)['jobTitle']), str((s['contact'] as Map)['accountName'])].where((e) => e.isNotEmpty).join(' · '),
+      actions: (s, reload) => [
+        MlIconButton(label: 'Edit contact', icon: const MlIcon(MlIcons.edit, size: 24), onPressed: () async {
+          final c = Map<String, dynamic>.from(s['contact'] as Map);
+          final ok = await _formSheet(context, title: 'Edit contact', fields: [
+            (label: 'First name', hint: 'Rita', type: TextInputTypeHint.text, initial: str(c['firstName'])),
+            (label: 'Last name', hint: 'Shaw', type: TextInputTypeHint.text, initial: str(c['lastName'])),
+            (label: 'Phone', hint: '+971 50 123 4567', type: TextInputTypeHint.phone, initial: str(c['phone'])),
+            (label: 'Email', hint: 'rita@company.com', type: TextInputTypeHint.email, initial: str(c['email'])),
+            (label: 'Job title', hint: 'Purchasing manager', type: TextInputTypeHint.text, initial: str(c['jobTitle'])),
+            (label: 'Notes', hint: 'Anything worth remembering', type: TextInputTypeHint.text, initial: str(c['description'])),
+          ], onSave: (v) async {
+            await ref.read(workspaceServiceProvider).updateContact(c, firstName: v[0], lastName: v[1], phone: v[2].isEmpty ? null : v[2], email: v[3].isEmpty ? null : v[3], jobTitle: v[4].isEmpty ? null : v[4], description: v[5].isEmpty ? null : v[5]);
+          });
+          if (ok) {
+            if (context.mounted) MlToast.show(context, message: 'Contact updated.', type: MlToastType.success);
+            await reload();
+          }
+        }),
+      ],
       builder: (context, s, reload) {
         final c = Map<String, dynamic>.from(s['contact'] as Map);
         final deals = ((s['deals'] as List?) ?? const []).whereType<Map>().toList();
@@ -204,10 +232,10 @@ class AccountsScreen extends StatelessWidget {
       emptyIcon: MlIcons.leadsOutline,
       onAdd: (context, ref) async {
         await _formSheet(context, title: 'New account', fields: [
-          (label: 'Company name', hint: 'Acme Logistics', type: TextInputTypeHint.text),
-          (label: 'Phone', hint: '+971 4 123 4567', type: TextInputTypeHint.phone),
-          (label: 'Website', hint: 'acme.com', type: TextInputTypeHint.text),
-          (label: 'Industry', hint: 'Logistics', type: TextInputTypeHint.text),
+          (label: 'Company name', hint: 'Acme Logistics', type: TextInputTypeHint.text, initial: null),
+          (label: 'Phone', hint: '+971 4 123 4567', type: TextInputTypeHint.phone, initial: null),
+          (label: 'Website', hint: 'acme.com', type: TextInputTypeHint.text, initial: null),
+          (label: 'Industry', hint: 'Logistics', type: TextInputTypeHint.text, initial: null),
         ], onSave: (v) async {
           await ref.read(workspaceServiceProvider).createAccount(name: v[0], phone: v[1].isEmpty ? null : v[1], website: v[2].isEmpty ? null : v[2], industry: v[3].isEmpty ? null : v[3]);
           if (context.mounted) MlToast.show(context, message: 'Account created.', type: MlToastType.success);
@@ -234,6 +262,24 @@ class AccountDetailScreen extends ConsumerWidget {
       id: id,
       title: (s) => str((s['account'] as Map)['name']),
       subtitle: (s) => str((s['account'] as Map)['industry']),
+      actions: (s, reload) => [
+        MlIconButton(label: 'Edit account', icon: const MlIcon(MlIcons.edit, size: 24), onPressed: () async {
+          final a = Map<String, dynamic>.from(s['account'] as Map);
+          final ok = await _formSheet(context, title: 'Edit account', fields: [
+            (label: 'Company name', hint: 'Acme Logistics', type: TextInputTypeHint.text, initial: str(a['name'])),
+            (label: 'Phone', hint: '+971 4 123 4567', type: TextInputTypeHint.phone, initial: str(a['phone'])),
+            (label: 'Website', hint: 'acme.com', type: TextInputTypeHint.text, initial: str(a['website'])),
+            (label: 'Industry', hint: 'Logistics', type: TextInputTypeHint.text, initial: str(a['industry'])),
+            (label: 'Notes', hint: 'Anything worth remembering', type: TextInputTypeHint.text, initial: str(a['description'])),
+          ], onSave: (v) async {
+            await ref.read(workspaceServiceProvider).updateAccount(a, name: v[0], phone: v[1].isEmpty ? null : v[1], website: v[2].isEmpty ? null : v[2], industry: v[3].isEmpty ? null : v[3], description: v[4].isEmpty ? null : v[4]);
+          });
+          if (ok) {
+            if (context.mounted) MlToast.show(context, message: 'Account updated.', type: MlToastType.success);
+            await reload();
+          }
+        }),
+      ],
       builder: (context, s, reload) {
         final a = Map<String, dynamic>.from(s['account'] as Map);
         final contacts = ((s['contacts'] as List?) ?? const []).whereType<Map>().toList();
@@ -292,6 +338,19 @@ class DealsScreen extends StatelessWidget {
       searchHint: 'Search deals or companies',
       emptyTitle: 'No deals yet',
       emptyIcon: MlIcons.handshake,
+      onAdd: (context, ref) async {
+        await _formSheet(context, title: 'New deal', fields: [
+          (label: 'Deal name', hint: 'Acme rollout', type: TextInputTypeHint.text, initial: null),
+          (label: 'Amount', hint: '12000', type: TextInputTypeHint.number, initial: null),
+          (label: 'Currency', hint: 'AED', type: TextInputTypeHint.text, initial: null),
+          (label: 'Expected close (YYYY-MM-DD)', hint: '2026-12-31', type: TextInputTypeHint.text, initial: null),
+        ], onSave: (v) async {
+          final close = _parseDate(v[3]);
+          if (v[3].isNotEmpty && close == null) throw const FormatException('Enter the date as YYYY-MM-DD.');
+          await ref.read(workspaceServiceProvider).createDeal(name: v[0], amount: double.tryParse(v[1]) ?? 0, currency: v[2].isEmpty ? null : v[2].toUpperCase(), expectedCloseDate: close);
+          if (context.mounted) MlToast.show(context, message: 'Deal created.', type: MlToastType.success);
+        });
+      },
       rowBuilder: (context, d) => RecordTile(
         title: str(d['name']),
         subtitle: [str(d['accountName']), money(d['amount'], d['currency'])].where((e) => e.isNotEmpty).join(' · '),
@@ -369,6 +428,25 @@ class DealDetailScreen extends ConsumerWidget {
       id: id,
       title: (d) => str(d['name']),
       subtitle: (d) => money(d['amount'], d['currency']),
+      actions: (d, reload) => [
+        MlIconButton(label: 'Edit deal', icon: const MlIcon(MlIcons.edit, size: 24), onPressed: () async {
+          final ok = await _formSheet(context, title: 'Edit deal', fields: [
+            (label: 'Deal name', hint: 'Acme rollout', type: TextInputTypeHint.text, initial: str(d['name'])),
+            (label: 'Amount', hint: '12000', type: TextInputTypeHint.number, initial: ((d['amount'] as num?) ?? 0).toString()),
+            (label: 'Currency', hint: 'AED', type: TextInputTypeHint.text, initial: str(d['currency'])),
+            (label: 'Expected close (YYYY-MM-DD)', hint: '2026-12-31', type: TextInputTypeHint.text, initial: str(d['expectedCloseDate']).split('T').first),
+            (label: 'Notes', hint: 'Anything worth remembering', type: TextInputTypeHint.text, initial: str(d['description'])),
+          ], onSave: (v) async {
+            final close = _parseDate(v[3]);
+            if (v[3].isNotEmpty && close == null) throw const FormatException('Enter the date as YYYY-MM-DD.');
+            await ref.read(workspaceServiceProvider).updateDeal(d, name: v[0], amount: double.tryParse(v[1]) ?? 0, currency: v[2].isEmpty ? null : v[2].toUpperCase(), expectedCloseDate: close, description: v[4].isEmpty ? null : v[4]);
+          });
+          if (ok) {
+            if (context.mounted) MlToast.show(context, message: 'Deal updated.', type: MlToastType.success);
+            await reload();
+          }
+        }),
+      ],
       builder: (context, d, reload) {
         final contacts = ((d['contacts'] as List?) ?? const []).whereType<Map>().toList();
         return [
