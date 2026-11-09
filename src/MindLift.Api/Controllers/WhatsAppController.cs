@@ -1,3 +1,4 @@
+using MindLift.Shared.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MindLift.Api.Auth;
@@ -53,6 +54,7 @@ public sealed class WhatsAppController(IWhatsAppService whatsAppService) : Contr
 
     [Authorize]
     [RequiresFeature("whatsapp")]
+    [HasPermission(AppModule.Communication, PermissionAction.View)]
     [HttpGet("settings")]
     public async Task<ActionResult<WhatsAppSettingsDto>> GetSettings(CancellationToken ct)
     {
@@ -62,6 +64,7 @@ public sealed class WhatsAppController(IWhatsAppService whatsAppService) : Contr
 
     [Authorize]
     [RequiresFeature("whatsapp")]
+    [HasPermission(AppModule.Communication, PermissionAction.Edit)]
     [HttpPut("settings")]
     public async Task<ActionResult<WhatsAppSettingsDto>> UpdateSettings(
         [FromBody] UpdateWhatsAppSettingsRequest request,
@@ -73,6 +76,7 @@ public sealed class WhatsAppController(IWhatsAppService whatsAppService) : Contr
 
     [Authorize]
     [RequiresFeature("whatsapp")]
+    [HasPermission(AppModule.Communication, PermissionAction.Create)]
     [HttpPost("messages/send")]
     public async Task<ActionResult<WhatsAppMessageDto>> SendMessage(
         [FromBody] SendWhatsAppMessageRequest request,
@@ -84,6 +88,7 @@ public sealed class WhatsAppController(IWhatsAppService whatsAppService) : Contr
 
     [Authorize]
     [RequiresFeature("whatsapp")]
+    [HasPermission(AppModule.Communication, PermissionAction.View)]
     [HttpGet("conversations")]
     public async Task<ActionResult<IReadOnlyList<WhatsAppConversationDto>>> GetConversations(CancellationToken ct)
     {
@@ -93,6 +98,7 @@ public sealed class WhatsAppController(IWhatsAppService whatsAppService) : Contr
 
     [Authorize]
     [RequiresFeature("whatsapp")]
+    [HasPermission(AppModule.Communication, PermissionAction.View)]
     [HttpGet("conversations/{phone}/messages")]
     public async Task<ActionResult<IReadOnlyList<WhatsAppMessageDto>>> GetMessages(
         string phone,

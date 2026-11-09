@@ -1,3 +1,4 @@
+using MindLift.Shared.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MindLift.Api.Auth;
@@ -16,6 +17,7 @@ namespace MindLift.Api.Controllers;
 [RequiresFeature("velocity-reports")]
 public sealed class VelocityReportsController(IVelocityReportService velocityService) : ControllerBase
 {
+    [HasPermission(AppModule.Reports, PermissionAction.View)]
     [HttpGet("funnel")]
     public async Task<ActionResult<PipelineFunnelReportDto>> GetFunnel(
         [FromQuery] PipelineFunnelReportRequest request,
@@ -25,6 +27,7 @@ public sealed class VelocityReportsController(IVelocityReportService velocitySer
         return Ok(report);
     }
 
+    [HasPermission(AppModule.Reports, PermissionAction.View)]
     [HttpGet("sales-velocity")]
     public async Task<ActionResult<SalesVelocityReportDto>> GetSalesVelocity(
         [FromQuery] SalesVelocityReportRequest request,

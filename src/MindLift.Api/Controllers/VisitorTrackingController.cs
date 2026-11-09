@@ -1,3 +1,4 @@
+using MindLift.Shared.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MindLift.Api.Auth;
@@ -18,6 +19,7 @@ public sealed class VisitorTrackingController(IVisitorTrackingService trackingSe
 
     [Authorize]
     [RequiresFeature("visitor-tracking")]
+    [HasPermission(AppModule.Settings, PermissionAction.Create)]
     [HttpPost("trackers")]
     public async Task<ActionResult<WebsiteTrackerDto>> CreateTracker(
         [FromBody] SaveWebsiteTrackerRequest request,
@@ -29,6 +31,7 @@ public sealed class VisitorTrackingController(IVisitorTrackingService trackingSe
 
     [Authorize]
     [RequiresFeature("visitor-tracking")]
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("trackers")]
     public async Task<ActionResult<IReadOnlyList<WebsiteTrackerDto>>> ListTrackers(CancellationToken ct)
     {
@@ -38,6 +41,7 @@ public sealed class VisitorTrackingController(IVisitorTrackingService trackingSe
 
     [Authorize]
     [RequiresFeature("visitor-tracking")]
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("trackers/{id:guid}")]
     public async Task<ActionResult<WebsiteTrackerDto>> GetTrackerById(
         Guid id,
@@ -49,6 +53,7 @@ public sealed class VisitorTrackingController(IVisitorTrackingService trackingSe
 
     [Authorize]
     [RequiresFeature("visitor-tracking")]
+    [HasPermission(AppModule.Settings, PermissionAction.Edit)]
     [HttpPut("trackers/{id:guid}")]
     public async Task<ActionResult<WebsiteTrackerDto>> UpdateTracker(
         Guid id,
@@ -61,6 +66,7 @@ public sealed class VisitorTrackingController(IVisitorTrackingService trackingSe
 
     [Authorize]
     [RequiresFeature("visitor-tracking")]
+    [HasPermission(AppModule.Settings, PermissionAction.Delete)]
     [HttpDelete("trackers/{id:guid}")]
     public async Task<IActionResult> DeleteTracker(
         Guid id,
@@ -73,6 +79,7 @@ public sealed class VisitorTrackingController(IVisitorTrackingService trackingSe
 
     [Authorize]
     [RequiresFeature("visitor-tracking")]
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("sessions")]
     public async Task<ActionResult<IReadOnlyList<VisitorSessionDto>>> GetSessions(
         [FromQuery] Guid? trackerId,
@@ -86,6 +93,7 @@ public sealed class VisitorTrackingController(IVisitorTrackingService trackingSe
 
     [Authorize]
     [RequiresFeature("visitor-tracking")]
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("analytics")]
     public async Task<ActionResult<VisitorAnalyticsDto>> GetAnalytics(
         [FromQuery] Guid? trackerId,

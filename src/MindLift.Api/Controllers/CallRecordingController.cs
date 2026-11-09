@@ -1,3 +1,4 @@
+using MindLift.Shared.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MindLift.Api.Auth;
@@ -36,6 +37,7 @@ public sealed class CallRecordingController(ICallRecordingService recordingServi
 
     [Authorize]
     [RequiresFeature("call-recording")]
+    [HasPermission(AppModule.Communication, PermissionAction.View)]
     [HttpGet("consent")]
     public async Task<ActionResult<RecordingConsentDto>> GetConsentSettings(CancellationToken ct)
     {
@@ -45,6 +47,7 @@ public sealed class CallRecordingController(ICallRecordingService recordingServi
 
     [Authorize]
     [RequiresFeature("call-recording")]
+    [HasPermission(AppModule.Communication, PermissionAction.Edit)]
     [HttpPut("consent")]
     public async Task<ActionResult<RecordingConsentDto>> UpdateConsentSettings(
         [FromBody] UpdateRecordingConsentRequest request,
@@ -56,6 +59,7 @@ public sealed class CallRecordingController(ICallRecordingService recordingServi
 
     [Authorize]
     [RequiresFeature("call-recording")]
+    [HasPermission(AppModule.Communication, PermissionAction.View)]
     [HttpGet("calls/{callId:guid}")]
     public async Task<ActionResult<CallRecordingDto>> GetRecording(
         Guid callId,
@@ -67,6 +71,7 @@ public sealed class CallRecordingController(ICallRecordingService recordingServi
 
     [Authorize]
     [RequiresFeature("call-recording")]
+    [HasPermission(AppModule.Communication, PermissionAction.Create)]
     [HttpPost("calls/{callId:guid}/transcribe")]
     public async Task<ActionResult<TranscriptionResultDto>> TranscribeCall(
         Guid callId,
@@ -79,6 +84,7 @@ public sealed class CallRecordingController(ICallRecordingService recordingServi
 
     [Authorize]
     [RequiresFeature("call-recording")]
+    [HasPermission(AppModule.Communication, PermissionAction.View)]
     [HttpGet("calls/{callId:guid}/transcription")]
     public async Task<ActionResult<TranscriptionResultDto>> GetTranscription(
         Guid callId,
@@ -90,6 +96,7 @@ public sealed class CallRecordingController(ICallRecordingService recordingServi
 
     [Authorize]
     [RequiresFeature("call-recording")]
+    [HasPermission(AppModule.Communication, PermissionAction.Delete)]
     [HttpDelete("calls/{callId:guid}")]
     public async Task<ActionResult<GdprDeleteRecordingResult>> DeleteRecording(
         Guid callId,

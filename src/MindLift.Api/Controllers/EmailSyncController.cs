@@ -1,3 +1,4 @@
+using MindLift.Shared.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MindLift.Api.Auth;
@@ -17,6 +18,7 @@ namespace MindLift.Api.Controllers;
 [Route("api/v1/email-sync")]
 public sealed class EmailSyncController(IEmailSyncService emailSyncService) : ControllerBase
 {
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("accounts")]
     public async Task<ActionResult<IReadOnlyList<EmailSyncAccountDto>>> ListAccounts(CancellationToken ct)
     {
@@ -24,6 +26,7 @@ public sealed class EmailSyncController(IEmailSyncService emailSyncService) : Co
         return Ok(accounts);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("accounts/{id:guid}")]
     public async Task<ActionResult<EmailSyncAccountDto>> GetAccount(Guid id, CancellationToken ct)
     {
@@ -32,6 +35,7 @@ public sealed class EmailSyncController(IEmailSyncService emailSyncService) : Co
         return Ok(account);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.Create)]
     [HttpPost("accounts")]
     public async Task<ActionResult<EmailSyncAccountDto>> CreateAccount(
         [FromBody] CreateEmailSyncAccountRequest request,
@@ -41,6 +45,7 @@ public sealed class EmailSyncController(IEmailSyncService emailSyncService) : Co
         return CreatedAtAction(nameof(GetAccount), new { id = created.Id }, created);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.Edit)]
     [HttpPut("accounts/{id:guid}")]
     public async Task<ActionResult<EmailSyncAccountDto>> UpdateAccount(
         Guid id,
@@ -51,6 +56,7 @@ public sealed class EmailSyncController(IEmailSyncService emailSyncService) : Co
         return Ok(updated);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.Delete)]
     [HttpDelete("accounts/{id:guid}")]
     public async Task<IActionResult> DeleteAccount(Guid id, CancellationToken ct)
     {
@@ -59,6 +65,7 @@ public sealed class EmailSyncController(IEmailSyncService emailSyncService) : Co
         return NoContent();
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpPost("test-connection")]
     public async Task<ActionResult<TestMailboxConnectionResult>> TestConnection(
         [FromBody] TestMailboxConnectionRequest request,
@@ -68,6 +75,7 @@ public sealed class EmailSyncController(IEmailSyncService emailSyncService) : Co
         return Ok(result);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.Create)]
     [HttpPost("accounts/{id:guid}/sync")]
     public async Task<ActionResult<EmailSyncResultDto>> SyncAccount(Guid id, CancellationToken ct)
     {
@@ -75,6 +83,7 @@ public sealed class EmailSyncController(IEmailSyncService emailSyncService) : Co
         return Ok(result);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("messages")]
     public async Task<ActionResult<IReadOnlyList<EmailSyncMessageDto>>> ListMessages(
         [FromQuery] Guid? accountId,
@@ -88,6 +97,7 @@ public sealed class EmailSyncController(IEmailSyncService emailSyncService) : Co
         return Ok(messages);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("messages/{id:guid}")]
     public async Task<ActionResult<EmailSyncMessageDto>> GetMessage(Guid id, CancellationToken ct)
     {
@@ -96,6 +106,7 @@ public sealed class EmailSyncController(IEmailSyncService emailSyncService) : Co
         return Ok(message);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.Create)]
     [HttpPost("accounts/{id:guid}/send")]
     public async Task<ActionResult<EmailSyncMessageDto>> SendEmail(
         Guid id,
@@ -106,6 +117,7 @@ public sealed class EmailSyncController(IEmailSyncService emailSyncService) : Co
         return Ok(sent);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.Create)]
     [HttpPost("accounts/{id:guid}/simulate-inbound")]
     public async Task<ActionResult<EmailSyncMessageDto>> SimulateInbound(
         Guid id,
@@ -116,6 +128,7 @@ public sealed class EmailSyncController(IEmailSyncService emailSyncService) : Co
         return Ok(message);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("logs")]
     public async Task<ActionResult<IReadOnlyList<EmailSyncLogDto>>> ListLogs(
         [FromQuery] Guid? accountId,
@@ -126,6 +139,7 @@ public sealed class EmailSyncController(IEmailSyncService emailSyncService) : Co
         return Ok(logs);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("stats")]
     public async Task<ActionResult<EmailSyncStatsDto>> GetStats(CancellationToken ct)
     {

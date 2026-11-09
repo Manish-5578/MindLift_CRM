@@ -1,3 +1,4 @@
+using MindLift.Shared.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MindLift.Api.Auth;
@@ -16,24 +17,28 @@ namespace MindLift.Api.Controllers;
 [Authorize]
 public sealed class CustomObjectsController(ICustomObjectService customObjects) : ControllerBase
 {
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("definitions")]
     public async Task<ActionResult<IReadOnlyList<CustomObjectDefinitionDto>>> ListDefinitions(
         [FromQuery] bool activeOnly,
         CancellationToken cancellationToken)
         => Ok(await customObjects.ListDefinitionsAsync(activeOnly, cancellationToken));
 
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("definitions/{id:guid}")]
     public async Task<ActionResult<CustomObjectDefinitionDto>> GetDefinition(
         Guid id,
         CancellationToken cancellationToken)
         => Ok(await customObjects.GetDefinitionAsync(id, cancellationToken));
 
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("definitions/by-slug/{slug}")]
     public async Task<ActionResult<CustomObjectDefinitionDto>> GetDefinitionBySlug(
         string slug,
         CancellationToken cancellationToken)
         => Ok(await customObjects.GetDefinitionBySlugAsync(slug, cancellationToken));
 
+    [HasPermission(AppModule.Settings, PermissionAction.Create)]
     [HttpPost("definitions")]
     public async Task<ActionResult<CustomObjectDefinitionDto>> CreateDefinition(
         [FromBody] SaveCustomObjectDefinitionRequest request,
@@ -43,6 +48,7 @@ public sealed class CustomObjectsController(ICustomObjectService customObjects) 
         return CreatedAtAction(nameof(GetDefinition), new { id = created.Id }, created);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.Edit)]
     [HttpPut("definitions/{id:guid}")]
     public async Task<ActionResult<CustomObjectDefinitionDto>> UpdateDefinition(
         Guid id,
@@ -50,6 +56,7 @@ public sealed class CustomObjectsController(ICustomObjectService customObjects) 
         CancellationToken cancellationToken)
         => Ok(await customObjects.UpdateDefinitionAsync(id, request, cancellationToken));
 
+    [HasPermission(AppModule.Settings, PermissionAction.Delete)]
     [HttpDelete("definitions/{id:guid}")]
     public async Task<IActionResult> DeleteDefinition(
         Guid id,
@@ -59,6 +66,7 @@ public sealed class CustomObjectsController(ICustomObjectService customObjects) 
         return NoContent();
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("{slug}/records")]
     public async Task<ActionResult<CustomObjectRecordPagedResult>> ListRecords(
         string slug,
@@ -66,6 +74,7 @@ public sealed class CustomObjectsController(ICustomObjectService customObjects) 
         CancellationToken cancellationToken)
         => Ok(await customObjects.ListRecordsAsync(slug, query, cancellationToken));
 
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("{slug}/records/{id:guid}")]
     public async Task<ActionResult<CustomObjectRecordDto>> GetRecord(
         string slug,
@@ -73,6 +82,7 @@ public sealed class CustomObjectsController(ICustomObjectService customObjects) 
         CancellationToken cancellationToken)
         => Ok(await customObjects.GetRecordAsync(slug, id, cancellationToken));
 
+    [HasPermission(AppModule.Settings, PermissionAction.Create)]
     [HttpPost("{slug}/records")]
     public async Task<ActionResult<CustomObjectRecordDto>> CreateRecord(
         string slug,
@@ -83,6 +93,7 @@ public sealed class CustomObjectsController(ICustomObjectService customObjects) 
         return CreatedAtAction(nameof(GetRecord), new { slug, id = created.Id }, created);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.Edit)]
     [HttpPut("{slug}/records/{id:guid}")]
     public async Task<ActionResult<CustomObjectRecordDto>> UpdateRecord(
         string slug,
@@ -91,6 +102,7 @@ public sealed class CustomObjectsController(ICustomObjectService customObjects) 
         CancellationToken cancellationToken)
         => Ok(await customObjects.UpdateRecordAsync(slug, id, request, cancellationToken));
 
+    [HasPermission(AppModule.Settings, PermissionAction.Delete)]
     [HttpDelete("{slug}/records/{id:guid}")]
     public async Task<IActionResult> DeleteRecord(
         string slug,

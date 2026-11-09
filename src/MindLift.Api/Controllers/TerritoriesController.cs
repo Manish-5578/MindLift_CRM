@@ -1,3 +1,4 @@
+using MindLift.Shared.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MindLift.Api.Auth;
@@ -19,6 +20,7 @@ public sealed class TerritoriesController(IRoutingService routingService) : Cont
 {
     // ================= Territories =================
 
+    [HasPermission(AppModule.Settings, PermissionAction.Create)]
     [HttpPost]
     public async Task<ActionResult<TerritoryDto>> Create(
         [FromBody] SaveTerritoryRequest request,
@@ -28,6 +30,7 @@ public sealed class TerritoriesController(IRoutingService routingService) : Cont
         return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<TerritoryDto>>> List(
         [FromQuery] bool? activeOnly,
@@ -37,6 +40,7 @@ public sealed class TerritoriesController(IRoutingService routingService) : Cont
         return Ok(list);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<TerritoryDto>> GetById(
         Guid id,
@@ -46,6 +50,7 @@ public sealed class TerritoriesController(IRoutingService routingService) : Cont
         return Ok(territory);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.Edit)]
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<TerritoryDto>> Update(
         Guid id,
@@ -56,6 +61,7 @@ public sealed class TerritoriesController(IRoutingService routingService) : Cont
         return Ok(updated);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.Delete)]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(
         Guid id,
@@ -68,6 +74,7 @@ public sealed class TerritoriesController(IRoutingService routingService) : Cont
 
     // ================= Members =================
 
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("{id:guid}/members")]
     public async Task<ActionResult<IReadOnlyList<TerritoryMemberDto>>> ListMembers(
         Guid id,
@@ -77,6 +84,7 @@ public sealed class TerritoriesController(IRoutingService routingService) : Cont
         return Ok(members);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.Create)]
     [HttpPost("{id:guid}/members")]
     public async Task<ActionResult<TerritoryMemberDto>> AddOrUpdateMember(
         Guid id,
@@ -87,6 +95,7 @@ public sealed class TerritoriesController(IRoutingService routingService) : Cont
         return Ok(member);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.Delete)]
     [HttpDelete("{id:guid}/members/{userId:guid}")]
     public async Task<IActionResult> RemoveMember(
         Guid id,
@@ -100,6 +109,7 @@ public sealed class TerritoriesController(IRoutingService routingService) : Cont
 
     // ================= Lead Routing & Simulation =================
 
+    [HasPermission(AppModule.Settings, PermissionAction.Create)]
     [HttpPost("route-lead/{leadId:guid}")]
     [HttpPost("/api/v1/routing/route-lead/{leadId:guid}")]
     public async Task<ActionResult<RouteLeadResultDto>> RouteLead(
@@ -111,6 +121,7 @@ public sealed class TerritoriesController(IRoutingService routingService) : Cont
         return Ok(result);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpPost("simulate")]
     [HttpPost("/api/v1/routing/simulate")]
     public async Task<ActionResult<SimulateRoutingResultDto>> Simulate(
@@ -121,6 +132,7 @@ public sealed class TerritoriesController(IRoutingService routingService) : Cont
         return Ok(result);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("logs")]
     [HttpGet("/api/v1/routing/logs")]
     public async Task<ActionResult<IReadOnlyList<LeadRoutingLogDto>>> ListLogs(

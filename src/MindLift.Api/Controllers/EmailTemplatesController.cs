@@ -1,3 +1,4 @@
+using MindLift.Shared.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MindLift.Api.Auth;
@@ -17,6 +18,7 @@ namespace MindLift.Api.Controllers;
 [Route("api/v1/email-templates")]
 public sealed class EmailTemplatesController(IEmailTemplateService templateService) : ControllerBase
 {
+    [SignedInUser]
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<EmailTemplateSummaryDto>>> ListTemplates(
         [FromQuery] string? category,
@@ -28,6 +30,7 @@ public sealed class EmailTemplatesController(IEmailTemplateService templateServi
         return Ok(list);
     }
 
+    [SignedInUser]
     [HttpGet("presets")]
     public async Task<ActionResult<IReadOnlyList<EmailTemplatePresetDto>>> GetPresets(CancellationToken ct)
     {
@@ -35,6 +38,7 @@ public sealed class EmailTemplatesController(IEmailTemplateService templateServi
         return Ok(presets);
     }
 
+    [HasPermission(AppModule.Communication, PermissionAction.Create)]
     [HttpPost("presets/{key}/create")]
     public async Task<ActionResult<EmailTemplateDto>> CreateFromPreset(
         string key,
@@ -52,6 +56,7 @@ public sealed class EmailTemplatesController(IEmailTemplateService templateServi
         }
     }
 
+    [SignedInUser]
     [HttpPost("render-preview")]
     public async Task<ActionResult<RenderedEmailResult>> RenderPreview(
         [FromBody] RenderTemplateRequest request,
@@ -61,6 +66,7 @@ public sealed class EmailTemplatesController(IEmailTemplateService templateServi
         return Ok(result);
     }
 
+    [SignedInUser]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<EmailTemplateDto>> GetTemplateById(Guid id, CancellationToken ct)
     {
@@ -69,6 +75,7 @@ public sealed class EmailTemplatesController(IEmailTemplateService templateServi
         return Ok(template);
     }
 
+    [HasPermission(AppModule.Communication, PermissionAction.Create)]
     [HttpPost]
     public async Task<ActionResult<EmailTemplateDto>> CreateTemplate(
         [FromBody] SaveEmailTemplateRequest request,
@@ -83,6 +90,7 @@ public sealed class EmailTemplatesController(IEmailTemplateService templateServi
         return CreatedAtAction(nameof(GetTemplateById), new { id = created.Id }, created);
     }
 
+    [HasPermission(AppModule.Communication, PermissionAction.Edit)]
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<EmailTemplateDto>> UpdateTemplate(
         Guid id,
@@ -94,6 +102,7 @@ public sealed class EmailTemplatesController(IEmailTemplateService templateServi
         return Ok(updated);
     }
 
+    [HasPermission(AppModule.Communication, PermissionAction.Delete)]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> DeleteTemplate(Guid id, CancellationToken ct)
     {
@@ -102,6 +111,7 @@ public sealed class EmailTemplatesController(IEmailTemplateService templateServi
         return NoContent();
     }
 
+    [HasPermission(AppModule.Communication, PermissionAction.Create)]
     [HttpPost("{id:guid}/clone")]
     public async Task<ActionResult<EmailTemplateDto>> CloneTemplate(
         Guid id,
@@ -113,6 +123,7 @@ public sealed class EmailTemplatesController(IEmailTemplateService templateServi
         return Ok(cloned);
     }
 
+    [SignedInUser]
     [HttpPost("{id:guid}/render")]
     public async Task<ActionResult<RenderedEmailResult>> RenderWithEntity(
         Guid id,

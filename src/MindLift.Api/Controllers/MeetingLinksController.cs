@@ -1,3 +1,4 @@
+using MindLift.Shared.Enums;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -76,6 +77,7 @@ public sealed class MeetingLinksController(
 
     [Authorize]
     [RequiresFeature("meeting-links")]
+    [HasPermission(AppModule.Calendar, PermissionAction.Create)]
     [HttpPost]
     public async Task<ActionResult<MeetingLinkDto>> CreateMeetingLink(
         [FromBody] CreateMeetingLinkRequest request,
@@ -88,6 +90,7 @@ public sealed class MeetingLinksController(
 
     [Authorize]
     [RequiresFeature("meeting-links")]
+    [HasPermission(AppModule.Calendar, PermissionAction.View)]
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<MeetingLinkDto>>> GetMeetingLinks(
         [FromQuery] Guid? userId = null,
@@ -105,6 +108,7 @@ public sealed class MeetingLinksController(
 
     [Authorize]
     [RequiresFeature("meeting-links")]
+    [HasPermission(AppModule.Calendar, PermissionAction.View)]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<MeetingLinkDto>> GetMeetingLink(
         Guid id,
@@ -116,6 +120,7 @@ public sealed class MeetingLinksController(
 
     [Authorize]
     [RequiresFeature("meeting-links")]
+    [HasPermission(AppModule.Calendar, PermissionAction.Edit)]
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<MeetingLinkDto>> UpdateMeetingLink(
         Guid id,
@@ -128,6 +133,7 @@ public sealed class MeetingLinksController(
 
     [Authorize]
     [RequiresFeature("meeting-links")]
+    [HasPermission(AppModule.Calendar, PermissionAction.Delete)]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> DeleteMeetingLink(
         Guid id,

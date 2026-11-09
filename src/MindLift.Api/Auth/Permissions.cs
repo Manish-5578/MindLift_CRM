@@ -14,6 +14,13 @@ public sealed class HasPermissionAttribute(AppModule module, PermissionAction ac
     : AuthorizeAttribute($"perm:{module}:{action}");
 
 /// <summary>
+/// Any signed-in person may call this. Use it only for a person's own data (chat, their devices, their photo) or for reference data
+/// every form needs to read; changing shared settings always needs a permission. The access-rule test accepts it as a declared rule.
+/// </summary>
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false)]
+public sealed class SignedInUserAttribute : AuthorizeAttribute;
+
+/// <summary>
 /// Requires that the platform owner has not switched a module off for the caller's company, for features that have no permissions of their own (such as Automation).
 /// The check runs in <see cref="ModuleHandler"/> through the policy <c>module:{module}</c>.
 /// </summary>

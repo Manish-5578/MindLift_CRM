@@ -1,3 +1,4 @@
+using MindLift.Shared.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MindLift.Api.Auth;
@@ -61,6 +62,7 @@ public sealed class GdprConsentController(IGdprConsentService consentService) : 
 
     [Authorize]
     [RequiresFeature("unsubscribe-center")]
+    [HasPermission(AppModule.Communication, PermissionAction.Create)]
     [HttpPost("tokens/generate")]
     public async Task<ActionResult<PreferenceTokenDto>> GenerateToken(
         [FromBody] GeneratePreferenceTokenRequest request,
@@ -75,6 +77,7 @@ public sealed class GdprConsentController(IGdprConsentService consentService) : 
 
     [Authorize]
     [RequiresFeature("unsubscribe-center")]
+    [HasPermission(AppModule.Communication, PermissionAction.View)]
     [HttpGet("check")]
     public async Task<ActionResult<ConsentCheckResult>> CheckConsent(
         [FromQuery] string email,
@@ -91,6 +94,7 @@ public sealed class GdprConsentController(IGdprConsentService consentService) : 
 
     [Authorize]
     [RequiresFeature("unsubscribe-center")]
+    [HasPermission(AppModule.Communication, PermissionAction.View)]
     [HttpGet("records")]
     public async Task<ActionResult<IReadOnlyList<GdprConsentRecordDto>>> ListConsentRecords(
         [FromQuery] string? email,
@@ -105,6 +109,7 @@ public sealed class GdprConsentController(IGdprConsentService consentService) : 
 
     [Authorize]
     [RequiresFeature("unsubscribe-center")]
+    [HasPermission(AppModule.Communication, PermissionAction.Create)]
     [HttpPost("records")]
     public async Task<ActionResult<GdprConsentRecordDto>> SaveConsentRecord(
         [FromBody] SaveConsentRecordRequest request,
@@ -122,6 +127,7 @@ public sealed class GdprConsentController(IGdprConsentService consentService) : 
 
     [Authorize]
     [RequiresFeature("unsubscribe-center")]
+    [HasPermission(AppModule.Settings, PermissionAction.Export)]
     [HttpPost("export")]
     public async Task<ActionResult<GdprSubjectDataExport>> ExportSubjectData(
         [FromBody] GeneratePreferenceTokenRequest request,
@@ -136,6 +142,7 @@ public sealed class GdprConsentController(IGdprConsentService consentService) : 
 
     [Authorize]
     [RequiresFeature("unsubscribe-center")]
+    [HasPermission(AppModule.Settings, PermissionAction.Delete)]
     [HttpPost("erasure")]
     public async Task<ActionResult<GdprErasureResult>> ExecuteErasure(
         [FromBody] GdprErasureRequest request,

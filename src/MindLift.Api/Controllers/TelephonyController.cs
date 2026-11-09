@@ -1,3 +1,4 @@
+using MindLift.Shared.Enums;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -51,6 +52,7 @@ public sealed class TelephonyController(
 
     [Authorize]
     [RequiresFeature("click-to-call")]
+    [HasPermission(AppModule.Communication, PermissionAction.View)]
     [HttpGet("settings")]
     public async Task<ActionResult<TelephonySettingsDto>> GetSettings(CancellationToken ct)
     {
@@ -60,6 +62,7 @@ public sealed class TelephonyController(
 
     [Authorize]
     [RequiresFeature("click-to-call")]
+    [HasPermission(AppModule.Communication, PermissionAction.Edit)]
     [HttpPut("settings")]
     public async Task<ActionResult<TelephonySettingsDto>> UpdateSettings(
         [FromBody] UpdateTelephonySettingsRequest request,
@@ -71,6 +74,7 @@ public sealed class TelephonyController(
 
     [Authorize]
     [RequiresFeature("click-to-call")]
+    [HasPermission(AppModule.Communication, PermissionAction.Create)]
     [HttpPost("calls")]
     public async Task<ActionResult<InitiateCallResult>> InitiateCall(
         [FromBody] InitiateCallRequest request,
@@ -86,6 +90,7 @@ public sealed class TelephonyController(
 
     [Authorize]
     [RequiresFeature("click-to-call")]
+    [HasPermission(AppModule.Communication, PermissionAction.View)]
     [HttpGet("calls/{id:guid}")]
     public async Task<ActionResult<CallSessionDto>> GetCall(Guid id, CancellationToken ct)
     {
@@ -95,6 +100,7 @@ public sealed class TelephonyController(
 
     [Authorize]
     [RequiresFeature("click-to-call")]
+    [HasPermission(AppModule.Communication, PermissionAction.Create)]
     [HttpPost("calls/{id:guid}/end")]
     public async Task<ActionResult<CallSessionDto>> EndCall(
         Guid id,
@@ -107,6 +113,7 @@ public sealed class TelephonyController(
 
     [Authorize]
     [RequiresFeature("click-to-call")]
+    [HasPermission(AppModule.Communication, PermissionAction.Create)]
     [HttpPost("calls/{id:guid}/disposition")]
     public async Task<ActionResult<CallSessionDto>> SetDisposition(
         Guid id,
@@ -119,6 +126,7 @@ public sealed class TelephonyController(
 
     [Authorize]
     [RequiresFeature("click-to-call")]
+    [HasPermission(AppModule.Communication, PermissionAction.View)]
     [HttpGet("calls")]
     public async Task<ActionResult<IReadOnlyList<CallSessionDto>>> GetCallHistory(
         [FromQuery] Guid? leadId = null,

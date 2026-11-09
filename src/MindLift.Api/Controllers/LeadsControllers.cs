@@ -104,6 +104,7 @@ public sealed class LeadsController(LeadService leads, ImportNotifier imports) :
     public async Task<ActionResult<LeadDto>> Merge(Guid id, [FromBody] MergeLeadsRequest request, CancellationToken cancellationToken)
         => Ok(await leads.MergeAsync(id, request.DuplicateIds, request.FieldOverrides, cancellationToken));
 
+    [HasPermission(AppModule.Leads, PermissionAction.Import)]
     [HttpGet("template")]
     public IActionResult DownloadTemplate([FromQuery] string? format = "xlsx")
     {

@@ -1,3 +1,4 @@
+using MindLift.Shared.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MindLift.Api.Auth;
@@ -16,18 +17,21 @@ namespace MindLift.Api.Controllers;
 [Authorize]
 public sealed class DependentPicklistsController(IDependentPicklistService dependentPicklists) : ControllerBase
 {
+    [SignedInUser]
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<DependentPicklistMapDto>>> List(
         [FromQuery] string? entityType,
         CancellationToken cancellationToken)
         => Ok(await dependentPicklists.ListAsync(entityType, cancellationToken));
 
+    [SignedInUser]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<DependentPicklistMapDto>> GetById(
         Guid id,
         CancellationToken cancellationToken)
         => Ok(await dependentPicklists.GetByIdAsync(id, cancellationToken));
 
+    [HasPermission(AppModule.Settings, PermissionAction.Create)]
     [HttpPost]
     public async Task<ActionResult<DependentPicklistMapDto>> Create(
         [FromBody] SaveDependentPicklistMapRequest request,
@@ -37,6 +41,7 @@ public sealed class DependentPicklistsController(IDependentPicklistService depen
         return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.Edit)]
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<DependentPicklistMapDto>> Update(
         Guid id,
@@ -44,6 +49,7 @@ public sealed class DependentPicklistsController(IDependentPicklistService depen
         CancellationToken cancellationToken)
         => Ok(await dependentPicklists.UpdateAsync(id, request, cancellationToken));
 
+    [HasPermission(AppModule.Settings, PermissionAction.Delete)]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(
         Guid id,
@@ -53,6 +59,7 @@ public sealed class DependentPicklistsController(IDependentPicklistService depen
         return NoContent();
     }
 
+    [SignedInUser]
     [HttpGet("allowed")]
     public async Task<ActionResult<AllowedPicklistValuesDto>> GetAllowed(
         [FromQuery] string entityType,
@@ -62,6 +69,7 @@ public sealed class DependentPicklistsController(IDependentPicklistService depen
         CancellationToken cancellationToken)
         => Ok(await dependentPicklists.GetAllowedValuesAsync(entityType, parentField, childField, parentValue, cancellationToken));
 
+    [SignedInUser]
     [HttpPost("validate")]
     public async Task<ActionResult<DependentPicklistValidationResult>> Validate(
         [FromBody] ValidateDependentPicklistRequest request,

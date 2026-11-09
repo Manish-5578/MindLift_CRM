@@ -1,3 +1,4 @@
+using MindLift.Shared.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MindLift.Api.Auth;
@@ -16,30 +17,35 @@ namespace MindLift.Api.Controllers;
 [Authorize]
 public sealed class WinLossController(IWinLossAnalysisService winLoss) : ControllerBase
 {
+    [HasPermission(AppModule.Reports, PermissionAction.View)]
     [HttpGet("summary")]
     public async Task<ActionResult<WinLossSummaryDto>> GetSummary(
         [FromQuery] WinLossFilterQuery query,
         CancellationToken cancellationToken)
         => Ok(await winLoss.GetSummaryAsync(query, cancellationToken));
 
+    [HasPermission(AppModule.Reports, PermissionAction.View)]
     [HttpGet("reasons")]
     public async Task<ActionResult<WinLossReasonsBreakdownDto>> GetReasons(
         [FromQuery] WinLossFilterQuery query,
         CancellationToken cancellationToken)
         => Ok(await winLoss.GetReasonsBreakdownAsync(query, cancellationToken));
 
+    [HasPermission(AppModule.Reports, PermissionAction.View)]
     [HttpGet("competitors")]
     public async Task<ActionResult<IReadOnlyList<CompetitorWinLossDto>>> GetCompetitorCorrelation(
         [FromQuery] WinLossFilterQuery query,
         CancellationToken cancellationToken)
         => Ok(await winLoss.GetCompetitorCorrelationAsync(query, cancellationToken));
 
+    [HasPermission(AppModule.Reports, PermissionAction.View)]
     [HttpGet("stages")]
     public async Task<ActionResult<IReadOnlyList<StageLeakageDto>>> GetPipelineLeakage(
         [FromQuery] WinLossFilterQuery query,
         CancellationToken cancellationToken)
         => Ok(await winLoss.GetPipelineLeakageAsync(query, cancellationToken));
 
+    [HasPermission(AppModule.Reports, PermissionAction.View)]
     [HttpGet("reps")]
     public async Task<ActionResult<IReadOnlyList<RepWinLossDto>>> GetSalesRepPerformance(
         [FromQuery] WinLossFilterQuery query,

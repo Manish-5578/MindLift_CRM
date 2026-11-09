@@ -1,3 +1,4 @@
+using MindLift.Shared.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MindLift.Api.Auth;
@@ -15,6 +16,7 @@ public sealed class PaymentLinksController(IPaymentLinkService paymentLinks) : C
 {
     // ================= Authenticated Endpoints =================
 
+    [HasPermission(AppModule.Invoices, PermissionAction.Create)]
     [HttpPost("api/v1/payment-links")]
     [Authorize]
     [RequiresFeature("payment-links")]
@@ -26,6 +28,7 @@ public sealed class PaymentLinksController(IPaymentLinkService paymentLinks) : C
         return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
     }
 
+    [HasPermission(AppModule.Invoices, PermissionAction.View)]
     [HttpGet("api/v1/payment-links")]
     [Authorize]
     [RequiresFeature("payment-links")]
@@ -38,6 +41,7 @@ public sealed class PaymentLinksController(IPaymentLinkService paymentLinks) : C
         return Ok(list);
     }
 
+    [HasPermission(AppModule.Invoices, PermissionAction.View)]
     [HttpGet("api/v1/payment-links/{id:guid}")]
     [Authorize]
     [RequiresFeature("payment-links")]
@@ -49,6 +53,7 @@ public sealed class PaymentLinksController(IPaymentLinkService paymentLinks) : C
         return Ok(link);
     }
 
+    [HasPermission(AppModule.Invoices, PermissionAction.Create)]
     [HttpPost("api/v1/payment-links/{id:guid}/cancel")]
     [Authorize]
     [RequiresFeature("payment-links")]

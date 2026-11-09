@@ -1,3 +1,5 @@
+using MindLift.Shared.Enums;
+using MindLift.Api.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MindLift.Application.Abstractions;
@@ -8,6 +10,7 @@ namespace MindLift.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/v1/mobile")]
+[SignedInUser]
 public sealed class MobileController(IMobileDeviceService deviceService, MindLift.Infrastructure.Mobile.FcmPushNotificationSender push, ITenantContext tenant) : ControllerBase
 {
     /// <summary>Sends a test push to the signed-in user's devices and says what happened to each one.</summary>

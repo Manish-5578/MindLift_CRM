@@ -1,3 +1,5 @@
+using MindLift.Shared.Enums;
+using MindLift.Api.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MindLift.Application.Abstractions;
@@ -12,6 +14,7 @@ namespace MindLift.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/v1/avatars")]
+[SignedInUser]
 public sealed class AvatarsController(IFileStorage storage, ITenantContext tenant) : ControllerBase
 {
     private const long MaxBytes = 3L * 1024 * 1024;

@@ -1,3 +1,4 @@
+using MindLift.Shared.Enums;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -43,6 +44,7 @@ public sealed class SharedInboxController(
     // Mailbox Endpoints
     // ==========================================
 
+    [HasPermission(AppModule.Communication, PermissionAction.Create)]
     [HttpPost("mailboxes")]
     public async Task<ActionResult<SharedMailboxDto>> CreateMailbox(
         [FromBody] CreateSharedMailboxRequest request,
@@ -52,6 +54,7 @@ public sealed class SharedInboxController(
         return CreatedAtAction(nameof(GetMailbox), new { id = mailbox.Id }, mailbox);
     }
 
+    [HasPermission(AppModule.Communication, PermissionAction.View)]
     [HttpGet("mailboxes")]
     public async Task<ActionResult<IReadOnlyList<SharedMailboxDto>>> GetMailboxes(CancellationToken ct)
     {
@@ -59,6 +62,7 @@ public sealed class SharedInboxController(
         return Ok(mailboxes);
     }
 
+    [HasPermission(AppModule.Communication, PermissionAction.View)]
     [HttpGet("mailboxes/{id:guid}")]
     public async Task<ActionResult<SharedMailboxDto>> GetMailbox(Guid id, CancellationToken ct)
     {
@@ -66,6 +70,7 @@ public sealed class SharedInboxController(
         return Ok(mailbox);
     }
 
+    [HasPermission(AppModule.Communication, PermissionAction.Edit)]
     [HttpPut("mailboxes/{id:guid}")]
     public async Task<ActionResult<SharedMailboxDto>> UpdateMailbox(
         Guid id,
@@ -80,6 +85,7 @@ public sealed class SharedInboxController(
     // Mailbox Members
     // ==========================================
 
+    [HasPermission(AppModule.Communication, PermissionAction.Create)]
     [HttpPost("mailboxes/{id:guid}/members")]
     public async Task<ActionResult<SharedMailboxMemberDto>> AddMember(
         Guid id,
@@ -90,6 +96,7 @@ public sealed class SharedInboxController(
         return Ok(member);
     }
 
+    [HasPermission(AppModule.Communication, PermissionAction.View)]
     [HttpGet("mailboxes/{id:guid}/members")]
     public async Task<ActionResult<IReadOnlyList<SharedMailboxMemberDto>>> GetMembers(
         Guid id,
@@ -99,6 +106,7 @@ public sealed class SharedInboxController(
         return Ok(members);
     }
 
+    [HasPermission(AppModule.Communication, PermissionAction.Delete)]
     [HttpDelete("mailboxes/{id:guid}/members/{userId:guid}")]
     public async Task<IActionResult> RemoveMember(
         Guid id,
@@ -113,6 +121,7 @@ public sealed class SharedInboxController(
     // Threads
     // ==========================================
 
+    [HasPermission(AppModule.Communication, PermissionAction.Create)]
     [HttpPost("threads")]
     public async Task<ActionResult<SharedThreadDto>> CreateThread(
         [FromBody] CreateSharedThreadRequest request,
@@ -122,6 +131,7 @@ public sealed class SharedInboxController(
         return CreatedAtAction(nameof(GetThread), new { id = thread.Id }, thread);
     }
 
+    [HasPermission(AppModule.Communication, PermissionAction.View)]
     [HttpGet("threads")]
     public async Task<ActionResult<IReadOnlyList<SharedThreadDto>>> GetThreads(
         [FromQuery] Guid? mailboxId = null,
@@ -137,6 +147,7 @@ public sealed class SharedInboxController(
         return Ok(threads);
     }
 
+    [HasPermission(AppModule.Communication, PermissionAction.View)]
     [HttpGet("threads/{id:guid}")]
     public async Task<ActionResult<SharedThreadDto>> GetThread(Guid id, CancellationToken ct)
     {
@@ -144,6 +155,7 @@ public sealed class SharedInboxController(
         return Ok(thread);
     }
 
+    [HasPermission(AppModule.Communication, PermissionAction.Edit)]
     [HttpPut("threads/{id:guid}/assign")]
     public async Task<ActionResult<SharedThreadDto>> AssignThread(
         Guid id,
@@ -154,6 +166,7 @@ public sealed class SharedInboxController(
         return Ok(thread);
     }
 
+    [HasPermission(AppModule.Communication, PermissionAction.Edit)]
     [HttpPut("threads/{id:guid}/status")]
     public async Task<ActionResult<SharedThreadDto>> UpdateThreadStatus(
         Guid id,
@@ -168,6 +181,7 @@ public sealed class SharedInboxController(
     // Messages & Internal Notes
     // ==========================================
 
+    [HasPermission(AppModule.Communication, PermissionAction.Create)]
     [HttpPost("threads/{id:guid}/messages")]
     public async Task<ActionResult<SharedThreadMessageDto>> PostMessage(
         Guid id,
@@ -179,6 +193,7 @@ public sealed class SharedInboxController(
         return Ok(message);
     }
 
+    [HasPermission(AppModule.Communication, PermissionAction.View)]
     [HttpGet("threads/{id:guid}/messages")]
     public async Task<ActionResult<IReadOnlyList<SharedThreadMessageDto>>> GetThreadMessages(
         Guid id,
@@ -192,6 +207,7 @@ public sealed class SharedInboxController(
     // Collision Detection Locks
     // ==========================================
 
+    [HasPermission(AppModule.Communication, PermissionAction.Create)]
     [HttpPost("threads/{id:guid}/lock")]
     public async Task<ActionResult<CollisionStatusDto>> AcquireLock(
         Guid id,
@@ -203,6 +219,7 @@ public sealed class SharedInboxController(
         return Ok(result);
     }
 
+    [HasPermission(AppModule.Communication, PermissionAction.Delete)]
     [HttpDelete("threads/{id:guid}/lock")]
     public async Task<IActionResult> ReleaseLock(
         Guid id,
@@ -213,6 +230,7 @@ public sealed class SharedInboxController(
         return NoContent();
     }
 
+    [HasPermission(AppModule.Communication, PermissionAction.View)]
     [HttpGet("threads/{id:guid}/lock")]
     public async Task<ActionResult<CollisionStatusDto>> GetCollisionStatus(
         Guid id,

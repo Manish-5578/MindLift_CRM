@@ -1,3 +1,4 @@
+using MindLift.Shared.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MindLift.Api.Auth;
@@ -16,18 +17,21 @@ namespace MindLift.Api.Controllers;
 [Authorize]
 public sealed class WorkflowsController(IVisualWorkflowService workflows) : ControllerBase
 {
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<VisualWorkflowDto>>> List(
         [FromQuery] string? entityType,
         CancellationToken cancellationToken)
         => Ok(await workflows.ListAsync(entityType, cancellationToken));
 
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<VisualWorkflowDto>> GetById(
         Guid id,
         CancellationToken cancellationToken)
         => Ok(await workflows.GetByIdAsync(id, cancellationToken));
 
+    [HasPermission(AppModule.Settings, PermissionAction.Create)]
     [HttpPost]
     public async Task<ActionResult<VisualWorkflowDto>> Create(
         [FromBody] SaveVisualWorkflowRequest request,
@@ -37,6 +41,7 @@ public sealed class WorkflowsController(IVisualWorkflowService workflows) : Cont
         return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.Edit)]
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<VisualWorkflowDto>> Update(
         Guid id,
@@ -44,6 +49,7 @@ public sealed class WorkflowsController(IVisualWorkflowService workflows) : Cont
         CancellationToken cancellationToken)
         => Ok(await workflows.UpdateAsync(id, request, cancellationToken));
 
+    [HasPermission(AppModule.Settings, PermissionAction.Delete)]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(
         Guid id,
@@ -53,6 +59,7 @@ public sealed class WorkflowsController(IVisualWorkflowService workflows) : Cont
         return NoContent();
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpPost("{id:guid}/simulate")]
     public async Task<ActionResult<WorkflowSimulationResult>> Simulate(
         Guid id,
@@ -60,6 +67,7 @@ public sealed class WorkflowsController(IVisualWorkflowService workflows) : Cont
         CancellationToken cancellationToken)
         => Ok(await workflows.SimulateAsync(id, request, cancellationToken));
 
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("{id:guid}/executions")]
     public async Task<ActionResult<IReadOnlyList<VisualWorkflowExecutionDto>>> ListExecutions(
         Guid id,

@@ -1,3 +1,4 @@
+using MindLift.Shared.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MindLift.Api.Auth;
@@ -16,14 +17,17 @@ namespace MindLift.Api.Controllers;
 [Authorize]
 public sealed class RecycleBinController(IRecycleBinService recycleBin) : ControllerBase
 {
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet]
     public async Task<ActionResult<RecycleBinPagedResult>> List([FromQuery] RecycleBinQuery query, CancellationToken cancellationToken)
         => Ok(await recycleBin.ListAsync(query, cancellationToken));
 
+    [HasPermission(AppModule.Settings, PermissionAction.Create)]
     [HttpPost("restore")]
     public async Task<ActionResult<RecycleBinOperationResult>> Restore([FromBody] RestoreRecordsRequest request, CancellationToken cancellationToken)
         => Ok(await recycleBin.RestoreAsync(request, cancellationToken));
 
+    [HasPermission(AppModule.Settings, PermissionAction.Create)]
     [HttpPost("purge")]
     public async Task<ActionResult<RecycleBinOperationResult>> Purge([FromBody] PurgeRecordsRequest request, CancellationToken cancellationToken)
         => Ok(await recycleBin.PurgeAsync(request, cancellationToken));

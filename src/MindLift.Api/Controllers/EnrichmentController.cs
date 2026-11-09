@@ -1,3 +1,4 @@
+using MindLift.Shared.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MindLift.Api.Auth;
@@ -17,6 +18,7 @@ namespace MindLift.Api.Controllers;
 [Route("api/v1/enrichment")]
 public sealed class EnrichmentController(IDataEnrichmentService enrichmentService) : ControllerBase
 {
+    [HasPermission(AppModule.Leads, PermissionAction.View)]
     [HttpGet("lookup")]
     public async Task<ActionResult<CompanyEnrichmentData>> Lookup(
         [FromQuery] string? domain,
@@ -33,6 +35,7 @@ public sealed class EnrichmentController(IDataEnrichmentService enrichmentServic
         return Ok(result);
     }
 
+    [HasPermission(AppModule.Leads, PermissionAction.Edit)]
     [HttpPost("leads/{id:guid}")]
     public async Task<ActionResult<EnrichmentResultDto>> EnrichLead(
         Guid id,
@@ -44,6 +47,7 @@ public sealed class EnrichmentController(IDataEnrichmentService enrichmentServic
         return Ok(result);
     }
 
+    [HasPermission(AppModule.Accounts, PermissionAction.Edit)]
     [HttpPost("accounts/{id:guid}")]
     public async Task<ActionResult<EnrichmentResultDto>> EnrichAccount(
         Guid id,
@@ -55,6 +59,7 @@ public sealed class EnrichmentController(IDataEnrichmentService enrichmentServic
         return Ok(result);
     }
 
+    [HasPermission(AppModule.Leads, PermissionAction.Edit)]
     [HttpPost("batch")]
     public async Task<ActionResult<IReadOnlyList<EnrichmentResultDto>>> BatchEnrich(
         [FromBody] BatchEnrichRequest request,
@@ -64,6 +69,7 @@ public sealed class EnrichmentController(IDataEnrichmentService enrichmentServic
         return Ok(results);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("logs")]
     public async Task<ActionResult<IReadOnlyList<EnrichmentLogDto>>> ListLogs(
         [FromQuery] string? entityType,
@@ -74,6 +80,7 @@ public sealed class EnrichmentController(IDataEnrichmentService enrichmentServic
         return Ok(logs);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("config")]
     public async Task<ActionResult<EnrichmentConfigDto>> GetConfig(CancellationToken ct)
     {
@@ -81,6 +88,7 @@ public sealed class EnrichmentController(IDataEnrichmentService enrichmentServic
         return Ok(config);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.Edit)]
     [HttpPut("config")]
     public async Task<ActionResult<EnrichmentConfigDto>> UpdateConfig(
         [FromBody] SaveEnrichmentConfigRequest request,

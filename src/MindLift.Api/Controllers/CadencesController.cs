@@ -1,3 +1,4 @@
+using MindLift.Shared.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MindLift.Api.Auth;
@@ -19,6 +20,7 @@ public sealed class CadencesController(ICadenceService cadenceService) : Control
 {
     // ================= Cadences =================
 
+    [HasPermission(AppModule.Settings, PermissionAction.Create)]
     [HttpPost]
     public async Task<ActionResult<CadenceDto>> Create(
         [FromBody] SaveCadenceRequest request,
@@ -28,6 +30,7 @@ public sealed class CadencesController(ICadenceService cadenceService) : Control
         return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<CadenceDto>>> List(
         [FromQuery] string? targetType,
@@ -38,6 +41,7 @@ public sealed class CadencesController(ICadenceService cadenceService) : Control
         return Ok(list);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<CadenceDto>> GetById(
         Guid id,
@@ -47,6 +51,7 @@ public sealed class CadencesController(ICadenceService cadenceService) : Control
         return Ok(cadence);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.Edit)]
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<CadenceDto>> Update(
         Guid id,
@@ -57,6 +62,7 @@ public sealed class CadencesController(ICadenceService cadenceService) : Control
         return Ok(updated);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.Delete)]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(
         Guid id,
@@ -67,6 +73,7 @@ public sealed class CadencesController(ICadenceService cadenceService) : Control
         return NoContent();
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.Create)]
     [HttpPost("{id:guid}/status")]
     public async Task<ActionResult<CadenceDto>> SetStatus(
         Guid id,
@@ -79,6 +86,7 @@ public sealed class CadencesController(ICadenceService cadenceService) : Control
 
     // ================= Enrollments =================
 
+    [HasPermission(AppModule.Leads, PermissionAction.Edit)]
     [HttpPost("enrollments")]
     public async Task<ActionResult<CadenceEnrollmentDto>> EnrollTarget(
         [FromBody] EnrollCadenceTargetRequest request,
@@ -88,6 +96,7 @@ public sealed class CadencesController(ICadenceService cadenceService) : Control
         return Ok(enrollment);
     }
 
+    [HasPermission(AppModule.Leads, PermissionAction.View)]
     [HttpGet("enrollments")]
     public async Task<ActionResult<IReadOnlyList<CadenceEnrollmentDto>>> ListEnrollments(
         [FromQuery] Guid? cadenceId,
@@ -100,6 +109,7 @@ public sealed class CadencesController(ICadenceService cadenceService) : Control
         return Ok(list);
     }
 
+    [HasPermission(AppModule.Leads, PermissionAction.View)]
     [HttpGet("enrollments/due")]
     public async Task<ActionResult<IReadOnlyList<CadenceEnrollmentDto>>> GetDue(
         CancellationToken ct)
@@ -108,6 +118,7 @@ public sealed class CadencesController(ICadenceService cadenceService) : Control
         return Ok(list);
     }
 
+    [HasPermission(AppModule.Leads, PermissionAction.View)]
     [HttpGet("enrollments/{id:guid}")]
     public async Task<ActionResult<CadenceEnrollmentDto>> GetEnrollmentById(
         Guid id,
@@ -117,6 +128,7 @@ public sealed class CadencesController(ICadenceService cadenceService) : Control
         return Ok(enrollment);
     }
 
+    [HasPermission(AppModule.Leads, PermissionAction.Edit)]
     [HttpPost("enrollments/{id:guid}/pause")]
     public async Task<ActionResult<CadenceEnrollmentDto>> Pause(
         Guid id,
@@ -126,6 +138,7 @@ public sealed class CadencesController(ICadenceService cadenceService) : Control
         return Ok(updated);
     }
 
+    [HasPermission(AppModule.Leads, PermissionAction.Edit)]
     [HttpPost("enrollments/{id:guid}/resume")]
     public async Task<ActionResult<CadenceEnrollmentDto>> Resume(
         Guid id,
@@ -135,6 +148,7 @@ public sealed class CadencesController(ICadenceService cadenceService) : Control
         return Ok(updated);
     }
 
+    [HasPermission(AppModule.Leads, PermissionAction.Edit)]
     [HttpPost("enrollments/{id:guid}/unenroll")]
     public async Task<ActionResult<CadenceEnrollmentDto>> Unenroll(
         Guid id,
@@ -145,6 +159,7 @@ public sealed class CadencesController(ICadenceService cadenceService) : Control
         return Ok(updated);
     }
 
+    [HasPermission(AppModule.Leads, PermissionAction.Edit)]
     [HttpPost("enrollments/{id:guid}/replied")]
     public async Task<ActionResult<CadenceEnrollmentDto>> MarkReplied(
         Guid id,
@@ -155,6 +170,7 @@ public sealed class CadencesController(ICadenceService cadenceService) : Control
         return Ok(updated);
     }
 
+    [HasPermission(AppModule.Leads, PermissionAction.Edit)]
     [HttpPost("enrollments/{id:guid}/execute")]
     public async Task<ActionResult<CadenceEnrollmentDto>> ExecuteStep(
         Guid id,

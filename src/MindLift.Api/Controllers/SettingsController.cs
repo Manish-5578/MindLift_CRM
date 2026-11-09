@@ -20,6 +20,7 @@ public sealed class SettingsController(
 {
     // ---------- Company, currencies, modules ----------
 
+    [SignedInUser]
     [HttpGet("company/profile")]
     [Authorize]
     public async Task<ActionResult<CompanySettingsDto>> GetCompanyProfile(CancellationToken cancellationToken)

@@ -1,3 +1,4 @@
+using MindLift.Shared.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MindLift.Api.Auth;
@@ -16,6 +17,7 @@ namespace MindLift.Api.Controllers;
 [RequiresFeature("dashboard-widgets")]
 public sealed class CustomDashboardWidgetsController(ICustomDashboardWidgetService widgetService) : ControllerBase
 {
+    [HasPermission(AppModule.Dashboard, PermissionAction.View)]
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<CustomDashboardWidgetDto>>> List(CancellationToken ct)
     {
@@ -23,6 +25,7 @@ public sealed class CustomDashboardWidgetsController(ICustomDashboardWidgetServi
         return Ok(widgets);
     }
 
+    [HasPermission(AppModule.Dashboard, PermissionAction.View)]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<CustomDashboardWidgetDto>> Get(Guid id, CancellationToken ct)
     {
@@ -30,6 +33,7 @@ public sealed class CustomDashboardWidgetsController(ICustomDashboardWidgetServi
         return Ok(widget);
     }
 
+    [HasPermission(AppModule.Dashboard, PermissionAction.Create)]
     [HttpPost]
     public async Task<ActionResult<CustomDashboardWidgetDto>> Create(
         [FromBody] SaveCustomDashboardWidgetRequest request,
@@ -39,6 +43,7 @@ public sealed class CustomDashboardWidgetsController(ICustomDashboardWidgetServi
         return Created($"/api/v1/custom-dashboard-widgets/{widget.Id}", widget);
     }
 
+    [HasPermission(AppModule.Dashboard, PermissionAction.Edit)]
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<CustomDashboardWidgetDto>> Update(
         Guid id,
@@ -49,6 +54,7 @@ public sealed class CustomDashboardWidgetsController(ICustomDashboardWidgetServi
         return Ok(updated);
     }
 
+    [HasPermission(AppModule.Dashboard, PermissionAction.Delete)]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
@@ -56,6 +62,7 @@ public sealed class CustomDashboardWidgetsController(ICustomDashboardWidgetServi
         return NoContent();
     }
 
+    [HasPermission(AppModule.Dashboard, PermissionAction.View)]
     [HttpGet("{id:guid}/data")]
     public async Task<ActionResult<CustomWidgetDataDto>> GetData(Guid id, CancellationToken ct)
     {
@@ -63,6 +70,7 @@ public sealed class CustomDashboardWidgetsController(ICustomDashboardWidgetServi
         return Ok(data);
     }
 
+    [HasPermission(AppModule.Dashboard, PermissionAction.View)]
     [HttpPost("preview")]
     public async Task<ActionResult<CustomWidgetDataDto>> Preview(
         [FromBody] SaveCustomDashboardWidgetRequest request,

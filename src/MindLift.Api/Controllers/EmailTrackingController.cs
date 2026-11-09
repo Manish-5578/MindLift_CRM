@@ -1,3 +1,4 @@
+using MindLift.Shared.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MindLift.Api.Auth;
@@ -59,6 +60,7 @@ public sealed class EmailTrackingController(IEmailTrackingService trackingServic
 
     [Authorize]
     [RequiresFeature("email-tracking")]
+    [HasPermission(AppModule.Communication, PermissionAction.Create)]
     [HttpPost("register")]
     public async Task<ActionResult<RegisterTrackedEmailResult>> RegisterAndTransform(
         [FromBody] RegisterTrackedEmailRequest request,
@@ -71,6 +73,7 @@ public sealed class EmailTrackingController(IEmailTrackingService trackingServic
 
     [Authorize]
     [RequiresFeature("email-tracking")]
+    [HasPermission(AppModule.Communication, PermissionAction.View)]
     [HttpGet("emails")]
     public async Task<ActionResult<IReadOnlyList<TrackedEmailDto>>> ListEmails(
         [FromQuery] string? entityType,
@@ -85,6 +88,7 @@ public sealed class EmailTrackingController(IEmailTrackingService trackingServic
 
     [Authorize]
     [RequiresFeature("email-tracking")]
+    [HasPermission(AppModule.Communication, PermissionAction.View)]
     [HttpGet("emails/{id:guid}")]
     public async Task<ActionResult<TrackedEmailDto>> GetEmail(Guid id, CancellationToken ct)
     {
@@ -95,6 +99,7 @@ public sealed class EmailTrackingController(IEmailTrackingService trackingServic
 
     [Authorize]
     [RequiresFeature("email-tracking")]
+    [HasPermission(AppModule.Communication, PermissionAction.View)]
     [HttpGet("emails/{id:guid}/events")]
     public async Task<ActionResult<IReadOnlyList<TrackedEmailEventDto>>> ListEvents(Guid id, CancellationToken ct)
     {
@@ -104,6 +109,7 @@ public sealed class EmailTrackingController(IEmailTrackingService trackingServic
 
     [Authorize]
     [RequiresFeature("email-tracking")]
+    [HasPermission(AppModule.Communication, PermissionAction.View)]
     [HttpGet("settings")]
     public async Task<ActionResult<EmailTrackingSettingsDto>> GetSettings(CancellationToken ct)
     {
@@ -113,6 +119,7 @@ public sealed class EmailTrackingController(IEmailTrackingService trackingServic
 
     [Authorize]
     [RequiresFeature("email-tracking")]
+    [HasPermission(AppModule.Communication, PermissionAction.Edit)]
     [HttpPut("settings")]
     public async Task<ActionResult<EmailTrackingSettingsDto>> UpdateSettings(
         [FromBody] SaveEmailTrackingSettingsRequest request,
@@ -124,6 +131,7 @@ public sealed class EmailTrackingController(IEmailTrackingService trackingServic
 
     [Authorize]
     [RequiresFeature("email-tracking")]
+    [HasPermission(AppModule.Communication, PermissionAction.View)]
     [HttpGet("stats")]
     public async Task<ActionResult<EmailTrackingStatsDto>> GetStats(CancellationToken ct)
     {

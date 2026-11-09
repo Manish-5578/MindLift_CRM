@@ -1,3 +1,4 @@
+using MindLift.Shared.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MindLift.Api.Auth;
@@ -19,6 +20,7 @@ public sealed class SlaController(ISlaService slaService) : ControllerBase
 {
     // ================= Policies =================
 
+    [HasPermission(AppModule.Settings, PermissionAction.Create)]
     [HttpPost("policies")]
     public async Task<ActionResult<SlaPolicyDto>> CreatePolicy(
         [FromBody] SaveSlaPolicyRequest request,
@@ -28,6 +30,7 @@ public sealed class SlaController(ISlaService slaService) : ControllerBase
         return CreatedAtAction(nameof(GetPolicyById), new { id = created.Id }, created);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("policies")]
     public async Task<ActionResult<IReadOnlyList<SlaPolicyDto>>> ListPolicies(
         [FromQuery] bool? activeOnly,
@@ -37,6 +40,7 @@ public sealed class SlaController(ISlaService slaService) : ControllerBase
         return Ok(list);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("policies/{id:guid}")]
     public async Task<ActionResult<SlaPolicyDto>> GetPolicyById(
         Guid id,
@@ -46,6 +50,7 @@ public sealed class SlaController(ISlaService slaService) : ControllerBase
         return Ok(policy);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.Edit)]
     [HttpPut("policies/{id:guid}")]
     public async Task<ActionResult<SlaPolicyDto>> UpdatePolicy(
         Guid id,
@@ -56,6 +61,7 @@ public sealed class SlaController(ISlaService slaService) : ControllerBase
         return Ok(updated);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.Delete)]
     [HttpDelete("policies/{id:guid}")]
     public async Task<IActionResult> DeletePolicy(
         Guid id,
@@ -68,6 +74,7 @@ public sealed class SlaController(ISlaService slaService) : ControllerBase
 
     // ================= Lead SLA Tracking =================
 
+    [HasPermission(AppModule.Leads, PermissionAction.Edit)]
     [HttpPost("leads/{leadId:guid}/attach")]
     public async Task<ActionResult<LeadSlaTrackerDto>> Attach(
         Guid leadId,
@@ -78,6 +85,7 @@ public sealed class SlaController(ISlaService slaService) : ControllerBase
         return Ok(tracker);
     }
 
+    [HasPermission(AppModule.Leads, PermissionAction.Edit)]
     [HttpPost("leads/{leadId:guid}/respond")]
     public async Task<ActionResult<LeadSlaTrackerDto>> RecordResponse(
         Guid leadId,
@@ -88,6 +96,7 @@ public sealed class SlaController(ISlaService slaService) : ControllerBase
         return Ok(tracker);
     }
 
+    [HasPermission(AppModule.Leads, PermissionAction.View)]
     [HttpGet("leads/{leadId:guid}")]
     public async Task<ActionResult<LeadSlaTrackerDto>> GetSlaForLead(
         Guid leadId,
@@ -98,6 +107,7 @@ public sealed class SlaController(ISlaService slaService) : ControllerBase
         return Ok(tracker);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.Create)]
     [HttpPost("process-escalations")]
     public async Task<ActionResult<SlaCheckResultDto>> ProcessEscalations(CancellationToken ct)
     {
@@ -105,6 +115,7 @@ public sealed class SlaController(ISlaService slaService) : ControllerBase
         return Ok(result);
     }
 
+    [HasPermission(AppModule.Leads, PermissionAction.View)]
     [HttpGet("trackers")]
     public async Task<ActionResult<IReadOnlyList<LeadSlaTrackerDto>>> ListTrackers(
         [FromQuery] string? status,

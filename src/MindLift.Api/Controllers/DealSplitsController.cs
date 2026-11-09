@@ -1,3 +1,4 @@
+using MindLift.Shared.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MindLift.Api.Auth;
@@ -16,12 +17,14 @@ namespace MindLift.Api.Controllers;
 [Authorize]
 public sealed class DealSplitsController(IDealSplitService dealSplits) : ControllerBase
 {
+    [HasPermission(AppModule.Deals, PermissionAction.View)]
     [HttpGet("{dealId:guid}/splits")]
     public async Task<ActionResult<DealSplitSummaryDto>> GetSplits(
         Guid dealId,
         CancellationToken cancellationToken)
         => Ok(await dealSplits.GetDealSplitsAsync(dealId, cancellationToken));
 
+    [HasPermission(AppModule.Deals, PermissionAction.Edit)]
     [HttpPut("{dealId:guid}/splits")]
     public async Task<ActionResult<DealSplitSummaryDto>> SetSplits(
         Guid dealId,
@@ -29,6 +32,7 @@ public sealed class DealSplitsController(IDealSplitService dealSplits) : Control
         CancellationToken cancellationToken)
         => Ok(await dealSplits.SetDealSplitsAsync(dealId, request, cancellationToken));
 
+    [HasPermission(AppModule.Deals, PermissionAction.Create)]
     [HttpPost("{dealId:guid}/splits")]
     public async Task<ActionResult<DealSplitMemberDto>> AddOrUpdateSplit(
         Guid dealId,
@@ -36,6 +40,7 @@ public sealed class DealSplitsController(IDealSplitService dealSplits) : Control
         CancellationToken cancellationToken)
         => Ok(await dealSplits.AddOrUpdateSplitAsync(dealId, request, cancellationToken));
 
+    [HasPermission(AppModule.Deals, PermissionAction.Delete)]
     [HttpDelete("{dealId:guid}/splits/{splitId:guid}")]
     public async Task<ActionResult<DealSplitSummaryDto>> RemoveSplit(
         Guid dealId,
@@ -43,6 +48,7 @@ public sealed class DealSplitsController(IDealSplitService dealSplits) : Control
         CancellationToken cancellationToken)
         => Ok(await dealSplits.RemoveSplitAsync(dealId, splitId, cancellationToken));
 
+    [HasPermission(AppModule.Deals, PermissionAction.View)]
     [HttpGet("splits/users/{userId:guid}")]
     public async Task<ActionResult<UserDealSplitsSummaryDto>> GetUserSplits(
         Guid userId,

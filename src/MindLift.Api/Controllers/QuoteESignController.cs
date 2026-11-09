@@ -1,3 +1,4 @@
+using MindLift.Shared.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MindLift.Api.Auth;
@@ -15,6 +16,7 @@ public sealed class QuoteESignController(IQuoteESignService eSignService) : Cont
 {
     // ================= Authenticated Endpoints =================
 
+    [HasPermission(AppModule.Quotations, PermissionAction.Create)]
     [HttpPost("api/v1/quotes/{id:guid}/esign/send")]
     [Authorize]
     [RequiresFeature("quote-esign")]
@@ -27,6 +29,7 @@ public sealed class QuoteESignController(IQuoteESignService eSignService) : Cont
         return Ok(details);
     }
 
+    [HasPermission(AppModule.Quotations, PermissionAction.View)]
     [HttpGet("api/v1/quotes/{id:guid}/esign")]
     [Authorize]
     [RequiresFeature("quote-esign")]
@@ -38,6 +41,7 @@ public sealed class QuoteESignController(IQuoteESignService eSignService) : Cont
         return Ok(details);
     }
 
+    [HasPermission(AppModule.Quotations, PermissionAction.Create)]
     [HttpPost("api/v1/quotes/{id:guid}/esign/revoke")]
     [Authorize]
     [RequiresFeature("quote-esign")]
@@ -50,6 +54,7 @@ public sealed class QuoteESignController(IQuoteESignService eSignService) : Cont
         return Ok(details);
     }
 
+    [HasPermission(AppModule.Quotations, PermissionAction.View)]
     [HttpGet("api/v1/quotes/{id:guid}/esign/audit-trail")]
     [Authorize]
     [RequiresFeature("quote-esign")]
@@ -61,6 +66,7 @@ public sealed class QuoteESignController(IQuoteESignService eSignService) : Cont
         return Ok(trail);
     }
 
+    [HasPermission(AppModule.Quotations, PermissionAction.View)]
     [HttpGet("api/v1/quotes/{id:guid}/esign/certificate")]
     [Authorize]
     [RequiresFeature("quote-esign")]

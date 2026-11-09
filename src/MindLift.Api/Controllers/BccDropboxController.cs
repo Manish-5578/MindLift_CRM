@@ -1,3 +1,4 @@
+using MindLift.Shared.Enums;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -55,6 +56,7 @@ public sealed class BccDropboxController(
 
     [Authorize]
     [RequiresFeature("bcc-dropbox")]
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("my-address")]
     public async Task<ActionResult<BccDropboxAddressDto>> GetMyAddress(CancellationToken ct)
     {
@@ -64,6 +66,7 @@ public sealed class BccDropboxController(
 
     [Authorize]
     [RequiresFeature("bcc-dropbox")]
+    [HasPermission(AppModule.Settings, PermissionAction.Create)]
     [HttpPost("regenerate-address")]
     public async Task<ActionResult<BccDropboxAddressDto>> RegenerateAddress(CancellationToken ct)
     {
@@ -73,6 +76,7 @@ public sealed class BccDropboxController(
 
     [Authorize]
     [RequiresFeature("bcc-dropbox")]
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("settings")]
     public async Task<ActionResult<BccDropboxSettingsDto>> GetSettings(CancellationToken ct)
     {
@@ -82,6 +86,7 @@ public sealed class BccDropboxController(
 
     [Authorize]
     [RequiresFeature("bcc-dropbox")]
+    [HasPermission(AppModule.Settings, PermissionAction.Edit)]
     [HttpPut("settings")]
     public async Task<ActionResult<BccDropboxSettingsDto>> UpdateSettings(
         [FromBody] UpdateBccDropboxSettingsRequest request,
@@ -93,6 +98,7 @@ public sealed class BccDropboxController(
 
     [Authorize]
     [RequiresFeature("bcc-dropbox")]
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("logs")]
     public async Task<ActionResult<IReadOnlyList<BccDropboxLogDto>>> ListLogs(
         [FromQuery] int limit = 50,

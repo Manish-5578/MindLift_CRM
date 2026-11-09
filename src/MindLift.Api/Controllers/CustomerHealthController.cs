@@ -17,6 +17,7 @@ namespace MindLift.Api.Controllers;
 [RequiresFeature("customer-health")]
 public sealed class CustomerHealthController(ICustomerHealthService healthService) : ControllerBase
 {
+    [HasPermission(AppModule.Accounts, PermissionAction.Create)]
     [HttpPost("surveys")]
     public async Task<ActionResult<CustomerSurveyDto>> SubmitSurvey(
         [FromBody] SubmitSurveyRequest request,
@@ -26,6 +27,7 @@ public sealed class CustomerHealthController(ICustomerHealthService healthServic
         return Created($"/api/v1/customer-health/surveys/{survey.Id}", survey);
     }
 
+    [HasPermission(AppModule.Accounts, PermissionAction.View)]
     [HttpGet("surveys")]
     public async Task<ActionResult<IReadOnlyList<CustomerSurveyDto>>> GetSurveys(
         [FromQuery] string? type = null,
@@ -38,6 +40,7 @@ public sealed class CustomerHealthController(ICustomerHealthService healthServic
         return Ok(surveys);
     }
 
+    [HasPermission(AppModule.Accounts, PermissionAction.View)]
     [HttpGet("surveys/summary")]
     public async Task<ActionResult<SurveySummaryDto>> GetSurveySummary(
         [FromQuery] string? type = null,
@@ -48,6 +51,7 @@ public sealed class CustomerHealthController(ICustomerHealthService healthServic
         return Ok(summary);
     }
 
+    [HasPermission(AppModule.Accounts, PermissionAction.View)]
     [HttpGet("accounts/{id:guid}")]
     public async Task<ActionResult<AccountHealthScoreDto>> GetAccountHealth(
         Guid id,
@@ -57,6 +61,7 @@ public sealed class CustomerHealthController(ICustomerHealthService healthServic
         return Ok(health);
     }
 
+    [HasPermission(AppModule.Accounts, PermissionAction.View)]
     [HttpGet("portfolio")]
     public async Task<ActionResult<PortfolioHealthOverviewDto>> GetPortfolioOverview(
         CancellationToken ct)

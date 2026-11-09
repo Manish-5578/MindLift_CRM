@@ -1,3 +1,4 @@
+using MindLift.Shared.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MindLift.Api.Auth;
@@ -14,6 +15,7 @@ namespace MindLift.Api.Controllers;
 [Route("api/v1/offline")]
 [Authorize]
 [RequiresFeature("pwa-offline")]
+[SignedInUser]
 public sealed class OfflineController(IOfflineSyncService offlineService) : ControllerBase
 {
     [HttpGet("manifest")]

@@ -1,3 +1,5 @@
+using MindLift.Shared.Enums;
+using MindLift.Api.Auth;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -12,6 +14,7 @@ namespace MindLift.Api.Controllers;
 [ApiController]
 [Route("api/v1/chat")]
 [Authorize]
+[SignedInUser]
 public sealed class ChatController(ChatService chatService) : ControllerBase
 {
     [HttpGet("messages")]

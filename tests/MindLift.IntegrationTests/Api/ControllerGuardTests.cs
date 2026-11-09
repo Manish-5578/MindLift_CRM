@@ -36,6 +36,7 @@ public sealed class ControllerGuardTests
 
                 var guarded = attributes.Any(a =>
                     a is HasPermissionAttribute
+                    || a is SignedInUserAttribute
                     || a is AllowAnonymousAttribute
                     || a is AuthorizeAttribute { Policy: "PlatformAdmin" }
                     || a is AuthorizeAttribute { Policy: "PortalUser" });

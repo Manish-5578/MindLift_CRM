@@ -1,3 +1,4 @@
+using MindLift.Shared.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MindLift.Api.Auth;
@@ -19,6 +20,7 @@ public sealed class LeadScoringController(ILeadScoringService scoringService) : 
 {
     // ================= Scoring Rules =================
 
+    [HasPermission(AppModule.Settings, PermissionAction.Create)]
     [HttpPost("rules")]
     public async Task<ActionResult<LeadScoringRuleDto>> CreateRule(
         [FromBody] SaveLeadScoringRuleRequest request,
@@ -28,6 +30,7 @@ public sealed class LeadScoringController(ILeadScoringService scoringService) : 
         return CreatedAtAction(nameof(GetRuleById), new { id = created.Id }, created);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("rules")]
     public async Task<ActionResult<IReadOnlyList<LeadScoringRuleDto>>> ListRules(
         [FromQuery] bool? activeOnly,
@@ -37,6 +40,7 @@ public sealed class LeadScoringController(ILeadScoringService scoringService) : 
         return Ok(list);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("rules/{id:guid}")]
     public async Task<ActionResult<LeadScoringRuleDto>> GetRuleById(
         Guid id,
@@ -46,6 +50,7 @@ public sealed class LeadScoringController(ILeadScoringService scoringService) : 
         return Ok(rule);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.Edit)]
     [HttpPut("rules/{id:guid}")]
     public async Task<ActionResult<LeadScoringRuleDto>> UpdateRule(
         Guid id,
@@ -56,6 +61,7 @@ public sealed class LeadScoringController(ILeadScoringService scoringService) : 
         return Ok(updated);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.Delete)]
     [HttpDelete("rules/{id:guid}")]
     public async Task<IActionResult> DeleteRule(
         Guid id,
@@ -68,6 +74,7 @@ public sealed class LeadScoringController(ILeadScoringService scoringService) : 
 
     // ================= Score Evaluation & Audit =================
 
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpPost("evaluate/{leadId:guid}")]
     public async Task<ActionResult<LeadScoreResultDto>> Evaluate(
         Guid leadId,
@@ -77,6 +84,7 @@ public sealed class LeadScoringController(ILeadScoringService scoringService) : 
         return Ok(result);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.Create)]
     [HttpPost("batch-evaluate")]
     public async Task<ActionResult<BatchScoreResultDto>> BatchEvaluate(
         [FromBody] BatchScoreRequest? request,
@@ -86,6 +94,7 @@ public sealed class LeadScoringController(ILeadScoringService scoringService) : 
         return Ok(result);
     }
 
+    [HasPermission(AppModule.Settings, PermissionAction.View)]
     [HttpGet("logs/{leadId:guid}")]
     public async Task<ActionResult<IReadOnlyList<LeadScoreLogDto>>> GetLogs(
         Guid leadId,

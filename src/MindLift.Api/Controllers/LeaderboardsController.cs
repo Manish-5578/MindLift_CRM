@@ -1,3 +1,4 @@
+using MindLift.Shared.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MindLift.Api.Auth;
@@ -16,6 +17,7 @@ namespace MindLift.Api.Controllers;
 [RequiresFeature("leaderboards")]
 public sealed class LeaderboardsController(ILeaderboardService leaderboardService) : ControllerBase
 {
+    [SignedInUser]
     [HttpGet]
     public async Task<ActionResult<LeaderboardResponseDto>> Get(
         [FromQuery] LeaderboardQueryRequest request,
@@ -25,6 +27,7 @@ public sealed class LeaderboardsController(ILeaderboardService leaderboardServic
         return Ok(leaderboard);
     }
 
+    [SignedInUser]
     [HttpGet("meta")]
     public async Task<ActionResult<LeaderboardMetaDto>> GetMeta(CancellationToken ct)
     {

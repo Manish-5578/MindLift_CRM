@@ -1,3 +1,4 @@
+using MindLift.Shared.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MindLift.Api.Auth;
@@ -15,29 +16,34 @@ namespace MindLift.Api.Controllers;
 [Authorize]
 public sealed class CompetitorsController(ICompetitorService competitors) : ControllerBase
 {
+    [HasPermission(AppModule.Deals, PermissionAction.View)]
     [HttpGet("api/v1/competitors")]
     public async Task<ActionResult<IReadOnlyList<CompetitorDto>>> List(
         [FromQuery] bool activeOnly,
         CancellationToken cancellationToken)
         => Ok(await competitors.ListCompetitorsAsync(activeOnly, cancellationToken));
 
+    [HasPermission(AppModule.Deals, PermissionAction.View)]
     [HttpGet("api/v1/competitors/analytics")]
     public async Task<ActionResult<CompetitorAnalyticsSummaryDto>> GetAnalytics(
         CancellationToken cancellationToken)
         => Ok(await competitors.GetCompetitorAnalyticsAsync(cancellationToken));
 
+    [HasPermission(AppModule.Deals, PermissionAction.View)]
     [HttpGet("api/v1/competitors/{id:guid}")]
     public async Task<ActionResult<CompetitorDto>> GetById(
         Guid id,
         CancellationToken cancellationToken)
         => Ok(await competitors.GetCompetitorByIdAsync(id, cancellationToken));
 
+    [HasPermission(AppModule.Deals, PermissionAction.Create)]
     [HttpPost("api/v1/competitors")]
     public async Task<ActionResult<CompetitorDto>> Create(
         [FromBody] SaveCompetitorRequest request,
         CancellationToken cancellationToken)
         => Ok(await competitors.CreateCompetitorAsync(request, cancellationToken));
 
+    [HasPermission(AppModule.Deals, PermissionAction.Edit)]
     [HttpPut("api/v1/competitors/{id:guid}")]
     public async Task<ActionResult<CompetitorDto>> Update(
         Guid id,
@@ -45,6 +51,7 @@ public sealed class CompetitorsController(ICompetitorService competitors) : Cont
         CancellationToken cancellationToken)
         => Ok(await competitors.UpdateCompetitorAsync(id, request, cancellationToken));
 
+    [HasPermission(AppModule.Deals, PermissionAction.Delete)]
     [HttpDelete("api/v1/competitors/{id:guid}")]
     public async Task<IActionResult> Delete(
         Guid id,
@@ -54,12 +61,14 @@ public sealed class CompetitorsController(ICompetitorService competitors) : Cont
         return NoContent();
     }
 
+    [HasPermission(AppModule.Deals, PermissionAction.View)]
     [HttpGet("api/v1/deals/{dealId:guid}/competitors")]
     public async Task<ActionResult<IReadOnlyList<DealCompetitorDto>>> GetDealCompetitors(
         Guid dealId,
         CancellationToken cancellationToken)
         => Ok(await competitors.GetDealCompetitorsAsync(dealId, cancellationToken));
 
+    [HasPermission(AppModule.Deals, PermissionAction.Create)]
     [HttpPost("api/v1/deals/{dealId:guid}/competitors")]
     public async Task<ActionResult<DealCompetitorDto>> AddCompetitorToDeal(
         Guid dealId,
@@ -67,6 +76,7 @@ public sealed class CompetitorsController(ICompetitorService competitors) : Cont
         CancellationToken cancellationToken)
         => Ok(await competitors.AddCompetitorToDealAsync(dealId, request, cancellationToken));
 
+    [HasPermission(AppModule.Deals, PermissionAction.Edit)]
     [HttpPut("api/v1/deals/{dealId:guid}/competitors/{competitorId:guid}")]
     public async Task<ActionResult<DealCompetitorDto>> UpdateDealCompetitor(
         Guid dealId,
@@ -75,6 +85,7 @@ public sealed class CompetitorsController(ICompetitorService competitors) : Cont
         CancellationToken cancellationToken)
         => Ok(await competitors.UpdateDealCompetitorAsync(dealId, competitorId, request, cancellationToken));
 
+    [HasPermission(AppModule.Deals, PermissionAction.Delete)]
     [HttpDelete("api/v1/deals/{dealId:guid}/competitors/{competitorId:guid}")]
     public async Task<IActionResult> RemoveCompetitorFromDeal(
         Guid dealId,
