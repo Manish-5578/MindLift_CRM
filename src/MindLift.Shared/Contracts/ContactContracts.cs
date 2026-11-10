@@ -44,6 +44,12 @@ public sealed record SaveContactRequest(
     Guid? OwnerId,
     IReadOnlyDictionary<string, JsonElement>? CustomFields);
 
+/// <summary>The details typed on a new account, checked against the accounts that already exist.</summary>
+public sealed record CheckAccountDuplicatesRequest(string Name, string? Website, string? Phone);
+
+/// <summary>Merge these accounts into the account in the URL: their contacts, deals, activities and the rest move to it, then they are removed.</summary>
+public sealed record MergeAccountsRequest(IReadOnlyList<Guid> DuplicateIds);
+
 public sealed record MergeContactsRequest(IReadOnlyList<Guid> DuplicateIds, IReadOnlyDictionary<string, string?>? FieldOverrides = null);
 
 /// <summary>A lead that was converted into a contact, shown on the contact so its history is not lost.</summary>

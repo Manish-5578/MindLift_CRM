@@ -35,6 +35,45 @@ public sealed class ContactsAndAccountsE2ETests(E2EHost host)
     private static ILocator Drawer(IPage page) => page.Locator("[data-testid=form-drawer].mud-drawer--open");
 
     [E2EFact]
+    public async Task A_new_account_with_the_name_of_an_existing_one_is_flagged_and_created_when_confirmed()
+    {
+        var (page, api) = await StartAsync();
+        await CreateAccountAsync(api, "Soylent Corp");
+        await page.GotoAsync("/accounts");
+
+        await page.Locator("button[data-testid=primary-action]").ClickAsync();
+        await Drawer(page).Locator("input[data-testid=account-name]").FillAsync("SOYLENT");
+        await Drawer(page).GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Create account" }).ClickAsync();
+
+        await Expect(Drawer(page).Locator("[data-testid=duplicate-warning]")).ToContainTextAsync("Soylent Corp");
+        await Expect(page.Locator("[data-testid=row]")).ToHaveCountAsync(1);
+
+        await Drawer(page).GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Create account" }).ClickAsync();
+        await Expect(page.Locator("[data-testid=row]")).ToHaveCountAsync(2);
+    }
+
+    [E2EFact]
+    public async Task A_duplicate_account_is_merged_into_this_one_from_its_page()
+    {
+        var (page, api) = await StartAsync();
+        var master = await CreateAccountAsync(api, "Vandelay Industries");
+        var twin = await CreateAccountAsync(api, "Vandelay Industries Ltd");
+        var contact = await CreateContactAsync(api, "Art", "art@vandelay.test", twin.Id);
+
+        await page.GotoAsync($"/accounts/{master.Id}");
+        await Expect(page.Locator("[data-testid=account-duplicates]")).ToContainTextAsync("Vandelay Industries Ltd");
+
+        await page.Locator("[data-testid=merge-duplicate]").ClickAsync();
+        await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Merge", Exact = true }).ClickAsync();
+
+        await Expect(page.GetByText("Merged Vandelay Industries Ltd into this account.")).ToBeVisibleAsync();
+        await Expect(page.Locator("[data-testid=account-duplicates]")).ToHaveCountAsync(0);
+        await Expect(page.Locator("[data-testid=account-contact]")).ToContainTextAsync("Art");
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, (await api.GetAsync($"/api/v1/accounts/{twin.Id}")).StatusCode);
+        Assert.Equal(master.Id, (await api.GetFromJsonAsync<ContactDto>($"/api/v1/contacts/{contact.Id}"))!.AccountId);
+    }
+
+    [E2EFact]
     public async Task A_contact_can_be_created_with_a_company_picked_from_the_search_and_appears_in_the_list()
     {
         var (page, api) = await StartAsync();

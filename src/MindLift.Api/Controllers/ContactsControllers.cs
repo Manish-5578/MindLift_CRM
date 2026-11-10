@@ -140,6 +140,23 @@ public sealed class AccountsController(AccountService accounts, ImportNotifier i
     public async Task<ActionResult<BulkActionResult>> BulkDelete([FromBody] BulkDeleteRequest request, CancellationToken cancellationToken)
         => Ok(await accounts.BulkDeleteAsync(request, cancellationToken));
 
+    /// <summary>Accounts that look like the one being typed: the same name, website or phone number.</summary>
+    [HasPermission(AppModule.Accounts, PermissionAction.Create)]
+    [HttpPost("check-duplicates")]
+    public async Task<ActionResult<IReadOnlyList<DuplicateCandidateDto>>> CheckDuplicates([FromBody] CheckAccountDuplicatesRequest request, CancellationToken cancellationToken)
+        => Ok(await accounts.CheckDuplicatesAsync(request, cancellationToken));
+
+    [HasPermission(AppModule.Accounts, PermissionAction.View)]
+    [HttpGet("{id:guid}/duplicates")]
+    public async Task<ActionResult<IReadOnlyList<DuplicateCandidateDto>>> GetDuplicates(Guid id, CancellationToken cancellationToken)
+        => Ok(await accounts.GetDuplicatesAsync(id, cancellationToken));
+
+    /// <summary>Merge duplicate accounts into this one. Needs permission to delete, because the duplicates are removed.</summary>
+    [HasPermission(AppModule.Accounts, PermissionAction.Delete)]
+    [HttpPost("{id:guid}/merge")]
+    public async Task<ActionResult<AccountDto>> Merge(Guid id, [FromBody] MergeAccountsRequest request, CancellationToken cancellationToken)
+        => Ok(await accounts.MergeAsync(id, request.DuplicateIds, cancellationToken));
+
     [HasPermission(AppModule.Accounts, PermissionAction.Import)]
     [HttpPost("import")]
     public async Task<ActionResult<ImportResultDto>> Import(CancellationToken cancellationToken)

@@ -56,6 +56,28 @@
                     </div>
                 </MlCard>
 
+                @if (_duplicates.Count > 0)
+                {
+                    <MlCard Title="Possible duplicates" Subtitle="These accounts share a name, website or phone number with this one." TestId="account-duplicates">
+                        <div class="ml-stack-sm">
+                            @foreach (var d in _duplicates)
+                            {
+                                var dup = d;
+                                <div class="ml-row" style="padding:6px 0;border-bottom:1px solid var(--ml-border)" data-testid="duplicate-row">
+                                    <div class="ml-grow">
+                                        <a href="@("/accounts/" + dup.Id)" class="ml-link">@dup.FullName</a>
+                                        <MudText Typo="Typo.caption" Class="ml-muted">@T[dup.Reason]@(string.IsNullOrWhiteSpace(dup.Email) ? "" : " · " + dup.Email)</MudText>
+                                    </div>
+                                    @if (Can(p => p.CanDelete))
+                                    {
+                                        <MudButton Variant="Variant.Outlined" Size="Size.Small" Disabled="_merging" OnClick="() => MergeAsync(dup)" StartIcon="@Icons.Material.Outlined.MergeType" data-testid="merge-duplicate">@T["Merge into this account"]</MudButton>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </MlCard>
+                }
+
                 <MlCard Title="@($"Contacts ({_summary.Contacts.Count})")">
                     <div class="ml-stack-sm">
                         @if (_summary.Contacts.Count == 0)
@@ -259,6 +281,36 @@
         await LoadAsync();
     }
 
+    private List<DuplicateCandidateDto> _duplicates = [];
+    private bool _merging;
+
+    /// <summary>Moves the other account's contacts, deals, activities and the rest onto this one, then removes it.</summary>
+    private async Task MergeAsync(DuplicateCandidateDto duplicate)
+    {
+        if (!await Dialogs.ConfirmAsync(T["Merge accounts?"], T["Everything in {0} (contacts, deals, activities, tickets) moves to {1}, and {0} is removed. This cannot be undone.", duplicate.FullName, _summary!.Account.Name], T["Merge"], danger: true, cancelText: T["Cancel"]))
+        {
+            return;
+        }
+
+        _merging = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync($"api/v1/accounts/{Id}/merge", new MergeAccountsRequest([duplicate.Id]));
+            if (!response.IsSuccessStatusCode)
+            {
+                Snackbar.Add(await ProblemText.FromAsync(response, T["We could not merge these accounts."]), Severity.Error);
+                return;
+            }
+
+            Snackbar.Add(T["Merged {0} into this account.", duplicate.FullName], Severity.Success);
+            await LoadAsync();
+        }
+        finally
+        {
+            _merging = false;
+        }
+    }
+
     private async Task LoadAsync()
     {
         _loading = true;
@@ -271,6 +323,7 @@
             {
                 try { _health = await Http.GetFromJsonAsync<AccountHealthScoreDto>($"api/v1/customer-health/accounts/{Id}"); } catch { _health = null; }
                 try { _hierarchy = await Http.GetFromJsonAsync<AccountHierarchyTreeDto>($"api/v1/accounts/{Id}/hierarchy"); } catch { _hierarchy = null; }
+                try { _duplicates = await Http.GetFromJsonAsync<List<DuplicateCandidateDto>>($"api/v1/accounts/{Id}/duplicates") ?? []; } catch { _duplicates = []; }
             }
             if (!response.IsSuccessStatusCode)
             {

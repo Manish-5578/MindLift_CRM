@@ -5,6 +5,18 @@
         <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3" data-testid="account-error">@_error</MudAlert>
     }
 
+    @if (_duplicates.Count > 0)
+    {
+        <MudAlert Severity="Severity.Warning" Class="mb-3" data-testid="duplicate-warning">
+            <MudText Typo="Typo.subtitle2">@T["Possible duplicates"]</MudText>
+            @foreach (var d in _duplicates)
+            {
+                <MudText Typo="Typo.body2">@d.FullName · @T[d.Reason]</MudText>
+            }
+            <MudText Typo="Typo.body2" Class="mt-2">@T["Press the button again to create the account anyway."]</MudText>
+        </MudAlert>
+    }
+
     <DynamicForm Fields="Fields" Values="_values" Users="_users" AccountSearch="SearchAccountsAsync" Errors="_fieldErrors"
                  CustomFields="_customFields" CustomValues="_custom" CustomValuesChanged="v => _custom = v" />
 </FormDrawer>
@@ -23,6 +35,7 @@
     private IReadOnlyDictionary<string, string> _fieldErrors = new Dictionary<string, string>();
     private List<UserListItem> _users = [];
     private Guid? _accountId;
+    private List<DuplicateCandidateDto> _duplicates = [];
     private bool _busy;
     private string? _error;
     private string _snapshot = string.Empty;
@@ -71,6 +84,7 @@
         _custom = custom;
         _customFields = App.Bootstrap?.Fields.GetValueOrDefault("accounts")?.Where(f => f.IsCustom && !f.Key.Contains("jurisdiction", StringComparison.OrdinalIgnoreCase) && !f.Label.Contains("jurisdiction", StringComparison.OrdinalIgnoreCase)).ToList() ?? [];
         _error = null;
+        _duplicates = [];
         _fieldErrors = new Dictionary<string, string>();
         _snapshot = TakeSnapshot();
     }
@@ -92,6 +106,18 @@
         _busy = true;
         try
         {
+            // New accounts: look for duplicates first. Pressing the button again confirms.
+            if (_accountId is null && _duplicates.Count == 0)
+            {
+                var check = await Http.PostAsJsonAsync("api/v1/accounts/check-duplicates", new CheckAccountDuplicatesRequest(Value("name")!, Value("website"), Value("phone")));
+                var found = check.IsSuccessStatusCode ? await check.Content.ReadFromJsonAsync<List<DuplicateCandidateDto>>() ?? [] : [];
+                if (found.Count > 0)
+                {
+                    _duplicates = found;
+                    return;
+                }
+            }
+
             Guid? parentId = Guid.TryParse(Value("parentAccountId"), out var parsedParent) ? parsedParent : null;
             Guid? ownerId = Guid.TryParse(Value("ownerId"), out var parsedOwner) ? parsedOwner : null;
             var request = new SaveAccountRequest(

@@ -722,7 +722,7 @@ public sealed class ContactService(AppDbContext db, ITenantContext tenant, ICloc
 
 /// <summary>Account (company) records, the parent hierarchy and the account summary.</summary>
 public sealed class AccountService(AppDbContext db, ITenantContext tenant, IClock clock, FieldSettingsService fields, IDataScopeService scope, INotificationService notifications, IRecordSavePipeline savePipeline,
-    MindLift.Infrastructure.Common.BulkQueue bulkQueue)
+    MindLift.Infrastructure.Common.BulkQueue bulkQueue, ITimelineEventBus timeline)
 {
     public static readonly IReadOnlyDictionary<string, string[]> ImportAliases = MindLift.Shared.Imports.ImportFieldSets.Accounts.ToDictionary(f => f.Field, f => f.Aliases);
 
@@ -1027,6 +1027,153 @@ public sealed class AccountService(AppDbContext db, ITenantContext tenant, ICloc
         var scopedAccounts = await ScopedAsync(cancellationToken);
         var parent = a.ParentAccountId is { } id ? await scopedAccounts.AsNoTracking().Where(x => x.Id == id).Select(x => x.Name).FirstOrDefaultAsync(cancellationToken) : null;
         return new AccountDto(a.Id, a.Name, a.Website, a.Phone, a.Industry, a.Description, a.ParentAccountId, parent, a.OwnerId, a.CreatedAt, RecordHelpers.Custom(a.CustomFields));
+    }
+
+    // ------------------------------------------------------------------ duplicates and merge
+
+    private static readonly HashSet<string> CompanySuffixes = ["inc", "incorporated", "ltd", "limited", "llc", "llp", "plc", "corp", "corporation", "co", "company", "gmbh", "sa", "ag", "bv", "pty", "pvt", "fze", "fzc", "wll"];
+
+    /// <summary>The name with case, punctuation and words like "Inc" or "Ltd" removed, so "Acme Ltd." and "ACME" match.</summary>
+    public static string NormalizeName(string? name)
+    {
+        var words = new string((name ?? string.Empty).ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : ' ').ToArray())
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Where(w => !CompanySuffixes.Contains(w));
+        return string.Concat(words);
+    }
+
+    /// <summary>The web address reduced to its host, so "https://www.acme.com/about" and "acme.com" match.</summary>
+    public static string? NormalizeDomain(string? website)
+    {
+        var text = (website ?? string.Empty).Trim().ToLowerInvariant();
+        if (text.Length == 0) return null;
+        var start = text.IndexOf("://", StringComparison.Ordinal);
+        if (start >= 0) text = text[(start + 3)..];
+        var end = text.IndexOfAny(['/', '?', '#']);
+        if (end >= 0) text = text[..end];
+        if (text.StartsWith("www.", StringComparison.Ordinal)) text = text[4..];
+        return text.Length == 0 ? null : text;
+    }
+
+    private static string? DuplicateReason(Account a, string nameKey, string? domain, string? phone)
+    {
+        if (nameKey.Length > 0 && NormalizeName(a.Name) == nameKey) return "Same name";
+        if (domain is not null && NormalizeDomain(a.Website) == domain) return "Same website";
+        if (phone is not null && LeadNormalizer.Phone(a.Phone) == phone) return "Same phone number";
+        return null;
+    }
+
+    /// <summary>Accounts that look like the details typed on a new (or existing) account: the same name, website or phone number.</summary>
+    public async Task<IReadOnlyList<DuplicateCandidateDto>> CheckDuplicatesAsync(CheckAccountDuplicatesRequest request, CancellationToken cancellationToken = default)
+        => await FindDuplicatesAsync(request.Name, request.Website, request.Phone, null, cancellationToken);
+
+    public async Task<IReadOnlyList<DuplicateCandidateDto>> GetDuplicatesAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var account = await LoadScopedAsync(id, cancellationToken);
+        return await FindDuplicatesAsync(account.Name, account.Website, account.Phone, id, cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<DuplicateCandidateDto>> FindDuplicatesAsync(string? name, string? website, string? phone, Guid? exclude, CancellationToken cancellationToken)
+    {
+        var nameKey = NormalizeName(name);
+        var domain = NormalizeDomain(website);
+        var normalizedPhone = LeadNormalizer.Phone(phone);
+        if (nameKey.Length == 0 && domain is null && normalizedPhone is null) return [];
+
+        // The database narrows the field (first word of the name, the host, any phone); the exact rules are applied in memory.
+        var firstWord = (name ?? string.Empty).Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.ToLower() ?? string.Empty;
+        var query = (await ScopedAsync(cancellationToken)).AsNoTracking().Where(a => exclude == null || a.Id != exclude);
+        var candidates = await query.Where(a =>
+                (firstWord.Length >= 2 && a.Name.ToLower().Contains(firstWord))
+                || (domain != null && a.Website != null && a.Website.ToLower().Contains(domain))
+                || (normalizedPhone != null && a.Phone != null))
+            .Take(500).ToListAsync(cancellationToken);
+
+        return candidates
+            .Select(a => (Account: a, Reason: DuplicateReason(a, nameKey, domain, normalizedPhone)))
+            .Where(x => x.Reason is not null)
+            .OrderBy(x => x.Account.Name)
+            .Take(10)
+            .Select(x => new DuplicateCandidateDto(x.Account.Id, "account", x.Account.Name, x.Account.Website, x.Account.Phone, x.Reason!))
+            .ToList();
+    }
+
+    /// <summary>
+    /// Moves everything that belongs to the duplicate accounts (contacts, deals, activities, tickets, quotes, invoices, documents, messages,
+    /// surveys, portal users and child accounts) onto the master account, fills the master's empty details from them, and removes the duplicates.
+    /// </summary>
+    public async Task<AccountDto> MergeAsync(Guid masterId, IReadOnlyList<Guid>? duplicateIds, CancellationToken cancellationToken = default)
+    {
+        var ids = (duplicateIds ?? []).ToList();
+        if (ids.Count == 0) throw new ValidationException("duplicateIds", "Choose at least one duplicate account.");
+        if (ids.Contains(masterId)) throw new ValidationException("duplicateIds", "An account cannot be merged into itself.");
+        if (ids.Distinct().Count() != ids.Count) throw new ValidationException("duplicateIds", "Each duplicate account can be listed only once.");
+        if (ids.Count > 5) throw new ValidationException("duplicateIds", "Merge at most 5 accounts at a time.");
+
+        var master = await LoadScopedAsync(masterId, cancellationToken);
+        var scoped = await ScopedAsync(cancellationToken);
+        var duplicates = await scoped.Where(a => ids.Contains(a.Id)).ToListAsync(cancellationToken);
+        if (duplicates.Count != ids.Count) throw new NotFoundException("Account", ids.First(i => duplicates.All(d => d.Id != i)));
+
+        var nameKey = NormalizeName(master.Name);
+        var domain = NormalizeDomain(master.Website);
+        var phone = LeadNormalizer.Phone(master.Phone);
+        foreach (var duplicate in duplicates)
+        {
+            if (DuplicateReason(duplicate, nameKey, domain, phone) is null)
+            {
+                throw new ValidationException("duplicateIds", $"'{duplicate.Name}' is not a duplicate of '{master.Name}'. Both must share a name, website or phone number.");
+            }
+        }
+
+        await using var transaction = db.Database.IsRelational() ? await db.Database.BeginTransactionAsync(cancellationToken) : null;
+
+        foreach (var duplicate in duplicates)
+        {
+            master.Website ??= duplicate.Website;
+            master.Phone ??= duplicate.Phone;
+            master.Industry ??= duplicate.Industry;
+            master.Description ??= duplicate.Description;
+        }
+
+        // Anything that pointed at a duplicate now points at the master.
+        await db.Contacts.Where(c => c.AccountId != null && ids.Contains(c.AccountId.Value)).ExecuteUpdateAsync(s => s.SetProperty(c => c.AccountId, masterId), cancellationToken);
+        await db.Deals.Where(d => d.AccountId != null && ids.Contains(d.AccountId.Value)).ExecuteUpdateAsync(s => s.SetProperty(d => d.AccountId, masterId), cancellationToken);
+        await db.Activities.Where(a => a.AccountId != null && ids.Contains(a.AccountId.Value)).ExecuteUpdateAsync(s => s.SetProperty(a => a.AccountId, masterId), cancellationToken);
+        await db.Tickets.Where(t => t.AccountId != null && ids.Contains(t.AccountId.Value)).ExecuteUpdateAsync(s => s.SetProperty(t => t.AccountId, masterId), cancellationToken);
+        await db.Quotes.Where(q => q.AccountId != null && ids.Contains(q.AccountId.Value)).ExecuteUpdateAsync(s => s.SetProperty(q => q.AccountId, masterId), cancellationToken);
+        await db.Invoices.Where(i => i.AccountId != null && ids.Contains(i.AccountId.Value)).ExecuteUpdateAsync(s => s.SetProperty(i => i.AccountId, masterId), cancellationToken);
+        await db.BusinessDocuments.Where(d => d.AssociatedAccountId != null && ids.Contains(d.AssociatedAccountId.Value)).ExecuteUpdateAsync(s => s.SetProperty(d => d.AssociatedAccountId, masterId), cancellationToken);
+        await db.Messages.Where(m => m.AccountId != null && ids.Contains(m.AccountId.Value)).ExecuteUpdateAsync(s => s.SetProperty(m => m.AccountId, masterId), cancellationToken);
+        await db.CustomerSurveys.Where(x => x.AccountId != null && ids.Contains(x.AccountId.Value)).ExecuteUpdateAsync(s => s.SetProperty(x => x.AccountId, masterId), cancellationToken);
+        await db.PortalUsers.Where(x => x.AccountId != null && ids.Contains(x.AccountId.Value)).ExecuteUpdateAsync(s => s.SetProperty(x => x.AccountId, masterId), cancellationToken);
+        await db.DocumentRequests.Where(x => x.AccountId != null && ids.Contains(x.AccountId.Value)).ExecuteUpdateAsync(s => s.SetProperty(x => x.AccountId, masterId), cancellationToken);
+        await db.Leads.Where(l => l.ConvertedAccountId != null && ids.Contains(l.ConvertedAccountId.Value)).ExecuteUpdateAsync(s => s.SetProperty(l => l.ConvertedAccountId, masterId), cancellationToken);
+        await db.Accounts.Where(a => a.ParentAccountId != null && ids.Contains(a.ParentAccountId.Value) && a.Id != masterId).ExecuteUpdateAsync(s => s.SetProperty(a => a.ParentAccountId, masterId), cancellationToken);
+        if (master.ParentAccountId is { } parent && ids.Contains(parent)) master.ParentAccountId = null;
+
+        // A person can be linked to an account only once: keep the master's link when both have one.
+        var masterLinked = await db.ContactAccountLinks.Where(l => l.AccountId == masterId).Select(l => l.ContactId).ToListAsync(cancellationToken);
+        var links = await db.ContactAccountLinks.Where(l => ids.Contains(l.AccountId)).ToListAsync(cancellationToken);
+        foreach (var link in links)
+        {
+            if (masterLinked.Contains(link.ContactId)) db.ContactAccountLinks.Remove(link);
+            else { link.AccountId = masterId; masterLinked.Add(link.ContactId); }
+        }
+
+        foreach (var duplicate in duplicates)
+        {
+            await timeline.PublishAsync(new TimelineEventInput(
+                EntityType: "account", EntityId: masterId, Kind: "account_merged",
+                Summary: $"Merged duplicate account '{duplicate.Name}' into this account",
+                Source: "crm", DetailJson: System.Text.Json.JsonSerializer.Serialize(new { DuplicateId = duplicate.Id, duplicate.Name, duplicate.Website, duplicate.Phone }),
+                ActorUserId: tenant.UserId, OccurredAt: clock.UtcNow), cancellationToken);
+            db.Accounts.Remove(duplicate);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        if (transaction is not null) await transaction.CommitAsync(cancellationToken);
+        return await MapAsync(master, cancellationToken);
     }
 
     private async Task<IQueryable<Account>> ScopedAsync(CancellationToken cancellationToken)
