@@ -167,7 +167,7 @@ Because the phone's guess is weaker, it is **never presented as certain**: overa
 
 Known limit: the ML Kit model used is **Latin only**. An Arabic card read offline will give little or no text, and the person is asked to enter details or retry when online.
 
-The classifier is kept in step with the server copy by design ("Mirrors the server's CardLineClassifier"), but it is a hand-maintained duplicate in Dart, so the two lists can drift.
+**One source of rules.** The word lists (address words, places, labels, titles, company words, honorifics) and the noise patterns live in `shared/card-rules.json`. Run `python scripts/gen-card-rules.py` after editing it: that writes `src/MindLift.Infrastructure/Leads/CardRules.g.cs` (server) and `mobile/packages/mindlift_mobile/lib/features/leads/presentation/card_rules.g.dart` (phone). A test on each side (`CardRulesSyncTests.cs`, `card_rules_sync_test.dart`) fails if its generated copy no longer matches the JSON. The matching logic itself is still written once in C# and once in Dart.
 
 ---
 
@@ -203,13 +203,12 @@ Implemented limits:
 - Name, company and title detection is rule and keyword based. Cards with unusual layouts, stylised logos or names that look like places can be misread; the review gate exists for this.
 - Address rules favour Indian and Gulf formats (PIN codes, UAE phone normalisation, city lists).
 - Only the first page of each image is read; only two images (front and back) are accepted.
-- Keyword and place lists exist in both Dart and C#.
+- The matching logic (not the word lists) exists in both Dart and C#.
 - Google ML Kit's Flutter package offers no Arabic model (only Latin, Chinese, Devanagari, Japanese, Korean), so offline Arabic reading is not possible with it. The phone now says so when it reads nothing offline.
 
 Suggestions (not implemented):
 - Add a device test and an endpoint test for the front/back flow.
 - Local QR / vCard reading before OCR (needs a new barcode package and native setup).
 - Move multi-pass OCR to a background queue if traffic grows.
-- Share the classifier word lists from one source to stop the two copies drifting.
 - Add an Arabic-capable offline option, or tell the person clearly when offline Arabic is unsupported.
 - Add vCard/QR detection for cards that carry one.

@@ -9,43 +9,19 @@ namespace MindLift.Infrastructure.Leads;
 public static partial class CardLineClassifier
 {
     /// <summary>Words that only appear in addresses. One of them is enough.</summary>
-    private static readonly HashSet<string> StrongTokens = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "landmark", "near", "nxt", "opp", "opposite", "behind", "beside",
-        "street", "st.", "road", "rd.", "avenue", "ave", "lane", "ln",
-        "floor", "fl.", "building", "bldg", "tower", "block", "blk", "sector", "phase", "plot", "no.", "suite", "apt",
-        "box", "p.o.", "po", "nagar", "layout", "colony", "district", "taluk", "taluka", "mandal", "pincode", "zipcode", "zip",
-        "village", "enclave", "marg", "cross", "chowk", "gali", "highway", "hwy", "junction", "flat", "door",
-        "شارع", "برج", "بناية", "صندوق", "طابق", "مكتب", "مبنى", "ص.ب",
-    };
+    private static readonly HashSet<string> StrongTokens = new(CardRules.StrongAddressTokens, StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Words that are usually address words but are also common in names or company names. They count only beside a digit or a comma.</summary>
-    private static readonly HashSet<string> WeakTokens = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "main", "area", "park", "town", "locality", "extension", "ext.", "estate", "circle", "next", "num", "pin", "city",
-    };
+    private static readonly HashSet<string> WeakTokens = new(CardRules.WeakAddressTokens, StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Cities, states and countries. A line made only of these is an address; a name that happens to share one ("Delhi Kumar") is not.</summary>
-    private static readonly HashSet<string> PlaceNames = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "bengaluru", "bangalore", "mumbai", "delhi", "chennai", "hyderabad", "pune", "kolkata", "ahmedabad", "surat", "jaipur", "lucknow",
-        "india", "karnataka", "maharashtra", "tamilnadu", "telangana", "kerala", "gujarat", "rajasthan", "pradesh", "nadu",
-        "dubai", "abu", "dhabi", "uae", "riyadh", "doha", "sharjah", "jeddah", "kuwait", "manama", "muscat", "ajman", "fujairah",
-        "دبي", "أبوظبي", "الرياض", "جدة", "الدوحة", "المنامة", "الكويت", "مسقط", "الشارقة", "عجمان",
-    };
+    private static readonly HashSet<string> PlaceNames = new(CardRules.PlaceNames, StringComparer.OrdinalIgnoreCase);
 
-    private static readonly HashSet<string> AddressLabels = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "address", "addr", "add", "landmark", "location", "loc", "reg. office", "regd. office", "registered office", "head office", "branch", "po box", "p.o. box", "pin", "pincode",
-        "العنوان",
-    };
+    private static readonly HashSet<string> AddressLabels = new(CardRules.AddressLabels, StringComparer.OrdinalIgnoreCase);
 
-    private static readonly HashSet<string> OtherLabels = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "name", "contact", "mobile", "mob", "cell", "tel", "telephone", "phone", "ph", "fax", "email", "e-mail", "mail", "web", "website", "whatsapp", "office", "direct", "m", "t", "e", "w",
-    };
+    private static readonly HashSet<string> OtherLabels = new(CardRules.OtherLabels, StringComparer.OrdinalIgnoreCase);
 
-    private static readonly string[] Honorifics = ["mr", "mrs", "ms", "miss", "dr", "eng", "prof", "sir", "shri", "smt", "sheikh", "السيد", "الدكتور", "المهندس"];
+    private static readonly string[] Honorifics = CardRules.Honorifics;
 
     [GeneratedRegex(@"(?<![\d+])[1-9]\d{2}\s?\d{3}(?!\d)")]
     private static partial Regex IndianPinCode();
@@ -53,13 +29,13 @@ public static partial class CardLineClassifier
     [GeneratedRegex(@"\d")]
     private static partial Regex AnyDigit();
 
-    [GeneratedRegex(@"(?i)(^|[\s(])@[a-z0-9_.]{2,}\b|\b(linkedin|facebook|instagram|twitter|tiktok|youtube|snapchat)\b|\b(wa\.me|t\.me)\b|\bx\.com/|\biso\s?\d{3,5}(:\d{4})?\b|\ball rights reserved\b|©|\bcopyright\b|\bterms (and|&) conditions\b")]
+    [GeneratedRegex(CardRules.NoisePattern, RegexOptions.IgnoreCase)]
     private static partial Regex NoisePattern();
 
-    [GeneratedRegex(@"(?i)\b(est\.?|established)\s*(in\s*)?(19|20)\d{2}\b|\bsince\s+(19|20)\d{2}\b")]
+    [GeneratedRegex(CardRules.FoundedPattern, RegexOptions.IgnoreCase)]
     private static partial Regex FoundedTagline();
 
-    [GeneratedRegex(@"(?i)^(https?://)?(www\.)?(linkedin|facebook|instagram|twitter|tiktok|youtube|snapchat)\.|^(https?://)?(www\.)?(wa\.me|t\.me|x\.com)")]
+    [GeneratedRegex(CardRules.SocialSitePattern, RegexOptions.IgnoreCase)]
     private static partial Regex SocialSite();
 
     /// <summary>

@@ -1,0 +1,50 @@
+{
+  "_comment": "Single source of truth for business card reading rules. Edit this file, then run: python scripts/gen-card-rules.py. It writes the C# (server) and Dart (phone) copies; tests in both fail if a copy is out of date.",
+  "strongAddressTokens": [
+    "landmark", "near", "nxt", "opp", "opposite", "behind", "beside",
+    "street", "st.", "road", "rd.", "avenue", "ave", "lane", "ln",
+    "floor", "fl.", "building", "bldg", "tower", "block", "blk", "sector", "phase", "plot", "no.", "suite", "apt",
+    "box", "p.o.", "po", "nagar", "layout", "colony", "district", "taluk", "taluka", "mandal", "pincode", "zipcode", "zip",
+    "village", "enclave", "marg", "cross", "chowk", "gali", "highway", "hwy", "junction", "flat", "door",
+    "شارع", "برج", "بناية", "صندوق", "طابق", "مكتب", "مبنى", "ص.ب"
+  ],
+  "weakAddressTokens": [
+    "main", "area", "park", "town", "locality", "extension", "ext.", "estate", "circle", "next", "num", "pin", "city"
+  ],
+  "placeNames": [
+    "bengaluru", "bangalore", "mumbai", "delhi", "chennai", "hyderabad", "pune", "kolkata", "ahmedabad", "surat", "jaipur", "lucknow",
+    "india", "karnataka", "maharashtra", "tamilnadu", "telangana", "kerala", "gujarat", "rajasthan", "pradesh", "nadu",
+    "dubai", "abu", "dhabi", "uae", "riyadh", "doha", "sharjah", "jeddah", "kuwait", "manama", "muscat", "ajman", "fujairah",
+    "دبي", "أبوظبي", "الرياض", "جدة", "الدوحة", "المنامة", "الكويت", "مسقط", "الشارقة", "عجمان"
+  ],
+  "addressLabels": [
+    "address", "addr", "add", "landmark", "location", "loc", "reg. office", "regd. office", "registered office", "head office", "branch", "po box", "p.o. box", "pin", "pincode",
+    "العنوان"
+  ],
+  "otherLabels": [
+    "name", "contact", "mobile", "mob", "cell", "tel", "telephone", "phone", "ph", "fax", "email", "e-mail", "mail", "web", "website", "whatsapp", "office", "direct", "m", "t", "e", "w"
+  ],
+  "honorifics": [
+    "mr", "mrs", "ms", "miss", "dr", "eng", "prof", "sir", "shri", "smt", "sheikh", "السيد", "الدكتور", "المهندس"
+  ],
+  "titleKeywords": [
+    "director", "manager", "ceo", "cto", "cfo", "coo", "founder", "co-founder", "president",
+    "executive", "engineer", "consultant", "head of", "lead", "developer", "specialist",
+    "representative", "partner", "officer", "advisor", "supervisor", "architect", "analyst", "designer",
+    "مدير عام", "المدير العام", "رئيس تنفيذي", "الرئيس التنفيذي", "مؤسس", "شريك", "مدير",
+    "مهندس", "مستشار", "رئيس", "أخصائي", "مشرف", "مسؤول", "ممثل", "مطور", "معماري"
+  ],
+  "companyKeywords": [
+    "llc", "inc", "corp", "corporation", "ltd", "limited", "group", "solutions",
+    "technologies", "tech", "co.", "company", "holdings", "ventures", "services",
+    "industries", "consulting", "enterprises", "global", "international", "agency", "media", "capital",
+    "ذ.م.م", "ذ م م", "ش.م.ح", "ش م ح", "ش.م.ع", "ش م ع", "شركة", "مؤسسة", "مجموعة",
+    "استشارات", "تكنولوجيا", "حلول", "خدمات", "مشاريع", "القابضة", "التجارية", "العالمية", "للتجارة", "للمقاولات"
+  ],
+  "patterns": {
+    "_comment": "Written to work in both .NET and Dart. Matching is case-insensitive.",
+    "noise": "(^|[\\s(])@[a-z0-9_.]{2,}\\b|\\b(linkedin|facebook|instagram|twitter|tiktok|youtube|snapchat)\\b|\\b(wa\\.me|t\\.me)\\b|\\bx\\.com/|\\biso\\s?\\d{3,5}(:\\d{4})?\\b|\\ball rights reserved\\b|©|\\bcopyright\\b|\\bterms (and|&) conditions\\b",
+    "founded": "\\b(est\\.?|established)\\s*(in\\s*)?(19|20)\\d{2}\\b|\\bsince\\s+(19|20)\\d{2}\\b",
+    "socialSite": "^(https?://)?(www\\.)?(linkedin|facebook|instagram|twitter|tiktok|youtube|snapchat)\\.|^(https?://)?(www\\.)?(wa\\.me|t\\.me|x\\.com)"
+  }
+}

@@ -1,42 +1,21 @@
+import 'card_rules.g.dart';
+
 /// Decides whether a line read from a business card is part of an address. Mirrors the server's CardLineClassifier so the phone's offline
 /// reading, the name guard and the server agree: a landmark, a street word, a PIN code or an "Address:" label makes a line an address, and an
 /// address is never the contact person.
 class CardLineClassifier {
   const CardLineClassifier._();
 
-  static const strongAddressTokens = {
-    'landmark', 'near', 'nxt', 'opp', 'opposite', 'behind', 'beside',
-    'street', 'st.', 'road', 'rd.', 'avenue', 'ave', 'lane', 'ln',
-    'floor', 'fl.', 'building', 'bldg', 'tower', 'block', 'blk', 'sector', 'phase', 'plot', 'no.', 'suite', 'apt',
-    'box', 'p.o.', 'po', 'nagar', 'layout', 'colony', 'district', 'taluk', 'taluka', 'mandal', 'pincode', 'zipcode', 'zip',
-    'village', 'enclave', 'marg', 'cross', 'chowk', 'gali', 'highway', 'hwy', 'junction', 'flat', 'door',
-    'شارع', 'برج', 'بناية', 'صندوق', 'طابق', 'مكتب', 'مبنى', 'ص.ب',
-  };
-  static const weakAddressTokens = {
-    'main', 'area', 'park', 'town', 'locality', 'extension', 'ext.', 'estate', 'circle', 'next', 'num', 'pin', 'city',
-  };
-  static const placeTokens = {
-    'bengaluru', 'bangalore', 'mumbai', 'delhi', 'chennai', 'hyderabad', 'pune', 'kolkata', 'ahmedabad', 'surat', 'jaipur', 'lucknow',
-    'india', 'karnataka', 'maharashtra', 'tamilnadu', 'telangana', 'kerala', 'gujarat', 'rajasthan', 'pradesh', 'nadu',
-    'dubai', 'abu', 'dhabi', 'uae', 'riyadh', 'doha', 'sharjah', 'jeddah', 'kuwait', 'manama', 'muscat', 'ajman', 'fujairah',
-    'دبي', 'أبوظبي', 'الرياض', 'جدة', 'الدوحة', 'المنامة', 'الكويت', 'مسقط', 'الشارقة', 'عجمان',
-  };
-  static const addressLabels = {'address', 'addr', 'add', 'landmark', 'location', 'loc', 'branch', 'pin', 'pincode', 'العنوان'};
-  static const otherLabels = {
-    'name', 'contact', 'mobile', 'mob', 'cell', 'tel', 'telephone', 'phone', 'ph', 'fax', 'email', 'e-mail', 'mail',
-    'web', 'website', 'whatsapp', 'office', 'direct', 'm', 't', 'e', 'w',
-  };
+  static final strongAddressTokens = CardRules.strongAddressTokens.toSet();
+  static final weakAddressTokens = CardRules.weakAddressTokens.toSet();
+  static final placeTokens = CardRules.placeNames.toSet();
+  static final addressLabels = CardRules.addressLabels.toSet();
+  static final otherLabels = CardRules.otherLabels.toSet();
   static final pinRegex = RegExp(r'(?<![\d+])[1-9]\d{2}\s?\d{3}(?!\d)');
 
-  static final _noise = RegExp(
-    r'(^|[\s(])@[a-z0-9_.]{2,}\b|\b(linkedin|facebook|instagram|twitter|tiktok|youtube|snapchat)\b|\b(wa\.me|t\.me)\b|\bx\.com/|\biso\s?\d{3,5}(:\d{4})?\b|\ball rights reserved\b|©|\bcopyright\b|\bterms (and|&) conditions\b',
-    caseSensitive: false,
-  );
-  static final _founded = RegExp(r'\b(est\.?|established)\s*(in\s*)?(19|20)\d{2}\b|\bsince\s+(19|20)\d{2}\b', caseSensitive: false);
-  static final _socialSite = RegExp(
-    r'^(https?://)?(www\.)?(linkedin|facebook|instagram|twitter|tiktok|youtube|snapchat)\.|^(https?://)?(www\.)?(wa\.me|t\.me|x\.com)',
-    caseSensitive: false,
-  );
+  static final _noise = RegExp(CardRules.noisePattern, caseSensitive: false);
+  static final _founded = RegExp(CardRules.foundedPattern, caseSensitive: false);
+  static final _socialSite = RegExp(CardRules.socialSitePattern, caseSensitive: false);
 
   /// True for a line that is not contact data: a social handle or page, a certification mark (ISO 9001), a copyright footer or an "Est. 1998" tagline.
   /// Mirrors the server's CardLineClassifier.IsNoiseLine.

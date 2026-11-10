@@ -26,25 +26,9 @@ public sealed class LeadCardOcrService(
     private static readonly Regex PhoneRegex = new(@"(?:\+?\d{1,4}[-.\s]?)?\(?\d{1,4}\)?[-.\s]?\d{2,4}[-.\s]?\d{3,5}|\+?\d{7,15}", RegexOptions.Compiled);
     private static readonly Regex WebRegex = new(@"(https?:\/\/[^\s]+|www\.[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}[^\s]*)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-    private static readonly string[] TitleKeywords =
-    [
-        "director", "manager", "ceo", "cto", "cfo", "coo", "founder", "co-founder", "president",
-        "executive", "engineer", "consultant", "head of", "lead", "developer", "specialist",
-        "representative", "partner", "officer", "advisor", "supervisor", "architect", "analyst", "designer",
-        // Arabic Job Titles
-        "مدير عام", "المدير العام", "رئيس تنفيذي", "الرئيس التنفيذي", "مؤسس", "شريك", "مدير",
-        "مهندس", "مستشار", "رئيس", "أخصائي", "مشرف", "مسؤول", "ممثل", "مطور", "معماري"
-    ];
+    private static readonly string[] TitleKeywords = CardRules.TitleKeywords;
 
-    private static readonly string[] CompanyKeywords =
-    [
-        "llc", "inc", "corp", "corporation", "ltd", "limited", "group", "solutions",
-        "technologies", "tech", "co.", "company", "holdings", "ventures", "services",
-        "industries", "consulting", "enterprises", "global", "international", "agency", "media", "capital",
-        // Arabic Corporate & Legal Entity Designations
-        "ذ.م.م", "ذ م م", "ش.م.ح", "ش م ح", "ش.م.ع", "ش م ع", "شركة", "مؤسسة", "مجموعة",
-        "استشارات", "تكنولوجيا", "حلول", "خدمات", "مشاريع", "القابضة", "التجارية", "العالمية", "للتجارة", "للمقاولات"
-    ];
+    private static readonly string[] CompanyKeywords = CardRules.CompanyKeywords;
 
     public async Task<ExtractedLeadCardDto> ExtractFromDirectStreamAsync(
         Stream inputStream,

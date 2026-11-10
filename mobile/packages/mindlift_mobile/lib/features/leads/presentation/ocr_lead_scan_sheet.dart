@@ -9,6 +9,7 @@ import 'package:mindlift_ui/mindlift_ui.dart';
 import '../../../core/network_provider.dart';
 import '../../offline/offline_database.dart';
 import 'card_line_classifier.dart';
+import 'card_rules.g.dart';
 
 class OcrLeadScanSheet extends ConsumerStatefulWidget {
   const OcrLeadScanSheet({super.key, this.onLeadCreated});
@@ -363,17 +364,8 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
     String? phone;
     final addressParts = <String>[];
 
-    final companyKeywords = [
-      'llc', 'inc', 'corp', 'corporation', 'ltd', 'limited', 'group', 'solutions',
-      'technologies', 'tech', 'co.', 'company', 'holdings', 'ventures', 'services',
-      'industries', 'consulting', 'enterprises', 'global', 'international', 'agency',
-      'ذ.م.م', 'ش.م.ح', 'شركة', 'مؤسسة', 'مجموعة'
-    ];
-    final titleKeywords = [
-      'director', 'manager', 'ceo', 'cto', 'cfo', 'founder', 'president', 'consultant',
-      'head', 'lead', 'developer', 'engineer', 'specialist', 'officer', 'representative', 'architect',
-      'مدير عام', 'رئيس تنفيذي', 'مؤسس', 'مهندس', 'مستشار'
-    ];
+    final companyKeywords = CardRules.companyKeywords;
+    final titleKeywords = CardRules.titleKeywords;
 
     final remainingLines = <String>[];
 
