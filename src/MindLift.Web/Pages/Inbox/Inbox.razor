@@ -60,9 +60,7 @@
             <div class="flex-grow-1 overflow-y-auto">
                 @if (_loadingThreads)
                 {
-                    <div class="d-flex justify-center align-center pa-8">
-                        <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
-                    </div>
+                    <div class="pa-3" data-testid="inbox-loading"><SkeletonTable Rows="7" Columns="2" /></div>
                 }
                 else if (_threads.Count == 0)
                 {

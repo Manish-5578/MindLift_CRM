@@ -181,9 +181,7 @@
     <MudPaper Class="elevation-0" Style="border:1px solid var(--mud-palette-divider); border-radius:10px; overflow:hidden;" data-testid="audit-table-card">
         @if (_loading)
         {
-            <div class="pa-8 d-flex justify-center align-center">
-                <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
-            </div>
+            <div class="pa-4" data-testid="audit-loading"><SkeletonTable Rows="8" Columns="5" /></div>
         }
         else if (_page is null || _page.Items.Count == 0)
         {

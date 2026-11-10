@@ -27,9 +27,7 @@
 
     @if (_loading)
     {
-        <div class="py-6 text-center">
-            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
-        </div>
+        <div class="py-4" data-testid="competitors-loading"><SkeletonTable Rows="5" Columns="4" /></div>
     }
     else
     {

@@ -84,9 +84,7 @@
         <MlCard Flush="true" TestId="recycle-bin-card">
             @if (_loading)
             {
-                <div class="pa-6 d-flex justify-center">
-                    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
-                </div>
+                <div class="pa-4" data-testid="recycle-loading"><SkeletonTable Rows="6" Columns="4" /></div>
             }
             else if (_items.Count == 0)
             {
