@@ -22,6 +22,7 @@ OCR for **documents** (trade licences, passports, invoices) is a related but sep
 |---|---|---|
 | Mobile app | Flutter / Dart, Riverpod, Dio | UI, state, HTTP |
 | Photo capture | `image_picker` ^1.1.2 | Camera and gallery |
+| QR / vCard reading | `google_mlkit_barcode_scanning` ^0.14.0 (Google ML Kit, on the phone, works offline) and `contact_qr_parser.dart` | Reads a contact QR code on the card exactly |
 | On-device OCR (offline fallback) | `google_mlkit_text_recognition` ^0.15.0 (Google ML Kit, Latin model) | Reads text without a network |
 | Mobile UI parts | `mindlift_ui` (MlSheet, MlToast, MlButton...) | Custom components only, per the rule book |
 | Offline storage | `offlineDatabaseProvider` outbox (`LocalOutboxMutation`) | Holds leads created without a network |
@@ -57,6 +58,8 @@ Phone                                   Server
 13. Person fixes / approves, taps Save
 14. POST create lead  (or outbox if offline)
 ```
+
+**QR code first.** Before any OCR, the phone looks for a QR code on the front and then the back photo (ML Kit barcode scanner, offline). If it holds a contact (vCard 2.1/3.0/4.0 or MECARD), the form is filled from it with full confidence, no review is required, and the server is called only to check for a duplicate (text-only `parse-card` call; skipped silently when offline). A code that is not a contact (a web link, a menu) is ignored and the card is read as text. Files: `contact_qr_parser.dart` (parser, tested by `contact_qr_parser_test.dart`) and `_readContactQr` / `_applyScannedContact` in `ocr_lead_scan_sheet.dart`.
 
 Fallback when step 3 fails (no network, server error): the phone runs ML Kit on each image, joins the text and runs its local parser (section 8). A third entry point, `POST /api/v1/leads/parse-card`, accepts text (or a base64 image) and is used when the person edits or pastes card text and taps parse.
 
@@ -208,7 +211,6 @@ Implemented limits:
 
 Suggestions (not implemented):
 - Add a device test and an endpoint test for the front/back flow.
-- Local QR / vCard reading before OCR (needs a new barcode package and native setup).
 - Move multi-pass OCR to a background queue if traffic grows.
 - Add an Arabic-capable offline option, or tell the person clearly when offline Arabic is unsupported.
 - Add vCard/QR detection for cards that carry one.

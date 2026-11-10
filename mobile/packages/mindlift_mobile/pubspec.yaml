@@ -23,6 +23,7 @@ dependencies:
   connectivity_plus: ^5.0.2
   image_picker: ^1.1.2
   google_mlkit_text_recognition: ^0.15.0
+  google_mlkit_barcode_scanning: ^0.14.0
   local_auth: ^2.3.0
   firebase_core: ^3.6.0
   firebase_messaging: ^15.1.3

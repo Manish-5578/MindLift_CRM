@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mindlift_api/mindlift_api.dart';
@@ -10,6 +11,7 @@ import '../../../core/network_provider.dart';
 import '../../offline/offline_database.dart';
 import 'card_line_classifier.dart';
 import 'card_rules.g.dart';
+import 'contact_qr_parser.dart';
 
 class OcrLeadScanSheet extends ConsumerStatefulWidget {
   const OcrLeadScanSheet({super.key, this.onLeadCreated});
@@ -180,6 +182,13 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
     if (_frontBytes == null) return;
     setState(() => _isExtracting = true);
     try {
+      // A QR code on the card (vCard / MECARD) holds the details exactly, so it is used instead of reading the printed text.
+      final qrContact = await _readContactQr();
+      if (qrContact != null) {
+        await _applyScannedContact(qrContact);
+        return;
+      }
+
       try {
         final card = await ref.read(chatServiceProvider).scanCardSides(
               frontPath: _frontFilePath,
@@ -244,6 +253,81 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
       }
     } finally {
       if (mounted) setState(() => _isExtracting = false);
+    }
+  }
+
+  /// Looks for a contact QR code on the front and then the back photo. Works offline (Google ML Kit on the phone).
+  /// A code that is not a contact (a web link, a menu) is ignored and the card is read as text instead.
+  Future<ScannedContact?> _readContactQr() async {
+    for (final path in [_frontFilePath, _backFilePath]) {
+      if (path == null || path.isEmpty) continue;
+      final scanner = BarcodeScanner(formats: [BarcodeFormat.qrCode]);
+      try {
+        final codes = await scanner.processImage(InputImage.fromFilePath(path));
+        for (final code in codes) {
+          final contact = ContactQrParser.parse(code.rawValue);
+          if (contact != null) return contact;
+        }
+      } catch (e) {
+        debugPrint('QR scan note: $e');
+      } finally {
+        await scanner.close();
+      }
+    }
+    return null;
+  }
+
+  /// Fills the form from a contact QR code. Every value that came from the code is exact, so it carries full confidence and the card needs no review.
+  /// The server is then asked only whether this person is already in the CRM.
+  Future<void> _applyScannedContact(ScannedContact contact) async {
+    final text = contact.asText;
+    final hasArabic = RegExp(r'[\u0600-\u06FF]').hasMatch(text);
+    final hasLatin = RegExp(r'[a-zA-Z]').hasMatch(text);
+    double? sure(String? v) => v != null && v.trim().isNotEmpty ? 1.0 : null;
+
+    setState(() {
+      _companyController.text = contact.company ?? '';
+      _nameController.text = contact.name ?? '';
+      _phoneController.text = contact.phone ?? '';
+      _emailController.text = contact.email ?? '';
+      _titleController.text = contact.title ?? '';
+      _addressController.text = contact.address ?? '';
+      _textController.text = text;
+      _overallConfidence = 1.0;
+      _engineConfidence = 1.0;
+      _companyConfidence = sure(contact.company);
+      _nameConfidence = sure(contact.name);
+      _phoneConfidence = sure(contact.phone);
+      _emailConfidence = sure(contact.email);
+      _titleConfidence = sure(contact.title);
+      _addressConfidence = sure(contact.address);
+      _detectedScript = (hasArabic && hasLatin) ? 'Bilingual' : (hasArabic ? 'Arabic' : 'Latin');
+      _duplicateCandidate = null;
+      _evidence = [];
+      _conflicts = [];
+      _hasExtracted = true;
+      _refreshReviewGate();
+    });
+
+    var duplicateFound = false;
+    try {
+      final card = await ref.read(chatServiceProvider).parseLeadCard(rawText: text);
+      if (mounted && card.duplicate != null) {
+        duplicateFound = true;
+        setState(() => _duplicateCandidate = card.duplicate);
+      }
+    } catch (_) {
+      // Offline: the details are still filled in; the duplicate check simply is not available.
+    }
+
+    if (mounted) {
+      MlToast.show(
+        context,
+        message: duplicateFound
+            ? 'Contact QR code read. Potential duplicate found in CRM. Review details below.'
+            : 'Contact QR code read. Details are exact, no review needed.',
+        type: duplicateFound ? MlToastType.info : MlToastType.success,
+      );
     }
   }
 
