@@ -359,7 +359,7 @@
         var dialog = await Dialogs.ShowAsync<LeadConvertDialog>(T["Move Lead to Engagement"], parameters,
             new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true });
         var diagResult = await dialog.Result;
-        if (!diagResult.Canceled && _list is not null)
+        if (diagResult is { Canceled: false } && _list is not null)
         {
             await _list.ReloadAsync();
         }
@@ -376,7 +376,7 @@
         var dialog = await Dialogs.ShowAsync<StickyNoteDialog>(string.Empty, parameters,
             new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true });
         var result = await dialog.Result;
-        if (!result.Canceled && _list is not null)
+        if (result is { Canceled: false } && _list is not null)
         {
             await _list.ReloadAsync();
         }

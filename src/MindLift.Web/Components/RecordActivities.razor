@@ -192,7 +192,7 @@
         var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true };
         var dialog = await Dialogs.ShowAsync<RescheduleActivityDialog>(T["Reschedule Activity"], parameters, options);
         var result = await dialog.Result;
-        if (!result.Canceled)
+        if (result is { Canceled: false })
         {
             await LoadAsync();
             await OnChanged.InvokeAsync();
@@ -208,7 +208,7 @@
         var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true };
         var dialog = await Dialogs.ShowAsync<RecordOutcomeDialog>(T["Record Outcome"], parameters, options);
         var result = await dialog.Result;
-        if (!result.Canceled)
+        if (result is { Canceled: false })
         {
             await LoadAsync();
             await OnChanged.InvokeAsync();

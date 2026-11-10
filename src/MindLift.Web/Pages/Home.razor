@@ -23,7 +23,7 @@
             @if (_dashboard?.AvailableViews.Count > 1)
             {
                 <MudChipSet T="DashboardView" SelectedValue="@(_currentView ?? _dashboard?.View ?? DashboardView.Staff)" SelectedValueChanged="OnViewChanged" CheckMark="false">
-                    @foreach (var v in _dashboard.AvailableViews)
+                    @foreach (var v in _dashboard!.AvailableViews)
                     {
                         <MudChip T="DashboardView" Value="@v" Color="Color.Primary" Variant="@((_currentView ?? _dashboard?.View) == v ? Variant.Filled : Variant.Outlined)" Size="Size.Small">
                             @(v switch

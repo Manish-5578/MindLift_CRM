@@ -517,7 +517,7 @@
 
         var dialog = await Dialogs.ShowAsync<SideBySideMergeDialog>(string.Empty, parameters);
         var result = await dialog.Result;
-        if (!result.Canceled && result.Data is true)
+        if (result is { Canceled: false, Data: true })
         {
             _showDuplicates = false;
             _selectedIds.Clear();
@@ -553,7 +553,7 @@
 
         var dialog = await Dialogs.ShowAsync<SideBySideMergeDialog>(string.Empty, parameters);
         var result = await dialog.Result;
-        if (!result.Canceled && result.Data is true)
+        if (result is { Canceled: false, Data: true })
         {
             _showDuplicates = false;
             _selectedIds.Clear();
@@ -561,15 +561,11 @@
         }
     }
 
-    private bool _showConvert;
     private bool _showDisqualify;
     private string _reason = string.Empty;
     private string? _reasonError;
     private string? _notes;
     private string? _accountName;
-    private bool _createDeal;
-    private string? _dealName;
-    private decimal? _amount;
 
     private bool _converted => _lead?.Status == "converted";
     private bool _disqualified => _lead?.Status == "disqualified";
@@ -700,7 +696,7 @@
         var dialog = await Dialogs.ShowAsync<LeadConvertDialog>(T["Move Lead to Engagement"], parameters,
             new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true });
         var diagResult = await dialog.Result;
-        if (!diagResult.Canceled)
+        if (diagResult is { Canceled: false })
         {
             await LoadAsync();
         }
@@ -721,7 +717,7 @@
         };
         var dialog = await Dialogs.ShowAsync<LeadConvertDialog>(T["Convert Lead"], parameters, options);
         var result = await dialog.Result;
-        if (!result.Canceled)
+        if (result is { Canceled: false })
         {
             await LoadAsync();
         }

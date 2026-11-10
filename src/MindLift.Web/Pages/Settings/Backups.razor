@@ -399,7 +399,7 @@
             var res = await Http.PutAsJsonAsync("api/v1/backups/schedule", req);
             if (res.IsSuccessStatusCode)
             {
-                _config = await res.Content.ReadFromJsonAsync<BackupScheduleConfigDto>();
+                _config = await res.Content.ReadFromJsonAsync<BackupScheduleConfigDto>() ?? _config;
                 Snackbar.Add(T["Backup schedule successfully updated."], Severity.Success);
             }
             else
