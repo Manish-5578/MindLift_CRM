@@ -26,3 +26,26 @@ The owner adds new rules by telling Claude; append them below with the next numb
 - Each feature gets automated tests (API, component and, where it fits, end-to-end) that pass before the commit.
 - Check the related existing files for places the feature must plug in, and say what was wired in the summary.
 - Applies to every feature, one at a time: build, wire, test, commit and push, log in Notion, then start the next.
+
+## 4. Clear, concise, result-oriented responses (added 2026-11-10)
+After any task, report so the owner understands the outcome within 30 seconds. Be precise, not verbose. Act like a senior engineer reporting to a product owner.
+
+**Format (in this order):**
+1. **Result** - completed, partially completed, or not completed, with the main outcome in 1-2 sentences.
+2. **What was done** - the significant changes only, with the relevant files or modules, in simple language.
+3. **Verification** - what was tested or validated and whether it passed or failed. If nothing was tested, say so.
+4. **Issues / pending** - remaining problems, limits or unfinished work. If none: "No pending issues identified." Say exactly what is needed from the owner.
+5. **Next action** - only if one is genuinely required.
+
+**Rules:**
+- Normal task reports: about 100-200 words. Small task: 3-5 bullets. Medium: brief summary with the sections above. Large: executive summary first, then key changes, verification, pending. Security or architecture reviews: structured report with evidence, severity, impact and recommendations, and do not drop findings to fit a word limit.
+- Simple professional English a non-technical person can follow. Bullets over paragraphs.
+- No code, logs, stack traces or terminal output unless asked. Do not narrate your thinking, repeat the request back, or offer alternative approaches after finishing.
+- Separate what was implemented from what is only recommended. Highlight failures, risks and decisions clearly.
+
+**Honesty:**
+- Never say "completed" for partial work, "all tests passed" when only some ran, or "fixed" without verifying the behaviour.
+- Never hide failed or skipped tests or unresolved issues. Never invent details or results.
+- If something could not be done, give the reason and what is needed.
+
+The owner should never have to ask: what did you do, was it completed, was it tested, is anything pending, do you need anything from me.
