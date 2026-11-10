@@ -43,7 +43,24 @@
                 <MudSelectItem T="string" Value="@("last_month")">@T["Last month"]</MudSelectItem>
                 <MudSelectItem T="string" Value="@("this_quarter")">@T["This quarter"]</MudSelectItem>
                 <MudSelectItem T="string" Value="@("this_year")">@T["This year"]</MudSelectItem>
+                <MudSelectItem T="string" Value="@("last_7_days")">@T["Last 7 days"]</MudSelectItem>
+                <MudSelectItem T="string" Value="@("last_30_days")">@T["Last 30 days"]</MudSelectItem>
+                <MudSelectItem T="string" Value="@("last_90_days")">@T["Last 90 days"]</MudSelectItem>
+                <MudSelectItem T="string" Value="@("custom")">@T["Custom range"]</MudSelectItem>
             </MudSelect>
+
+            @if (_periodPreset == "custom")
+            {
+                <div class="d-flex flex-wrap align-center gap-2" data-testid="custom-range">
+                    <MudDatePicker Date="_rangeFrom" DateChanged="d => { _rangeFrom = d; return Task.CompletedTask; }" Label="@T["From"]" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width:150px" data-testid="range-from" />
+                    <MudDatePicker Date="_rangeTo" DateChanged="d => { _rangeTo = d; return Task.CompletedTask; }" Label="@T["To"]" Variant="Variant.Outlined" Margin="Margin.Dense" Style="width:150px" data-testid="range-to" />
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" OnClick="ApplyRangeAsync" data-testid="range-apply">@T["Apply"]</MudButton>
+                </div>
+                @if (_rangeError is not null)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Error" data-testid="range-error">@_rangeError</MudText>
+                }
+            }
 
             <MudIconButton Icon="@Icons.Material.Outlined.Refresh" Size="Size.Small" OnClick="() => LoadDashboardAsync(true)" aria-label="@T["Refresh dashboard"]" />
             <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Outlined.DashboardCustomize" OnClick="() => _customizeOpen = true">
@@ -256,7 +273,10 @@
         try
         {
             var viewParam = _currentView.HasValue ? $"view={_currentView.Value}&" : "";
-            var url = $"api/v1/dashboard?{viewParam}period={_periodPreset}&refresh={refresh}";
+            var periodParam = _periodPreset == "custom" && _rangeFrom is { } from && _rangeTo is { } to
+                ? $"from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}"
+                : $"period={(_periodPreset == "custom" ? "this_month" : _periodPreset)}";
+            var url = $"api/v1/dashboard?{viewParam}{periodParam}&refresh={refresh}";
             var resp = await Http.GetFromJsonAsync<DashboardResponse>(url);
             if (resp is not null)
             {
@@ -280,9 +300,40 @@
         await LoadDashboardAsync();
     }
 
+    private DateTime? _rangeFrom, _rangeTo;
+    private string? _rangeError;
+
     private async Task OnPeriodChanged(string period)
     {
         _periodPreset = period;
+        _rangeError = null;
+
+        // Choosing "Custom range" waits for two dates and the Apply button.
+        if (period == "custom") return;
+        await LoadDashboardAsync();
+    }
+
+    private async Task ApplyRangeAsync()
+    {
+        _rangeError = null;
+        if (_rangeFrom is not { } from || _rangeTo is not { } to)
+        {
+            _rangeError = T["Choose a start and an end date."];
+            return;
+        }
+
+        if (to < from)
+        {
+            _rangeError = T["The end date must be on or after the start date."];
+            return;
+        }
+
+        if ((to - from).TotalDays >= 366)
+        {
+            _rangeError = T["Choose a range of at most 366 days."];
+            return;
+        }
+
         await LoadDashboardAsync();
     }
 

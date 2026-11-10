@@ -181,6 +181,40 @@ public sealed class NewScreensE2ETests(E2EHost host)
     }
 
     [E2EFact]
+    public async Task The_dashboard_period_can_be_a_rolling_window_or_a_custom_range()
+    {
+        var (page, _, _) = await CompanyAsync();
+        await page.GotoAsync("/");
+        await Expect(page.Locator("[data-testid=kpi-strip]")).ToBeVisibleAsync();
+
+        var rolling = page.WaitForRequestAsync(r => r.Url.Contains("api/v1/dashboard") && r.Url.Contains("period=last_30_days"));
+        await page.GetByRole(AriaRole.Combobox).Filter(new LocatorFilterOptions { HasText = "This month" }).ClickAsync();
+        await page.GetByRole(AriaRole.Option, new PageGetByRoleOptions { Name = "Last 30 days" }).ClickAsync();
+        await rolling;
+        await Expect(page.Locator("[data-testid=custom-range]")).ToHaveCountAsync(0);
+
+        await page.GetByRole(AriaRole.Combobox).Filter(new LocatorFilterOptions { HasText = "Last 30 days" }).ClickAsync();
+        await page.GetByRole(AriaRole.Option, new PageGetByRoleOptions { Name = "Custom range" }).ClickAsync();
+        await Expect(page.Locator("[data-testid=custom-range]")).ToBeVisibleAsync();
+
+        await page.Locator("[data-testid=range-apply]").ClickAsync();
+        await Expect(page.Locator("[data-testid=range-error]")).ToContainTextAsync("Choose a start and an end date");
+
+        await page.Locator("input[data-testid=range-from]").ClickAsync();
+        await page.Locator(".mud-picker-calendar-day:not(.mud-day-outside)").Filter(new LocatorFilterOptions { HasTextRegex = new System.Text.RegularExpressions.Regex("^2$") }).First.ClickAsync();
+        await page.Locator("input[data-testid=range-to]").ClickAsync();
+        await page.Locator(".mud-picker-calendar-day:not(.mud-day-outside)").Filter(new LocatorFilterOptions { HasTextRegex = new System.Text.RegularExpressions.Regex("^9$") }).First.ClickAsync();
+
+        var custom = page.WaitForRequestAsync(r => r.Url.Contains("api/v1/dashboard") && r.Url.Contains("from=") && r.Url.Contains("to="));
+        await page.Locator("[data-testid=range-apply]").ClickAsync();
+        var request = await custom;
+        Assert.DoesNotContain("period=", request.Url);
+        Assert.Contains("-02&to=", request.Url);
+        Assert.Contains("-09&", request.Url);
+        await Expect(page.Locator("[data-testid=kpi-strip]")).ToBeVisibleAsync();
+    }
+
+    [E2EFact]
     public async Task The_dashboard_draws_its_charts()
     {
         var (page, _, api) = await CompanyAsync();

@@ -318,14 +318,40 @@ public sealed class DashboardService(
         return allowed;
     }
 
+    /// <summary>The longest custom range the dashboard accepts, in days.</summary>
+    public const int MaxCustomRangeDays = 366;
+
     private static (DateRange Period, DateRange PreviousPeriod) ResolvePeriods(string? preset, DateTime? fromUtc, DateTime? toUtc, DateTime nowUtc, TimeZoneInfo zone)
     {
         if (fromUtc is not null && toUtc is not null)
         {
-            var p = new DateRange(fromUtc.Value, toUtc.Value);
-            var span = toUtc.Value - fromUtc.Value;
-            var pp = new DateRange(fromUtc.Value - span, fromUtc.Value);
-            return (p, pp);
+            // Plain dates (no time) are whole calendar days in the company's time zone, both ends included.
+            // Full instants (with a Z or an offset) are used exactly as given.
+            DateRange p;
+            if (fromUtc.Value.Kind == DateTimeKind.Unspecified && toUtc.Value.Kind == DateTimeKind.Unspecified)
+            {
+                var first = fromUtc.Value.Date;
+                var last = toUtc.Value.Date;
+                if (last < first) throw new ValidationException("to", "The end date must be on or after the start date.");
+                p = new DateRange(TimeZoneInfo.ConvertTimeToUtc(first, zone), TimeZoneInfo.ConvertTimeToUtc(last.AddDays(1), zone));
+            }
+            else
+            {
+                p = new DateRange(fromUtc.Value, toUtc.Value);
+            }
+
+            if (p.EndUtc <= p.StartUtc) throw new ValidationException("to", "The end date must be on or after the start date.");
+            var span = p.EndUtc - p.StartUtc;
+            if (span.TotalDays > MaxCustomRangeDays) throw new ValidationException("to", $"Choose a range of at most {MaxCustomRangeDays} days.");
+            return (p, new DateRange(p.StartUtc - span, p.StartUtc));
+        }
+
+        // Rolling windows: the last N days including today, against the N days before them.
+        var rolling = preset?.ToLowerInvariant() switch { "last_7_days" => 7, "last_30_days" => 30, "last_90_days" => 90, _ => 0 };
+        if (rolling > 0)
+        {
+            var window = DateRangeResolver.Resolve(DatePreset.LastNDays, nowUtc, zone, rolling);
+            return (window, new DateRange(window.StartUtc - (window.EndUtc - window.StartUtc), window.StartUtc));
         }
 
         var datePreset = preset?.ToLowerInvariant() switch
