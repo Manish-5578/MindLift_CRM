@@ -39,6 +39,25 @@ public sealed class ActivitiesM9E2ETests(E2EHost host)
     }
 
     [E2EFact]
+    public async Task The_plus_button_adds_a_lead_from_any_page_and_shows_it_in_the_leads_list()
+    {
+        var (page, _, api) = await StartAsync();
+        await page.GotoAsync("/contacts");
+
+        await page.Locator("[data-testid=quick-add]").ClickAsync();
+        await page.Locator("[data-testid=quick-add-lead]").ClickAsync();
+        await Drawer(page).GetByLabel("First name").FillAsync("Quinn");
+        await Drawer(page).GetByLabel("Last name").FillAsync("Quick");
+        await Drawer(page).Locator("[data-testid=lead-address]").First.FillAsync("1 Quick Street");
+        await Drawer(page).GetByLabel("Email").FillAsync("quinn@example.test");
+        await Drawer(page).GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Create lead" }).ClickAsync();
+
+        await Expect(page.GetByText("Lead saved")).ToBeVisibleAsync();
+        await Expect(page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex("/leads$"));
+        await Expect(page.Locator("[data-testid=row]")).ToContainTextAsync("Quinn Quick");
+    }
+
+    [E2EFact]
     public async Task A_note_can_mention_a_colleague_and_the_mention_shows_on_the_note()
     {
         var (page, _, api) = await StartAsync();
