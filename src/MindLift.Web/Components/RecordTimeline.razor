@@ -12,7 +12,18 @@
     }
     else
     {
-        <Timeline Items="_items" EmptyText="Nothing has happened yet." TestId="record-timeline" />
+        @if (_all.Count > 0)
+        {
+            <div class="ml-row ml-row--wrap" style="margin-bottom:12px" data-testid="timeline-filters">
+                @foreach (var (key, label) in Filters)
+                {
+                    var current = key;
+                    <MudChip T="string" Size="Size.Small" Variant="@(_filter == current ? Variant.Filled : Variant.Outlined)" Color="@(_filter == current ? Color.Primary : Color.Default)"
+                             OnClick="() => SetFilter(current)" data-testid="@("timeline-filter-" + current)">@T[label] (@CountOf(current))</MudChip>
+                }
+            </div>
+        }
+        <Timeline Items="_items" EmptyText="@(_all.Count == 0 ? "Nothing has happened yet." : "Nothing of this kind has happened yet.")" TestId="record-timeline" />
     }
 </MlCard>
 
@@ -22,6 +33,13 @@
 
     [Parameter, EditorRequired] public Guid EntityId { get; set; }
 
+    private static readonly (string Key, string Label)[] Filters =
+    [
+        ("all", "All"), ("activity", "Activities"), ("change", "Changes"), ("related", "Contacts, deals and tickets"), ("event", "Other events"),
+    ];
+
+    private List<TimelineEntryDto> _all = [];
+    private string _filter = "all";
     private IReadOnlyList<TimelineItem> _items = [];
     private bool _loading = true;
     private bool _failed;
@@ -42,8 +60,8 @@
         _failed = false;
         try
         {
-            var entries = await Http.GetFromJsonAsync<List<TimelineEntryDto>>($"api/v1/timeline?entityType={EntityType}&entityId={EntityId}") ?? [];
-            _items = entries.Select(e => new TimelineItem(e.WhenUtc, e.Title, string.Join(" · ", new[] { e.Detail, e.ActorName }.Where(s => !string.IsNullOrWhiteSpace(s))), IconFor(e), e.Href)).ToList();
+            _all = await Http.GetFromJsonAsync<List<TimelineEntryDto>>($"api/v1/timeline?entityType={EntityType}&entityId={EntityId}") ?? [];
+            Apply();
         }
         catch (HttpRequestException)
         {
@@ -55,6 +73,27 @@
             StateHasChanged();
         }
     }
+
+    /// <summary>Which filter an entry belongs to.</summary>
+    private static string GroupOf(TimelineEntryDto e) => e.Kind switch
+    {
+        "activity" => "activity",
+        "created" or "changed" or "stage" or "converted" => "change",
+        "contact" or "deal" or "ticket" => "related",
+        _ => "event",
+    };
+
+    private int CountOf(string filter) => filter == "all" ? _all.Count : _all.Count(e => GroupOf(e) == filter);
+
+    private void SetFilter(string filter)
+    {
+        _filter = filter;
+        Apply();
+    }
+
+    private void Apply()
+        => _items = _all.Where(e => _filter == "all" || GroupOf(e) == _filter)
+            .Select(e => new TimelineItem(e.WhenUtc, e.Title, string.Join(" · ", new[] { e.Detail, e.ActorName }.Where(s => !string.IsNullOrWhiteSpace(s))), IconFor(e), e.Href)).ToList();
 
     private static string IconFor(TimelineEntryDto entry) => entry.Kind switch
     {
@@ -69,6 +108,7 @@
         "converted" => Icons.Material.Outlined.SwapHoriz,
         "contact" => Icons.Material.Outlined.Contacts,
         "deal" => Icons.Material.Outlined.Handshake,
+        "ticket" => Icons.Material.Outlined.ConfirmationNumber,
         "changed" => Icons.Material.Outlined.Edit,
         _ => Icons.Material.Outlined.History,
     };

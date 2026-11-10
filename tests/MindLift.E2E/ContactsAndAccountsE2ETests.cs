@@ -35,6 +35,30 @@ public sealed class ContactsAndAccountsE2ETests(E2EHost host)
     private static ILocator Drawer(IPage page) => page.Locator("[data-testid=form-drawer].mud-drawer--open");
 
     [E2EFact]
+    public async Task The_account_timeline_shows_tickets_and_can_be_filtered_by_kind()
+    {
+        var (page, api) = await StartAsync();
+        var account = await CreateAccountAsync(api, "Initrode");
+        (await api.PostAsJsonAsync("/api/v1/tickets", new SaveTicketRequest("Stapler missing", "x", null, null, null, account.Id, null))).EnsureSuccessStatusCode();
+
+        await page.GotoAsync($"/accounts/{account.Id}");
+        var timeline = page.Locator("[data-testid=record-timeline-card]");
+        await Expect(timeline.Locator("[data-testid=timeline-filters]")).ToBeVisibleAsync();
+        await Expect(timeline).ToContainTextAsync("Stapler missing");
+        await Expect(timeline).ToContainTextAsync("Account created");
+
+        await page.Locator("[data-testid=timeline-filter-related]").ClickAsync();
+        await Expect(timeline).ToContainTextAsync("Stapler missing");
+        await Expect(timeline).Not.ToContainTextAsync("Account created");
+
+        await page.Locator("[data-testid=timeline-filter-activity]").ClickAsync();
+        await Expect(timeline).ToContainTextAsync("Nothing of this kind has happened yet.");
+
+        await page.Locator("[data-testid=timeline-filter-all]").ClickAsync();
+        await Expect(timeline).ToContainTextAsync("Stapler missing");
+    }
+
+    [E2EFact]
     public async Task A_new_account_with_the_name_of_an_existing_one_is_flagged_and_created_when_confirmed()
     {
         var (page, api) = await StartAsync();

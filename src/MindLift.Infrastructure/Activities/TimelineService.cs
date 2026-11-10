@@ -115,6 +115,29 @@ public sealed class TimelineService(AppDbContext db, IPermissionService permissi
             entries.AddRange(deals.Select(d => new TimelineEntryDto("deal", d.CreatedAt, $"Deal created: {d.Name}", $"{d.Amount:N0} {d.Currency}", null, "/deals/" + d.Id, null)));
         }
 
+        // Help-desk tickets raised by this contact or for this account, when the person may see tickets.
+        if ((kind is "contacts" or "accounts") && await permissions.HasAsync(AppModule.Tickets, PermissionAction.View, cancellationToken))
+        {
+            var ticketScope = await scope.GetScopeUserIdsAsync(AppModule.Tickets, cancellationToken);
+            var tickets = db.Tickets.AsNoTracking().Where(t => kind == "contacts" ? t.ContactId == entityId : t.AccountId == entityId);
+            if (ticketScope is not null) tickets = tickets.Where(t => t.AssigneeId != null && ticketScope.Contains(t.AssigneeId.Value));
+            var rows = await tickets.OrderByDescending(t => t.CreatedAt).Take(50).ToListAsync(cancellationToken);
+            entries.AddRange(rows.Select(t => new TimelineEntryDto("ticket", t.CreatedAt, $"Ticket {t.Number} opened: {t.Subject}", $"Status: {t.Status}", null, "/tickets/" + t.Id, null)));
+        }
+
+        // What other features recorded against the record: merges, missed answer times, website visits and the like.
+        // Creation and status changes are left out here because the change history above already shows them.
+        var singular = kind.TrimEnd('s');
+        var events = await db.TimelineEvents.AsNoTracking()
+            .Where(e => e.EntityId == entityId && (e.EntityType == kind || e.EntityType == singular)
+                        && !e.Kind.EndsWith("_created") && e.Kind != "lead_converted" && e.Kind != "lead_status_changed")
+            .OrderByDescending(e => e.OccurredAt).Take(MaxEntries).ToListAsync(cancellationToken);
+        foreach (var e in events)
+        {
+            if (e.ActorUserId is { } actor) userIds.Add(actor);
+            entries.Add(new TimelineEntryDto("event", e.OccurredAt, e.Summary, null, e.ActorUserId?.ToString(), null, e.Kind));
+        }
+
         var names = await RecordHelpers.OwnerNamesAsync(db, userIds, cancellationToken);
         return entries
             .Select(e => e.ActorName is { } id && Guid.TryParse(id, out var guid) ? e with { ActorName = names.GetValueOrDefault(guid) } : e)
