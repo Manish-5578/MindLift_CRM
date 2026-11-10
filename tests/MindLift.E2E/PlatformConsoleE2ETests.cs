@@ -30,6 +30,17 @@ public sealed class PlatformConsoleE2ETests(E2EHost host)
         await Expect(page.Locator("[data-testid=company-name]")).ToHaveTextAsync(name);
     }
 
+    /// <summary>Opens the console dropdown with this test id and picks the option with this text.</summary>
+    private static async Task PickAsync(IPage page, string testId, string optionText)
+    {
+        await page.Locator($"[data-testid={testId}] .mud-input-control").ClickAsync();
+        await page.GetByRole(AriaRole.Option, new PageGetByRoleOptions { Name = optionText, Exact = true }).ClickAsync();
+    }
+
+    /// <summary>Ticks the console check box with this test id.</summary>
+    private static async Task TickAsync(IPage page, string testId)
+        => await page.Locator($"[data-testid={testId}] input[type=checkbox]").CheckAsync(new LocatorCheckOptions { Force = true });
+
     [E2EFact]
     public async Task The_owner_signs_in_lands_in_the_console_and_sees_numbers_for_every_company()
     {
@@ -255,7 +266,7 @@ public sealed class PlatformConsoleE2ETests(E2EHost host)
         await page.Locator("input[data-testid=nc-last]").FillAsync("Saleh");
         await page.Locator("input[data-testid=nc-email]").FillAsync(email);
         await page.Locator("input[data-testid=nc-password]").FillAsync("Welcome#2026");
-        await page.Locator("select[data-testid=nc-preset]").SelectOptionAsync("sales");
+        await PickAsync(page, "nc-preset", "Sales CRM");
         await Shots.SaveAsync(page, "platform-new-company");
         await page.Locator("[data-testid=nc-save]").ClickAsync();
 
@@ -296,8 +307,8 @@ public sealed class PlatformConsoleE2ETests(E2EHost host)
         await page.Locator("input[data-testid=plan-description]").FillAsync("Sales only");
         await page.Locator("input[data-testid=plan-price]").FillAsync("15");
         await page.Locator("[data-testid=plan-none]").ClickAsync();
-        await page.Locator("input[data-testid=plan-mod-Leads]").CheckAsync();
-        await page.Locator("input[data-testid=plan-mod-Contacts]").CheckAsync();
+        await TickAsync(page, "plan-mod-Leads");
+        await TickAsync(page, "plan-mod-Contacts");
         await Expect(page.Locator("[data-testid=plan-module-count]")).ToContainTextAsync("2 of");
         await Shots.SaveAsync(page, "platform-plan-editor");
         await page.Locator("[data-testid=plan-save]").ClickAsync();
@@ -349,7 +360,7 @@ public sealed class PlatformConsoleE2ETests(E2EHost host)
 
         await page.GotoAsync("/platform/activity");
         await Expect(page.Locator("[data-testid=audit-row]").First).ToBeVisibleAsync();
-        await page.Locator("select[data-testid=audit-company]").SelectOptionAsync(new SelectOptionValue { Label = name });
+        await PickAsync(page, "audit-company", name);
         await Expect(page.Locator("[data-testid=audit-row]")).ToHaveCountAsync(1);
         await Expect(page.Locator("[data-testid=audit-row]")).ToContainTextAsync("Priya Owner");
         await page.Locator("[data-testid=audit-row]").ClickAsync();

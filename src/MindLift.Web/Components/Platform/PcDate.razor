@@ -1,0 +1,11 @@
+@* A date field for the platform console, built from the shared MudBlazor date picker (no browser-native date input). *@
+<div class="pc-date-wrap" style="min-width:150px" data-testid="@TestId">
+    <MudDatePicker Date="Value" DateChanged="ValueChanged" Label="@Label" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" />
+</div>
+
+@code {
+    [Parameter] public DateTime? Value { get; set; }
+    [Parameter] public EventCallback<DateTime?> ValueChanged { get; set; }
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public string? TestId { get; set; }
+}

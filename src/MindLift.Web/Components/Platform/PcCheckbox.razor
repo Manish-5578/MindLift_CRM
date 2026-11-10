@@ -1,0 +1,16 @@
+@* A tick box for the platform console, built from the shared MudBlazor check box (no browser-native checkbox). *@
+<div class="pc-checkbox @Class" data-testid="@TestId">
+    <MudCheckBox T="bool" Value="Value" ValueChanged="ValueChanged" Color="Color.Primary" Dense="true" Size="Size.Medium" aria-label="@AriaLabel">@ChildContent</MudCheckBox>
+</div>
+
+@code {
+    [Parameter] public bool Value { get; set; }
+    [Parameter] public EventCallback<bool> ValueChanged { get; set; }
+
+    /// <summary>The words (and anything else) shown beside the box.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    [Parameter] public string? AriaLabel { get; set; }
+    [Parameter] public string? TestId { get; set; }
+    [Parameter] public string? Class { get; set; }
+}

@@ -24,15 +24,9 @@
             <button class="@(_kind == kind ? "is-on" : "")" @onclick="() => SetKind(kind)" data-testid="audit-kind-@(kind == "" ? "all" : kind)">@k.Value</button>
         }
     </div>
-    <select class="pc-select" @onchange="OnCompany" data-testid="audit-company" aria-label="@T["Company"]">
-        <option value="">@T["All companies"]</option>
-        @foreach (var c in _companies)
-        {
-            <option value="@c.Id">@c.Name</option>
-        }
-    </select>
-    <input class="pc-input" type="date" @bind="From" data-testid="audit-from" aria-label="@T["From date"]" />
-    <input class="pc-input" type="date" @bind="To" data-testid="audit-to" aria-label="@T["To date"]" />
+    <PcSelect Value="_companyId" ValueChanged="OnCompany" Options="CompanyOptions" AriaLabel="@T["Company"]" Width="200px" TestId="audit-company" />
+    <PcDate Value="From" ValueChanged="v => From = v" Label="@T["From date"]" TestId="audit-from" />
+    <PcDate Value="To" ValueChanged="v => To = v" Label="@T["To date"]" TestId="audit-to" />
     <input class="pc-input" style="min-width:220px" placeholder="@T["Search who, what or which company"]" @bind="Search" @bind:event="oninput" data-testid="audit-search" />
     @if (Filtered)
     {
@@ -164,7 +158,9 @@
 
     private async Task ReloadAsync() { _pageNo = 1; _open = null; await LoadAsync(); await InvokeAsync(StateHasChanged); }
     private async Task SetKind(string k) { _kind = k; await ReloadAsync(); }
-    private async Task OnCompany(ChangeEventArgs e) { _companyId = e.Value?.ToString() ?? ""; await ReloadAsync(); }
+    private async Task OnCompany(string value) { _companyId = value ?? ""; await ReloadAsync(); }
+
+    private IEnumerable<PcOption> CompanyOptions => new[] { new PcOption("", T["All companies"]) }.Concat(_companies.Select(c => new PcOption(c.Id.ToString(), c.Name)));
     private async Task GoAsync(int page) { _pageNo = page; _open = null; await LoadAsync(); }
 
     private async Task DebouncedAsync()

@@ -215,8 +215,7 @@ else
                 <div class="pc-field" style="margin-bottom:20px">
                     <label>@T["AI document reading"]</label>
                     <label class="d-flex align-center" style="gap:12px;cursor:pointer;font-weight:500;font-size:14px;color:var(--pc-text)">
-                        <input type="checkbox" @bind="_aiAllowed" data-testid="ai-allowed" style="width:18px;height:18px;accent-color:#6366F1" />
-                        This company may use AI to read its documents
+                        <PcCheckbox Value="_aiAllowed" ValueChanged="v => _aiAllowed = v" TestId="ai-allowed">This company may use AI to read its documents</PcCheckbox>
                     </label>
                     <small>@T["When off, its own AI switch is turned off too and nothing is sent to the local language model."]</small>
                 </div>
@@ -300,10 +299,10 @@ else
                 <div class="pc-card">
                     <div class="pc-card__head"><div class="pc-card__title">@T["Record a payment"]</div></div>
                     <div class="pc-field" style="margin-bottom:14px"><label for="pay-plan">@T["Plan"]</label>
-                        <select id="pay-plan" class="pc-select" @bind="_payPlan" data-testid="pay-plan">@foreach (var p in _plans.Where(p => p.IsActive)) { <option value="@p.Key">@p.Name</option> }</select></div>
+                        <PcSelect Value="_payPlan" ValueChanged="v => _payPlan = v" Options="PayPlanOptions" TestId="pay-plan" /></div>
                     <div class="d-flex" style="gap:12px;margin-bottom:14px">
                         <div class="pc-field" style="flex:1"><label for="pay-interval">@T["Period"]</label>
-                            <select id="pay-interval" class="pc-select" @bind="_payInterval"><option value="monthly">@T["One month"]</option><option value="yearly">@T["One year"]</option></select></div>
+                            <PcSelect Value="_payInterval" ValueChanged="v => _payInterval = v" Options="PayIntervalOptions" TestId="pay-interval" /></div>
                         <div class="pc-field" style="flex:1"><label for="pay-amount">@T["Amount"]</label><input id="pay-amount" class="pc-input" type="number" min="0" step="0.01" placeholder="@T["Plan price"]" @bind="_payAmount" data-testid="pay-amount" /></div>
                     </div>
                     <div class="pc-field" style="margin-bottom:18px"><label for="pay-ref">@T["Reference"]</label><input id="pay-ref" class="pc-input" placeholder="@T["Bank transfer reference, cheque number"]" @bind="_payRef" data-testid="pay-ref" /></div>
@@ -439,6 +438,8 @@ else
     private PlatformBillingDto? _bill;
     private string _payPlan = "";
     private string _payInterval = "monthly";
+    private IEnumerable<PcOption> PayPlanOptions => _plans.Where(p => p.IsActive).Select(p => new PcOption(p.Key, p.Name));
+    private IEnumerable<PcOption> PayIntervalOptions => [new("monthly", T["One month"]), new("yearly", T["One year"])];
     private decimal? _payAmount;
     private string? _payRef;
 

@@ -36,21 +36,8 @@
         <button class="@(_activity == "active" ? "is-on" : "")" @onclick='() => SetActivity("active")' data-testid="activity-active">@T["Active"] <span class="n">@(_list?.ActiveCount ?? 0)</span></button>
         <button class="@(_activity == "inactive" ? "is-on" : "")" @onclick='() => SetActivity("inactive")' data-testid="activity-inactive">@T["Inactive"] <span class="n">@(_list?.InactiveCount ?? 0)</span></button>
     </div>
-    <select class="pc-select" @onchange="OnPlan" data-testid="plan-filter" aria-label="@T["Plan"]">
-        <option value="">@T["Any plan"]</option>
-        @foreach (var p in _list?.Plans ?? [])
-        {
-            <option value="@p.Key" selected="@(_plan == p.Key)">@p.Label (@p.Value)</option>
-        }
-    </select>
-    <select class="pc-select" @onchange="OnSort" data-testid="sort" aria-label="@T["Sort"]">
-        <option value="name">@T["Sort: Name"]</option>
-        <option value="newest">@T["Sort: Newest"]</option>
-        <option value="active">@T["Sort: Last active"]</option>
-        <option value="users">@T["Sort: Most users"]</option>
-        <option value="records">@T["Sort: Most records"]</option>
-        <option value="health">@T["Sort: Needs care first"]</option>
-    </select>
+    <PcSelect Value="_plan" ValueChanged="OnPlan" Options="PlanFilterOptions" AriaLabel="@T["Plan"]" Width="170px" TestId="plan-filter" />
+    <PcSelect Value="_sort" ValueChanged="OnSort" Options="SortOptions" AriaLabel="@T["Sort"]" Width="190px" TestId="sort" />
     <input class="pc-input" style="min-width:240px" placeholder="@T["Filter by name"]" data-testid="company-filter" @bind="Search" @bind:event="oninput" />
 </div>
 
@@ -161,14 +148,14 @@ else
                 </div>
                 <div class="d-flex" style="gap:12px">
                     <div class="pc-field" style="flex:1"><label for="nc-plan">@T["Plan"]</label>
-                        <select id="nc-plan" class="pc-select" @bind="_new.Plan" data-testid="nc-plan">@foreach (var p in _list?.Plans ?? []) { <option value="@p.Key">@p.Label</option> }</select></div>
+                        <PcSelect Value="_new.Plan" ValueChanged="v => _new.Plan = v" Options="NewPlanOptions" TestId="nc-plan" /></div>
                     <div class="pc-field" style="flex:1"><label for="nc-status">@T["Starts as"]</label>
-                        <select id="nc-status" class="pc-select" @bind="_new.Status" data-testid="nc-status"><option value="Trial">@T["On trial (14 days)"]</option><option value="Active">@T["Active"]</option></select></div>
+                        <PcSelect Value="_new.Status" ValueChanged="v => _new.Status = v" Options="StatusOptions" TestId="nc-status" /></div>
                 </div>
                 <div class="d-flex" style="gap:12px">
                     <div class="pc-field" style="flex:1"><label for="nc-country">@T["Country (2 letters)"]</label><input id="nc-country" class="pc-input" maxlength="2" @bind="_new.Country" data-testid="nc-country" /></div>
                     <div class="pc-field" style="flex:1"><label for="nc-preset">@T["Modules"]</label>
-                        <select id="nc-preset" class="pc-select" @bind="_new.Preset" data-testid="nc-preset"><option value="">@T["Full suite"]</option><option value="sales">@T["Sales CRM"]</option><option value="sales-billing">@T["Sales & billing"]</option><option value="documents">@T["Document operations"]</option><option value="minimal">@T["Minimal"]</option></select>
+                        <PcSelect Value="_new.Preset" ValueChanged="v => _new.Preset = v" Options="PresetOptions" TestId="nc-preset" />
                         <small>@T["You can fine-tune each module on the company page afterwards."]</small></div>
                 </div>
                 @if (_newError is not null) { <div style="color:var(--pc-bad);font-weight:600" data-testid="nc-error">@_newError</div> }
@@ -231,8 +218,15 @@ else
 
     private async Task SetStatus(string s) { _status = s; _shown = PageSize; await LoadAsync(); }
     private async Task SetActivity(string a) { _activity = a; _shown = PageSize; await LoadAsync(); }
-    private async Task OnPlan(ChangeEventArgs e) { _plan = e.Value?.ToString() ?? ""; _shown = PageSize; await LoadAsync(); }
-    private async Task OnSort(ChangeEventArgs e) { _sort = e.Value?.ToString() ?? "name"; await LoadAsync(); }
+    private async Task OnPlan(string value) { _plan = value ?? ""; _shown = PageSize; await LoadAsync(); }
+    private async Task OnSort(string value) { _sort = string.IsNullOrEmpty(value) ? "name" : value; await LoadAsync(); }
+
+    private IEnumerable<PcOption> PlanFilterOptions => new[] { new PcOption("", T["Any plan"]) }.Concat((_list?.Plans ?? []).Select(p => new PcOption(p.Key, $"{p.Label} ({p.Value})")));
+    private IEnumerable<PcOption> NewPlanOptions => (_list?.Plans ?? []).Select(p => new PcOption(p.Key, p.Label));
+    private IEnumerable<PcOption> StatusOptions => [new("Trial", T["On trial (14 days)"]), new("Active", T["Active"])];
+    private IEnumerable<PcOption> PresetOptions => [new("", T["Full suite"]), new("sales", T["Sales CRM"]), new("sales-billing", T["Sales & billing"]), new("documents", T["Document operations"]), new("minimal", T["Minimal"])];
+    private IEnumerable<PcOption> SortOptions =>
+        [new("name", T["Sort: Name"]), new("newest", T["Sort: Newest"]), new("active", T["Sort: Last active"]), new("users", T["Sort: Most users"]), new("records", T["Sort: Most records"]), new("health", T["Sort: Needs care first"])];
     private async Task MoreAsync() { _shown += PageSize; await LoadAsync(); }
     private void Open(Guid id) => Nav.NavigateTo($"/platform/companies/{id}");
 

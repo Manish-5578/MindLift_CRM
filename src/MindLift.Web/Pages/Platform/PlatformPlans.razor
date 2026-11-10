@@ -68,7 +68,7 @@ else
                     <div class="pc-field" style="flex:1"><label for="plan-yearly">@T["Price / year"]</label><input id="plan-yearly" class="pc-input" type="number" min="0" step="1" placeholder="@($"Ten months: {_price * 10:N0}")" @bind="_priceYearly" data-testid="plan-yearly" /></div>
                     <div class="pc-field" style="flex:1"><label for="plan-currency">@T["Currency"]</label><input id="plan-currency" class="pc-input" maxlength="3" @bind="_currency" data-testid="plan-currency" /></div>
                 </div>
-                <label class="d-flex align-center" style="gap:12px;cursor:pointer"><input type="checkbox" @bind="_active" style="width:18px;height:18px;accent-color:#6366F1" data-testid="plan-active" />@T["Offer this plan to new companies"]</label>
+                <PcCheckbox Value="_active" ValueChanged="v => _active = v" TestId="plan-active">@T["Offer this plan to new companies"]</PcCheckbox>
 
                 <div>
                     <div class="d-flex align-center justify-space-between" style="margin-bottom:10px">
@@ -79,10 +79,9 @@ else
                         @foreach (var m in _switchable)
                         {
                             var module = m;
-                            <label class="pc-check @(_included.Contains(module.Key) ? "is-on" : "")">
-                                <input type="checkbox" checked="@_included.Contains(module.Key)" @onchange="e => ToggleModule(module.Key, (bool)(e.Value ?? false))" data-testid="plan-mod-@module.Key" />
+                            <PcCheckbox Class="@("pc-check " + (_included.Contains(module.Key) ? "is-on" : ""))" Value="_included.Contains(module.Key)" ValueChanged="on => ToggleModule(module.Key, on)" TestId="@("plan-mod-" + module.Key)">
                                 <MudIcon Icon="@Pc.Icon(module.Icon)" Size="Size.Small" /><span>@module.Name</span>
-                            </label>
+                            </PcCheckbox>
                         }
                     </div>
                     <div class="pc-card__hint" style="margin-top:8px">@T["Core modules (Dashboard, Users, Settings) are always included."]</div>

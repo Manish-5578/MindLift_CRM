@@ -1,0 +1,24 @@
+@* A dropdown for the platform console, built from the shared MudBlazor select so it looks and behaves like the rest of the app (no browser-native select). *@
+<div class="pc-select-wrap" style="@WrapStyle" data-testid="@TestId">
+    <MudSelect T="string" Value="Value" ValueChanged="ValueChanged" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true"
+               Label="@Label" aria-label="@(Label ?? AriaLabel)">
+        @foreach (var option in Options)
+        {
+            <MudSelectItem T="string" Value="@option.Value">@option.Label</MudSelectItem>
+        }
+    </MudSelect>
+</div>
+
+@code {
+    [Parameter] public string Value { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter, EditorRequired] public IEnumerable<PcOption> Options { get; set; } = [];
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public string? AriaLabel { get; set; }
+    [Parameter] public string? TestId { get; set; }
+
+    /// <summary>Width of the dropdown, for example "180px". Empty fills the space it is given.</summary>
+    [Parameter] public string? Width { get; set; }
+
+    private string? WrapStyle => string.IsNullOrWhiteSpace(Width) ? null : $"min-width:{Width}";
+}
