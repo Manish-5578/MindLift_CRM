@@ -74,7 +74,13 @@
                 link.click();
                 document.body.removeChild(link);
                 setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-            }
+            },
+            // Shows bytes the app already holds (a file preview) without a second authenticated request. Returns a temporary address.
+            objectUrl: function (contentType, base64) {
+                var bytes = Uint8Array.from(atob(base64), function (c) { return c.charCodeAt(0); });
+                return URL.createObjectURL(new Blob([bytes], { type: contentType }));
+            },
+            releaseUrl: function (url) { if (url) URL.revokeObjectURL(url); }
         };
     </script>
     <script>

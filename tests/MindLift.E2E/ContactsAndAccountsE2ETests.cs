@@ -34,6 +34,42 @@ public sealed class ContactsAndAccountsE2ETests(E2EHost host)
 
     private static ILocator Drawer(IPage page) => page.Locator("[data-testid=form-drawer].mud-drawer--open");
 
+    private static async Task UploadAsync(HttpClient api, Guid accountId, string fileName, byte[] bytes, string contentType)
+    {
+        using var form = new MultipartFormDataContent();
+        var file = new ByteArrayContent(bytes);
+        file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+        form.Add(file, "file", fileName);
+        form.Add(new StringContent("accounts"), "entityType");
+        form.Add(new StringContent(accountId.ToString()), "entityId");
+        (await api.PostAsync("/api/v1/files", form)).EnsureSuccessStatusCode();
+    }
+
+    [E2EFact]
+    public async Task An_attached_picture_and_text_file_are_previewed_in_the_page_without_downloading()
+    {
+        var (page, api) = await StartAsync();
+        var account = await CreateAccountAsync(api, "Preview Co");
+        // A real 1x1 PNG.
+        var png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==");
+        await UploadAsync(api, account.Id, "logo.png", png, "image/png");
+        await UploadAsync(api, account.Id, "notes.txt", System.Text.Encoding.UTF8.GetBytes("Renewal terms: net 30"), "text/plain");
+
+        await page.GotoAsync($"/accounts/{account.Id}");
+        await Expect(page.Locator("[data-testid=record-file]")).ToHaveCountAsync(2);
+
+        await page.Locator("[data-testid=record-file]").Filter(new LocatorFilterOptions { HasText = "logo.png" }).Locator("[data-testid=file-preview]").ClickAsync();
+        var image = page.Locator("[data-testid=preview-image]");
+        await Expect(image).ToBeVisibleAsync();
+        await Expect(image).ToHaveAttributeAsync("src", new System.Text.RegularExpressions.Regex("^blob:"));
+        Assert.True(await image.EvaluateAsync<bool>("img => img.complete && img.naturalWidth > 0"), "The picture did not load.");
+        await page.Locator("[data-testid=preview-close]").ClickAsync();
+        await Expect(image).ToHaveCountAsync(0);
+
+        await page.Locator("[data-testid=record-file]").Filter(new LocatorFilterOptions { HasText = "notes.txt" }).Locator("[data-testid=file-preview]").ClickAsync();
+        await Expect(page.Locator("[data-testid=preview-text]")).ToContainTextAsync("Renewal terms: net 30");
+    }
+
     [E2EFact]
     public async Task The_account_timeline_shows_tickets_and_can_be_filtered_by_kind()
     {
