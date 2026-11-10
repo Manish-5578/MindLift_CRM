@@ -24,6 +24,7 @@ builder.Services.AddScoped<NotificationClient>();
 builder.Services.AddScoped<MindLift.UI.Components.AvatarPhotos>();
 builder.Services.AddScoped<PlatformNotifier>();
 builder.Services.AddScoped<QuickLogDockState>();
+builder.Services.AddScoped<ThemeState>();
 builder.Services.AddScoped(sp => new HttpClient(new AuthHandler(sp.GetRequiredService<AuthSession>(), apiBase)) { BaseAddress = apiBase });
 
 builder.Services.AddMudServices(config =>

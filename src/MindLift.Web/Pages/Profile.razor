@@ -1,5 +1,8 @@
 @page "/profile"
 @inject AppState App
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject ThemeState Theme
 @inject AvatarPhotos Photos
 @inject ISnackbar Snackbar
 @inject Translator T
@@ -9,7 +12,7 @@
 @if (App.Bootstrap is { } boot)
 {
     var me = boot.User;
-    <PageHeader Title="My profile" Subtitle="Your photo is shown to your team across the app." />
+    <PageHeader Title="My profile" Subtitle="Your photo, password, language and notifications." />
 
     <MlCard Title="Profile photo" Subtitle="A square photo works best. JPG, PNG or WEBP up to 3 MB.">
         <div class="d-flex align-center flex-wrap gap-4" data-testid="profile-photo-card">
@@ -34,10 +37,100 @@
             </div>
         </div>
     </MlCard>
+
+    <MlCard Title="Language and appearance" Subtitle="These apply on this device.">
+        <div class="ml-stack" data-testid="profile-preferences">
+            <div>
+                <MudText Typo="Typo.subtitle2" Class="mb-1">@T["Language"]</MudText>
+                <MudChipSet T="string" SelectedValue="@(T.IsArabic ? "ar" : "en")" SelectedValueChanged="SetLanguageAsync" CheckMark="false">
+                    <MudChip T="string" Value="@("en")" Variant="@(!T.IsArabic ? Variant.Filled : Variant.Outlined)" Color="Color.Primary" data-testid="lang-en">English</MudChip>
+                    <MudChip T="string" Value="@("ar")" Variant="@(T.IsArabic ? Variant.Filled : Variant.Outlined)" Color="Color.Primary" data-testid="lang-ar">العربية</MudChip>
+                </MudChipSet>
+            </div>
+            <div>
+                <MudText Typo="Typo.subtitle2" Class="mb-1">@T["Theme"]</MudText>
+                <MudChipSet T="string" SelectedValue="@(IsDark ? "dark" : "light")" SelectedValueChanged="SetTheme" CheckMark="false">
+                    <MudChip T="string" Value="@("light")" Variant="@(!IsDark ? Variant.Filled : Variant.Outlined)" Color="Color.Primary" data-testid="theme-light">@T["Light"]</MudChip>
+                    <MudChip T="string" Value="@("dark")" Variant="@(IsDark ? Variant.Filled : Variant.Outlined)" Color="Color.Primary" data-testid="theme-dark">@T["Dark"]</MudChip>
+                </MudChipSet>
+            </div>
+        </div>
+    </MlCard>
+
+    <MlCard Title="Notifications" Subtitle="Choose what you are told about, and how.">
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.NotificationsActive" Href="/notifications/preferences" data-testid="profile-notification-prefs">@T["Notification preferences"]</MudButton>
+    </MlCard>
+
+    <MlCard Title="Change password" Subtitle="Use at least 8 characters with uppercase, lowercase letters and a digit.">
+        <div class="ml-stack" style="max-width:420px" data-testid="profile-password-card">
+            @if (_passwordError is not null)
+            {
+                <MudAlert Severity="Severity.Error" Dense="true" data-testid="password-error">@_passwordError</MudAlert>
+            }
+            <PasswordInput @bind-Value="_current" Label="@T["Current password *"]" data-testid="current-password" />
+            <PasswordInput @bind-Value="_new" Label="@T["New password *"]" data-testid="profile-new-password" />
+            <PasswordInput @bind-Value="_confirm" Label="@T["Confirm new password *"]" data-testid="profile-confirm-password" />
+            <div>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@_passwordBusy" OnClick="ChangePasswordAsync" data-testid="change-password">@T["Change password"]</MudButton>
+            </div>
+        </div>
+    </MlCard>
 }
 
 @code {
     private bool _busy;
+
+    [CascadingParameter(Name = "IsDarkMode")] private bool IsDark { get; set; }
+
+    private string? _current, _new, _confirm, _passwordError;
+    private bool _passwordBusy;
+
+    private async Task SetLanguageAsync(string? language)
+    {
+        if (language is not ("en" or "ar") || (language == "ar") == T.IsArabic) return;
+        await JS.InvokeVoidAsync("mindlift.setLanguage", language);
+        T.Choose(language);
+    }
+
+    private void SetTheme(string? theme)
+    {
+        if (theme is "light" or "dark") Theme.Request(theme == "dark");
+    }
+
+    private async Task ChangePasswordAsync()
+    {
+        _passwordError = null;
+        if (string.IsNullOrEmpty(_current) || string.IsNullOrEmpty(_new))
+        {
+            _passwordError = T["Enter your current and new password."];
+            return;
+        }
+
+        if (_new != _confirm)
+        {
+            _passwordError = T["The new passwords do not match."];
+            return;
+        }
+
+        _passwordBusy = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/v1/auth/change-password", new ChangePasswordRequest(_current, _new));
+            if (!response.IsSuccessStatusCode)
+            {
+                _passwordError = await ProblemText.FromAsync(response, T["We could not change your password."]);
+                return;
+            }
+
+            _current = _new = _confirm = null;
+            Snackbar.Add(T["Your password was changed."], Severity.Success);
+        }
+        finally
+        {
+            _passwordBusy = false;
+        }
+    }
+
 
     private async Task OnFileSelected(InputFileChangeEventArgs e)
     {

@@ -5,6 +5,7 @@
 @inject Translator T
 @inject NavigationManager Nav
 @inject IJSRuntime JS
+@inject ThemeState Theme
 @using MindLift.Shared.Validation
 @using MindLift.Shared.Contracts
 @implements IDisposable
@@ -202,6 +203,7 @@
     {
         Session.Changed += StateHasChanged;
         T.Changed += OnLanguageChanged;
+        Theme.Requested += OnThemeRequested;
         App.Changed += OnAppChanged;
         Nav.LocationChanged += OnLocationChanged;
         ApplyBrandColor();
@@ -280,6 +282,14 @@
         await JS.InvokeVoidAsync("mindlift.setTheme", _isDark ? "dark" : "light");
     }
 
+    private void OnThemeRequested(bool dark)
+    {
+        if (dark == _isDark) return;
+        _isDark = dark;
+        _ = JS.InvokeVoidAsync("mindlift.setTheme", dark ? "dark" : "light");
+        _ = InvokeAsync(StateHasChanged);
+    }
+
     private async Task ToggleLanguage()
     {
         var next = T.IsArabic ? "en" : "ar";
@@ -335,6 +345,7 @@
     {
         Session.Changed -= StateHasChanged;
         T.Changed -= OnLanguageChanged;
+        Theme.Requested -= OnThemeRequested;
         App.Changed -= OnAppChanged;
         Nav.LocationChanged -= OnLocationChanged;
     }
