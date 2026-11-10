@@ -90,7 +90,7 @@
                     <button class="pc-btn pc-btn--icon" @onclick="ToggleDark" aria-label="@T["Switch light or dark"]" data-testid="platform-theme">
                         <MudIcon Icon="@(_isDark ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)" />
                     </button>
-                    <button class="pc-btn" @onclick="SignOut" data-testid="platform-signout"><MudIcon Icon="@Icons.Material.Filled.Logout" Size="Size.Small" />@T["Sign out"]</button>
+                    <button class="pc-btn" @onclick="SignOut" aria-label="@T["Sign out"]" data-testid="platform-signout"><MudIcon Icon="@Icons.Material.Filled.Logout" Size="Size.Small" /><span class="pc-hide-xs">@T["Sign out"]</span></button>
                 </header>
 
                 <main class="pc-content"><div @key="T.Language">@Body</div></main>

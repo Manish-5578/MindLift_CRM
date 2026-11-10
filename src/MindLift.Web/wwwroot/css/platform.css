@@ -431,6 +431,15 @@
   .pc-title { font-size: 26px; }
   .pc-table th:nth-child(n+5), .pc-table td:nth-child(n+5) { display: none; }
 }
+@media (max-width: 560px) {
+    /* Phones: header buttons wrap instead of running off the screen, and a wide table scrolls inside its card. */
+    .pc-head > .d-flex { flex-wrap: wrap; }
+    .pc-card--flush { overflow-x: auto; overflow-y: hidden; }
+    .pc-table th, .pc-table td { padding: 12px 10px; }
+    .pc-hide-xs { display: none; }
+    .pc-top { gap: 8px; padding-inline: 12px; }
+    .pc-search { min-width: 0; flex: 1 1 0; }
+}
 @media (max-width: 560px) { .pc-search kbd { display: none; } .pc-grid--kpi { grid-template-columns: 1fr 1fr; gap: 12px; } .pc-kpi__value { font-size: 26px; } .pc-companies { grid-template-columns: 1fr; } }
 .pc-tabs button.is-on .pc-chip { background: rgba(255, 255, 255, .25); color: #fff; }
 
