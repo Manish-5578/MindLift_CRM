@@ -172,4 +172,56 @@ public sealed class CardClassificationTests
     [InlineData("Rahul", false)]
     public void IsLikelyPersonName_rejects_addresses_and_single_words(string line, bool expected)
         => CardLineClassifier.IsLikelyPersonName(line).ShouldBe(expected);
+
+    [Fact]
+    public async Task Several_details_on_one_line_are_all_read()
+    {
+        var card = await ParseAsync("Omar Khalid\nGeneral Manager\nGulf Star Trading LLC\ninfo@gulfstar.ae | +971 50 123 4567 | www.gulfstar.ae");
+
+        card.Email.ShouldBe("info@gulfstar.ae");
+        card.Phone.ShouldBe("+971 50 123 4567");
+        card.Website.ShouldBe("www.gulfstar.ae");
+        card.FullName.ShouldBe("Omar Khalid");
+    }
+
+    [Fact]
+    public async Task Labels_on_a_compound_line_are_not_left_behind_as_text()
+    {
+        var card = await ParseAsync("Sara Nasser\nE: sara@nasser.com  W: www.nasser.com\nT: +971 4 555 0101");
+
+        card.Email.ShouldBe("sara@nasser.com");
+        card.Website.ShouldBe("www.nasser.com");
+        card.Phone.ShouldNotBeNull();
+        card.FullName.ShouldBe("Sara Nasser");
+    }
+
+    [Theory]
+    [InlineData("@gulfstar_ae")]
+    [InlineData("linkedin.com/in/omar-khalid")]
+    [InlineData("ISO 9001:2015")]
+    [InlineData("All rights reserved")]
+    [InlineData("Est. 1998")]
+    public async Task Social_handles_certifications_and_footers_never_become_the_name_or_company(string noise)
+    {
+        var card = await ParseAsync($"{noise}\nOmar Khalid\nGulf Star Trading LLC\nomar@gulfstar.ae");
+
+        card.FullName.ShouldBe("Omar Khalid");
+        card.CompanyName.ShouldBe("Gulf Star Trading LLC");
+    }
+
+    [Fact]
+    public async Task A_social_page_is_not_taken_as_the_website()
+    {
+        var card = await ParseAsync("Omar Khalid\nGulf Star Trading LLC\nwww.linkedin.com/in/omar\nwww.gulfstar.ae");
+
+        card.Website.ShouldBe("www.gulfstar.ae");
+    }
+
+    [Fact]
+    public async Task A_company_name_with_a_founding_year_is_kept()
+    {
+        var card = await ParseAsync("Omar Khalid\nDubai Gold Trading LLC Est. 1998\nomar@dubaigold.ae");
+
+        card.CompanyName.ShouldBe("Dubai Gold Trading LLC Est. 1998");
+    }
 }

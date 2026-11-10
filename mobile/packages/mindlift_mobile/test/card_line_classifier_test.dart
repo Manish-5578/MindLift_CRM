@@ -49,4 +49,23 @@ void main() {
       expect(CardLineClassifier.looksLikePhoneLine('Bengaluru 560 001'), isFalse);
     });
   });
+
+  group('isNoiseLine', () {
+    test('social handles, certifications and footers are noise', () {
+      for (final line in ['@gulfstar_ae', 'linkedin.com/in/omar-khalid', 'ISO 9001:2015', 'All rights reserved', 'Est. 1998']) {
+        expect(CardLineClassifier.isNoiseLine(line), isTrue, reason: line);
+      }
+    });
+
+    test('real card lines are not noise', () {
+      for (final line in ['Omar Khalid', 'Gulf Star Trading LLC', 'Dubai Gold Trading LLC Est. 1998', 'Isolation Systems LLC']) {
+        expect(CardLineClassifier.isNoiseLine(line), isFalse, reason: line);
+      }
+    });
+
+    test('a social page is not the company website', () {
+      expect(CardLineClassifier.isSocialSite('www.linkedin.com/in/omar'), isTrue);
+      expect(CardLineClassifier.isSocialSite('www.gulfstar.ae'), isFalse);
+    });
+  });
 }

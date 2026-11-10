@@ -43,7 +43,7 @@ Server images: the Dockerfile installs `tesseract-ocr`, `tesseract-ocr-eng` and 
 Phone                                   Server
 -----                                   ------
 1. Capture front (and back)
-   image_picker, max 3200x3200, quality 98
+   image_picker, max 1800x1800, quality 85
 2. Size sanity check (<15 KB warns)
 3. POST /api/v1/leads/scan-card-file ->  4. Stream each image to a temp file
    multipart: "front", optional "back"   5. Check file signature (JPEG/PNG/WEBP/TIFF)
@@ -74,7 +74,7 @@ Fallback when step 3 fails (no network, server error): the phone runs ML Kit on 
 
 **Capture**
 - Camera or gallery, front slot required, back slot optional ("Capture the front of the card first" if the back is added first).
-- Images are limited to 3200 x 3200 and quality 98 by `image_picker` so they are sharp but not huge.
+- Images are limited to 1800 x 1800 and quality 85 by `image_picker` (changed from 3200 / 98 on 2026-11-11): a card read at that size is still above 300 DPI, and uploads are far smaller on mobile data.
 - A file under 15 KB shows a "very small or dark" warning but is still processed.
 - Adding, replacing or removing a side clears the earlier result and rescans.
 
@@ -124,7 +124,7 @@ Limits come from `OcrOptions` (`src/MindLift.Infrastructure/Cpq/OcrEngine.cs`): 
 
 ## 6. Turning text into fields
 
-`LeadCardOcrService.ParseTextAndCheckDuplicatesAsync` (`src/MindLift.Infrastructure/Leads/LeadCardOcrService.cs`), with `CardLineClassifier.cs` beside it. Arabic-Indic digits are converted to ASCII first. Each line is tested in this order, and the first rule that claims it wins:
+`LeadCardOcrService.ParseTextAndCheckDuplicatesAsync` (`src/MindLift.Infrastructure/Leads/LeadCardOcrService.cs`), with `CardLineClassifier.cs` beside it. Arabic-Indic digits are converted to ASCII first. Each line is first cut at separators (`|`, bullets), the email and own-site website are lifted out of every piece (so `info@x.com | +971 50 123 4567 | www.x.com` yields all three), field labels such as `E:` and `W:` are stripped, and noise lines are dropped (social handles and pages, ISO/certification marks, copyright and rights-reserved footers, short "Est. 1998" taglines; a company name that merely contains a founding year is kept). A social page is never taken as the website. What is left of each line is tested in this order, and the first rule that claims it wins:
 
 1. **Email** (regex).
 2. **Website** (`http(s)://` or `www.`).
@@ -204,9 +204,12 @@ Implemented limits:
 - Address rules favour Indian and Gulf formats (PIN codes, UAE phone normalisation, city lists).
 - Only the first page of each image is read; only two images (front and back) are accepted.
 - Keyword and place lists exist in both Dart and C#.
+- Google ML Kit's Flutter package offers no Arabic model (only Latin, Chinese, Devanagari, Japanese, Korean), so offline Arabic reading is not possible with it. The phone now says so when it reads nothing offline.
 
 Suggestions (not implemented):
 - Add a device test and an endpoint test for the front/back flow.
+- Local QR / vCard reading before OCR (needs a new barcode package and native setup).
+- Move multi-pass OCR to a background queue if traffic grows.
 - Share the classifier word lists from one source to stop the two copies drifting.
 - Add an Arabic-capable offline option, or tell the person clearly when offline Arabic is unsupported.
 - Add vCard/QR detection for cards that carry one.

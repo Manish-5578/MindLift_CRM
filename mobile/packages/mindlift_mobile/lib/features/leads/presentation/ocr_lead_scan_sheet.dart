@@ -100,9 +100,9 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
     try {
       final photo = await _picker.pickImage(
         source: ImageSource.camera,
-        maxWidth: 3200,
-        maxHeight: 3200,
-        imageQuality: 98,
+        maxWidth: 1800,
+        maxHeight: 1800,
+        imageQuality: 85,
       );
       if (photo != null) {
         final bytes = await photo.readAsBytes();
@@ -117,9 +117,9 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
     try {
       final photo = await _picker.pickImage(
         source: ImageSource.gallery,
-        maxWidth: 3200,
-        maxHeight: 3200,
-        imageQuality: 98,
+        maxWidth: 1800,
+        maxHeight: 1800,
+        imageQuality: 85,
       );
       if (photo != null) {
         final bytes = await photo.readAsBytes();
@@ -233,7 +233,7 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
       } else if (mounted) {
         MlToast.show(
           context,
-          message: 'No readable text could be recognized from the card. Ensure adequate lighting and clear text.',
+          message: 'No readable text could be recognized offline. The phone can only read Latin letters without a connection; for an Arabic card, connect and scan again.',
           type: MlToastType.info,
         );
       }
@@ -331,10 +331,32 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
       return;
     }
 
-    final emailMatch = RegExp(r'[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}').firstMatch(trimmed);
+    final emailRegex = RegExp(r'[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}');
+    final webRegex = RegExp(r'(https?:\/\/[^\s]+|www\.[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}[^\s]*)', caseSensitive: false);
+    final leadingLabel = RegExp(r'^\s*(e-?mail|mail|web(site)?|url|e|w)\s*[:\-–]\s*', caseSensitive: false);
+    final trailingLabel = RegExp(r'\s*(e-?mail|mail|web(site)?|url|e|w)\s*[:\-–]\s*$', caseSensitive: false);
     final phoneMatch = RegExp(r'(?:\+?\d{1,4}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{3,4}|\+?\d{8,15}');
 
-    final lines = trimmed.split(RegExp(r'\r?\n')).map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+    // Several details can share one line ("info@x.com | +971 50 123 4567 | www.x.com"): the email and website are lifted out of each piece
+    // first, and what is left is classified on its own, so one detail never hides another.
+    String? email;
+    final lines = <String>[];
+    for (final raw in trimmed.split(RegExp(r'\r?\n'))) {
+      for (final piece in raw.split(RegExp(r'[|•·▪■◦►]'))) {
+        var text = piece.trim();
+        final mail = emailRegex.firstMatch(text);
+        if (mail != null) {
+          email ??= mail.group(0);
+          text = text.replaceAll(emailRegex, '');
+        }
+        text = text.replaceAll(webRegex, '');
+        text = text.replaceFirst(leadingLabel, '').replaceFirst(trailingLabel, '').trim();
+        if (text.runes.where((r) => RegExp(r'[\p{L}\p{N}]', unicode: true).hasMatch(String.fromCharCode(r))).length >= 2) {
+          lines.add(text);
+        }
+      }
+    }
+
     String? company;
     String? name;
     String? title;
@@ -357,7 +379,7 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
 
     for (final l in lines) {
       final lower = l.toLowerCase();
-      if (l.contains('@') || lower.startsWith('www.') || lower.startsWith('http')) {
+      if (CardLineClassifier.isNoiseLine(l)) {
         continue;
       }
 
@@ -400,7 +422,7 @@ class _OcrLeadScanSheetState extends ConsumerState<OcrLeadScanSheet> {
     setState(() {
       _companyController.text = company ?? '';
       _nameController.text = name ?? '';
-      _emailController.text = emailMatch?.group(0) ?? '';
+      _emailController.text = email ?? '';
       _phoneController.text = phone ?? '';
       _titleController.text = title ?? '';
       _addressController.text = addressParts.join(', ');

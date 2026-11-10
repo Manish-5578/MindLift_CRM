@@ -248,8 +248,17 @@ public sealed class LeadCardOcrService(
         var remainingLines = new List<string>();
         var nameFromEmail = false;
 
+        // Cards often put several details on one line ("info@x.com | +971 50 123 4567 | www.x.com"). The email and website are lifted out of each
+        // piece first, and whatever is left is classified on its own, so one detail never hides another.
+        lines = lines.SelectMany(l => SplitLine(l, ref email, ref website)).ToList();
+
         foreach (var line in lines)
         {
+            if (CardLineClassifier.IsNoiseLine(line))
+            {
+                continue;
+            }
+
             var matchEmail = EmailRegex.Match(line);
             if (matchEmail.Success && email == null)
             {
@@ -397,6 +406,50 @@ public sealed class LeadCardOcrService(
             Evidence: evidence,
             AddressConfidence: addressConf
         );
+    }
+
+    private static readonly char[] LineSeparators = ['|', '•', '·', '▪', '■', '◦', '►'];
+
+    private static readonly Regex LeadingLabel = new(@"^\s*(e-?mail|mail|web(site)?|url|e|w)\s*[:\-–]\s*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex TrailingLabel = new(@"\s*(e-?mail|mail|web(site)?|url|e|w)\s*[:\-–]\s*$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Cuts a card line at its separators, takes the first email and the first own-site web address out of each piece (setting
+    /// <paramref name="email"/> and <paramref name="website"/> when still empty) and returns what is left of each piece.
+    /// Social media pages are dropped, not kept as the website.
+    /// </summary>
+    private static IEnumerable<string> SplitLine(string line, ref string? email, ref string? website)
+    {
+        var result = new List<string>();
+        foreach (var piece in line.Split(LineSeparators, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var text = piece.Trim();
+
+            foreach (Match m in EmailRegex.Matches(text).Reverse())
+            {
+                email ??= m.Value;
+                text = text.Remove(m.Index, m.Length);
+            }
+
+            foreach (Match m in WebRegex.Matches(text).Reverse())
+            {
+                if (website == null && !CardLineClassifier.IsSocialSite(m.Value))
+                {
+                    website = m.Value;
+                }
+
+                text = text.Remove(m.Index, m.Length);
+            }
+
+            text = LeadingLabel.Replace(text, string.Empty);
+            text = TrailingLabel.Replace(text, string.Empty).Trim(' ', ',', ';', '-', '–', ':');
+            if (text.Count(char.IsLetterOrDigit) >= 2)
+            {
+                result.Add(text);
+            }
+        }
+
+        return result;
     }
 
     private async Task<LeadDuplicateCandidateDto?> FindDuplicateInCrmAsync(

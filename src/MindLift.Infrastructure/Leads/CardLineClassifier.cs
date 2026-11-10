@@ -53,6 +53,31 @@ public static partial class CardLineClassifier
     [GeneratedRegex(@"\d")]
     private static partial Regex AnyDigit();
 
+    [GeneratedRegex(@"(?i)(^|[\s(])@[a-z0-9_.]{2,}\b|\b(linkedin|facebook|instagram|twitter|tiktok|youtube|snapchat)\b|\b(wa\.me|t\.me)\b|\bx\.com/|\biso\s?\d{3,5}(:\d{4})?\b|\ball rights reserved\b|©|\bcopyright\b|\bterms (and|&) conditions\b")]
+    private static partial Regex NoisePattern();
+
+    [GeneratedRegex(@"(?i)\b(est\.?|established)\s*(in\s*)?(19|20)\d{2}\b|\bsince\s+(19|20)\d{2}\b")]
+    private static partial Regex FoundedTagline();
+
+    [GeneratedRegex(@"(?i)^(https?://)?(www\.)?(linkedin|facebook|instagram|twitter|tiktok|youtube|snapchat)\.|^(https?://)?(www\.)?(wa\.me|t\.me|x\.com)")]
+    private static partial Regex SocialSite();
+
+    /// <summary>
+    /// True for a line that is not contact data at all: a social media handle or page, a certification mark (ISO 9001), a copyright or legal footer,
+    /// or an "Est. 1998" tagline. Such a line is dropped so it can never become the contact person or the company.
+    /// </summary>
+    public static bool IsNoiseLine(string line)
+    {
+        if (string.IsNullOrWhiteSpace(line)) return false;
+        if (NoisePattern().IsMatch(line)) return true;
+
+        // "Est. 1998" on its own is a tagline; inside a company name ("Dubai Gold Trading Est. 1998") the line is kept.
+        return FoundedTagline().IsMatch(line) && line.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length <= 4;
+    }
+
+    /// <summary>True when the web address is a social media page rather than the company's own site.</summary>
+    public static bool IsSocialSite(string site) => SocialSite().IsMatch(site.Trim());
+
     /// <summary>Splits "Label: value" at the first colon. Returns false when the line has no short label before a colon.</summary>
     public static bool TrySplitLabel(string line, out string label, out string value)
     {

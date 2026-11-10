@@ -28,6 +28,27 @@ class CardLineClassifier {
   };
   static final pinRegex = RegExp(r'(?<![\d+])[1-9]\d{2}\s?\d{3}(?!\d)');
 
+  static final _noise = RegExp(
+    r'(^|[\s(])@[a-z0-9_.]{2,}\b|\b(linkedin|facebook|instagram|twitter|tiktok|youtube|snapchat)\b|\b(wa\.me|t\.me)\b|\bx\.com/|\biso\s?\d{3,5}(:\d{4})?\b|\ball rights reserved\b|©|\bcopyright\b|\bterms (and|&) conditions\b',
+    caseSensitive: false,
+  );
+  static final _founded = RegExp(r'\b(est\.?|established)\s*(in\s*)?(19|20)\d{2}\b|\bsince\s+(19|20)\d{2}\b', caseSensitive: false);
+  static final _socialSite = RegExp(
+    r'^(https?://)?(www\.)?(linkedin|facebook|instagram|twitter|tiktok|youtube|snapchat)\.|^(https?://)?(www\.)?(wa\.me|t\.me|x\.com)',
+    caseSensitive: false,
+  );
+
+  /// True for a line that is not contact data: a social handle or page, a certification mark (ISO 9001), a copyright footer or an "Est. 1998" tagline.
+  /// Mirrors the server's CardLineClassifier.IsNoiseLine.
+  static bool isNoiseLine(String line) {
+    if (line.trim().isEmpty) return false;
+    if (_noise.hasMatch(line)) return true;
+    return _founded.hasMatch(line) && line.split(' ').where((w) => w.isNotEmpty).length <= 4;
+  }
+
+  /// True when the web address is a social media page rather than the company's own site.
+  static bool isSocialSite(String site) => _socialSite.hasMatch(site.trim());
+
   static bool looksLikePhoneLine(String line) {
     final colon = line.indexOf(':');
     if (colon > 0 && colon <= 24 && otherLabels.contains(line.substring(0, colon).trim().toLowerCase())) return true;
