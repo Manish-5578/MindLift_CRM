@@ -43,7 +43,7 @@
 
         @if (_loading)
         {
-            <div style="padding:16px"><SkeletonTable Rows="6" Columns="5" /></div>
+            <div style="padding:16px"><SkeletonTable Rows="6" Columns="6" /></div>
         }
         else if (_page is null)
         {
@@ -55,13 +55,23 @@
         }
         else
         {
+            @if (_selected.Count > 0)
+            {
+                <div class="ml-row ml-row--wrap" style="padding:10px 16px;border-bottom:1px solid var(--ml-border)" data-testid="bulk-bar">
+                    <MudText Typo="Typo.subtitle2" data-testid="bulk-count">@T["{0} selected", _selected.Count.ToString("N0")]</MudText>
+                    <ListBulkBar Selection="CurrentSelection()" Entity="tickets" ItemLabel="tickets" Users="_users" Statuses="BulkStatuses"
+                                 CanEdit="App.CanEdit(AppModule.Tickets)" CanDelete="App.CanDelete(AppModule.Tickets)" CanExport="false" />
+                    <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="ClearSelectionAsync" data-testid="bulk-clear">@T["Clear"]</MudButton>
+                </div>
+            }
             <MudSimpleTable Hover="true" Dense="false" Style="background:transparent">
-                <thead><tr><th>@T["Ticket"]</th><th>@T["Customer"]</th><th>@T["Priority"]</th><th>@T["Status"]</th><th>@T["Assigned to"]</th><th>@T["Answer due"]</th></tr></thead>
+                <thead><tr><th style="width:44px"><MudCheckBox T="bool" Value="AllOnPageSelected" ValueChanged="TogglePage" Size="Size.Small" Dense="true" aria-label="@T["Select all on this page"]" data-testid="select-page" /></th><th>@T["Ticket"]</th><th>@T["Customer"]</th><th>@T["Priority"]</th><th>@T["Status"]</th><th>@T["Assigned to"]</th><th>@T["Answer due"]</th></tr></thead>
                 <tbody>
                     @foreach (var t in _page.Items)
                     {
                         var ticket = t;
-                        <tr style="cursor:pointer" @onclick="@(() => Nav.NavigateTo($"/tickets/{ticket.Id}"))" data-testid="ticket-row">
+                        <tr style="cursor:pointer" class="@(_selected.Contains(ticket.Id) ? "ml-row-selected" : null)" @onclick="@(() => Nav.NavigateTo($"/tickets/{ticket.Id}"))" data-testid="ticket-row">
+                            <td @onclick:stopPropagation="true"><MudCheckBox T="bool" Value="_selected.Contains(ticket.Id)" ValueChanged="v => ToggleRow(ticket.Id, v)" Size="Size.Small" Dense="true" aria-label="@T["Select row"]" data-testid="select-row" /></td>
                             <td><b>@ticket.Number</b> <span style="margin-inline-start:6px">@ticket.Subject</span></td>
                             <td>@(ticket.ContactName ?? ticket.AccountName ?? "-")</td>
                             <td><MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="@PriorityColor(ticket.Priority)">@T[ticket.Priority]</MudChip></td>
@@ -140,9 +150,9 @@
         finally { _loading = false; }
     }
 
-    private async Task Filter(string key) { _filter = key ?? "all"; _pageNo = 1; await LoadAsync(); }
-    private async Task Reload() { _pageNo = 1; await LoadAsync(); }
-    private async Task GoAsync(int page) { _pageNo = page; await LoadAsync(); }
+    private async Task Filter(string key) { _filter = key ?? "all"; _pageNo = 1; _selected.Clear(); await LoadAsync(); }
+    private async Task Reload() { _pageNo = 1; _selected.Clear(); await LoadAsync(); }
+    private async Task GoAsync(int page) { _pageNo = page; _selected.Clear(); await LoadAsync(); }
 
     private void OpenNew() { _subject = _description = _error = _contactName = null; _priority = "normal"; _contactId = _assigneeId = null; _open = true; }
 
@@ -159,6 +169,27 @@
         }
         finally { _busy = false; }
     }
+
+    // ---- bulk selection
+
+    private readonly HashSet<Guid> _selected = [];
+
+    private static readonly IReadOnlyList<PicklistValueDto> BulkStatuses = TicketStatuses.All
+        .Select((v, i) => new PicklistValueDto(Guid.Empty, v, char.ToUpperInvariant(v[0]) + v[1..], null, null, null, i, false, true, true)).ToList();
+
+    private bool AllOnPageSelected => _page is { Items.Count: > 0 } && _page.Items.All(t => _selected.Contains(t.Id));
+
+    private BulkSelection CurrentSelection() => new(_selected.ToList(), null, _selected.Count, ClearSelectionAsync);
+
+    private void ToggleRow(Guid id, bool on) { if (on) _selected.Add(id); else _selected.Remove(id); }
+
+    private void TogglePage(bool on)
+    {
+        foreach (var t in _page?.Items ?? []) { if (on) _selected.Add(t.Id); else _selected.Remove(t.Id); }
+    }
+
+    // Called by the bulk bar as a plain delegate, so the page redraws itself.
+    private async Task ClearSelectionAsync() { _selected.Clear(); await LoadAsync(); await InvokeAsync(StateHasChanged); }
 
     private static Color PriorityColor(string p) => p switch { "urgent" => Color.Error, "high" => Color.Warning, "low" => Color.Default, _ => Color.Info };
 }

@@ -92,6 +92,9 @@ public sealed class AppState(HttpClient http, AuthSession session, Translator tr
     /// <summary>True when the module is enabled and the user may change records in it.</summary>
     public bool CanEdit(AppModule module) => CanView(module) && Permission(module)?.CanEdit == true;
 
+    /// <summary>True when the module is enabled and the user may delete records in it.</summary>
+    public bool CanDelete(AppModule module) => CanView(module) && Permission(module)?.CanDelete == true;
+
     private ModulePermissionDto? Permission(AppModule module) => Bootstrap?.Permissions.FirstOrDefault(p => p.Module == module.ToString());
 
     public string ModuleLabel(AppModule module, bool plural = true)

@@ -109,6 +109,39 @@ public sealed class NewScreensE2ETests(E2EHost host)
     }
 
     [E2EFact]
+    public async Task Tickets_are_ticked_and_resolved_or_deleted_together_from_the_list()
+    {
+        var (page, _, api) = await CompanyAsync();
+        foreach (var subject in new[] { "Bulk one", "Bulk two", "Bulk three" })
+        {
+            (await api.PostAsJsonAsync("/api/v1/tickets", new SaveTicketRequest(subject, "Details", null, null, null, null, null))).EnsureSuccessStatusCode();
+        }
+
+        await page.GotoAsync("/tickets");
+        await Expect(page.Locator("[data-testid=ticket-row]")).ToHaveCountAsync(3);
+        await Expect(page.Locator("[data-testid=bulk-bar]")).ToHaveCountAsync(0);
+
+        await page.Locator("[data-testid=select-row]").Nth(0).ClickAsync();
+        await page.Locator("[data-testid=select-row]").Nth(1).ClickAsync();
+        await Expect(page.Locator("[data-testid=bulk-count]")).ToContainTextAsync("2 selected");
+
+        await page.Locator("[data-testid=bulk-status]").ClickAsync();
+        await page.Locator("[data-testid=bulk-status-resolved]").ClickAsync();
+        await Expect(page.GetByText("Changed the status of 2 tickets")).ToBeVisibleAsync();
+        await Expect(page.Locator("[data-testid=ticket-row]")).ToHaveCountAsync(1);
+        await Expect(page.Locator("[data-testid=bulk-bar]")).ToHaveCountAsync(0);
+
+        await page.Locator("[data-testid=select-page]").ClickAsync();
+        await page.Locator("[data-testid=bulk-delete]").ClickAsync();
+        await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Yes" }).ClickAsync();
+        await Expect(page.GetByText("Deleted 1 tickets")).ToBeVisibleAsync();
+        await Expect(page.Locator("[data-testid=ticket-row]")).ToHaveCountAsync(0);
+
+        await page.Locator("[data-testid=tf-resolved]").ClickAsync();
+        await Expect(page.Locator("[data-testid=ticket-row]")).ToHaveCountAsync(2);
+    }
+
+    [E2EFact]
     public async Task A_campaign_is_written_sent_and_its_results_appear()
     {
         var (page, _, api) = await CompanyAsync();

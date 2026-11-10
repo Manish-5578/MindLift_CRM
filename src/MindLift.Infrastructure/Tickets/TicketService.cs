@@ -217,6 +217,89 @@ public sealed class TicketService(
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Assign or change the status of many tickets at once (the list's bulk bar). Each ticket goes through the same checks as on its own page;
+    /// one that cannot be changed is reported and the rest still go ahead.
+    /// </summary>
+    public async Task<BulkActionResult> BulkAsync(BulkActionRequest request, CancellationToken cancellationToken = default)
+    {
+        var ids = BulkIds(request.Ids);
+        if (request.Action != BulkActions.Assign && request.Action != BulkActions.ChangeStatus)
+        {
+            throw new ValidationException("action", "Tickets can be assigned or have their status changed in bulk.");
+        }
+
+        if (request.Action == BulkActions.ChangeStatus && !TicketStatuses.All.Contains((request.Status ?? string.Empty).Trim().ToLowerInvariant()))
+        {
+            throw new ValidationException("status", "Choose open, pending, resolved or closed.");
+        }
+
+        var failures = new List<BulkFailure>();
+        var done = 0;
+        foreach (var id in ids)
+        {
+            try
+            {
+                if (request.Action == BulkActions.Assign)
+                {
+                    await AssignAsync(id, new AssignTicketRequest(request.OwnerId), cancellationToken);
+                }
+                else
+                {
+                    await ChangeStatusAsync(id, new ChangeTicketStatusRequest(request.Status!), cancellationToken);
+                }
+
+                done++;
+            }
+            catch (Exception ex) when (ex is NotFoundException or ValidationException)
+            {
+                failures.Add(new BulkFailure(id, await NumberOfAsync(id, cancellationToken), ex is NotFoundException ? "Ticket not found." : ex.Message));
+            }
+        }
+
+        return new BulkActionResult(ids.Count, done, failures);
+    }
+
+    public async Task<BulkActionResult> BulkDeleteAsync(BulkDeleteRequest request, CancellationToken cancellationToken = default)
+    {
+        var ids = BulkIds(request.Ids);
+        var failures = new List<BulkFailure>();
+        var done = 0;
+        foreach (var id in ids)
+        {
+            try
+            {
+                await DeleteAsync(id, cancellationToken);
+                done++;
+            }
+            catch (NotFoundException)
+            {
+                failures.Add(new BulkFailure(id, null, "Ticket not found."));
+            }
+        }
+
+        return new BulkActionResult(ids.Count, done, failures);
+    }
+
+    private static List<Guid> BulkIds(IReadOnlyList<Guid>? ids)
+    {
+        var list = (ids ?? []).Distinct().ToList();
+        if (list.Count == 0)
+        {
+            throw new ValidationException("ids", "Choose at least one ticket.");
+        }
+
+        if (list.Count > BulkActions.MaxRecords)
+        {
+            throw new ValidationException("ids", $"Choose at most {BulkActions.MaxRecords} tickets at a time.");
+        }
+
+        return list;
+    }
+
+    private async Task<string?> NumberOfAsync(Guid id, CancellationToken cancellationToken)
+        => await db.Tickets.AsNoTracking().Where(t => t.Id == id).Select(t => t.Number).FirstOrDefaultAsync(cancellationToken);
+
     // ------------------------------------------------------------------ helpers
 
     private async Task<Ticket> LoadScopedAsync(Guid id, CancellationToken cancellationToken)

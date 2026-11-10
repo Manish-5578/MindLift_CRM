@@ -48,6 +48,17 @@ public sealed class TicketsController(TicketService tickets) : ControllerBase
     public async Task<ActionResult<TicketDto>> Comment(Guid id, [FromBody] AddTicketCommentRequest request, CancellationToken cancellationToken)
         => Ok(await tickets.AddCommentAsync(id, request, cancellationToken));
 
+    /// <summary>Assign or change the status of many tickets at once (the list's bulk bar).</summary>
+    [HasPermission(AppModule.Tickets, PermissionAction.Edit)]
+    [HttpPost("bulk")]
+    public async Task<ActionResult<BulkActionResult>> Bulk([FromBody] BulkActionRequest request, CancellationToken cancellationToken)
+        => Ok(await tickets.BulkAsync(request, cancellationToken));
+
+    [HasPermission(AppModule.Tickets, PermissionAction.Delete)]
+    [HttpPost("bulk-delete")]
+    public async Task<ActionResult<BulkActionResult>> BulkDelete([FromBody] BulkDeleteRequest request, CancellationToken cancellationToken)
+        => Ok(await tickets.BulkDeleteAsync(request, cancellationToken));
+
     [HasPermission(AppModule.Tickets, PermissionAction.Delete)]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
