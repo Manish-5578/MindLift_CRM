@@ -20,3 +20,9 @@ The owner adds new rules by telling Claude; append them below with the next numb
 ## Standing working patterns
 - Commit and push after each task.
 - Log work in Notion: tasks in Mindlift Track, defects and security findings in Mindlift CRM Issues (see AGENTS.md).
+
+## 3. Every feature is wired end to end and tested before it counts as done (added 2026-11-10)
+- A feature is finished only when everything it touches is connected: UI, API endpoint, permissions, data model/migration, navigation and menus, Arabic strings, help text, and any mobile or related-page impact.
+- Each feature gets automated tests (API, component and, where it fits, end-to-end) that pass before the commit.
+- Check the related existing files for places the feature must plug in, and say what was wired in the summary.
+- Applies to every feature, one at a time: build, wire, test, commit and push, log in Notion, then start the next.

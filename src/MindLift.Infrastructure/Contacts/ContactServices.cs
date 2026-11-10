@@ -1040,7 +1040,7 @@ public sealed class AccountService(AppDbContext db, ITenantContext tenant, ICloc
         => await (await ScopedAsync(cancellationToken)).FirstOrDefaultAsync(a => a.Id == id, cancellationToken) ?? throw new NotFoundException("Account", id);
 }
 
-/// <summary>Searches contacts, accounts and leads for the box at the top of every page.</summary>
+/// <summary>Searches contacts, accounts, leads, deals and tickets for the box at the top of every page.</summary>
 public sealed class GlobalSearchService(AppDbContext db, IDataScopeService scope)
 {
     public async Task<IReadOnlyList<SearchHitDto>> SearchAsync(string? term, CancellationToken cancellationToken = default)
@@ -1078,6 +1078,24 @@ public sealed class GlobalSearchService(AppDbContext db, IDataScopeService scope
             if (leadScope is not null) leads = leads.Where(l => leadScope.Contains(l.OwnerId));
             hits.AddRange((await leads.Where(l => (l.FirstName + " " + l.LastName).ToLower().Contains(text) || (l.Email != null && l.Email.ToLower().Contains(text)) || (l.CompanyName != null && l.CompanyName.ToLower().Contains(text)))
                 .OrderBy(l => l.FirstName).Take(5).ToListAsync(cancellationToken)).Select(l => new SearchHitDto("lead", l.Id, $"{l.FirstName} {l.LastName}".Trim(), l.Email ?? l.CompanyName)));
+        }
+
+        var dealScope = await scope.GetScopeUserIdsAsync(AppModule.Deals, cancellationToken);
+        if (dealScope is not { Count: 0 })
+        {
+            var deals = db.Deals.AsNoTracking().AsQueryable();
+            if (dealScope is not null) deals = deals.Where(d => dealScope.Contains(d.OwnerId));
+            hits.AddRange((await deals.Where(d => d.Name.ToLower().Contains(text)).OrderBy(d => d.Name).Take(5).ToListAsync(cancellationToken))
+                .Select(d => new SearchHitDto("deal", d.Id, d.Name, $"{d.Status} · {d.Amount:N0} {d.Currency}")));
+        }
+
+        var ticketScope = await scope.GetScopeUserIdsAsync(AppModule.Tickets, cancellationToken);
+        if (ticketScope is not { Count: 0 })
+        {
+            var tickets = db.Tickets.AsNoTracking().AsQueryable();
+            if (ticketScope is not null) tickets = tickets.Where(t => t.AssigneeId != null && ticketScope.Contains(t.AssigneeId.Value));
+            hits.AddRange((await tickets.Where(t => t.Number.ToLower().Contains(text) || t.Subject.ToLower().Contains(text)).OrderByDescending(t => t.LastActivityAt).Take(5).ToListAsync(cancellationToken))
+                .Select(t => new SearchHitDto("ticket", t.Id, $"{t.Number} {t.Subject}".Trim(), t.Status)));
         }
 
         return hits;

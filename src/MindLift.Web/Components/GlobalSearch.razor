@@ -3,8 +3,8 @@
 @inject Translator T
 
 <MudAutocomplete T="SearchHitDto" Value="_selected" ValueChanged="OnPickedAsync" SearchFunc="SearchAsync" ToStringFunc="hit => hit?.Title"
-                 Placeholder="@T["Search records"]" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.Search"
-                 Variant="Variant.Outlined" Margin="Margin.Dense" Class="ml-hide-xs mr-2" Style="max-width:320px" Clearable="true"
+                 Placeholder="@T["Search records (Ctrl+K)"]" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.Search"
+                 Variant="Variant.Outlined" Margin="Margin.Dense" Class="ml-hide-xs mr-2 ml-global-search" Style="max-width:320px" Clearable="true"
                  CoerceText="false" ResetValueOnEmptyText="true" MinCharacters="2" DebounceInterval="250" MaxItems="15"
                  data-testid="global-search">
     <ItemTemplate Context="hit">
@@ -17,7 +17,7 @@
                     <MudText Typo="Typo.caption" Class="ml-muted ml-truncate">@hit.Subtitle</MudText>
                 }
             </div>
-            <span class="ml-faint">@KindLabel(hit.Kind)</span>
+            <span class="ml-faint">@T[KindLabel(hit.Kind)]</span>
         </div>
     </ItemTemplate>
     <NoItemsTemplate>
@@ -49,7 +49,7 @@
     {
         if (hit is not null)
         {
-            Nav.NavigateTo(hit.Kind switch { "contact" => "/contacts/", "account" => "/accounts/", _ => "/leads/" } + hit.Id);
+            Nav.NavigateTo(hit.Kind switch { "contact" => "/contacts/", "account" => "/accounts/", "deal" => "/deals/", "ticket" => "/tickets/", _ => "/leads/" } + hit.Id);
         }
 
         _selected = null;
@@ -60,8 +60,10 @@
     {
         "contact" => Icons.Material.Outlined.Contacts,
         "account" => Icons.Material.Outlined.Business,
+        "deal" => Icons.Material.Outlined.Handshake,
+        "ticket" => Icons.Material.Outlined.ConfirmationNumber,
         _ => Icons.Material.Outlined.PersonSearch,
     };
 
-    private static string KindLabel(string kind) => kind switch { "contact" => "Contact", "account" => "Account", _ => "Lead" };
+    private static string KindLabel(string kind) => kind switch { "contact" => "Contact", "account" => "Account", "deal" => "Deal", "ticket" => "Ticket", _ => "Lead" };
 }
